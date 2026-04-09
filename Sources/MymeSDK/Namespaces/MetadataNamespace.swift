@@ -1,0 +1,48 @@
+import Foundation
+
+/// Metadata API namespace. Manages tags, about references, and metadata operations.
+public struct MetadataNamespace: Sendable {
+
+    let transport: any Transport
+
+    /// Gets metadata for an item.
+    public func get(itemId: String) async throws -> Metadata {
+        let response: MetadataResponse = try await transport.request(
+            method: .get, path: "/items/\(itemId)/metadata", body: nil, query: nil
+        )
+        return response.metadata
+    }
+
+    /// Replaces all metadata for an item.
+    public func set(itemId: String, input: MetadataInput) async throws -> Metadata {
+        let response: MetadataResponse = try await transport.request(
+            method: .put, path: "/items/\(itemId)/metadata", body: input, query: nil
+        )
+        return response.metadata
+    }
+
+    /// Merges metadata with existing values (set union for tags and about).
+    public func merge(itemId: String, input: MetadataInput) async throws -> Metadata {
+        let response: MetadataResponse = try await transport.request(
+            method: .patch, path: "/items/\(itemId)/metadata", body: input, query: nil
+        )
+        return response.metadata
+    }
+
+    /// Adds tags to an item.
+    public func addTags(itemId: String, tags: [String]) async throws -> Metadata {
+        let response: MetadataResponse = try await transport.request(
+            method: .post, path: "/items/\(itemId)/tags",
+            body: AddTagsBody(tags: tags), query: nil
+        )
+        return response.metadata
+    }
+
+    /// Removes a single tag from an item.
+    public func removeTag(itemId: String, tag: String) async throws {
+        let encoded = tag.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? tag
+        let _: EmptyResponse = try await transport.request(
+            method: .delete, path: "/items/\(itemId)/tags/\(encoded)", body: nil, query: nil
+        )
+    }
+}

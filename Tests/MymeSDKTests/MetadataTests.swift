@@ -1,0 +1,77 @@
+import Testing
+import Foundation
+@testable import MymeSDK
+
+@Suite("MetadataNamespace")
+struct MetadataTests {
+
+    func makeClient() -> (MymeClient, MockTransport) {
+        let mock = MockTransport()
+        let config = ClientConfiguration(url: URL(string: "http://test")!, apiKey: "test-key")
+        let client = MymeClient(configuration: config, transport: mock)
+        return (client, mock)
+    }
+
+    func sampleMetadata() -> MetadataResponse {
+        MetadataResponse(metadata: Metadata(
+            itemId: "item-1",
+            tags: ["work", "dev"],
+            about: [],
+            extensions: [:]
+        ))
+    }
+
+    @Test("Get metadata sends GET /items/:id/metadata")
+    func getMetadata() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(sampleMetadata())
+
+        let meta = try await client.metadata.get(itemId: "item-1")
+
+        #expect(meta.tags == ["work", "dev"])
+        #expect(mock.calls[0].method == .get)
+        #expect(mock.calls[0].path == "/items/item-1/metadata")
+    }
+
+    @Test("Add tags sends POST /items/:id/tags")
+    func addTags() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(MetadataResponse(metadata: Metadata(
+            itemId: "item-1",
+            tags: ["work", "dev", "new-tag"],
+            about: [],
+            extensions: [:]
+        )))
+
+        let meta = try await client.metadata.addTags(itemId: "item-1", tags: ["new-tag"])
+
+        #expect(meta.tags.contains("new-tag"))
+        #expect(mock.calls[0].method == .post)
+        #expect(mock.calls[0].path == "/items/item-1/tags")
+    }
+
+    @Test("Remove tag sends DELETE /items/:id/tags/:tag")
+    func removeTag() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(EmptyResponse())
+
+        try await client.metadata.removeTag(itemId: "item-1", tag: "work")
+
+        #expect(mock.calls[0].method == .delete)
+        #expect(mock.calls[0].path == "/items/item-1/tags/work")
+    }
+
+    @Test("Set metadata sends PUT /items/:id/metadata")
+    func setMetadata() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(sampleMetadata())
+
+        let meta = try await client.metadata.set(
+            itemId: "item-1",
+            input: MetadataInput(tags: ["work", "dev"])
+        )
+
+        #expect(meta.tags == ["work", "dev"])
+        #expect(mock.calls[0].method == .put)
+    }
+}
