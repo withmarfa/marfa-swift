@@ -141,7 +141,7 @@ final class URLSessionTransport: Transport {
         do {
             return try encoder.encode(body)
         } catch {
-            throw ResponseDecodingError(error)
+            throw MymeError(code: "encoding_error", message: "Failed to encode request body: \(error.localizedDescription)", status: 0)
         }
     }
 

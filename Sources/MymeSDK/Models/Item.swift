@@ -20,6 +20,22 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let captureLatitude: Double?
     public let captureLongitude: Double?
 
+    public init(
+        id: String, type: String, state: ItemState, properties: [String: JSONValue],
+        createdAt: String, updatedAt: String, timestamp: String,
+        source: String? = nil, sourceId: String? = nil, origin: String? = nil,
+        version: Int, schemaVersion: Int? = nil, deviceId: String? = nil,
+        parentId: String? = nil, threadId: String? = nil,
+        captureLatitude: Double? = nil, captureLongitude: Double? = nil
+    ) {
+        self.id = id; self.type = type; self.state = state; self.properties = properties
+        self.createdAt = createdAt; self.updatedAt = updatedAt; self.timestamp = timestamp
+        self.source = source; self.sourceId = sourceId; self.origin = origin
+        self.version = version; self.schemaVersion = schemaVersion; self.deviceId = deviceId
+        self.parentId = parentId; self.threadId = threadId
+        self.captureLatitude = captureLatitude; self.captureLongitude = captureLongitude
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, type, state, properties, version, source, origin, timestamp
         case createdAt = "created_at"
@@ -98,12 +114,12 @@ public struct CreateItemInput: Codable, Sendable {
 }
 
 /// Body for PATCH /items/:id.
-public struct UpdateItemBody: Codable, Sendable {
-    public var properties: [String: JSONValue]
-    public var version: Int?
-    public var parentId: String?
-    public var threadId: String?
-    public var snapshot: Bool?
+struct UpdateItemBody: Codable, Sendable {
+    var properties: [String: JSONValue]
+    var version: Int?
+    var parentId: String?
+    var threadId: String?
+    var snapshot: Bool?
 
     enum CodingKeys: String, CodingKey {
         case properties, version, snapshot

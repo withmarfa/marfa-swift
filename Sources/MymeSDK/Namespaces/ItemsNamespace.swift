@@ -63,7 +63,8 @@ public struct ItemsNamespace: Sendable {
             clientPatch: properties,
             version: version!,
             strategy: strategy,
-            resolver: options?.resolve
+            resolver: options?.resolve,
+            threadId: options?.threadId
         )
     }
 
