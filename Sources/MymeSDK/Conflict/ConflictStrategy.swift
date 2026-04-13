@@ -37,13 +37,17 @@ public struct ConflictSnapshot: Codable, Sendable, Hashable {
 public struct ConflictResponse: Codable, Sendable {
     public let error: ConflictErrorInfo
     public let current: ConflictSnapshot
-    public let ancestor: ConflictSnapshot?
-    // swiftlint:disable:next identifier_name
-    public let conflicting_fields: [String]
+    public let ancestor: ConflictSnapshot
+    public let conflictingFields: [String]
 
     public struct ConflictErrorInfo: Codable, Sendable {
         public let code: String
         public let status: Int?
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case error, current, ancestor
+        case conflictingFields = "conflicting_fields"
     }
 }
 

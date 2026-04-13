@@ -40,8 +40,8 @@ final class URLSessionTransport: Transport {
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 throw ConflictError(
                     current: conflict.current,
-                    ancestor: conflict.ancestor ?? ConflictSnapshot(version: 0, properties: [:]),
-                    conflictingFields: conflict.conflicting_fields,
+                    ancestor: conflict.ancestor,
+                    conflictingFields: conflict.conflictingFields,
                     clientPatch: [:]
                 )
             }

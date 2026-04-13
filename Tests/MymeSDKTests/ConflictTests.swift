@@ -71,4 +71,37 @@ struct ConflictTests {
         #expect(merged["title"] == .string("Server Title"))
         #expect(merged["body"] == .string("Server Body"))
     }
+
+    @Test("ConflictResponse decodes conflicting_fields wire name to conflictingFields")
+    func conflictResponseCamelCaseMapping() throws {
+        let body = #"""
+        {
+            "error": {"code": "version_conflict", "status": 409},
+            "current": {"version": 2, "properties": {"title": "Server"}},
+            "ancestor": {"version": 1, "properties": {"title": "Original"}},
+            "conflicting_fields": ["title"]
+        }
+        """#
+
+        let response = try JSONDecoder().decode(ConflictResponse.self, from: Data(body.utf8))
+
+        #expect(response.conflictingFields == ["title"])
+        #expect(response.current.version == 2)
+        #expect(response.ancestor.version == 1)
+    }
+
+    @Test("ConflictResponse decoding fails when ancestor is absent")
+    func conflictResponseRequiresAncestor() {
+        let body = #"""
+        {
+            "error": {"code": "version_conflict"},
+            "current": {"version": 2, "properties": {}},
+            "conflicting_fields": []
+        }
+        """#
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(ConflictResponse.self, from: Data(body.utf8))
+        }
+    }
 }

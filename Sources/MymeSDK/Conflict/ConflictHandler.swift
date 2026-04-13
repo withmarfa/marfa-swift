@@ -42,8 +42,8 @@ func handleConflictUpdate(
             if case .manual = strategy {
                 throw ConflictError(
                     current: conflictResponse.current,
-                    ancestor: conflictResponse.ancestor ?? ConflictSnapshot(version: 0, properties: [:]),
-                    conflictingFields: conflictResponse.conflicting_fields,
+                    ancestor: conflictResponse.ancestor,
+                    conflictingFields: conflictResponse.conflictingFields,
                     clientPatch: clientPatch
                 )
             }
@@ -52,16 +52,16 @@ func handleConflictUpdate(
             if attempt == maxRetries {
                 throw ConflictError(
                     current: conflictResponse.current,
-                    ancestor: conflictResponse.ancestor ?? ConflictSnapshot(version: 0, properties: [:]),
-                    conflictingFields: conflictResponse.conflicting_fields,
+                    ancestor: conflictResponse.ancestor,
+                    conflictingFields: conflictResponse.conflictingFields,
                     clientPatch: clientPatch
                 )
             }
 
             let conflict = ConflictData(
                 current: conflictResponse.current,
-                ancestor: conflictResponse.ancestor ?? ConflictSnapshot(version: 0, properties: [:]),
-                conflictingFields: conflictResponse.conflicting_fields,
+                ancestor: conflictResponse.ancestor,
+                conflictingFields: conflictResponse.conflictingFields,
                 clientPatch: clientPatch
             )
 
