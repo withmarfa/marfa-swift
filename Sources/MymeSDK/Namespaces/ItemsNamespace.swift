@@ -49,10 +49,11 @@ public struct ItemsNamespace: Sendable {
         properties: [String: JSONValue],
         options: UpdateOptions? = nil
     ) async throws -> Item {
-        var version = options?.version
-        if version == nil {
-            let item = try await get(id: id)
-            version = item.version
+        let resolvedVersion: Int
+        if let v = options?.version {
+            resolvedVersion = v
+        } else {
+            resolvedVersion = try await get(id: id).version
         }
 
         let strategy = options?.conflict ?? defaultConflictStrategy
@@ -61,7 +62,7 @@ public struct ItemsNamespace: Sendable {
             transport: transport,
             itemId: id,
             clientPatch: properties,
-            version: version!,
+            version: resolvedVersion,
             strategy: strategy,
             resolver: options?.resolve,
             threadId: options?.threadId
