@@ -45,11 +45,11 @@ final class URLSessionTransport: Transport {
                     clientPatch: [:]
                 )
             }
-            throw try parseError(data: data, statusCode: 409)
+            throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
         guard (200..<300).contains(response.statusCode) else {
-            throw try parseError(data: data, statusCode: response.statusCode)
+            throw parseMymeError(data: data, statusCode: response.statusCode, decoder: decoder)
         }
 
         if response.statusCode == 204 || data.isEmpty {
@@ -82,11 +82,11 @@ final class URLSessionTransport: Transport {
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 return .conflict(conflict)
             }
-            throw try parseError(data: data, statusCode: 409)
+            throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
         guard (200..<300).contains(response.statusCode) else {
-            throw try parseError(data: data, statusCode: response.statusCode)
+            throw parseMymeError(data: data, statusCode: response.statusCode, decoder: decoder)
         }
 
         do {
@@ -165,26 +165,6 @@ final class URLSessionTransport: Transport {
         return url
     }
 
-    private func parseError(data: Data, statusCode: Int) throws -> MymeError {
-        let message: String
-        let details: [String: JSONValue]?
-
-        if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
-            message = apiError.error.message ?? apiError.error.code
-            details = apiError.error.details
-        } else {
-            message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            details = nil
-        }
-
-        switch statusCode {
-        case 400: return ValidationError(message: message, details: details)
-        case 401: return UnauthorizedError(message: message, details: details)
-        case 403: return ForbiddenError(message: message, details: details)
-        case 404: return NotFoundError(message: message, details: details)
-        default: return MymeError(code: "server_error", message: message, status: statusCode, details: details)
-        }
-    }
 }
 
 // MARK: - Empty Response
