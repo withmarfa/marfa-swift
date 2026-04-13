@@ -21,13 +21,19 @@ public struct ClientConfiguration: Sendable {
     /// Optional CDN base URL for blob retrieval. Falls back to `url` if `nil`.
     public var cdnBaseURL: URL?
 
+    /// When `true`, the transport logs full request and response headers
+    /// and bodies at the `.debug` level with `.private` privacy. Off by
+    /// default; headers and bodies stay redacted in regular logs either way.
+    public var debugLogging: Bool
+
     public init(
         url: URL,
         apiKey: String,
         conflictStrategy: ConflictStrategy = .auto,
         timeoutInterval: TimeInterval = 30,
         resourceTimeout: TimeInterval = 120,
-        cdnBaseURL: URL? = nil
+        cdnBaseURL: URL? = nil,
+        debugLogging: Bool = false
     ) {
         self.url = url
         self.apiKey = apiKey
@@ -35,6 +41,7 @@ public struct ClientConfiguration: Sendable {
         self.timeoutInterval = timeoutInterval
         self.resourceTimeout = resourceTimeout
         self.cdnBaseURL = cdnBaseURL
+        self.debugLogging = debugLogging
     }
 
     /// Creates a configuration from environment variables.

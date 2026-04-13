@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// URLSession-based implementation of the `Transport` protocol.
 final class URLSessionTransport: Transport {
@@ -8,6 +9,8 @@ final class URLSessionTransport: Transport {
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let logger: MymeLogger
+    private let debugLogging: Bool
 
     init(configuration: ClientConfiguration) {
         self.baseURL = configuration.url
@@ -20,6 +23,8 @@ final class URLSessionTransport: Transport {
 
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+        self.logger = MymeLogger(category: "transport")
+        self.debugLogging = configuration.debugLogging
     }
 
     // MARK: - Transport Protocol
@@ -45,6 +50,7 @@ final class URLSessionTransport: Transport {
                     clientPatch: [:]
                 )
             }
+            logger.log.error("409 body failed to decode as ConflictResponse; falling back to generic error")
             throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
@@ -82,6 +88,7 @@ final class URLSessionTransport: Transport {
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 return .conflict(conflict)
             }
+            logger.log.error("409 body failed to decode as ConflictResponse; falling back to generic error")
             throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
@@ -116,19 +123,46 @@ final class URLSessionTransport: Transport {
             request.httpBody = body
         }
 
+        let signpostID = logger.signposter.makeSignpostID()
+        let interval = logger.signposter.beginInterval(
+            "HTTP request",
+            id: signpostID,
+            "\(method.rawValue) \(path)"
+        )
+        defer { logger.signposter.endInterval("HTTP request", interval) }
+
+        logger.log.info("→ \(method.rawValue, privacy: .public) \(path, privacy: .public)")
+        if debugLogging, let body {
+            logger.log.debug(
+                "request body: \(String(data: body, encoding: .utf8) ?? "<binary>", privacy: .private)"
+            )
+        }
+
         let data: Data
         let response: URLResponse
 
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
+            logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public)")
             throw NetworkError(error)
         } catch {
+            logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(String(describing: error), privacy: .public)")
             throw NetworkError(error)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) not-http")
             throw NetworkError(URLError(.badServerResponse))
+        }
+
+        logger.log.info(
+            "← \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public)"
+        )
+        if debugLogging, !data.isEmpty {
+            logger.log.debug(
+                "response body: \(String(data: data, encoding: .utf8) ?? "<binary>", privacy: .private)"
+            )
         }
 
         return (data, httpResponse)
