@@ -18,14 +18,6 @@ public struct Metadata: Codable, Sendable, Hashable {
         self.about = about
         self.extensions = extensions
     }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        itemId = try container.decodeIfPresent(String.self, forKey: .itemId) ?? ""
-        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
-        about = try container.decodeIfPresent([String].self, forKey: .about) ?? []
-        extensions = try container.decodeIfPresent([String: [String: JSONValue]].self, forKey: .extensions) ?? [:]
-    }
 }
 
 /// Input for metadata set/merge operations.
