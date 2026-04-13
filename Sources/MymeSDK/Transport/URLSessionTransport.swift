@@ -234,6 +234,83 @@ final class URLSessionTransport: Transport {
         await rateLimitState.lastRetryAfter
     }
 
+    // MARK: - SSE
+
+    func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let url = try buildURL(path: path, query: query)
+                    var request = URLRequest(url: url)
+                    request.httpMethod = HTTPMethod.get.rawValue
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    if let lastEventID {
+                        request.setValue(lastEventID, forHTTPHeaderField: "Last-Event-ID")
+                    }
+
+                    let sseLogger = MymeLogger(category: "sse")
+                    sseLogger.log.info("→ SSE \(path, privacy: .public)")
+
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw NetworkError(URLError(.badServerResponse))
+                    }
+                    guard (200..<300).contains(httpResponse.statusCode) else {
+                        // Drain the bytes to assemble the error body.
+                        var data = Data()
+                        for try await byte in bytes { data.append(byte) }
+                        throw parseMymeError(data: data, statusCode: httpResponse.statusCode)
+                    }
+
+                    var parser = SSEParser()
+                    var lineBuffer = Data()
+                    for try await byte in bytes {
+                        try Task.checkCancellation()
+                        if byte == 0x0A {  // \n — line terminator
+                            let raw = String(data: lineBuffer, encoding: .utf8) ?? ""
+                            // Strip trailing \r to handle CRLF line endings.
+                            let line = raw.hasSuffix("\r") ? String(raw.dropLast()) : raw
+                            if let event = parser.consume(line: line) {
+                                continuation.yield(event)
+                            }
+                            lineBuffer.removeAll(keepingCapacity: true)
+                        } else {
+                            lineBuffer.append(byte)
+                        }
+                    }
+                    // End of stream: if any bytes remain, treat as a final line;
+                    // then flush with a blank line to dispatch any pending block.
+                    if !lineBuffer.isEmpty {
+                        let raw = String(data: lineBuffer, encoding: .utf8) ?? ""
+                        let line = raw.hasSuffix("\r") ? String(raw.dropLast()) : raw
+                        if let event = parser.consume(line: line) {
+                            continuation.yield(event)
+                        }
+                    }
+                    if let final = parser.consume(line: "") {
+                        continuation.yield(final)
+                    }
+                    sseLogger.log.info("← SSE \(path, privacy: .public) closed")
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch let error as URLError where error.code == .cancelled {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
     // MARK: - Private
 
     private func encodeBody(_ body: (any Encodable & Sendable)?) throws -> Data? {
