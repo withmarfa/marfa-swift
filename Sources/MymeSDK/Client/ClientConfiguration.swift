@@ -41,7 +41,7 @@ public struct ClientConfiguration: Sendable {
     ///
     /// Reads `MYME_API_URL` and `MYME_API_KEY` from the process environment.
     /// Returns `nil` if either is missing or empty.
-    public static var fromEnvironment: ClientConfiguration? {
+    public static func fromEnvironment() -> ClientConfiguration? {
         let env = ProcessInfo.processInfo.environment
         guard let urlString = env["MYME_API_URL"], !urlString.isEmpty,
               let url = URL(string: urlString),

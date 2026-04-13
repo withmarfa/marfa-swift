@@ -45,42 +45,7 @@ public final class MymeClient: Sendable {
 
     // MARK: - Init
 
-    /// Creates a client with the given configuration.
-    public init(configuration: ClientConfiguration) {
-        self.configuration = configuration
-        let transport = URLSessionTransport(configuration: configuration)
-        self.transport = transport
-
-        self.items = ItemsNamespace(
-            transport: transport,
-            defaultConflictStrategy: configuration.conflictStrategy
-        )
-        self.metadata = MetadataNamespace(transport: transport)
-        self.extensions = ExtensionsNamespace(transport: transport)
-        self.threads = ThreadsNamespace(transport: transport)
-        self.blobs = BlobsNamespace(
-            transport: transport,
-            apiBaseURL: configuration.url,
-            cdnBaseURL: configuration.cdnBaseURL
-        )
-        self.types = TypesNamespace(transport: transport)
-        self.keys = KeysNamespace(transport: transport)
-        self.webhooks = WebhooksNamespace(transport: transport)
-    }
-
-    /// Creates a client with a URL and API key using default settings.
-    public convenience init(url: URL, apiKey: String) {
-        self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
-    }
-
-    /// Creates a client from environment variables (`MYME_API_URL`, `MYME_API_KEY`).
-    /// Returns `nil` if the environment variables are not set.
-    public static func fromEnvironment() -> MymeClient? {
-        guard let config = ClientConfiguration.fromEnvironment else { return nil }
-        return MymeClient(configuration: config)
-    }
-
-    /// Creates a client with a custom transport (for testing).
+    /// Designated init — used by every other init path, including tests.
     init(configuration: ClientConfiguration, transport: any Transport) {
         self.configuration = configuration
         self.transport = transport
@@ -100,6 +65,26 @@ public final class MymeClient: Sendable {
         self.types = TypesNamespace(transport: transport)
         self.keys = KeysNamespace(transport: transport)
         self.webhooks = WebhooksNamespace(transport: transport)
+    }
+
+    /// Creates a client with the given configuration.
+    public convenience init(configuration: ClientConfiguration) {
+        self.init(
+            configuration: configuration,
+            transport: URLSessionTransport(configuration: configuration)
+        )
+    }
+
+    /// Creates a client with a URL and API key using default settings.
+    public convenience init(url: URL, apiKey: String) {
+        self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
+    }
+
+    /// Creates a client from environment variables (`MYME_API_URL`, `MYME_API_KEY`).
+    /// Returns `nil` if the environment variables are not set.
+    public static func fromEnvironment() -> MymeClient? {
+        guard let config = ClientConfiguration.fromEnvironment() else { return nil }
+        return MymeClient(configuration: config)
     }
 
     // MARK: - Top-Level Methods
