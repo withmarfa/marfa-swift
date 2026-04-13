@@ -11,20 +11,28 @@ final class URLSessionTransport: Transport {
     private let encoder: JSONEncoder
     private let logger: MymeLogger
     private let debugLogging: Bool
+    private let retryPolicy: RetryPolicy
+    let rateLimitState: RateLimitState
 
-    init(configuration: ClientConfiguration) {
-        self.baseURL = configuration.url
-        self.apiKey = configuration.apiKey
-
+    convenience init(configuration: ClientConfiguration) {
         let urlConfig = URLSessionConfiguration.default
         urlConfig.timeoutIntervalForRequest = configuration.timeoutInterval
         urlConfig.timeoutIntervalForResource = configuration.resourceTimeout
-        self.session = URLSession(configuration: urlConfig)
+        self.init(configuration: configuration, session: URLSession(configuration: urlConfig))
+    }
 
+    /// Internal init for test harnesses — injects a pre-built URLSession
+    /// so tests can route through a `URLProtocol` stub.
+    init(configuration: ClientConfiguration, session: URLSession) {
+        self.baseURL = configuration.url
+        self.apiKey = configuration.apiKey
+        self.session = session
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
         self.logger = MymeLogger(category: "transport")
         self.debugLogging = configuration.debugLogging
+        self.retryPolicy = configuration.retryPolicy
+        self.rateLimitState = RateLimitState()
     }
 
     // MARK: - Transport Protocol
@@ -138,34 +146,92 @@ final class URLSessionTransport: Transport {
             )
         }
 
-        let data: Data
-        let response: URLResponse
+        var lastError: Error?
+        for attempt in 1...retryPolicy.maxAttempts {
+            try Task.checkCancellation()
 
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError {
-            logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public)")
-            throw NetworkError(error)
-        } catch {
-            logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(String(describing: error), privacy: .public)")
-            throw NetworkError(error)
+            if attempt > 1 {
+                let delay = retryPolicy.delay(forAttempt: attempt)
+                let serverDelay = await currentRetryAfterOverride()
+                let effective = retryPolicy.honoursRetryAfter
+                    ? max(delay, serverDelay ?? 0)
+                    : delay
+                if effective > 0 {
+                    try await Task.sleep(for: .seconds(effective))
+                }
+                logger.log.debug(
+                    "retry attempt \(attempt, privacy: .public)/\(self.retryPolicy.maxAttempts, privacy: .public) after \(effective, privacy: .public)s"
+                )
+            }
+
+            do {
+                let (data, response) = try await session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) not-http")
+                    throw NetworkError(URLError(.badServerResponse))
+                }
+
+                await rateLimitState.update(from: httpResponse.allHeaderFields)
+
+                let shouldRetry = attempt < retryPolicy.maxAttempts && retryPolicy.shouldRetry(
+                    method: method,
+                    statusCode: httpResponse.statusCode,
+                    urlError: nil
+                )
+
+                if shouldRetry {
+                    logger.log.info(
+                        "↻ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public) — will retry"
+                    )
+                    continue
+                }
+
+                logger.log.info(
+                    "← \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public)"
+                )
+                if debugLogging, !data.isEmpty {
+                    logger.log.debug(
+                        "response body: \(String(data: data, encoding: .utf8) ?? "<binary>", privacy: .private)"
+                    )
+                }
+                return (data, httpResponse)
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
+            } catch let error as URLError {
+                lastError = error
+                let shouldRetry = attempt < retryPolicy.maxAttempts && retryPolicy.shouldRetry(
+                    method: method,
+                    statusCode: nil,
+                    urlError: error
+                )
+                if shouldRetry {
+                    logger.log.info(
+                        "↻ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public) — will retry"
+                    )
+                    continue
+                }
+                logger.log.error(
+                    "✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public)"
+                )
+                throw NetworkError(error)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                logger.log.error(
+                    "✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(String(describing: error), privacy: .public)"
+                )
+                throw NetworkError(error)
+            }
         }
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) not-http")
-            throw NetworkError(URLError(.badServerResponse))
-        }
+        throw NetworkError(lastError ?? URLError(.unknown))
+    }
 
-        logger.log.info(
-            "← \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public)"
-        )
-        if debugLogging, !data.isEmpty {
-            logger.log.debug(
-                "response body: \(String(data: data, encoding: .utf8) ?? "<binary>", privacy: .private)"
-            )
-        }
-
-        return (data, httpResponse)
+    /// If the most recent `Retry-After` is present, return it as a delay
+    /// override; otherwise `nil`.
+    private func currentRetryAfterOverride() async -> TimeInterval? {
+        await rateLimitState.lastRetryAfter
     }
 
     // MARK: - Private

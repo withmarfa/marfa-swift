@@ -26,6 +26,10 @@ public struct ClientConfiguration: Sendable {
     /// default; headers and bodies stay redacted in regular logs either way.
     public var debugLogging: Bool
 
+    /// Policy controlling retry attempts on transient failures, 429/503,
+    /// and idempotent-method 5xx responses.
+    public var retryPolicy: RetryPolicy
+
     public init(
         url: URL,
         apiKey: String,
@@ -33,7 +37,8 @@ public struct ClientConfiguration: Sendable {
         timeoutInterval: TimeInterval = 30,
         resourceTimeout: TimeInterval = 120,
         cdnBaseURL: URL? = nil,
-        debugLogging: Bool = false
+        debugLogging: Bool = false,
+        retryPolicy: RetryPolicy = .default
     ) {
         self.url = url
         self.apiKey = apiKey
@@ -42,6 +47,7 @@ public struct ClientConfiguration: Sendable {
         self.resourceTimeout = resourceTimeout
         self.cdnBaseURL = cdnBaseURL
         self.debugLogging = debugLogging
+        self.retryPolicy = retryPolicy
     }
 
     /// Creates a configuration from environment variables.
