@@ -15,11 +15,7 @@ public struct BlobsNamespace: Sendable {
         )
 
         guard (200..<300).contains(response.statusCode) else {
-            throw MymeError(
-                code: "upload_failed",
-                message: "Blob upload failed with status \(response.statusCode)",
-                status: response.statusCode
-            )
+            throw parseMymeError(data: responseData, statusCode: response.statusCode)
         }
 
         do {
@@ -38,7 +34,7 @@ public struct BlobsNamespace: Sendable {
         )
 
         guard (200..<300).contains(response.statusCode) else {
-            throw NotFoundError(message: "Blob not found: \(cleanHash)")
+            throw parseMymeError(data: data, statusCode: response.statusCode)
         }
 
         let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"

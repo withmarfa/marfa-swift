@@ -21,13 +21,24 @@ public struct ClientConfiguration: Sendable {
     /// Optional CDN base URL for blob retrieval. Falls back to `url` if `nil`.
     public var cdnBaseURL: URL?
 
+    /// When `true`, the transport logs full request and response headers
+    /// and bodies at the `.debug` level with `.private` privacy. Off by
+    /// default; headers and bodies stay redacted in regular logs either way.
+    public var debugLogging: Bool
+
+    /// Policy controlling retry attempts on transient failures, 429/503,
+    /// and idempotent-method 5xx responses.
+    public var retryPolicy: RetryPolicy
+
     public init(
         url: URL,
         apiKey: String,
         conflictStrategy: ConflictStrategy = .auto,
         timeoutInterval: TimeInterval = 30,
         resourceTimeout: TimeInterval = 120,
-        cdnBaseURL: URL? = nil
+        cdnBaseURL: URL? = nil,
+        debugLogging: Bool = false,
+        retryPolicy: RetryPolicy = .default
     ) {
         self.url = url
         self.apiKey = apiKey
@@ -35,13 +46,15 @@ public struct ClientConfiguration: Sendable {
         self.timeoutInterval = timeoutInterval
         self.resourceTimeout = resourceTimeout
         self.cdnBaseURL = cdnBaseURL
+        self.debugLogging = debugLogging
+        self.retryPolicy = retryPolicy
     }
 
     /// Creates a configuration from environment variables.
     ///
     /// Reads `MYME_API_URL` and `MYME_API_KEY` from the process environment.
     /// Returns `nil` if either is missing or empty.
-    public static var fromEnvironment: ClientConfiguration? {
+    public static func fromEnvironment() -> ClientConfiguration? {
         let env = ProcessInfo.processInfo.environment
         guard let urlString = env["MYME_API_URL"], !urlString.isEmpty,
               let url = URL(string: urlString),

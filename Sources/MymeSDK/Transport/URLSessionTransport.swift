@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// URLSession-based implementation of the `Transport` protocol.
 final class URLSessionTransport: Transport {
@@ -8,18 +9,30 @@ final class URLSessionTransport: Transport {
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
+    private let logger: MymeLogger
+    private let debugLogging: Bool
+    private let retryPolicy: RetryPolicy
+    let rateLimitState: RateLimitState
 
-    init(configuration: ClientConfiguration) {
-        self.baseURL = configuration.url
-        self.apiKey = configuration.apiKey
-
+    convenience init(configuration: ClientConfiguration) {
         let urlConfig = URLSessionConfiguration.default
         urlConfig.timeoutIntervalForRequest = configuration.timeoutInterval
         urlConfig.timeoutIntervalForResource = configuration.resourceTimeout
-        self.session = URLSession(configuration: urlConfig)
+        self.init(configuration: configuration, session: URLSession(configuration: urlConfig))
+    }
 
+    /// Internal init for test harnesses — injects a pre-built URLSession
+    /// so tests can route through a `URLProtocol` stub.
+    init(configuration: ClientConfiguration, session: URLSession) {
+        self.baseURL = configuration.url
+        self.apiKey = configuration.apiKey
+        self.session = session
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
+        self.logger = MymeLogger(category: "transport")
+        self.debugLogging = configuration.debugLogging
+        self.retryPolicy = configuration.retryPolicy
+        self.rateLimitState = RateLimitState()
     }
 
     // MARK: - Transport Protocol
@@ -40,16 +53,17 @@ final class URLSessionTransport: Transport {
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 throw ConflictError(
                     current: conflict.current,
-                    ancestor: conflict.ancestor ?? ConflictSnapshot(version: 0, properties: [:]),
-                    conflictingFields: conflict.conflicting_fields,
+                    ancestor: conflict.ancestor,
+                    conflictingFields: conflict.conflictingFields,
                     clientPatch: [:]
                 )
             }
-            throw try parseError(data: data, statusCode: 409)
+            logger.log.error("409 body failed to decode as ConflictResponse; falling back to generic error")
+            throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
         guard (200..<300).contains(response.statusCode) else {
-            throw try parseError(data: data, statusCode: response.statusCode)
+            throw parseMymeError(data: data, statusCode: response.statusCode, decoder: decoder)
         }
 
         if response.statusCode == 204 || data.isEmpty {
@@ -82,11 +96,12 @@ final class URLSessionTransport: Transport {
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 return .conflict(conflict)
             }
-            throw try parseError(data: data, statusCode: 409)
+            logger.log.error("409 body failed to decode as ConflictResponse; falling back to generic error")
+            throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
         guard (200..<300).contains(response.statusCode) else {
-            throw try parseError(data: data, statusCode: response.statusCode)
+            throw parseMymeError(data: data, statusCode: response.statusCode, decoder: decoder)
         }
 
         do {
@@ -116,22 +131,184 @@ final class URLSessionTransport: Transport {
             request.httpBody = body
         }
 
-        let data: Data
-        let response: URLResponse
+        let signpostID = logger.signposter.makeSignpostID()
+        let interval = logger.signposter.beginInterval(
+            "HTTP request",
+            id: signpostID,
+            "\(method.rawValue) \(path)"
+        )
+        defer { logger.signposter.endInterval("HTTP request", interval) }
 
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError {
-            throw NetworkError(error)
-        } catch {
-            throw NetworkError(error)
+        logger.log.info("→ \(method.rawValue, privacy: .public) \(path, privacy: .public)")
+        if debugLogging, let body {
+            logger.log.debug(
+                "request body: \(String(data: body, encoding: .utf8) ?? "<binary>", privacy: .private)"
+            )
         }
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError(URLError(.badServerResponse))
+        var lastError: Error?
+        for attempt in 1...retryPolicy.maxAttempts {
+            try Task.checkCancellation()
+
+            if attempt > 1 {
+                let delay = retryPolicy.delay(forAttempt: attempt)
+                let serverDelay = await currentRetryAfterOverride()
+                let effective = retryPolicy.honoursRetryAfter
+                    ? max(delay, serverDelay ?? 0)
+                    : delay
+                if effective > 0 {
+                    try await Task.sleep(for: .seconds(effective))
+                }
+                logger.log.debug(
+                    "retry attempt \(attempt, privacy: .public)/\(self.retryPolicy.maxAttempts, privacy: .public) after \(effective, privacy: .public)s"
+                )
+            }
+
+            do {
+                let (data, response) = try await session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) not-http")
+                    throw NetworkError(URLError(.badServerResponse))
+                }
+
+                await rateLimitState.update(from: httpResponse.allHeaderFields)
+
+                let shouldRetry = attempt < retryPolicy.maxAttempts && retryPolicy.shouldRetry(
+                    method: method,
+                    statusCode: httpResponse.statusCode,
+                    urlError: nil
+                )
+
+                if shouldRetry {
+                    logger.log.info(
+                        "↻ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public) — will retry"
+                    )
+                    continue
+                }
+
+                logger.log.info(
+                    "← \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public)"
+                )
+                if debugLogging, !data.isEmpty {
+                    logger.log.debug(
+                        "response body: \(String(data: data, encoding: .utf8) ?? "<binary>", privacy: .private)"
+                    )
+                }
+                return (data, httpResponse)
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
+            } catch let error as URLError {
+                lastError = error
+                let shouldRetry = attempt < retryPolicy.maxAttempts && retryPolicy.shouldRetry(
+                    method: method,
+                    statusCode: nil,
+                    urlError: error
+                )
+                if shouldRetry {
+                    logger.log.info(
+                        "↻ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public) — will retry"
+                    )
+                    continue
+                }
+                logger.log.error(
+                    "✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public)"
+                )
+                throw NetworkError(error)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                logger.log.error(
+                    "✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(String(describing: error), privacy: .public)"
+                )
+                throw NetworkError(error)
+            }
         }
 
-        return (data, httpResponse)
+        throw NetworkError(lastError ?? URLError(.unknown))
+    }
+
+    /// If the most recent `Retry-After` is present, return it as a delay
+    /// override; otherwise `nil`.
+    private func currentRetryAfterOverride() async -> TimeInterval? {
+        await rateLimitState.lastRetryAfter
+    }
+
+    // MARK: - SSE
+
+    func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let url = try buildURL(path: path, query: query)
+                    var request = URLRequest(url: url)
+                    request.httpMethod = HTTPMethod.get.rawValue
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    if let lastEventID {
+                        request.setValue(lastEventID, forHTTPHeaderField: "Last-Event-ID")
+                    }
+
+                    let sseLogger = MymeLogger(category: "sse")
+                    sseLogger.log.info("→ SSE \(path, privacy: .public)")
+
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw NetworkError(URLError(.badServerResponse))
+                    }
+                    guard (200..<300).contains(httpResponse.statusCode) else {
+                        // Drain the bytes to assemble the error body.
+                        var data = Data()
+                        for try await byte in bytes { data.append(byte) }
+                        throw parseMymeError(data: data, statusCode: httpResponse.statusCode)
+                    }
+
+                    var parser = SSEParser()
+                    var lineBuffer = Data()
+                    for try await byte in bytes {
+                        try Task.checkCancellation()
+                        if byte == 0x0A {  // \n — line terminator
+                            let raw = String(data: lineBuffer, encoding: .utf8) ?? ""
+                            // Strip trailing \r to handle CRLF line endings.
+                            let line = raw.hasSuffix("\r") ? String(raw.dropLast()) : raw
+                            if let event = parser.consume(line: line) {
+                                continuation.yield(event)
+                            }
+                            lineBuffer.removeAll(keepingCapacity: true)
+                        } else {
+                            lineBuffer.append(byte)
+                        }
+                    }
+                    // End of stream: if any bytes remain, treat as a final line;
+                    // then flush with a blank line to dispatch any pending block.
+                    if !lineBuffer.isEmpty {
+                        let raw = String(data: lineBuffer, encoding: .utf8) ?? ""
+                        let line = raw.hasSuffix("\r") ? String(raw.dropLast()) : raw
+                        if let event = parser.consume(line: line) {
+                            continuation.yield(event)
+                        }
+                    }
+                    if let final = parser.consume(line: "") {
+                        continuation.yield(final)
+                    }
+                    sseLogger.log.info("← SSE \(path, privacy: .public) closed")
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch let error as URLError where error.code == .cancelled {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
     }
 
     // MARK: - Private
@@ -165,42 +342,4 @@ final class URLSessionTransport: Transport {
         return url
     }
 
-    private func parseError(data: Data, statusCode: Int) throws -> MymeError {
-        let message: String
-        let details: [String: JSONValue]?
-
-        if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
-            message = apiError.error.message ?? apiError.error.code
-            details = apiError.error.details
-        } else {
-            message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            details = nil
-        }
-
-        switch statusCode {
-        case 400: return ValidationError(message: message, details: details)
-        case 401: return UnauthorizedError(message: message, details: details)
-        case 403: return ForbiddenError(message: message, details: details)
-        case 404: return NotFoundError(message: message, details: details)
-        default: return MymeError(code: "server_error", message: message, status: statusCode, details: details)
-        }
-    }
-}
-
-// MARK: - Empty Response
-
-/// Placeholder for endpoints that return no meaningful body (DELETE, etc.).
-struct EmptyResponse: Codable, Sendable {}
-
-/// AnyEncodable wrapper for encoding arbitrary Encodable values.
-struct AnyEncodable: Encodable, @unchecked Sendable {
-    private let _encode: (Encoder) throws -> Void
-
-    init(_ value: any Encodable & Sendable) {
-        _encode = value.encode
-    }
-
-    func encode(to encoder: Encoder) throws {
-        try _encode(encoder)
-    }
 }

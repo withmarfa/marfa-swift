@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import MymeSDK
+import MymeSDKTestSupport
 
 @Suite("ItemsNamespace")
 struct ItemsTests {
@@ -117,6 +118,37 @@ struct ItemsTests {
         #expect(item.state == .active)
         #expect(mock.calls[0].method == .post)
         #expect(mock.calls[0].path == "/items/test-id/transition")
+    }
+
+    @Test("Update without version fetches current version first, then patches")
+    func updateFetchesVersionWhenUnset() async throws {
+        let (client, mock) = makeClient()
+        // 1) GET /items/:id to resolve version, 2) PATCH with that version
+        mock.enqueue(sampleItem())
+        mock.enqueue(sampleItem())
+
+        _ = try await client.items.update(id: "test-id", properties: ["title": .string("Updated")])
+
+        #expect(mock.calls.count == 2)
+        #expect(mock.calls[0].method == .get)
+        #expect(mock.calls[0].path == "/items/test-id")
+        #expect(mock.calls[1].method == .patch)
+        #expect(mock.calls[1].path == "/items/test-id")
+    }
+
+    @Test("Update with explicit version skips the initial GET")
+    func updateSkipsFetchWhenVersionProvided() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(sampleItem())
+
+        _ = try await client.items.update(
+            id: "test-id",
+            properties: ["title": .string("Updated")],
+            options: UpdateOptions(version: 4)
+        )
+
+        #expect(mock.calls.count == 1)
+        #expect(mock.calls[0].method == .patch)
     }
 
     @Test("Stats sends GET /items/stats")

@@ -30,4 +30,34 @@ public protocol Transport: Sendable {
         contentType: String?,
         query: [(String, String)]?
     ) async throws -> (Data, HTTPURLResponse)
+
+    /// Opens a Server-Sent Events stream and yields parsed events.
+    ///
+    /// Transport owns connection establishment and parsing; reconnect logic
+    /// and `Last-Event-ID` cursor persistence are the consumer's
+    /// responsibility. When the stream fails, the error is thrown through
+    /// the returned `AsyncThrowingStream`.
+    func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error>
+}
+
+public extension Transport {
+    /// Default `eventStream` that signals unsupported. Concrete transports
+    /// (URLSessionTransport, and test-support MockTransport) override.
+    func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.finish(throwing: MymeError(
+                code: "not_supported",
+                message: "Transport does not support eventStream",
+                status: 0
+            ))
+        }
+    }
 }

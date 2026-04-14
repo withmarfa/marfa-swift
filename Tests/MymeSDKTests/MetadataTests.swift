@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import MymeSDK
+import MymeSDKTestSupport
 
 @Suite("MetadataNamespace")
 struct MetadataTests {
@@ -73,5 +74,23 @@ struct MetadataTests {
 
         #expect(meta.tags == ["work", "dev"])
         #expect(mock.calls[0].method == .put)
+    }
+
+    @Test("Missing item_id field on the wire fails decoding")
+    func strictDecodingRequiresItemId() throws {
+        let body = #"{"tags":[],"about":[],"extensions":{}}"#
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(Metadata.self, from: Data(body.utf8))
+        }
+    }
+
+    @Test("Well-formed wire body decodes every field")
+    func strictDecodingHappyPath() throws {
+        let body = #"{"item_id":"item-9","tags":["x"],"about":["entity-1"],"extensions":{}}"#
+        let meta = try JSONDecoder().decode(Metadata.self, from: Data(body.utf8))
+
+        #expect(meta.itemId == "item-9")
+        #expect(meta.tags == ["x"])
+        #expect(meta.about == ["entity-1"])
     }
 }

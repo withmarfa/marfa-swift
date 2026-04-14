@@ -45,42 +45,7 @@ public final class MymeClient: Sendable {
 
     // MARK: - Init
 
-    /// Creates a client with the given configuration.
-    public init(configuration: ClientConfiguration) {
-        self.configuration = configuration
-        let transport = URLSessionTransport(configuration: configuration)
-        self.transport = transport
-
-        self.items = ItemsNamespace(
-            transport: transport,
-            defaultConflictStrategy: configuration.conflictStrategy
-        )
-        self.metadata = MetadataNamespace(transport: transport)
-        self.extensions = ExtensionsNamespace(transport: transport)
-        self.threads = ThreadsNamespace(transport: transport)
-        self.blobs = BlobsNamespace(
-            transport: transport,
-            apiBaseURL: configuration.url,
-            cdnBaseURL: configuration.cdnBaseURL
-        )
-        self.types = TypesNamespace(transport: transport)
-        self.keys = KeysNamespace(transport: transport)
-        self.webhooks = WebhooksNamespace(transport: transport)
-    }
-
-    /// Creates a client with a URL and API key using default settings.
-    public convenience init(url: URL, apiKey: String) {
-        self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
-    }
-
-    /// Creates a client from environment variables (`MYME_API_URL`, `MYME_API_KEY`).
-    /// Returns `nil` if the environment variables are not set.
-    public static func fromEnvironment() -> MymeClient? {
-        guard let config = ClientConfiguration.fromEnvironment else { return nil }
-        return MymeClient(configuration: config)
-    }
-
-    /// Creates a client with a custom transport (for testing).
+    /// Designated init — used by every other init path, including tests.
     init(configuration: ClientConfiguration, transport: any Transport) {
         self.configuration = configuration
         self.transport = transport
@@ -100,6 +65,69 @@ public final class MymeClient: Sendable {
         self.types = TypesNamespace(transport: transport)
         self.keys = KeysNamespace(transport: transport)
         self.webhooks = WebhooksNamespace(transport: transport)
+    }
+
+    /// Creates a client with the given configuration.
+    public convenience init(configuration: ClientConfiguration) {
+        self.init(
+            configuration: configuration,
+            transport: URLSessionTransport(configuration: configuration)
+        )
+    }
+
+    /// Creates a client with a URL and API key using default settings.
+    public convenience init(url: URL, apiKey: String) {
+        self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
+    }
+
+    /// Creates a client from environment variables (`MYME_API_URL`, `MYME_API_KEY`).
+    /// Returns `nil` if the environment variables are not set.
+    public static func fromEnvironment() -> MymeClient? {
+        guard let config = ClientConfiguration.fromEnvironment() else { return nil }
+        return MymeClient(configuration: config)
+    }
+
+    /// Creates a client by loading the API key from the system Keychain.
+    ///
+    /// - Parameters:
+    ///   - service: Keychain service. Defaults to `"myme.sdk"`.
+    ///   - account: Keychain account identifier (typically the server
+    ///     hostname or a named environment).
+    ///   - url: Base URL of the Myme API.
+    ///   - accessGroup: Optional access group for app-extension sharing.
+    /// - Throws: ``KeychainError`` if the item is missing or unreadable.
+    public static func fromKeychain(
+        service: String = "myme.sdk",
+        account: String,
+        url: URL,
+        accessGroup: String? = nil
+    ) async throws -> MymeClient {
+        let storage = KeychainStorage(service: service, accessGroup: accessGroup)
+        return try await fromSecureStorage(service: service, account: account, url: url, storage: storage)
+    }
+
+    /// Protocol-based helper — takes any ``SecureStorage`` so tests can
+    /// pass an ``InMemoryKeychain`` without touching the real Keychain.
+    public static func fromSecureStorage(
+        service: String = "myme.sdk",
+        account: String,
+        url: URL,
+        storage: any SecureStorage
+    ) async throws -> MymeClient {
+        guard let apiKey = try await storage.get(for: account) else {
+            throw KeychainError.osStatus(errSecItemNotFound)
+        }
+        return MymeClient(url: url, apiKey: apiKey)
+    }
+
+    /// Writes the current client's API key back to the system Keychain.
+    public func saveToKeychain(
+        service: String = "myme.sdk",
+        account: String,
+        accessGroup: String? = nil
+    ) async throws {
+        let storage = KeychainStorage(service: service, accessGroup: accessGroup)
+        try await storage.set(configuration.apiKey, for: account)
     }
 
     // MARK: - Top-Level Methods
