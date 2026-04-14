@@ -72,8 +72,3 @@ public enum ExtensionPermission: String, Codable, Sendable {
     case write
 }
 
-// MARK: - Wire wrappers
-
-struct KeysListResponse: Codable, Sendable {
-    let keys: [ApiKey]
-}

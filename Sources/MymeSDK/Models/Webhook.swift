@@ -78,12 +78,3 @@ public struct WebhookDelivery: Codable, Sendable, Identifiable {
     }
 }
 
-// MARK: - Wire wrappers
-
-struct WebhooksListResponse: Codable, Sendable {
-    let webhooks: [Webhook]
-}
-
-struct DeliveriesResponse: Codable, Sendable {
-    let deliveries: [WebhookDelivery]
-}

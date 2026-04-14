@@ -20,36 +20,6 @@ public struct TypeSchema: Codable, Sendable {
     }
 }
 
-/// A field definition within a type schema.
-public struct FieldDefinition: Codable, Sendable {
-    public let type: FieldType
-    public let description: String?
-    public let required: Bool?
-    public let enumValues: [String]?
-    public let itemsType: String?
-
-    enum CodingKeys: String, CodingKey {
-        case type, description, required
-        case enumValues = "enum_values"
-        case itemsType = "items_type"
-    }
-}
-
-/// Supported field types in a type schema.
-public enum FieldType: String, Codable, Sendable {
-    case string
-    case number
-    case integer
-    case boolean
-    case url
-    case email
-    case datetime
-    case date
-    case `enum`
-    case array
-    case object
-}
-
 /// Version retention policy overrides for a type.
 public struct VersionPolicy: Codable, Sendable {
     public let recentDays: Int?
@@ -63,10 +33,4 @@ public struct VersionPolicy: Codable, Sendable {
         case weeklySnapshotDays = "weekly_snapshot_days"
         case maxVersions = "max_versions"
     }
-}
-
-// MARK: - Wire wrappers
-
-struct TypeResponse: Codable, Sendable {
-    let type: TypeSchema
 }

@@ -148,26 +148,7 @@ public struct UpdateOptions: Sendable {
     }
 }
 
-/// An item paired with its metadata, as returned with `include=metadata`.
-public struct ItemWithMetadata: Codable, Sendable, Hashable {
-    public let item: Item
-    public let metadata: Metadata
-}
-
-// MARK: - Wire response wrappers
-
-/// Single item response: `{ "item": ..., "metadata": ... }`.
-struct ItemResponse: Codable, Sendable {
-    var item: Item
-    var metadata: Metadata?
-}
-
 /// Body for POST /items/:id/transition.
 struct TransitionBody: Codable, Sendable {
     let state: String
-}
-
-/// Response from GET /items/:id/versions.
-struct VersionsResponse: Codable, Sendable {
-    let versions: [Version]
 }

@@ -31,25 +31,7 @@ public struct MetadataInput: Codable, Sendable {
     }
 }
 
-// MARK: - Wire response wrappers
-
-/// Response from metadata endpoints: `{ "metadata": ... }`.
-struct MetadataResponse: Codable, Sendable {
-    let metadata: Metadata
-}
-
 /// Body for POST /items/:id/tags.
 struct AddTagsBody: Codable, Sendable {
     let tags: [String]
-}
-
-/// Response from extension endpoints: `{ "extensions": ... }`.
-struct ExtensionsResponse: Codable, Sendable {
-    let extensions: [String: [String: JSONValue]]
-}
-
-/// Response from GET /items/:id/extensions/:namespace.
-struct NamespaceResponse: Codable, Sendable {
-    let namespace: String
-    let data: [String: JSONValue]?
 }

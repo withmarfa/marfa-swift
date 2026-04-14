@@ -1,17 +1,5 @@
 import Foundation
 
-/// Cursor-based paginated result from the Myme API.
-public struct PaginatedResult<T: Codable & Sendable>: Codable, Sendable {
-    public let data: [T]
-    public let cursor: String?
-    public let hasMore: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case data, cursor
-        case hasMore = "has_more"
-    }
-}
-
 /// Filters for listing items.
 public struct ListFilters: Sendable {
     public var type: String?

@@ -12,15 +12,3 @@ public struct MymeThread: Codable, Sendable, Hashable, Identifiable {
         case updatedAt = "updated_at"
     }
 }
-
-/// A thread with its associated items.
-public struct ThreadWithItems: Codable, Sendable {
-    public let thread: MymeThread
-    public let items: [Item]
-}
-
-// MARK: - Wire wrappers
-
-struct ThreadResponse: Codable, Sendable {
-    let thread: MymeThread
-}
