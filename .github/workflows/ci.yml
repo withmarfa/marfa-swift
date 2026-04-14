@@ -12,8 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show Swift version
-        run: swift --version
+      - name: List installed Xcode versions
+        run: ls -1 /Applications/ | grep -i '^Xcode' || true
+
+      - name: Select latest Xcode (for Swift 6.2)
+        run: |
+          latest=$(ls -1 /Applications/ | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
+          if [[ -z "$latest" ]]; then
+            echo "::error::No Xcode found in /Applications"
+            exit 1
+          fi
+          echo "Selecting /Applications/$latest"
+          sudo xcode-select -s "/Applications/$latest/Contents/Developer"
+          swift --version
 
       - name: Build
         run: swift build
