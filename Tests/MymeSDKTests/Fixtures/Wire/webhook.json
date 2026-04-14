@@ -1,0 +1,10 @@
+{
+  "active": true,
+  "created_at": "2026-04-14T10:00:00Z",
+  "events": ["item.created", "item.updated"],
+  "id": "whk_01ABC",
+  "secret": "whsec_abcdef0123456789",
+  "type_filter": "core.note",
+  "updated_at": "2026-04-14T10:05:00Z",
+  "url": "https://example.com/webhook"
+}

@@ -1,0 +1,8 @@
+{
+  "created_at": "2026-04-14T10:00:00Z",
+  "device": "iphone15-a1b2",
+  "id": "ver_01XYZ",
+  "item_id": "itm_01JABCXYZ",
+  "properties": { "title": "Hello", "body": "Earlier version body" },
+  "version": 1
+}

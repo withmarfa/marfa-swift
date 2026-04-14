@@ -22,7 +22,8 @@ let package = Package(
         ),
         .testTarget(
             name: "MymeSDKTests",
-            dependencies: ["MymeSDK", "MymeSDKTestSupport"]
+            dependencies: ["MymeSDK", "MymeSDKTestSupport"],
+            resources: [.copy("Fixtures")]
         ),
         .executableTarget(
             name: "codegen-wire",
