@@ -16,29 +16,30 @@ struct ItemsTests {
     func sampleItem() -> ItemResponse {
         ItemResponse(
             item: Item(
-                id: "test-id",
-                type: "core.note",
-                state: .new,
-                properties: ["title": .string("Test Note")],
+                captureLatitude: nil,
+                captureLongitude: nil,
                 createdAt: "2026-01-01T00:00:00Z",
-                updatedAt: "2026-01-01T00:00:00Z",
-                timestamp: "2026-01-01T00:00:00Z",
+                device: nil,
+                id: "test-id",
+                library: false,
+                origin: nil,
+                parentId: nil,
+                properties: ["title": .string("Test Note")],
+                schemaVersion: 1,
                 source: nil,
                 sourceId: nil,
-                origin: nil,
-                version: 1,
-                schemaVersion: nil,
-                deviceId: nil,
-                parentId: nil,
+                state: .new,
                 threadId: nil,
-                captureLatitude: nil,
-                captureLongitude: nil
+                timestamp: "2026-01-01T00:00:00Z",
+                type: "core.note",
+                updatedAt: "2026-01-01T00:00:00Z",
+                version: 1
             ),
             metadata: Metadata(
-                itemId: "test-id",
-                tags: ["test"],
                 about: [],
-                extensions: [:]
+                extensions: [:],
+                itemId: "test-id",
+                tags: ["test"]
             )
         )
     }
@@ -104,12 +105,24 @@ struct ItemsTests {
         let (client, mock) = makeClient()
         var response = sampleItem()
         response.item = Item(
-            id: "test-id", type: "core.note", state: .active,
-            properties: [:], createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-01T00:00:00Z", timestamp: "2026-01-01T00:00:00Z",
-            source: nil, sourceId: nil, origin: nil, version: 1,
-            schemaVersion: nil, deviceId: nil, parentId: nil,
-            threadId: nil, captureLatitude: nil, captureLongitude: nil
+            captureLatitude: nil,
+            captureLongitude: nil,
+            createdAt: "2026-01-01T00:00:00Z",
+            device: nil,
+            id: "test-id",
+            library: false,
+            origin: nil,
+            parentId: nil,
+            properties: [:],
+            schemaVersion: 1,
+            source: nil,
+            sourceId: nil,
+            state: .active,
+            threadId: nil,
+            timestamp: "2026-01-01T00:00:00Z",
+            type: "core.note",
+            updatedAt: "2026-01-01T00:00:00Z",
+            version: 1
         )
         mock.enqueue(response)
 

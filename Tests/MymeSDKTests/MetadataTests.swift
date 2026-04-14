@@ -15,10 +15,10 @@ struct MetadataTests {
 
     func sampleMetadata() -> MetadataResponse {
         MetadataResponse(metadata: Metadata(
-            itemId: "item-1",
-            tags: ["work", "dev"],
             about: [],
-            extensions: [:]
+            extensions: [:],
+            itemId: "item-1",
+            tags: ["work", "dev"]
         ))
     }
 
@@ -38,10 +38,10 @@ struct MetadataTests {
     func addTags() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(MetadataResponse(metadata: Metadata(
-            itemId: "item-1",
-            tags: ["work", "dev", "new-tag"],
             about: [],
-            extensions: [:]
+            extensions: [:],
+            itemId: "item-1",
+            tags: ["work", "dev", "new-tag"]
         )))
 
         let meta = try await client.metadata.addTags(itemId: "item-1", tags: ["new-tag"])

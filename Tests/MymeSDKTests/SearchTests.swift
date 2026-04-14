@@ -19,16 +19,26 @@ struct SearchTests {
         mock.enqueue(SearchResponse(results: [
             SearchResult(
                 item: Item(
-                    id: "found-1", type: "core.note", state: .active,
-                    properties: ["title": .string("Found")],
+                    captureLatitude: nil,
+                    captureLongitude: nil,
                     createdAt: "2026-01-01T00:00:00Z",
-                    updatedAt: "2026-01-01T00:00:00Z",
+                    device: nil,
+                    id: "found-1",
+                    library: false,
+                    origin: nil,
+                    parentId: nil,
+                    properties: ["title": .string("Found")],
+                    schemaVersion: 1,
+                    source: nil,
+                    sourceId: nil,
+                    state: .active,
+                    threadId: nil,
                     timestamp: "2026-01-01T00:00:00Z",
-                    source: nil, sourceId: nil, origin: nil, version: 1,
-                    schemaVersion: nil, deviceId: nil, parentId: nil,
-                    threadId: nil, captureLatitude: nil, captureLongitude: nil
+                    type: "core.note",
+                    updatedAt: "2026-01-01T00:00:00Z",
+                    version: 1
                 ),
-                metadata: Metadata(itemId: "found-1", tags: [], about: [], extensions: [:]),
+                metadata: Metadata(about: [], extensions: [:], itemId: "found-1", tags: []),
                 relevanceScore: 0.95,
                 snippetHtml: "<mark>Found</mark> in title"
             ),
