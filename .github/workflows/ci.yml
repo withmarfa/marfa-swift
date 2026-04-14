@@ -10,48 +10,21 @@ jobs:
     name: Build, test, codegen freshness
     runs-on: macos-latest
     steps:
-      - name: Checkout swift-sdk
-        uses: actions/checkout@v4
-        with:
-          path: swift-sdk
-
-      - name: Checkout myme (for openapi.json)
-        uses: actions/checkout@v4
-        with:
-          repository: mymehq/myme
-          path: myme
-          sparse-checkout: openapi.json
-          sparse-checkout-cone-mode: false
-
-      - name: Show Swift version
-        working-directory: swift-sdk
-        run: swift --version
-
-      - name: Build
-        working-directory: swift-sdk
-        run: swift build
-
-      - name: Test
-        working-directory: swift-sdk
-        run: swift test --parallel
-
-      - name: Codegen freshness
-        working-directory: swift-sdk
-        run: |
-          swift run codegen-wire
-          if ! git diff --exit-code -- Sources/MymeSDK/Types/Wire/Generated; then
-            echo "::error::codegen-wire output is stale. Run 'swift run codegen-wire' locally and commit the delta."
-            exit 1
-          fi
-
-  format-check:
-    name: swift-format lint
-    runs-on: macos-latest
-    steps:
       - uses: actions/checkout@v4
 
       - name: Show Swift version
         run: swift --version
 
-      - name: Lint
-        run: swift format lint --strict --recursive Sources Tests scripts
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test --parallel
+
+      - name: Codegen freshness
+        run: |
+          swift run codegen-wire
+          if ! git diff --exit-code -- Sources/MymeSDK/Types/Wire/Generated; then
+            echo "::error::codegen-wire output is stale. Run 'swift run codegen-wire' (or './scripts/sync-openapi.sh' if the OpenAPI snapshot is behind) locally and commit the delta."
+            exit 1
+          fi

@@ -1,5 +1,5 @@
 {
-  "specPath": "../myme/openapi.json",
+  "specPath": "scripts/openapi.json",
   "outputDir": "Sources/MymeSDK/Types/Wire/Generated",
   "numericIntFields": [
     "version",

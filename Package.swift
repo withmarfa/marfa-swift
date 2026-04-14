@@ -28,7 +28,7 @@ let package = Package(
         .executableTarget(
             name: "codegen-wire",
             path: "scripts",
-            exclude: ["wire-types.json"],
+            exclude: ["wire-types.json", "openapi.json", "sync-openapi.sh"],
             sources: ["codegen-wire.swift"]
         ),
     ],
