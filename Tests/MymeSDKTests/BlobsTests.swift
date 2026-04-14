@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import MymeSDK
+import MymeSDKTestSupport
 
 @Suite("BlobsNamespace")
 struct BlobsTests {

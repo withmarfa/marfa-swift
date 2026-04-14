@@ -343,21 +343,3 @@ final class URLSessionTransport: Transport {
     }
 
 }
-
-// MARK: - Empty Response
-
-/// Placeholder for endpoints that return no meaningful body (DELETE, etc.).
-struct EmptyResponse: Codable, Sendable {}
-
-/// AnyEncodable wrapper for encoding arbitrary Encodable values.
-struct AnyEncodable: Encodable, @unchecked Sendable {
-    private let _encode: (Encoder) throws -> Void
-
-    init(_ value: any Encodable & Sendable) {
-        _encode = value.encode
-    }
-
-    func encode(to encoder: Encoder) throws {
-        try _encode(encoder)
-    }
-}

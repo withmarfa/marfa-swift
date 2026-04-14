@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import MymeSDK
+import MymeSDKTestSupport
 
 /// Tests for `ItemsNamespace.purge(id:)` — admin-scoped permanent delete.
 /// Distinct from `delete(id:)` which transitions active → trashed.
