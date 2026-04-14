@@ -87,6 +87,49 @@ public final class MymeClient: Sendable {
         return MymeClient(configuration: config)
     }
 
+    /// Creates a client by loading the API key from the system Keychain.
+    ///
+    /// - Parameters:
+    ///   - service: Keychain service. Defaults to `"myme.sdk"`.
+    ///   - account: Keychain account identifier (typically the server
+    ///     hostname or a named environment).
+    ///   - url: Base URL of the Myme API.
+    ///   - accessGroup: Optional access group for app-extension sharing.
+    /// - Throws: ``KeychainError`` if the item is missing or unreadable.
+    public static func fromKeychain(
+        service: String = "myme.sdk",
+        account: String,
+        url: URL,
+        accessGroup: String? = nil
+    ) async throws -> MymeClient {
+        let storage = KeychainStorage(service: service, accessGroup: accessGroup)
+        return try await fromSecureStorage(service: service, account: account, url: url, storage: storage)
+    }
+
+    /// Protocol-based helper — takes any ``SecureStorage`` so tests can
+    /// pass an ``InMemoryKeychain`` without touching the real Keychain.
+    public static func fromSecureStorage(
+        service: String = "myme.sdk",
+        account: String,
+        url: URL,
+        storage: any SecureStorage
+    ) async throws -> MymeClient {
+        guard let apiKey = try await storage.get(for: account) else {
+            throw KeychainError.osStatus(errSecItemNotFound)
+        }
+        return MymeClient(url: url, apiKey: apiKey)
+    }
+
+    /// Writes the current client's API key back to the system Keychain.
+    public func saveToKeychain(
+        service: String = "myme.sdk",
+        account: String,
+        accessGroup: String? = nil
+    ) async throws {
+        let storage = KeychainStorage(service: service, accessGroup: accessGroup)
+        try await storage.set(configuration.apiKey, for: account)
+    }
+
     // MARK: - Top-Level Methods
 
     /// Full-text search across items.
