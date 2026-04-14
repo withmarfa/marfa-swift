@@ -1,0 +1,15 @@
+{
+  "description": "A freeform note",
+  "display_hints": { "title_field": "title", "body_field": "body" },
+  "fields": { "title": { "type": "string" }, "body": { "type": "string" } },
+  "id": "core.note",
+  "label": "Note",
+  "parent": "core.item",
+  "version": 1,
+  "version_policy": {
+    "daily_snapshot_days": 30,
+    "max_versions": 100,
+    "recent_days": 7,
+    "weekly_snapshot_days": 365
+  }
+}

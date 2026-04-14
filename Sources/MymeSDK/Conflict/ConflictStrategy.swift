@@ -34,6 +34,13 @@ public struct ConflictSnapshot: Codable, Sendable, Hashable {
 }
 
 /// Server conflict response (HTTP 409).
+///
+/// TODO: The OpenAPI spec's 409 response currently only describes the generic
+/// `{ error: { code, message } }` envelope — it does not capture the
+/// conflict-specific `current` / `ancestor` / `conflicting_fields` fields the
+/// server actually emits. When the monorepo extends the 409 schema, this
+/// struct graduates to `Sources/MymeSDK/Types/Wire/Generated/` via codegen
+/// and the hand-written version deletes.
 public struct ConflictResponse: Codable, Sendable {
     public let error: ConflictErrorInfo
     public let current: ConflictSnapshot

@@ -1,0 +1,12 @@
+{
+  "ancestor": {
+    "properties": { "title": "Original", "body": "First draft" },
+    "version": 1
+  },
+  "conflicting_fields": ["title"],
+  "current": {
+    "properties": { "title": "Server edit", "body": "First draft" },
+    "version": 2
+  },
+  "error": { "code": "version_conflict", "status": 409 }
+}

@@ -1,0 +1,106 @@
+{
+  "specPath": "scripts/openapi.json",
+  "outputDir": "Sources/MymeSDK/Types/Wire/Generated",
+  "numericIntFields": [
+    "version",
+    "schema_version",
+    "attempt",
+    "status_code",
+    "size",
+    "expires_in",
+    "recent_days",
+    "daily_snapshot_days",
+    "weekly_snapshot_days",
+    "max_versions",
+    "ambient_days"
+  ],
+  "types": [
+    {
+      "name": "Item",
+      "pointer": "/paths/~1items~1{id}/get/responses/200/content/application~1json/schema/properties/item",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id",
+      "enumOverrides": {
+        "state": "ItemState",
+        "origin": "Origin"
+      }
+    },
+    {
+      "name": "Metadata",
+      "pointer": "/paths/~1items~1{id}/get/responses/200/content/application~1json/schema/properties/metadata",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "Version",
+      "pointer": "/paths/~1items~1{id}~1versions/get/responses/200/content/application~1json/schema/properties/versions/items",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "MymeThread",
+      "pointer": "/paths/~1threads~1{id}/get/responses/200/content/application~1json/schema/properties/thread",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "ApiKey",
+      "pointer": "/paths/~1keys/get/responses/200/content/application~1json/schema/properties/keys/items",
+      "conformances": ["Codable", "Sendable", "Identifiable"],
+      "identifiableKey": "id",
+      "fieldOverrides": {
+        "type_permissions": "[String: TypePermission]",
+        "extension_permissions": "[String: ExtensionPermission]"
+      },
+      "enumOverrides": {
+        "role": "KeyRole",
+        "default_origin": "Origin"
+      }
+    },
+    {
+      "name": "CreatedKey",
+      "pointer": "/paths/~1keys/post/responses/201/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable"],
+      "fieldOverrides": {
+        "type_permissions": "[String: TypePermission]",
+        "extension_permissions": "[String: ExtensionPermission]"
+      },
+      "enumOverrides": {
+        "role": "KeyRole",
+        "default_origin": "Origin"
+      }
+    },
+    {
+      "name": "Webhook",
+      "pointer": "/paths/~1webhooks~1{id}/get/responses/200/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "WebhookDelivery",
+      "pointer": "/paths/~1webhooks~1{id}~1deliveries/get/responses/200/content/application~1json/schema/properties/deliveries/items",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "AuditEntry",
+      "pointer": "/paths/~1audit/get/responses/200/content/application~1json/schema/properties/data/items",
+      "conformances": ["Codable", "Sendable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "BlobUploadResponse",
+      "pointer": "/paths/~1blobs/post/responses/201/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "PresignedURLResponse",
+      "pointer": "/paths/~1blobs~1{hash}~1url/get/responses/200/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "TypeSchema",
+      "pointer": "/paths/~1types~1{id}/get/responses/200/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable"]
+    }
+  ]
+}

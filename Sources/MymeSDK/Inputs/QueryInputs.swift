@@ -1,17 +1,5 @@
 import Foundation
 
-/// Cursor-based paginated result from the Myme API.
-public struct PaginatedResult<T: Codable & Sendable>: Codable, Sendable {
-    public let data: [T]
-    public let cursor: String?
-    public let hasMore: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case data, cursor
-        case hasMore = "has_more"
-    }
-}
-
 /// Filters for listing items.
 public struct ListFilters: Sendable {
     public var type: String?
@@ -122,4 +110,20 @@ public struct SearchFilters: Sendable {
         if let limit { params.append(("limit", String(limit))) }
         return params
     }
+}
+
+/// Input for metadata set/merge operations.
+public struct MetadataInput: Codable, Sendable {
+    public var tags: [String]?
+    public var about: [String]?
+
+    public init(tags: [String]? = nil, about: [String]? = nil) {
+        self.tags = tags
+        self.about = about
+    }
+}
+
+/// Body for POST /items/:id/tags.
+struct AddTagsBody: Codable, Sendable {
+    let tags: [String]
 }

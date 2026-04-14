@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    name: Build, test, codegen freshness
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List installed Xcode versions
+        run: ls -1 /Applications/ | grep -i '^Xcode' || true
+
+      - name: Select latest Xcode (for Swift 6.2)
+        run: |
+          latest=$(ls -1 /Applications/ | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
+          if [[ -z "$latest" ]]; then
+            echo "::error::No Xcode found in /Applications"
+            exit 1
+          fi
+          echo "Selecting /Applications/$latest"
+          sudo xcode-select -s "/Applications/$latest/Contents/Developer"
+          swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test --parallel
+
+      - name: Codegen freshness
+        run: |
+          swift run codegen-wire
+          if ! git diff --exit-code -- Sources/MymeSDK/Types/Wire/Generated; then
+            echo "::error::codegen-wire output is stale. Run 'swift run codegen-wire' (or './scripts/sync-openapi.sh' if the OpenAPI snapshot is behind) locally and commit the delta."
+            exit 1
+          fi
