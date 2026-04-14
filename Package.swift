@@ -24,6 +24,12 @@ let package = Package(
             name: "MymeSDKTests",
             dependencies: ["MymeSDK", "MymeSDKTestSupport"]
         ),
+        .executableTarget(
+            name: "codegen-wire",
+            path: "scripts",
+            exclude: ["wire-types.json"],
+            sources: ["codegen-wire.swift"]
+        ),
     ],
     swiftLanguageModes: [.v6]
 )
