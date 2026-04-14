@@ -111,3 +111,19 @@ public struct SearchFilters: Sendable {
         return params
     }
 }
+
+/// Input for metadata set/merge operations.
+public struct MetadataInput: Codable, Sendable {
+    public var tags: [String]?
+    public var about: [String]?
+
+    public init(tags: [String]? = nil, about: [String]? = nil) {
+        self.tags = tags
+        self.about = about
+    }
+}
+
+/// Body for POST /items/:id/tags.
+struct AddTagsBody: Codable, Sendable {
+    let tags: [String]
+}
