@@ -103,3 +103,43 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 2. Widen `numericIntFields` in `scripts/wire-types.json` if a field expected as `Int` came out `Double`.
 3. Add a per-type `fieldOverrides` entry for local overrides.
 4. Add an `enumOverrides` entry to point a string-enum field at an existing hand-written enum.
+
+## Codegen — domain models
+
+Typed Swift structs per Myme core type live under `Sources/MymeSDK/DomainModels/Generated/`. Each struct wraps a generic `Item` and exposes typed property accessors, a failable `init?(from:)` that validates the type string and required fields, and `toProperties()` for round-tripping into create/update calls.
+
+All 21 active core types are generated (bookmark, entity, entity.person, entity.place, event, file, file.audio, file.image, file.video, highlight, media, media.album, media.article, media.book, media.film, media.podcast, media.series, media.song, media.tv_episode, note, task).
+
+### Regenerate
+
+From the repo root:
+
+```bash
+# If the monorepo's type schemas have changed:
+./scripts/sync-types.sh
+
+# Otherwise (snapshot is current):
+swift run codegen-domain
+```
+
+`sync-types.sh` copies from `../myme/packages/types/core/` into `scripts/core-types/` then runs `codegen-domain`.
+
+### Freshness check
+
+CI runs `swift run codegen-domain && git diff --exit-code` against `Sources/MymeSDK/DomainModels/Generated/`.
+
+### MymeItem protocol
+
+Hand-written at `Sources/MymeSDK/DomainModels/MymeItem.swift`. Provides:
+- `typeIdentifier: String` — the Myme type ID
+- `item: Item` — backing generic item
+- `init?(from item: Item)` — failable init
+- `toProperties() -> [String: JSONValue]` — build properties dict for create/update
+- Default accessors for `id`, `type`, `state`, `createdAt`, `updatedAt`, `timestamp`, `version`, `source`, `sourceId`, `origin`, `library`, `isActive`, `isTrashed`, `isArchived`
+
+### Field conventions
+
+- Required fields are non-optional with `?? ""` / `?? 0` / `?? false` fallback (init? already guards presence).
+- Optional fields are `T?`, returning `nil` when absent.
+- Enum schema fields surface as `String?` (values documented in property doc comments).
+- Child type fields shadow same-named parent fields for doc comments; the type mapping is identical either way.
