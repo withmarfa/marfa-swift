@@ -85,7 +85,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 ### What stays hand-written
 
-- `Sources/MymeSDK/Types/Wire/Hand/` — composite wrappers (`ItemWithMetadata`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, …), and types the OpenAPI spec doesn't cover (`ItemState`, `Origin`, `FieldDefinition`, `SearchResult`).
+- `Sources/MymeSDK/Types/Wire/Hand/` — composite wrappers (`ItemWithMetadata`, `ItemEdgeGroup`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, …), and types the OpenAPI spec doesn't cover (`ItemState`, `Origin`, `FieldDefinition`, `SearchResult`).
 - `Sources/MymeSDK/Conflict/ConflictStrategy.swift` — `ConflictResponse` and `ConflictSnapshot` are NOT in the OpenAPI spec yet (the 409 response schema is the generic envelope). Treated as a known temporary. Once the monorepo extends the 409 schema with `current` / `ancestor` / `conflicting_fields`, these graduate to `Types/Wire/Generated/` and the hand-written versions delete.
 - `Sources/MymeSDK/Inputs/` — all SDK input shapes (`CreateItemInput`, `UpdateOptions`, `ListFilters`, `CreateKeyInput`, etc.).
 
@@ -95,7 +95,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 - `numericIntFields` — global list of JSON field names that are spec'd as `number` but represent whole integers in the SDK (`version`, `schema_version`, `attempt`, `status_code`, …). Widen this list when a new such field lands.
 - Per-type `fieldOverrides` — raw Swift type expressions substituted verbatim (used for map-with-enum-value cases like `type_permissions: [String: TypePermission]`).
-- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `Origin`, `TypePermission`, `ExtensionPermission`) instead of emitting fresh sibling enums per occurrence.
+- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `Origin`, `TypePermission`, `ExtensionPermission`, `EdgePermission`) instead of emitting fresh sibling enums per occurrence.
 
 ### Troubleshooting
 
