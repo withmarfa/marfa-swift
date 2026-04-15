@@ -9,6 +9,7 @@ public struct CreatedKey: Codable, Sendable {
     public let createdAt: String
     public let defaultLibrary: Bool
     public let defaultOrigin: Origin
+    public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
     public let key: String
@@ -22,6 +23,7 @@ public struct CreatedKey: Codable, Sendable {
         createdAt: String,
         defaultLibrary: Bool,
         defaultOrigin: Origin,
+        edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
         key: String,
@@ -34,6 +36,7 @@ public struct CreatedKey: Codable, Sendable {
         self.createdAt = createdAt
         self.defaultLibrary = defaultLibrary
         self.defaultOrigin = defaultOrigin
+        self.edgePermissions = edgePermissions
         self.extensionPermissions = extensionPermissions
         self.id = id
         self.key = key
@@ -48,6 +51,7 @@ public struct CreatedKey: Codable, Sendable {
         case createdAt = "created_at"
         case defaultLibrary = "default_library"
         case defaultOrigin = "default_origin"
+        case edgePermissions = "edge_permissions"
         case extensionPermissions = "extension_permissions"
         case id
         case key

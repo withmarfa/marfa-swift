@@ -6,25 +6,21 @@
 import Foundation
 
 public struct Metadata: Codable, Sendable, Hashable {
-    public let about: [String]
     public let extensions: [String: JSONValue]
     public let itemId: String
     public let tags: [String]
 
     public init(
-        about: [String],
         extensions: [String: JSONValue],
         itemId: String,
         tags: [String]
     ) {
-        self.about = about
         self.extensions = extensions
         self.itemId = itemId
         self.tags = tags
     }
 
     enum CodingKeys: String, CodingKey {
-        case about
         case extensions
         case itemId = "item_id"
         case tags
