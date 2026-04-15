@@ -16,27 +16,20 @@ struct ItemsTests {
     func sampleItem() -> ItemResponse {
         ItemResponse(
             item: Item(
-                captureLatitude: nil,
-                captureLongitude: nil,
                 createdAt: "2026-01-01T00:00:00Z",
-                device: nil,
                 id: "test-id",
                 library: false,
-                origin: nil,
-                parentId: nil,
+                origin: .user,
                 properties: ["title": .string("Test Note")],
                 schemaVersion: 1,
-                source: nil,
-                sourceId: nil,
+                source: "sdk-test",
                 state: .new,
-                threadId: nil,
                 timestamp: "2026-01-01T00:00:00Z",
                 type: "core.note",
                 updatedAt: "2026-01-01T00:00:00Z",
                 version: 1
             ),
             metadata: Metadata(
-                about: [],
                 extensions: [:],
                 itemId: "test-id",
                 tags: ["test"]
@@ -105,20 +98,14 @@ struct ItemsTests {
         let (client, mock) = makeClient()
         var response = sampleItem()
         response.item = Item(
-            captureLatitude: nil,
-            captureLongitude: nil,
             createdAt: "2026-01-01T00:00:00Z",
-            device: nil,
             id: "test-id",
             library: false,
-            origin: nil,
-            parentId: nil,
+            origin: .user,
             properties: [:],
             schemaVersion: 1,
-            source: nil,
-            sourceId: nil,
+            source: "sdk-test",
             state: .active,
-            threadId: nil,
             timestamp: "2026-01-01T00:00:00Z",
             type: "core.note",
             updatedAt: "2026-01-01T00:00:00Z",

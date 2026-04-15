@@ -9,6 +9,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
     public let createdAt: String
     public let defaultLibrary: Bool
     public let defaultOrigin: Origin
+    public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
     public let label: String
@@ -21,6 +22,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         createdAt: String,
         defaultLibrary: Bool,
         defaultOrigin: Origin,
+        edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
         label: String,
@@ -32,6 +34,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.defaultLibrary = defaultLibrary
         self.defaultOrigin = defaultOrigin
+        self.edgePermissions = edgePermissions
         self.extensionPermissions = extensionPermissions
         self.id = id
         self.label = label
@@ -45,6 +48,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         case createdAt = "created_at"
         case defaultLibrary = "default_library"
         case defaultOrigin = "default_origin"
+        case edgePermissions = "edge_permissions"
         case extensionPermissions = "extension_permissions"
         case id
         case label

@@ -3,16 +3,31 @@
   "capture_longitude": -0.1278,
   "created_at": "2026-04-14T10:00:00Z",
   "device": "iphone15-a1b2",
+  "edges": {
+    "parent": {
+      "edges": [
+        {
+          "created_at": "2026-04-14T10:01:00Z",
+          "edge_type": "parent",
+          "id": "edg_01PARENT",
+          "properties": {},
+          "source_id": "itm_01JABCXYZ",
+          "target_id": "itm_01PARENT",
+          "tenant_id": "tnt_01",
+          "updated_at": "2026-04-14T10:01:00Z"
+        }
+      ],
+      "has_more": false
+    }
+  },
   "id": "itm_01JABCXYZ",
   "library": true,
   "origin": "user",
-  "parent_id": "itm_01PARENT",
   "properties": { "title": "Hello", "count": 3, "active": true },
   "schema_version": 1,
   "source": "mobile",
   "source_id": "src_42",
   "state": "active",
-  "thread_id": "thd_01ABC",
   "timestamp": "2026-04-14T10:00:00Z",
   "type": "core.note",
   "updated_at": "2026-04-14T10:05:00Z",

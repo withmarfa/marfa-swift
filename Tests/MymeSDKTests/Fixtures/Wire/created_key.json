@@ -2,6 +2,7 @@
   "created_at": "2026-04-14T10:00:00Z",
   "default_library": true,
   "default_origin": "worker",
+  "edge_permissions": { "parent": "write" },
   "extension_permissions": { "myme.source": "read" },
   "id": "key_01NEW",
   "key": "myme_k1_abcdef0123456789",

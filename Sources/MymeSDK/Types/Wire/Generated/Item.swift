@@ -10,16 +10,15 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let captureLongitude: Double?
     public let createdAt: String
     public let device: String?
+    public let edges: [String: ItemEdgeGroup]?
     public let id: String
     public let library: Bool
-    public let origin: Origin?
-    public let parentId: String?
+    public let origin: Origin
     public let properties: [String: JSONValue]
     public let schemaVersion: Int
-    public let source: String?
+    public let source: String
     public let sourceId: String?
     public let state: ItemState
-    public let threadId: String?
     public let timestamp: String
     public let type: String
     public let updatedAt: String
@@ -30,16 +29,15 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         captureLongitude: Double? = nil,
         createdAt: String,
         device: String? = nil,
+        edges: [String: ItemEdgeGroup]? = nil,
         id: String,
         library: Bool,
-        origin: Origin? = nil,
-        parentId: String? = nil,
+        origin: Origin,
         properties: [String: JSONValue],
         schemaVersion: Int,
-        source: String? = nil,
+        source: String,
         sourceId: String? = nil,
         state: ItemState,
-        threadId: String? = nil,
         timestamp: String,
         type: String,
         updatedAt: String,
@@ -49,16 +47,15 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         self.captureLongitude = captureLongitude
         self.createdAt = createdAt
         self.device = device
+        self.edges = edges
         self.id = id
         self.library = library
         self.origin = origin
-        self.parentId = parentId
         self.properties = properties
         self.schemaVersion = schemaVersion
         self.source = source
         self.sourceId = sourceId
         self.state = state
-        self.threadId = threadId
         self.timestamp = timestamp
         self.type = type
         self.updatedAt = updatedAt
@@ -70,16 +67,15 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         case captureLongitude = "capture_longitude"
         case createdAt = "created_at"
         case device
+        case edges
         case id
         case library
         case origin
-        case parentId = "parent_id"
         case properties
         case schemaVersion = "schema_version"
         case source
         case sourceId = "source_id"
         case state
-        case threadId = "thread_id"
         case timestamp
         case type
         case updatedAt = "updated_at"

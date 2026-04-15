@@ -20,10 +20,25 @@
       "pointer": "/paths/~1items~1{id}/get/responses/200/content/application~1json/schema/properties/item",
       "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
       "identifiableKey": "id",
+      "fieldOverrides": {
+        "edges": "[String: ItemEdgeGroup]"
+      },
       "enumOverrides": {
         "state": "ItemState",
         "origin": "Origin"
       }
+    },
+    {
+      "name": "Edge",
+      "pointer": "/paths/~1edges/post/responses/201/content/application~1json/schema/properties/edge",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "EdgeType",
+      "pointer": "/paths/~1edges~1types/get/responses/200/content/application~1json/schema/properties/edge_types/items",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
     },
     {
       "name": "Metadata",
@@ -49,7 +64,8 @@
       "identifiableKey": "id",
       "fieldOverrides": {
         "type_permissions": "[String: TypePermission]",
-        "extension_permissions": "[String: ExtensionPermission]"
+        "extension_permissions": "[String: ExtensionPermission]",
+        "edge_permissions": "[String: EdgePermission]"
       },
       "enumOverrides": {
         "role": "KeyRole",
@@ -62,7 +78,8 @@
       "conformances": ["Codable", "Sendable"],
       "fieldOverrides": {
         "type_permissions": "[String: TypePermission]",
-        "extension_permissions": "[String: ExtensionPermission]"
+        "extension_permissions": "[String: ExtensionPermission]",
+        "edge_permissions": "[String: EdgePermission]"
       },
       "enumOverrides": {
         "role": "KeyRole",

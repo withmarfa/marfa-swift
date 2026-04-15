@@ -15,7 +15,6 @@ struct MetadataTests {
 
     func sampleMetadata() -> MetadataResponse {
         MetadataResponse(metadata: Metadata(
-            about: [],
             extensions: [:],
             itemId: "item-1",
             tags: ["work", "dev"]
@@ -38,7 +37,6 @@ struct MetadataTests {
     func addTags() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(MetadataResponse(metadata: Metadata(
-            about: [],
             extensions: [:],
             itemId: "item-1",
             tags: ["work", "dev", "new-tag"]
@@ -78,7 +76,7 @@ struct MetadataTests {
 
     @Test("Missing item_id field on the wire fails decoding")
     func strictDecodingRequiresItemId() throws {
-        let body = #"{"tags":[],"about":[],"extensions":{}}"#
+        let body = #"{"tags":[],"extensions":{}}"#
         #expect(throws: DecodingError.self) {
             _ = try JSONDecoder().decode(Metadata.self, from: Data(body.utf8))
         }
@@ -86,11 +84,11 @@ struct MetadataTests {
 
     @Test("Well-formed wire body decodes every field")
     func strictDecodingHappyPath() throws {
-        let body = #"{"item_id":"item-9","tags":["x"],"about":["entity-1"],"extensions":{}}"#
+        let body = #"{"item_id":"item-9","tags":["x"],"extensions":{"theme":"dark"}}"#
         let meta = try JSONDecoder().decode(Metadata.self, from: Data(body.utf8))
 
         #expect(meta.itemId == "item-9")
         #expect(meta.tags == ["x"])
-        #expect(meta.about == ["entity-1"])
+        #expect(meta.extensions["theme"] == .string("dark"))
     }
 }
