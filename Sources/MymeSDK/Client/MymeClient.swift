@@ -28,9 +28,6 @@ public final class MymeClient: Sendable {
     /// Extensions API: read and write namespaced extension data.
     public let extensions: ExtensionsNamespace
 
-    /// Threads API: thread records plus `in-thread` edge membership convenience.
-    public let threads: ThreadsNamespace
-
     /// Edges API: create, update, delete typed edges; list from source / to target.
     public let edges: EdgesNamespace
 
@@ -62,7 +59,6 @@ public final class MymeClient: Sendable {
         self.edges = edges
         self.metadata = MetadataNamespace(transport: transport)
         self.extensions = ExtensionsNamespace(transport: transport)
-        self.threads = ThreadsNamespace(transport: transport, items: items, edges: edges)
         self.blobs = BlobsNamespace(
             transport: transport,
             apiBaseURL: configuration.url,
