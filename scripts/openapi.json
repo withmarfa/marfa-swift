@@ -73,12 +73,6 @@
                   "device": {
                     "type": "string"
                   },
-                  "parent_id": {
-                    "type": "string"
-                  },
-                  "thread_id": {
-                    "type": "string"
-                  },
                   "capture_latitude": {
                     "type": "number"
                   },
@@ -91,10 +85,13 @@
                       "type": "string"
                     }
                   },
-                  "about": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
+                  "edges": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 },
@@ -129,7 +126,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -139,14 +141,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -179,6 +173,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -189,8 +246,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -208,12 +265,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -224,7 +275,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -400,6 +450,19 @@
           },
           {
             "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "all"
+              ]
+            },
+            "required": false,
+            "name": "library",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "string"
             },
             "required": false,
@@ -523,7 +586,12 @@
                                 }
                               },
                               "state": {
-                                "type": "string"
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "archived",
+                                  "trashed"
+                                ]
                               },
                               "library": {
                                 "type": "boolean"
@@ -533,14 +601,6 @@
                               },
                               "schema_version": {
                                 "type": "integer"
-                              },
-                              "thread_id": {
-                                "type": "string",
-                                "nullable": true
-                              },
-                              "parent_id": {
-                                "type": "string",
-                                "nullable": true
                               },
                               "source": {
                                 "type": "string"
@@ -573,6 +633,69 @@
                               },
                               "updated_at": {
                                 "type": "string"
+                              },
+                              "edges": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "edges": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "tenant_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                          },
+                                          "source_id": {
+                                            "type": "string"
+                                          },
+                                          "target_id": {
+                                            "type": "string"
+                                          },
+                                          "edge_type": {
+                                            "type": "string"
+                                          },
+                                          "properties": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "nullable": true
+                                            }
+                                          },
+                                          "created_at": {
+                                            "type": "string"
+                                          },
+                                          "updated_at": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "source_id",
+                                          "target_id",
+                                          "edge_type",
+                                          "properties",
+                                          "created_at",
+                                          "updated_at"
+                                        ]
+                                      }
+                                    },
+                                    "has_more": {
+                                      "type": "boolean"
+                                    },
+                                    "next_cursor": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "edges",
+                                    "has_more"
+                                  ]
+                                }
                               }
                             },
                             "required": [
@@ -583,8 +706,8 @@
                               "library",
                               "version",
                               "schema_version",
-                              "thread_id",
-                              "parent_id",
+                              "source",
+                              "origin",
                               "timestamp",
                               "created_at",
                               "updated_at"
@@ -629,7 +752,12 @@
                                     }
                                   },
                                   "state": {
-                                    "type": "string"
+                                    "type": "string",
+                                    "enum": [
+                                      "active",
+                                      "archived",
+                                      "trashed"
+                                    ]
                                   },
                                   "library": {
                                     "type": "boolean"
@@ -639,14 +767,6 @@
                                   },
                                   "schema_version": {
                                     "type": "integer"
-                                  },
-                                  "thread_id": {
-                                    "type": "string",
-                                    "nullable": true
-                                  },
-                                  "parent_id": {
-                                    "type": "string",
-                                    "nullable": true
                                   },
                                   "source": {
                                     "type": "string"
@@ -679,6 +799,69 @@
                                   },
                                   "updated_at": {
                                     "type": "string"
+                                  },
+                                  "edges": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "object",
+                                      "properties": {
+                                        "edges": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "tenant_id": {
+                                                "type": "string",
+                                                "nullable": true
+                                              },
+                                              "source_id": {
+                                                "type": "string"
+                                              },
+                                              "target_id": {
+                                                "type": "string"
+                                              },
+                                              "edge_type": {
+                                                "type": "string"
+                                              },
+                                              "properties": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                  "nullable": true
+                                                }
+                                              },
+                                              "created_at": {
+                                                "type": "string"
+                                              },
+                                              "updated_at": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "source_id",
+                                              "target_id",
+                                              "edge_type",
+                                              "properties",
+                                              "created_at",
+                                              "updated_at"
+                                            ]
+                                          }
+                                        },
+                                        "has_more": {
+                                          "type": "boolean"
+                                        },
+                                        "next_cursor": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "edges",
+                                        "has_more"
+                                      ]
+                                    }
                                   }
                                 },
                                 "required": [
@@ -689,8 +872,8 @@
                                   "library",
                                   "version",
                                   "schema_version",
-                                  "thread_id",
-                                  "parent_id",
+                                  "source",
+                                  "origin",
                                   "timestamp",
                                   "created_at",
                                   "updated_at"
@@ -708,12 +891,6 @@
                                       "type": "string"
                                     }
                                   },
-                                  "about": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string"
-                                    }
-                                  },
                                   "extensions": {
                                     "type": "object",
                                     "additionalProperties": {
@@ -724,7 +901,6 @@
                                 "required": [
                                   "item_id",
                                   "tags",
-                                  "about",
                                   "extensions"
                                 ]
                               }
@@ -938,7 +1114,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -948,14 +1129,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -988,6 +1161,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -998,8 +1234,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -1017,12 +1253,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -1033,7 +1263,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -1152,20 +1381,21 @@
                       "nullable": true
                     }
                   },
-                  "parent_id": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "thread_id": {
-                    "type": "string",
-                    "nullable": true
-                  },
                   "version": {
                     "type": "integer",
                     "minimum": 0
                   },
                   "snapshot": {
                     "type": "boolean"
+                  },
+                  "edges": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }
@@ -1196,7 +1426,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -1206,14 +1441,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -1246,6 +1473,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -1256,8 +1546,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -1275,12 +1565,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -1291,7 +1575,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -1621,7 +1904,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -1631,14 +1919,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -1671,6 +1951,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -1681,8 +2024,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -1700,12 +2043,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -1716,7 +2053,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -1833,7 +2169,11 @@
                 "properties": {
                   "state": {
                     "type": "string",
-                    "minLength": 1
+                    "enum": [
+                      "active",
+                      "archived",
+                      "trashed"
+                    ]
                   }
                 },
                 "required": [
@@ -1845,7 +2185,7 @@
         },
         "responses": {
           "200": {
-            "description": "Item transitioned",
+            "description": "Item state changed",
             "content": {
               "application/json": {
                 "schema": {
@@ -1867,7 +2207,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -1877,14 +2222,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -1917,6 +2254,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -1927,8 +2327,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -1946,12 +2346,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -1962,7 +2356,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -2275,12 +2668,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -2291,7 +2678,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -2409,13 +2795,6 @@
                       "type": "string"
                     },
                     "default": []
-                  },
-                  "about": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "default": []
                   }
                 }
               }
@@ -2442,12 +2821,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -2458,7 +2831,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -2611,12 +2983,6 @@
                     "items": {
                       "type": "string"
                     }
-                  },
-                  "about": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
                   }
                 }
               }
@@ -2643,12 +3009,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -2659,7 +3019,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -2844,12 +3203,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -2860,7 +3213,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -3150,12 +3502,6 @@
                             "type": "string"
                           }
                         },
-                        "about": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
                         "extensions": {
                           "type": "object",
                           "additionalProperties": {
@@ -3166,7 +3512,6 @@
                       "required": [
                         "item_id",
                         "tags",
-                        "about",
                         "extensions"
                       ]
                     }
@@ -4023,6 +4368,1339 @@
         }
       }
     },
+    "/items/{id}/edges": {
+      "get": {
+        "tags": [
+          "Edges"
+        ],
+        "summary": "List outbound edges from an item",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "edge_type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outbound edges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "tenant_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "source_id": {
+                            "type": "string"
+                          },
+                          "target_id": {
+                            "type": "string"
+                          },
+                          "edge_type": {
+                            "type": "string"
+                          },
+                          "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "source_id",
+                          "target_id",
+                          "edge_type",
+                          "properties",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "cursor",
+                    "has_more"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}/backrefs": {
+      "get": {
+        "tags": [
+          "Edges"
+        ],
+        "summary": "List inbound edges (backrefs) targeting an item",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "edge_type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inbound edges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "tenant_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "source_id": {
+                            "type": "string"
+                          },
+                          "target_id": {
+                            "type": "string"
+                          },
+                          "edge_type": {
+                            "type": "string"
+                          },
+                          "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "source_id",
+                          "target_id",
+                          "edge_type",
+                          "properties",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "cursor",
+                    "has_more"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edges": {
+      "post": {
+        "tags": [
+          "Edges"
+        ],
+        "summary": "Create a single edge",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source_id": {
+                    "type": "string"
+                  },
+                  "target_id": {
+                    "type": "string"
+                  },
+                  "edge_type": {
+                    "type": "string"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                },
+                "required": [
+                  "source_id",
+                  "target_id",
+                  "edge_type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Edge created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edge": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "source_id": {
+                          "type": "string"
+                        },
+                        "target_id": {
+                          "type": "string"
+                        },
+                        "edge_type": {
+                          "type": "string"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source_id",
+                        "target_id",
+                        "edge_type",
+                        "properties",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "edge"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / constraint / cycle error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source, target, or edge type not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edges/{id}": {
+      "patch": {
+        "tags": [
+          "Edges"
+        ],
+        "summary": "Update edge properties (edge_type, source_id, target_id are immutable)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "properties": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                },
+                "required": [
+                  "properties"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Edge updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edge": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "source_id": {
+                          "type": "string"
+                        },
+                        "target_id": {
+                          "type": "string"
+                        },
+                        "edge_type": {
+                          "type": "string"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source_id",
+                        "target_id",
+                        "edge_type",
+                        "properties",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "edge"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Attempted to change immutable field",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Edge not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Edges"
+        ],
+        "summary": "Delete an edge",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Edge not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edges/types": {
+      "post": {
+        "tags": [
+          "EdgeTypes"
+        ],
+        "summary": "Register a custom edge type (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "cardinality": {
+                    "type": "string",
+                    "enum": [
+                      "one-to-one",
+                      "one-to-many",
+                      "many-to-one",
+                      "many-to-many"
+                    ]
+                  },
+                  "source_type_constraints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "target_type_constraints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cascade_on_delete": {
+                    "type": "string",
+                    "enum": [
+                      "cascade",
+                      "orphan",
+                      "block"
+                    ]
+                  },
+                  "property_schema": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "enum_values": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "items_type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "cardinality"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Edge type registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edge_type": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "cardinality": {
+                          "type": "string",
+                          "enum": [
+                            "one-to-one",
+                            "one-to-many",
+                            "many-to-one",
+                            "many-to-many"
+                          ]
+                        },
+                        "source_type_constraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "target_type_constraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "cascade_on_delete": {
+                          "type": "string",
+                          "enum": [
+                            "cascade",
+                            "orphan",
+                            "block"
+                          ]
+                        },
+                        "property_schema": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "cardinality",
+                        "source_type_constraints",
+                        "target_type_constraints",
+                        "cascade_on_delete",
+                        "property_schema"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "edge_type"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Edge type already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "EdgeTypes"
+        ],
+        "summary": "List all edge types (core + custom)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Edge types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edge_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "cardinality": {
+                            "type": "string",
+                            "enum": [
+                              "one-to-one",
+                              "one-to-many",
+                              "many-to-one",
+                              "many-to-many"
+                            ]
+                          },
+                          "source_type_constraints": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "target_type_constraints": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "cascade_on_delete": {
+                            "type": "string",
+                            "enum": [
+                              "cascade",
+                              "orphan",
+                              "block"
+                            ]
+                          },
+                          "property_schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "cardinality",
+                          "source_type_constraints",
+                          "target_type_constraints",
+                          "cascade_on_delete",
+                          "property_schema"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "edge_types"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edges/types/{id}": {
+      "delete": {
+        "tags": [
+          "EdgeTypes"
+        ],
+        "summary": "Unregister a custom edge type (admin)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Can't delete a core edge type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Edge type not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/threads": {
       "post": {
         "tags": [
@@ -4290,7 +5968,12 @@
                             }
                           },
                           "state": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "archived",
+                              "trashed"
+                            ]
                           },
                           "library": {
                             "type": "boolean"
@@ -4300,14 +5983,6 @@
                           },
                           "schema_version": {
                             "type": "integer"
-                          },
-                          "thread_id": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "parent_id": {
-                            "type": "string",
-                            "nullable": true
                           },
                           "source": {
                             "type": "string"
@@ -4340,6 +6015,69 @@
                           },
                           "updated_at": {
                             "type": "string"
+                          },
+                          "edges": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "edges": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "tenant_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "source_id": {
+                                        "type": "string"
+                                      },
+                                      "target_id": {
+                                        "type": "string"
+                                      },
+                                      "edge_type": {
+                                        "type": "string"
+                                      },
+                                      "properties": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "nullable": true
+                                        }
+                                      },
+                                      "created_at": {
+                                        "type": "string"
+                                      },
+                                      "updated_at": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "source_id",
+                                      "target_id",
+                                      "edge_type",
+                                      "properties",
+                                      "created_at",
+                                      "updated_at"
+                                    ]
+                                  }
+                                },
+                                "has_more": {
+                                  "type": "boolean"
+                                },
+                                "next_cursor": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "edges",
+                                "has_more"
+                              ]
+                            }
                           }
                         },
                         "required": [
@@ -4350,8 +6088,8 @@
                           "library",
                           "version",
                           "schema_version",
-                          "thread_id",
-                          "parent_id",
+                          "source",
+                          "origin",
                           "timestamp",
                           "created_at",
                           "updated_at"
@@ -4505,7 +6243,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -4515,14 +6258,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -4555,6 +6290,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -4565,8 +6363,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -4744,7 +6542,12 @@
                           }
                         },
                         "state": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "archived",
+                            "trashed"
+                          ]
                         },
                         "library": {
                           "type": "boolean"
@@ -4754,14 +6557,6 @@
                         },
                         "schema_version": {
                           "type": "integer"
-                        },
-                        "thread_id": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "parent_id": {
-                          "type": "string",
-                          "nullable": true
                         },
                         "source": {
                           "type": "string"
@@ -4794,6 +6589,69 @@
                         },
                         "updated_at": {
                           "type": "string"
+                        },
+                        "edges": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "edges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "tenant_id": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "source_id": {
+                                      "type": "string"
+                                    },
+                                    "target_id": {
+                                      "type": "string"
+                                    },
+                                    "edge_type": {
+                                      "type": "string"
+                                    },
+                                    "properties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    },
+                                    "created_at": {
+                                      "type": "string"
+                                    },
+                                    "updated_at": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "source_id",
+                                    "target_id",
+                                    "edge_type",
+                                    "properties",
+                                    "created_at",
+                                    "updated_at"
+                                  ]
+                                }
+                              },
+                              "has_more": {
+                                "type": "boolean"
+                              },
+                              "next_cursor": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "edges",
+                              "has_more"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -4804,8 +6662,8 @@
                         "library",
                         "version",
                         "schema_version",
-                        "thread_id",
-                        "parent_id",
+                        "source",
+                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -5829,14 +7687,54 @@
                               "type": {
                                 "type": "string"
                               },
-                              "state": {
-                                "type": "string"
-                              },
                               "properties": {
                                 "type": "object",
                                 "additionalProperties": {
                                   "nullable": true
                                 }
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "archived",
+                                  "trashed"
+                                ]
+                              },
+                              "library": {
+                                "type": "boolean"
+                              },
+                              "version": {
+                                "type": "number"
+                              },
+                              "schema_version": {
+                                "type": "integer"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "source_id": {
+                                "type": "string"
+                              },
+                              "origin": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "ai",
+                                  "worker"
+                                ]
+                              },
+                              "device": {
+                                "type": "string"
+                              },
+                              "capture_latitude": {
+                                "type": "number"
+                              },
+                              "capture_longitude": {
+                                "type": "number"
+                              },
+                              "timestamp": {
+                                "type": "string"
                               },
                               "created_at": {
                                 "type": "string"
@@ -5844,18 +7742,83 @@
                               "updated_at": {
                                 "type": "string"
                               },
-                              "timestamp": {
-                                "type": "string"
+                              "edges": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "edges": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "tenant_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                          },
+                                          "source_id": {
+                                            "type": "string"
+                                          },
+                                          "target_id": {
+                                            "type": "string"
+                                          },
+                                          "edge_type": {
+                                            "type": "string"
+                                          },
+                                          "properties": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "nullable": true
+                                            }
+                                          },
+                                          "created_at": {
+                                            "type": "string"
+                                          },
+                                          "updated_at": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "source_id",
+                                          "target_id",
+                                          "edge_type",
+                                          "properties",
+                                          "created_at",
+                                          "updated_at"
+                                        ]
+                                      }
+                                    },
+                                    "has_more": {
+                                      "type": "boolean"
+                                    },
+                                    "next_cursor": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "edges",
+                                    "has_more"
+                                  ]
+                                }
                               }
                             },
                             "required": [
                               "id",
                               "type",
-                              "state",
                               "properties",
+                              "state",
+                              "library",
+                              "version",
+                              "schema_version",
+                              "source",
+                              "origin",
+                              "timestamp",
                               "created_at",
-                              "updated_at",
-                              "timestamp"
+                              "updated_at"
                             ],
                             "additionalProperties": {
                               "nullable": true
@@ -5864,22 +7827,26 @@
                           "metadata": {
                             "type": "object",
                             "properties": {
+                              "item_id": {
+                                "type": "string"
+                              },
                               "tags": {
                                 "type": "array",
                                 "items": {
                                   "type": "string"
                                 }
                               },
-                              "about": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
+                              "extensions": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
                                 }
                               }
                             },
                             "required": [
+                              "item_id",
                               "tags",
-                              "about"
+                              "extensions"
                             ],
                             "additionalProperties": {
                               "nullable": true
@@ -6708,6 +8675,16 @@
                         "write"
                       ]
                     }
+                  },
+                  "edge_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -6768,6 +8745,16 @@
                       }
                     },
                     "extension_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
+                    "edge_permissions": {
                       "type": "object",
                       "additionalProperties": {
                         "type": "string",
@@ -6897,6 +8884,16 @@
                             }
                           },
                           "extension_permissions": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "enum": [
+                                "read",
+                                "write"
+                              ]
+                            }
+                          },
+                          "edge_permissions": {
                             "type": "object",
                             "additionalProperties": {
                               "type": "string",
