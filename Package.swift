@@ -28,8 +28,20 @@ let package = Package(
         .executableTarget(
             name: "codegen-wire",
             path: "scripts",
-            exclude: ["wire-types.json", "openapi.json", "sync-openapi.sh"],
+            exclude: [
+                "wire-types.json", "openapi.json", "sync-openapi.sh",
+                "core-types", "sync-types.sh", "codegen-domain.swift",
+            ],
             sources: ["codegen-wire.swift"]
+        ),
+        .executableTarget(
+            name: "codegen-domain",
+            path: "scripts",
+            exclude: [
+                "wire-types.json", "openapi.json", "sync-openapi.sh",
+                "core-types", "sync-types.sh", "codegen-wire.swift",
+            ],
+            sources: ["codegen-domain.swift"]
         ),
     ],
     swiftLanguageModes: [.v6]
