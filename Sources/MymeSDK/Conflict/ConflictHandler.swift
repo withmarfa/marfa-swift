@@ -13,8 +13,7 @@ func handleConflictUpdate(
     clientPatch: [String: JSONValue],
     version: Int,
     strategy: ConflictStrategy,
-    resolver: ConflictResolver?,
-    threadId: String? = nil
+    resolver: ConflictResolver?
 ) async throws -> Item {
     var properties = clientPatch
     var currentVersion = version
@@ -22,8 +21,7 @@ func handleConflictUpdate(
     for attempt in 0...maxRetries {
         let body = UpdateItemBody(
             properties: properties,
-            version: currentVersion,
-            threadId: threadId
+            version: currentVersion
         )
 
         let result: ConflictResult<ItemResponse> = try await transport.requestWithConflict(

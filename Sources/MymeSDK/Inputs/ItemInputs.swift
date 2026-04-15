@@ -1,6 +1,11 @@
 import Foundation
 
 /// Input for creating a new item.
+///
+/// Item-to-item relationships (parent-of, in-thread, about, etc.) are no
+/// longer fields on the item body — create the relationship by adding an
+/// entry to `edges` (an atomic item-plus-edges write), or post the edge
+/// separately through `client.edges.create(...)`.
 public struct CreateItemInput: Codable, Sendable {
     public var type: String
     public var properties: [String: JSONValue]
@@ -12,12 +17,10 @@ public struct CreateItemInput: Codable, Sendable {
     public var origin: Origin?
     public var device: String?
     public var library: Bool?
-    public var parentId: String?
-    public var threadId: String?
     public var captureLatitude: Double?
     public var captureLongitude: Double?
     public var tags: [String]?
-    public var about: [String]?
+    public var edges: [CreateItemEdge]?
 
     public init(
         type: String,
@@ -30,12 +33,10 @@ public struct CreateItemInput: Codable, Sendable {
         origin: Origin? = nil,
         device: String? = nil,
         library: Bool? = nil,
-        parentId: String? = nil,
-        threadId: String? = nil,
         captureLatitude: Double? = nil,
         captureLongitude: Double? = nil,
         tags: [String]? = nil,
-        about: [String]? = nil
+        edges: [CreateItemEdge]? = nil
     ) {
         self.type = type
         self.properties = properties
@@ -47,21 +48,54 @@ public struct CreateItemInput: Codable, Sendable {
         self.origin = origin
         self.device = device
         self.library = library
-        self.parentId = parentId
-        self.threadId = threadId
         self.captureLatitude = captureLatitude
         self.captureLongitude = captureLongitude
         self.tags = tags
-        self.about = about
+        self.edges = edges
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, properties, id, state, timestamp, source, origin, device, library, tags, about
+        case type, properties, id, state, timestamp, source, origin, device, library, tags, edges
         case sourceId = "source_id"
-        case parentId = "parent_id"
-        case threadId = "thread_id"
         case captureLatitude = "capture_latitude"
         case captureLongitude = "capture_longitude"
+    }
+}
+
+/// One edge to attach atomically when creating an item.
+///
+/// `direction` picks whether the new item is the edge's source or target.
+/// `otherId` is the already-existing item on the other side.
+public struct CreateItemEdge: Codable, Sendable, Hashable {
+    public enum Direction: String, Codable, Sendable, Hashable {
+        /// The new item is the edge's source; `otherId` is the target.
+        case outbound
+        /// The new item is the edge's target; `otherId` is the source.
+        case inbound
+    }
+
+    public var edgeType: String
+    public var direction: Direction
+    public var otherId: String
+    public var properties: [String: JSONValue]?
+
+    public init(
+        edgeType: String,
+        direction: Direction,
+        otherId: String,
+        properties: [String: JSONValue]? = nil
+    ) {
+        self.edgeType = edgeType
+        self.direction = direction
+        self.otherId = otherId
+        self.properties = properties
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case edgeType = "edge_type"
+        case direction
+        case otherId = "other_id"
+        case properties
     }
 }
 
@@ -69,32 +103,21 @@ public struct CreateItemInput: Codable, Sendable {
 struct UpdateItemBody: Codable, Sendable {
     var properties: [String: JSONValue]
     var version: Int?
-    var parentId: String?
-    var threadId: String?
     var snapshot: Bool?
-
-    enum CodingKeys: String, CodingKey {
-        case properties, version, snapshot
-        case parentId = "parent_id"
-        case threadId = "thread_id"
-    }
 }
 
 /// Options for item update operations.
 public struct UpdateOptions: Sendable {
     public var version: Int?
-    public var threadId: String?
     public var conflict: ConflictStrategy?
     public var resolve: ConflictResolver?
 
     public init(
         version: Int? = nil,
-        threadId: String? = nil,
         conflict: ConflictStrategy? = nil,
         resolve: ConflictResolver? = nil
     ) {
         self.version = version
-        self.threadId = threadId
         self.conflict = conflict
         self.resolve = resolve
     }

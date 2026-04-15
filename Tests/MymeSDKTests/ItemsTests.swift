@@ -151,6 +151,42 @@ struct ItemsTests {
         #expect(mock.calls[0].method == .patch)
     }
 
+    @Test("Create item with edges emits edges array in snake_case body")
+    func createWithEdges() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(sampleItem())
+
+        let input = CreateItemInput(
+            type: "core.note",
+            properties: ["title": .string("Hello")],
+            edges: [
+                CreateItemEdge(
+                    edgeType: "in-thread",
+                    direction: .outbound,
+                    otherId: "thread-1",
+                    properties: ["position": .double(1)]
+                ),
+                CreateItemEdge(
+                    edgeType: "about",
+                    direction: .outbound,
+                    otherId: "topic-1"
+                ),
+            ]
+        )
+        _ = try await client.items.create(input)
+
+        let body = try JSONSerialization.jsonObject(with: mock.calls[0].body!) as? [String: Any]
+        let edges = body?["edges"] as? [[String: Any]]
+        #expect(edges?.count == 2)
+        #expect(edges?[0]["edge_type"] as? String == "in-thread")
+        #expect(edges?[0]["other_id"] as? String == "thread-1")
+        #expect(edges?[0]["direction"] as? String == "outbound")
+        // parent_id / thread_id / about must be absent on the wire now.
+        #expect(body?["parent_id"] == nil)
+        #expect(body?["thread_id"] == nil)
+        #expect(body?["about"] == nil)
+    }
+
     @Test("Stats sends GET /items/stats")
     func stats() async throws {
         let (client, mock) = makeClient()
