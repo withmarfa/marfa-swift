@@ -44,3 +44,9 @@ public enum ExtensionPermission: String, Codable, Sendable {
     case read
     case write
 }
+
+/// Permission level for an edge type.
+public enum EdgePermission: String, Codable, Sendable {
+    case read
+    case write
+}
