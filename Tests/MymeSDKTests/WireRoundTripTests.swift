@@ -73,4 +73,8 @@ struct WireRoundTripTests {
     @Test("PaginatedResult<Item>") func paginatedItems() throws {
         try assertRoundTrip(PaginatedResult<Item>.self, fixture: "paginated_items")
     }
+
+    @Test("Edge") func edge() throws { try assertRoundTrip(Edge.self, fixture: "edge") }
+
+    @Test("EdgeType") func edgeType() throws { try assertRoundTrip(EdgeType.self, fixture: "edge_type") }
 }

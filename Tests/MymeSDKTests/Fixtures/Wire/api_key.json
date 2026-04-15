@@ -2,6 +2,7 @@
   "created_at": "2026-04-14T10:00:00Z",
   "default_library": true,
   "default_origin": "user",
+  "edge_permissions": { "parent": "write", "related_to": "read" },
   "extension_permissions": { "myme.source": "read", "myme.favorite": "write" },
   "id": "key_01ABC",
   "label": "iPhone dev key",
