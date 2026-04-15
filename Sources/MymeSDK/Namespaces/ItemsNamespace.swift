@@ -64,8 +64,7 @@ public struct ItemsNamespace: Sendable {
             clientPatch: properties,
             version: resolvedVersion,
             strategy: strategy,
-            resolver: options?.resolve,
-            threadId: options?.threadId
+            resolver: options?.resolve
         )
     }
 
@@ -112,6 +111,45 @@ public struct ItemsNamespace: Sendable {
     public func purge(id: String) async throws {
         let _: EmptyResponse = try await transport.request(
             method: .delete, path: "/items/\(id)/purge", body: nil, query: nil
+        )
+    }
+
+    // MARK: - Edge-related reads
+
+    /// Lists outbound edges from the item — edges where this item is the source.
+    /// Filter by `edgeType` to narrow to a single relationship (e.g. `"about"`).
+    public func edges(
+        id: String,
+        edgeType: String? = nil,
+        cursor: String? = nil,
+        limit: Int? = nil
+    ) async throws -> PaginatedResult<Edge> {
+        var query: [(String, String)] = []
+        if let edgeType { query.append(("edge_type", edgeType)) }
+        if let cursor { query.append(("cursor", cursor)) }
+        if let limit { query.append(("limit", String(limit))) }
+        return try await transport.request(
+            method: .get, path: "/items/\(id)/edges", body: nil,
+            query: query.isEmpty ? nil : query
+        )
+    }
+
+    /// Lists inbound edges pointing at the item — edges where this item is the target.
+    /// Use for "who references me?" queries (e.g. list all `in-thread` edges
+    /// whose target is this thread to enumerate its members).
+    public func backrefs(
+        id: String,
+        edgeType: String? = nil,
+        cursor: String? = nil,
+        limit: Int? = nil
+    ) async throws -> PaginatedResult<Edge> {
+        var query: [(String, String)] = []
+        if let edgeType { query.append(("edge_type", edgeType)) }
+        if let cursor { query.append(("cursor", cursor)) }
+        if let limit { query.append(("limit", String(limit))) }
+        return try await transport.request(
+            method: .get, path: "/items/\(id)/backrefs", body: nil,
+            query: query.isEmpty ? nil : query
         )
     }
 

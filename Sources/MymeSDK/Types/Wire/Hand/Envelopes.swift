@@ -56,17 +56,6 @@ struct ThreadResponse: Codable, Sendable {
     let thread: MymeThread
 }
 
-/// A thread with its associated items.
-public struct ThreadWithItems: Codable, Sendable {
-    public let thread: MymeThread
-    public let items: [Item]
-
-    public init(thread: MymeThread, items: [Item]) {
-        self.thread = thread
-        self.items = items
-    }
-}
-
 /// Response from GET /keys: `{ "keys": [ApiKey] }`.
 struct KeysListResponse: Codable, Sendable {
     let keys: [ApiKey]
