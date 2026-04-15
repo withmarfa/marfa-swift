@@ -10,6 +10,14 @@ import Foundation
 ///     )
 ///     let results = try await client.search(query: "hello")
 ///
+/// For pure offline / on-device use, create a local-only client backed by
+/// a SQLite store — no API key or server URL required:
+///
+///     let client = try MymeClient.local(path: "/path/to/store.sqlite")
+///     let note = try await client.items.create(
+///         CreateItemInput(type: "core.note", properties: ["body": .string("Hello")])
+///     )
+///
 /// The client is `Sendable` and safe to share across tasks and actors.
 public final class MymeClient: Sendable {
 
@@ -46,18 +54,19 @@ public final class MymeClient: Sendable {
     // MARK: - Init
 
     /// Designated init — used by every other init path, including tests.
-    init(configuration: ClientConfiguration, transport: any Transport) {
+    init(configuration: ClientConfiguration, transport: any Transport, localStore: LocalStore? = nil) {
         self.configuration = configuration
         self.transport = transport
 
         let items = ItemsNamespace(
             transport: transport,
-            defaultConflictStrategy: configuration.conflictStrategy
+            defaultConflictStrategy: configuration.conflictStrategy,
+            localStore: localStore
         )
-        let edges = EdgesNamespace(transport: transport)
+        let edges = EdgesNamespace(transport: transport, localStore: localStore)
         self.items = items
         self.edges = edges
-        self.metadata = MetadataNamespace(transport: transport)
+        self.metadata = MetadataNamespace(transport: transport, localStore: localStore)
         self.extensions = ExtensionsNamespace(transport: transport)
         self.blobs = BlobsNamespace(
             transport: transport,
@@ -80,6 +89,27 @@ public final class MymeClient: Sendable {
     /// Creates a client with a URL and API key using default settings.
     public convenience init(url: URL, apiKey: String) {
         self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
+    }
+
+    /// Creates a pure-local client backed by a SQLite store at `path`.
+    ///
+    /// No server URL or API key is required. All namespace calls resolve against
+    /// the local store. Pass `":memory:"` for an ephemeral store (useful in tests).
+    ///
+    /// - Throws: ``LocalStoreError`` if the database cannot be opened or migrated.
+    public static func local(path: String) throws -> MymeClient {
+        let store = try LocalStore(path: path)
+        // The transport is never invoked in pure-local mode: every namespace
+        // method checks `localStore` first before touching the transport.
+        let config = ClientConfiguration(
+            url: URL(string: "local://offline")!,
+            apiKey: ""
+        )
+        return MymeClient(
+            configuration: config,
+            transport: URLSessionTransport(configuration: config),
+            localStore: store
+        )
     }
 
     /// Creates a client from environment variables (`MYME_API_URL`, `MYME_API_KEY`).
