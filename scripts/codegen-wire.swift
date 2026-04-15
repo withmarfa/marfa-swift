@@ -485,7 +485,7 @@ func resolveType(
 // MARK: - Naming helpers
 
 func toCamelCase(_ snake: String) -> String {
-    let parts = snake.split(separator: "_")
+    let parts = snake.split(whereSeparator: { $0 == "_" || $0 == "-" })
     guard let first = parts.first else { return snake }
     var result = String(first).lowercased()
     for segment in parts.dropFirst() {
@@ -495,7 +495,7 @@ func toCamelCase(_ snake: String) -> String {
 }
 
 func pascal(_ snake: String) -> String {
-    let parts = snake.split(separator: "_")
+    let parts = snake.split(whereSeparator: { $0 == "_" || $0 == "-" })
     return parts.map { $0.capitalized(firstOnly: true) }.joined()
 }
 
