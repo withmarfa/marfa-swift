@@ -55,3 +55,8 @@ struct DeliveriesResponse: Codable, Sendable {
 struct KeysListResponse: Codable, Sendable {
     let keys: [ApiKey]
 }
+
+/// Response from single-edge endpoints: `{ "edge": ... }`.
+struct EdgeResponse: Codable, Sendable {
+    let edge: Edge
+}

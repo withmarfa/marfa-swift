@@ -51,22 +51,44 @@ public final class MymeClient: Sendable {
     /// Webhooks API: create, list, get, update, delete, delivery history.
     public let webhooks: WebhooksNamespace
 
+    /// The active sync engine, present only in synced mode (``MymeClient/synced(url:apiKey:storePath:)``).
+    ///
+    /// Call ``SyncEngine/start()`` to begin synchronisation and
+    /// ``SyncEngine/stop()`` to tear it down gracefully.
+    public let syncEngine: SyncEngine?
+
     // MARK: - Init
 
     /// Designated init — used by every other init path, including tests.
-    init(configuration: ClientConfiguration, transport: any Transport, localStore: LocalStore? = nil) {
+    init(
+        configuration: ClientConfiguration,
+        transport: any Transport,
+        localStore: LocalStore? = nil,
+        mutationQueue: MutationQueue? = nil,
+        syncEngine: SyncEngine? = nil
+    ) {
         self.configuration = configuration
         self.transport = transport
+        self.syncEngine = syncEngine
 
         let items = ItemsNamespace(
             transport: transport,
             defaultConflictStrategy: configuration.conflictStrategy,
-            localStore: localStore
+            localStore: localStore,
+            mutationQueue: mutationQueue
         )
-        let edges = EdgesNamespace(transport: transport, localStore: localStore)
+        let edges = EdgesNamespace(
+            transport: transport,
+            localStore: localStore,
+            mutationQueue: mutationQueue
+        )
         self.items = items
         self.edges = edges
-        self.metadata = MetadataNamespace(transport: transport, localStore: localStore)
+        self.metadata = MetadataNamespace(
+            transport: transport,
+            localStore: localStore,
+            mutationQueue: mutationQueue
+        )
         self.extensions = ExtensionsNamespace(transport: transport)
         self.blobs = BlobsNamespace(
             transport: transport,
@@ -109,6 +131,46 @@ public final class MymeClient: Sendable {
             configuration: config,
             transport: URLSessionTransport(configuration: config),
             localStore: store
+        )
+    }
+
+    /// Creates a synced client backed by a SQLite store and a live server connection.
+    ///
+    /// The client writes optimistically to the local store on every mutation and
+    /// enqueues the mutation for background replay. The returned ``SyncEngine``
+    /// (via ``MymeClient/syncEngine``) must be started by the caller:
+    ///
+    ///     let client = try MymeClient.synced(url: serverURL, apiKey: key, storePath: dbPath)
+    ///     await client.syncEngine?.start()
+    ///
+    /// - Parameters:
+    ///   - url: Base URL of the Myme API.
+    ///   - apiKey: API key for authentication.
+    ///   - storePath: Path to the SQLite database file. Pass `":memory:"` for tests.
+    ///   - connectionManager: Optional pre-built manager; the default creates one.
+    /// - Throws: ``LocalStoreError`` if the database cannot be opened or migrated.
+    public static func synced(
+        url: URL,
+        apiKey: String,
+        storePath: String,
+        connectionManager: ConnectionStateManager = ConnectionStateManager()
+    ) throws -> MymeClient {
+        let config = ClientConfiguration(url: url, apiKey: apiKey)
+        let transport = URLSessionTransport(configuration: config)
+        let store = try LocalStore(path: storePath)
+        let queue = try MutationQueue(pool: store.pool)
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connectionManager
+        )
+        return MymeClient(
+            configuration: config,
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            syncEngine: engine
         )
     }
 

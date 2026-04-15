@@ -11,6 +11,7 @@ public struct EdgesNamespace: Sendable {
 
     let transport: any Transport
     let localStore: LocalStore?
+    let mutationQueue: MutationQueue?
 
     // MARK: - Mutations
 
@@ -22,10 +23,16 @@ public struct EdgesNamespace: Sendable {
         properties: [String: JSONValue]? = nil
     ) async throws -> Edge {
         if let store = localStore {
-            return try await store.createEdge(
+            let edge = try await store.createEdge(
                 source: source, target: target,
                 edgeType: edgeType, properties: properties
             )
+            try? await mutationQueue?.enqueueCreateEdge(
+                source: source, target: target,
+                edgeType: edgeType, properties: properties,
+                localEdgeId: edge.id
+            )
+            return edge
         }
         let body = CreateEdgeBody(
             sourceId: source,
@@ -45,7 +52,9 @@ public struct EdgesNamespace: Sendable {
         properties: [String: JSONValue]
     ) async throws -> Edge {
         if let store = localStore {
-            return try await store.updateEdge(id: id, properties: properties)
+            let edge = try await store.updateEdge(id: id, properties: properties)
+            try? await mutationQueue?.enqueueUpdateEdge(id: id, properties: properties)
+            return edge
         }
         let body = UpdateEdgeBody(properties: properties)
         let response: EdgeResponse = try await transport.request(
@@ -57,7 +66,9 @@ public struct EdgesNamespace: Sendable {
     /// Deletes an edge.
     public func delete(id: String) async throws {
         if let store = localStore {
-            return try await store.deleteEdge(id: id)
+            try await store.deleteEdge(id: id)
+            try? await mutationQueue?.enqueueDeleteEdge(id: id)
+            return
         }
         let _: EmptyResponse = try await transport.request(
             method: .delete, path: "/edges/\(id)", body: nil, query: nil
@@ -165,9 +176,4 @@ struct CreateEdgeBody: Codable, Sendable {
 /// Request body for `PATCH /edges/:id`.
 struct UpdateEdgeBody: Codable, Sendable {
     let properties: [String: JSONValue]
-}
-
-/// Response envelope for single-edge endpoints: `{ "edge": ... }`.
-struct EdgeResponse: Codable, Sendable {
-    let edge: Edge
 }

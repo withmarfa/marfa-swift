@@ -6,11 +6,14 @@ public struct ItemsNamespace: Sendable {
     let transport: any Transport
     let defaultConflictStrategy: ConflictStrategy
     let localStore: LocalStore?
+    let mutationQueue: MutationQueue?
 
     /// Creates a new item.
     public func create(_ input: CreateItemInput) async throws -> Item {
         if let store = localStore {
-            return try await store.createItem(input)
+            let item = try await store.createItem(input)
+            try? await mutationQueue?.enqueueCreateItem(input, localId: item.id)
+            return item
         }
         let response: ItemResponse = try await transport.request(
             method: .post, path: "/items", body: input, query: nil
@@ -74,7 +77,9 @@ public struct ItemsNamespace: Sendable {
         options: UpdateOptions? = nil
     ) async throws -> Item {
         if let store = localStore {
-            return try await store.updateItem(id: id, properties: properties)
+            let item = try await store.updateItem(id: id, properties: properties)
+            try? await mutationQueue?.enqueueUpdateItem(id: id, properties: properties)
+            return item
         }
         let resolvedVersion: Int
         if let v = options?.version {
@@ -96,7 +101,9 @@ public struct ItemsNamespace: Sendable {
     /// Soft-deletes an item (transitions to trashed).
     public func delete(id: String) async throws {
         if let store = localStore {
-            return try await store.trashItem(id: id)
+            try await store.trashItem(id: id)
+            try? await mutationQueue?.enqueueDeleteItem(id: id)
+            return
         }
         let _: EmptyResponse = try await transport.request(
             method: .delete, path: "/items/\(id)", body: nil, query: nil
@@ -106,7 +113,9 @@ public struct ItemsNamespace: Sendable {
     /// Restores a trashed item.
     public func restore(id: String) async throws -> Item {
         if let store = localStore {
-            return try await store.restoreItem(id: id)
+            let item = try await store.restoreItem(id: id)
+            try? await mutationQueue?.enqueueRestoreItem(id: id)
+            return item
         }
         let response: ItemResponse = try await transport.request(
             method: .post, path: "/items/\(id)/restore", body: nil, query: nil
@@ -117,7 +126,9 @@ public struct ItemsNamespace: Sendable {
     /// Transitions an item to a new lifecycle state.
     public func transition(id: String, to state: String) async throws -> Item {
         if let store = localStore {
-            return try await store.transitionItem(id: id, to: state)
+            let item = try await store.transitionItem(id: id, to: state)
+            try? await mutationQueue?.enqueueTransitionItem(id: id, to: state)
+            return item
         }
         let response: ItemResponse = try await transport.request(
             method: .post, path: "/items/\(id)/transition",
@@ -159,7 +170,9 @@ public struct ItemsNamespace: Sendable {
     /// Permanently deletes a trashed item (admin only).
     public func purge(id: String) async throws {
         if let store = localStore {
-            return try await store.purgeItem(id: id)
+            try await store.purgeItem(id: id)
+            try? await mutationQueue?.enqueuePurgeItem(id: id)
+            return
         }
         let _: EmptyResponse = try await transport.request(
             method: .delete, path: "/items/\(id)/purge", body: nil, query: nil
