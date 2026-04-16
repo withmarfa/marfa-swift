@@ -75,7 +75,6 @@ struct ListFiltersTests {
             type: "core.note",
             state: .active,
             source: "sdk",
-            rootOnly: true,
             tags: ["a", "b"],
             sort: .createdAt,
             direction: .descending,
@@ -85,7 +84,7 @@ struct ListFiltersTests {
         let params = filters.toQueryParams()
         let keys = Set(params.map { $0.0 })
         #expect(keys.isSuperset(of: [
-            "type", "state", "source", "root_only", "tags",
+            "type", "state", "source", "tags",
             "sort", "direction", "limit", "cursor",
         ]))
     }

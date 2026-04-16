@@ -5,8 +5,8 @@ import os
 /// `Logger` and `OSSignposter`. One instance per category.
 ///
 /// Subsystem is fixed to `"sdk.myme"` so consumers can filter logs and
-/// signposts to the SDK in Console.app or Instruments. Categories used in
-/// Wave 1: `"transport"`, `"retry"`, `"sse"`, `"keychain"`.
+/// signposts to the SDK in Console.app or Instruments. Active categories:
+/// `"transport"`, `"retry"`, `"sse"`, `"keychain"`.
 ///
 /// Privacy is the caller's responsibility at the interpolation site:
 ///

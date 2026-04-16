@@ -10,7 +10,6 @@ public struct ListFilters: Sendable {
     public var type: String?
     public var state: ItemState?
     public var source: String?
-    public var rootOnly: Bool?
     public var library: LibraryFilter?
     public var tags: [String]?
     public var filter: String?
@@ -33,7 +32,6 @@ public struct ListFilters: Sendable {
         type: String? = nil,
         state: ItemState? = nil,
         source: String? = nil,
-        rootOnly: Bool? = nil,
         library: LibraryFilter? = nil,
         tags: [String]? = nil,
         filter: String? = nil,
@@ -49,7 +47,6 @@ public struct ListFilters: Sendable {
         self.type = type
         self.state = state
         self.source = source
-        self.rootOnly = rootOnly
         self.library = library
         self.tags = tags
         self.filter = filter
@@ -69,7 +66,6 @@ public struct ListFilters: Sendable {
         if let type { params.append(("type", type)) }
         if let state { params.append(("state", state.rawValue)) }
         if let source { params.append(("source", source)) }
-        if let rootOnly { params.append(("root_only", rootOnly ? "true" : "false")) }
         if let library { params.append(("library", library.rawValue)) }
         if let tags, !tags.isEmpty { params.append(("tags", tags.joined(separator: ","))) }
         if let filter { params.append(("filter", filter)) }
@@ -94,16 +90,18 @@ public struct ListFilters: Sendable {
     }
 }
 
-/// Tri-value filter for `GET /items?library=...`.
+/// Tri-value filter for `GET /items?library=...` and `GET /search?library=...`.
 ///
-/// Omitting the filter (the default) matches the server-side default of
-/// library-only. Use `.ambient` or `.all` to widen.
+/// Omitting the filter matches the server-side default of no filter — both
+/// library and ambient items are returned. Use `.library` to narrow to
+/// curated items, `.ambient` to narrow to the expiring tier, or `.all` as an
+/// explicit synonym for the default.
 public enum LibraryFilter: String, Sendable, Hashable, Codable {
-    /// Library items only. Matches the server default when `library` is absent.
+    /// Library items only.
     case library = "true"
     /// Ambient items only.
     case ambient = "false"
-    /// Both library and ambient items.
+    /// Both library and ambient items (same as omitting the filter).
     case all
 }
 
@@ -124,17 +122,20 @@ public enum SortDirection: String, Sendable {
 public struct SearchFilters: Sendable {
     public var type: String?
     public var state: ItemState?
+    public var library: LibraryFilter?
     public var filter: String?
     public var limit: Int?
 
     public init(
         type: String? = nil,
         state: ItemState? = nil,
+        library: LibraryFilter? = nil,
         filter: String? = nil,
         limit: Int? = nil
     ) {
         self.type = type
         self.state = state
+        self.library = library
         self.filter = filter
         self.limit = limit
     }
@@ -143,6 +144,7 @@ public struct SearchFilters: Sendable {
         var params: [(String, String)] = [("q", query)]
         if let type { params.append(("type", type)) }
         if let state { params.append(("state", state.rawValue)) }
+        if let library { params.append(("library", library.rawValue)) }
         if let filter { params.append(("filter", filter)) }
         if let limit { params.append(("limit", String(limit))) }
         return params
