@@ -331,7 +331,6 @@ func requiredCheckExpr(fieldKey: String, field: FieldDefinition?) -> String {
 
 /// Generates the statement that writes a typed property into the props dict.
 func propertyAssignment(swiftName: String, fieldKey: String, field: FieldDefinition, required: Bool) -> String {
-    let accessor = self.extractionExpr(swiftName: swiftName, fieldKey: fieldKey, field: field, required: required)
     switch field.type {
     case "string", "enum":
         if required {
