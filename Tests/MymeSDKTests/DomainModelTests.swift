@@ -424,14 +424,4 @@ struct DomainModelTests {
         #expect(CoreNote.typeIdentifier == "core.note")
         #expect(CoreTask.typeIdentifier == "core.task")
     }
-
-    private func makeItem(type: String, properties: [String: JSONValue]) -> Item {
-        Item(
-            createdAt: "2026-01-01T00:00:00Z", id: "test-id",
-            library: false, origin: .user, properties: properties,
-            schemaVersion: 1, source: "test", state: .active,
-            timestamp: "2026-01-01T00:00:00Z", type: type,
-            updatedAt: "2026-01-01T00:00:00Z", version: 1
-        )
-    }
 }

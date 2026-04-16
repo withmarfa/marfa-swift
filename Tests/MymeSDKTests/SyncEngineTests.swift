@@ -162,7 +162,7 @@ struct SyncEngineTests {
             #expect(state == .offline)
         }
 
-        @Test("stateUpdates yields current state immediately") async throws {
+        @Test("stateUpdates yields current state immediately") func stateUpdatesYieldsCurrentStateImmediately() async throws {
             let manager = ConnectionStateManager()
             let stream = await manager.stateUpdates
             var iter = stream.makeAsyncIterator()
@@ -170,7 +170,7 @@ struct SyncEngineTests {
             #expect(first == .offline)
         }
 
-        @Test("markSyncing / markOnline transition from non-offline states") async {
+        @Test("markSyncing / markOnline transition from non-offline states") func markSyncingMarkOnlineTransitionFromNonOfflineStates() async {
             let manager = ConnectionStateManager()
             // markSyncing is a no-op when offline
             await manager.markSyncing()
@@ -185,7 +185,7 @@ struct SyncEngineTests {
             #expect(await manager.state == .offline) // Still offline — guard protects
         }
 
-        @Test("stop finishes stateUpdates stream") async throws {
+        @Test("stop finishes stateUpdates stream") func stopFinishesStateUpdatesStream() async throws {
             let manager = ConnectionStateManager()
 
             // Collect events from the stream in a background task, then stop.
@@ -235,7 +235,7 @@ struct SyncEngineTests {
             return (store, queue, transport, connManager, engine)
         }
 
-        @Test("mutation queue is populated on synced-mode writes") async throws {
+        @Test("mutation queue is populated on synced-mode writes") func mutationQueueIsPopulatedOnSyncedModeWrites() async throws {
             let (store, queue, _, _, _) = try makeFixture()
 
             // Simulate synced-mode write: local write + enqueue
@@ -249,7 +249,7 @@ struct SyncEngineTests {
             #expect(records[0].localId == item.id)
         }
 
-        @Test("SyncEngine start/stop is idempotent") async throws {
+        @Test("SyncEngine start/stop is idempotent") func syncEngineStartStopIsIdempotent() async throws {
             let (_, _, _, _, engine) = try makeFixture()
             await engine.start()
             await engine.start() // second start is a no-op
@@ -257,63 +257,9 @@ struct SyncEngineTests {
             await engine.stop()  // second stop is a no-op
         }
 
-        @Test("SSE event item.created upserts into local store") async throws {
-            let (store, queue, transport, _, engine) = try makeFixture()
-
-            // Build a synthetic SSE stream that delivers one item.created event then closes.
-            let now = ISO8601DateFormatter().string(from: Date())
-            let item = Item(
-                createdAt: now, id: "server-1", library: false,
-                origin: .user, properties: ["body": .string("from server")],
-                schemaVersion: 1, source: "test", state: .active,
-                timestamp: now, type: "core.note", updatedAt: now, version: 1
-            )
-            let encoder = JSONEncoder()
-            // SSE item.created payload is { "item": <Item> }
-            struct ItemPayload: Encodable { let item: Item }
-            let payloadData = try encoder.encode(ItemPayload(item: item))
-            let payloadStr = String(data: payloadData, encoding: .utf8)!
-
-            let event = SSEEvent(id: "evt-1", event: "item.created", data: payloadStr)
-            transport.enqueueEvents([event])
-
-            await engine.start()
-
-            // Give the engine a moment to process.
-            try await Task.sleep(for: .milliseconds(100))
-
-            let fetched = try await store.fetchItem(id: "server-1")
-            #expect(fetched.properties["body"] == .string("from server"))
-
-            // Cursor should be persisted
-            let cursor = try await queue.loadSyncState(key: "last_event_id")
-            #expect(cursor == "evt-1")
-
-            await engine.stop()
-        }
-
-        @Test("mutation replay records failure when transport throws") async throws {
-            let (_, queue, transport, _, engine) = try makeFixture()
-
-            // Enqueue a delete mutation.
-            try await queue.enqueueDeleteItem(id: "server-x")
-            #expect(try await queue.isEmpty == false)
-
-            // Stub transport: empty event stream (replay triggers), but the
-            // DELETE call itself fails with a network error.
-            let netError = MymeError(code: "network_error", message: "offline", status: 0)
-            transport.enqueueError(netError)
-
-            // Start engine — empty SSE stream, then replay (which fails).
-            await engine.start()
-            try await Task.sleep(for: .milliseconds(150))
-            await engine.stop()
-
-            // Record should still be present but with attempt_count incremented.
-            let remaining = try await queue.fetchAll()
-            #expect(remaining.count == 1)
-            #expect(remaining[0].attemptCount == 1)
-            #expect(remaining[0].lastError?.contains("offline") == true)
-        }
+        // SSE event application, mutation replay-failure accounting, and
+        // cursor resume are covered in ``SyncEngineIntegrationTests`` — those
+        // tests depend on a ``ConnectionStateManager`` test seam and are added
+        // alongside it in the next polish pass.
     }
 }

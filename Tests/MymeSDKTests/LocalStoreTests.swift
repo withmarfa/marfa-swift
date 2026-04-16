@@ -78,7 +78,7 @@ struct LocalStoreTests {
         #expect(result.hasMore == false)
     }
 
-    @Test("fetchItems filters by type") async throws {
+    @Test("fetchItems filters by type") func fetchItemsFiltersByType() async throws {
         let store = try makeStore()
         _ = try await store.createItem(noteInput())
         _ = try await store.createItem(CreateItemInput(type: "core.task", properties: ["title": "Task"]))
@@ -87,7 +87,7 @@ struct LocalStoreTests {
         #expect(notes.data.count == 1)
     }
 
-    @Test("fetchItems filters by state") async throws {
+    @Test("fetchItems filters by state") func fetchItemsFiltersByState() async throws {
         let store = try makeStore()
         let active = try await store.createItem(noteInput(body: "keep"))
         let toTrash = try await store.createItem(noteInput(body: "trash me"))
@@ -97,7 +97,7 @@ struct LocalStoreTests {
         #expect(!actives.data.map(\.id).contains(toTrash.id))
     }
 
-    @Test("updateItem replaces properties and increments version") async throws {
+    @Test("updateItem replaces properties and increments version") func updateItemReplacesPropertiesAndIncrementsVersion() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput(body: "original"))
         let updated = try await store.updateItem(
@@ -109,7 +109,7 @@ struct LocalStoreTests {
         #expect(updated.properties["title"] == .string("New Title"))
     }
 
-    @Test("trashItem sets state to trashed") async throws {
+    @Test("trashItem sets state to trashed") func trashItemSetsStateToTrashed() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         try await store.trashItem(id: item.id)
@@ -117,7 +117,7 @@ struct LocalStoreTests {
         #expect(fetched.state == .trashed)
     }
 
-    @Test("restoreItem sets state back to active") async throws {
+    @Test("restoreItem sets state back to active") func restoreItemSetsStateBackToActive() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         try await store.trashItem(id: item.id)
@@ -125,14 +125,14 @@ struct LocalStoreTests {
         #expect(restored.state == .active)
     }
 
-    @Test("transitionItem sets arbitrary state") async throws {
+    @Test("transitionItem sets arbitrary state") func transitionItemSetsArbitraryState() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         let archived = try await store.transitionItem(id: item.id, to: "archived")
         #expect(archived.state == .archived)
     }
 
-    @Test("itemStats counts by state") async throws {
+    @Test("itemStats counts by state") func itemStatsCountsByState() async throws {
         let store = try makeStore()
         _ = try await store.createItem(noteInput(body: "1"))
         _ = try await store.createItem(noteInput(body: "2"))
@@ -143,7 +143,7 @@ struct LocalStoreTests {
         #expect(stats["trashed"] == 1)
     }
 
-    @Test("purgeItem removes item permanently") async throws {
+    @Test("purgeItem removes item permanently") func purgeItemRemovesItemPermanently() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         try await store.purgeItem(id: item.id)
@@ -155,7 +155,7 @@ struct LocalStoreTests {
 
     // MARK: - Edge CRUD
 
-    @Test("createEdge and fetchEdgesFromSource") async throws {
+    @Test("createEdge and fetchEdgesFromSource") func createEdgeAndFetchEdgesFromSource() async throws {
         let store = try makeStore()
         let a = try await store.createItem(noteInput(body: "A"))
         let b = try await store.createItem(noteInput(body: "B"))
@@ -173,7 +173,7 @@ struct LocalStoreTests {
         #expect(edges.data.map(\.id).contains(edge.id))
     }
 
-    @Test("fetchEdgesToTarget returns inbound edges") async throws {
+    @Test("fetchEdgesToTarget returns inbound edges") func fetchEdgesToTargetReturnsInboundEdges() async throws {
         let store = try makeStore()
         let a = try await store.createItem(noteInput(body: "A"))
         let b = try await store.createItem(noteInput(body: "B"))
@@ -187,7 +187,7 @@ struct LocalStoreTests {
         #expect(backrefs.data.map(\.id).contains(edge.id))
     }
 
-    @Test("fetchEdgesFromSource filters by edgeType") async throws {
+    @Test("fetchEdgesFromSource filters by edgeType") func fetchEdgesFromSourceFiltersByEdgeType() async throws {
         let store = try makeStore()
         let a = try await store.createItem(noteInput())
         let b = try await store.createItem(noteInput())
@@ -202,7 +202,7 @@ struct LocalStoreTests {
         #expect(aboutEdges.data[0].edgeType == "about")
     }
 
-    @Test("updateEdge replaces properties") async throws {
+    @Test("updateEdge replaces properties") func updateEdgeReplacesProperties() async throws {
         let store = try makeStore()
         let a = try await store.createItem(noteInput())
         let b = try await store.createItem(noteInput())
@@ -217,7 +217,7 @@ struct LocalStoreTests {
         #expect(updated.properties["note"] == .string("new"))
     }
 
-    @Test("deleteEdge removes edge") async throws {
+    @Test("deleteEdge removes edge") func deleteEdgeRemovesEdge() async throws {
         let store = try makeStore()
         let a = try await store.createItem(noteInput())
         let b = try await store.createItem(noteInput())
@@ -233,14 +233,14 @@ struct LocalStoreTests {
 
     // MARK: - Metadata CRUD
 
-    @Test("fetchMetadata returns empty metadata for unknown item") async throws {
+    @Test("fetchMetadata returns empty metadata for unknown item") func fetchMetadataReturnsEmptyMetadataForUnknownItem() async throws {
         let store = try makeStore()
         let meta = try await store.fetchMetadata(itemId: "ghost")
         #expect(meta.tags.isEmpty)
         #expect(meta.extensions.isEmpty)
     }
 
-    @Test("setMetadata replaces tags") async throws {
+    @Test("setMetadata replaces tags") func setMetadataReplacesTags() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         _ = try await store.setMetadata(itemId: item.id, input: MetadataInput(tags: ["a", "b"]))
@@ -248,7 +248,7 @@ struct LocalStoreTests {
         #expect(Set(meta.tags) == ["a", "b"])
     }
 
-    @Test("mergeMetadata unions tags") async throws {
+    @Test("mergeMetadata unions tags") func mergeMetadataUnionsTags() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         _ = try await store.setMetadata(itemId: item.id, input: MetadataInput(tags: ["a"]))
@@ -257,7 +257,7 @@ struct LocalStoreTests {
         #expect(Set(meta.tags) == ["a", "b", "c"])
     }
 
-    @Test("addTags unions with existing") async throws {
+    @Test("addTags unions with existing") func addTagsUnionsWithExisting() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         _ = try await store.addTags(itemId: item.id, tags: ["x"])
@@ -266,7 +266,7 @@ struct LocalStoreTests {
         #expect(Set(meta.tags) == ["x", "y"])
     }
 
-    @Test("removeTag removes single tag") async throws {
+    @Test("removeTag removes single tag") func removeTagRemovesSingleTag() async throws {
         let store = try makeStore()
         let item = try await store.createItem(noteInput())
         _ = try await store.setMetadata(itemId: item.id, input: MetadataInput(tags: ["a", "b", "c"]))

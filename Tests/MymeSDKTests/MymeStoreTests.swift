@@ -233,7 +233,7 @@ struct MymeStoreTests {
 
     // MARK: - EdgesQuery
 
-    @Test("EdgesQuery returns outbound edges") async throws {
+    @Test("EdgesQuery returns outbound edges") func edgesQueryReturnsOutboundEdges() async throws {
         let client = try makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
@@ -253,7 +253,7 @@ struct MymeStoreTests {
         query.stop()
     }
 
-    @Test("EdgesQuery filters by edgeType") async throws {
+    @Test("EdgesQuery filters by edgeType") func edgesQueryFiltersByEdgeType() async throws {
         let client = try makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
@@ -273,7 +273,7 @@ struct MymeStoreTests {
         aboutQuery.stop()
     }
 
-    @Test("EdgesQuery updates when edge is deleted") async throws {
+    @Test("EdgesQuery updates when edge is deleted") func edgesQueryUpdatesWhenEdgeIsDeleted() async throws {
         let client = try makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
