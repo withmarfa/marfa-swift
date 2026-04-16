@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 
 /// Client for the Myme API.
 ///

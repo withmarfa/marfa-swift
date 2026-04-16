@@ -387,10 +387,23 @@ func propertyAssignment(swiftName: String, fieldKey: String, field: FieldDefinit
 
 // MARK: - Main
 
-let scriptDir = URL(fileURLWithPath: CommandLine.arguments[0])
-    .deletingLastPathComponent()
-let repoRoot = scriptDir.deletingLastPathComponent()
-let typesDir = scriptDir.appendingPathComponent("core-types")
+/// Walks up from the current working directory looking for `Package.swift`,
+/// matching the pattern used by `codegen-wire`. Needed because
+/// `CommandLine.arguments[0]` under `swift run` resolves to the build output
+/// path, not the scripts directory.
+func locateRepoRoot() -> URL {
+    var url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    for _ in 0..<8 {
+        if FileManager.default.fileExists(atPath: url.appendingPathComponent("Package.swift").path) {
+            return url
+        }
+        url = url.deletingLastPathComponent()
+    }
+    fatalError("could not locate Package.swift starting from \(FileManager.default.currentDirectoryPath)")
+}
+
+let repoRoot = locateRepoRoot()
+let typesDir = repoRoot.appendingPathComponent("scripts/core-types")
 let outputDir = repoRoot
     .appendingPathComponent("Sources/MymeSDK/DomainModels/Generated")
 

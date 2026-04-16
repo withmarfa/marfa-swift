@@ -17,23 +17,41 @@ public actor LocalStore {
 
     // MARK: - Internal state
 
-    let pool: DatabasePool
+    /// Shared `DatabasePool` — nonisolated so the reactive and sync layers
+    /// (`MymeStore`, `MutationQueue`, `SyncEngine`) can construct observations
+    /// and sibling writers without crossing the actor boundary for every read.
+    /// `DatabasePool` is `Sendable` (GRDB 7+), so this is safe.
+    nonisolated let pool: DatabasePool
 
-    private static let iso8601: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    /// ISO 8601 timestamp with fractional seconds, matching the wire format
+    /// used by the server. `Date.ISO8601FormatStyle` is a `Sendable` value type,
+    /// so this avoids the concurrency constraints that apply to
+    /// `ISO8601DateFormatter` under Swift 6 strict mode.
+    private static func iso8601(_ date: Date) -> String {
+        date.ISO8601Format(.init(includingFractionalSeconds: true))
+    }
 
     // MARK: - Init
 
     /// Opens (or creates) the SQLite database at `path` and runs migrations.
     ///
-    /// Pass `:memory:` for an ephemeral in-memory database — useful in tests.
+    /// Pass `:memory:` for an ephemeral database — useful in tests. `DatabasePool`
+    /// requires file-backed storage for WAL mode, so `:memory:` is transparently
+    /// mapped to a unique file under the OS temporary directory. The file is
+    /// not explicitly cleaned up; the OS evicts stale temp files.
     public init(path: String) throws {
+        let resolvedPath: String
+        if path == ":memory:" {
+            resolvedPath = FileManager.default
+                .temporaryDirectory
+                .appendingPathComponent("myme-\(UUID().uuidString).sqlite")
+                .path
+        } else {
+            resolvedPath = path
+        }
         var config = Configuration()
         config.maximumReaderCount = 5
-        pool = try DatabasePool(path: path, configuration: config)
+        pool = try DatabasePool(path: resolvedPath, configuration: config)
         var migrator = DatabaseMigrator()
         LocalStore.registerMigrations(into: &migrator)
         try migrator.migrate(pool)
@@ -106,7 +124,7 @@ public actor LocalStore {
     // MARK: - Helpers
 
     private func now() -> String {
-        LocalStore.iso8601.string(from: Date())
+        LocalStore.iso8601(Date())
     }
 
     private func newId() -> String {

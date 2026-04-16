@@ -202,7 +202,7 @@ public actor SyncEngine {
         case "metadata.changed":
             if let payload = try? decoder.decode(MetadataEventPayload.self, from: data) {
                 let input = MetadataInput(tags: payload.metadata.tags)
-                try? await localStore.setMetadata(itemId: payload.itemId, input: input)
+                _ = try? await localStore.setMetadata(itemId: payload.itemId, input: input)
             }
 
         default:
