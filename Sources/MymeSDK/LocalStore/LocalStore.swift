@@ -7,9 +7,9 @@ import GRDB
 /// - **Pure-local** — `MymeClient.local(path:)`. No server; all namespace
 ///   calls resolve against this store. Ideal for on-device-only apps, tests,
 ///   and offline-first prototyping.
-/// - **Synced** — `MymeClient.synced(url:apiKey:storePath:)` (PR 3). Writes
-///   go to the store immediately, then queue to replay against the server.
-///   Reads are served locally; the sync engine keeps the store fresh via SSE.
+/// - **Synced** — `MymeClient.synced(url:apiKey:storePath:)`. Writes go to
+///   the store immediately, then queue to replay against the server. Reads
+///   are served locally; the sync engine keeps the store fresh via SSE.
 ///
 /// The actor isolates all SQLite access. `DatabasePool` is opened in WAL mode,
 /// allowing concurrent reads while a write is in flight.

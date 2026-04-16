@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Fields mirror the WHATWG SSE specification:
 /// - ``id`` — the most recent `id:` field seen on this stream (sticky across
-///   events per spec). Wave 2's sync consumer reads this and persists it as
-///   the `sync_state` cursor for reconnection via `Last-Event-ID`.
+///   events per spec). Stream consumers such as ``SyncEngine`` persist this
+///   as a cursor and pass it back as `Last-Event-ID` on reconnection.
 /// - ``event`` — the `event:` type, if any. Callers usually switch on this.
 /// - ``data`` — the `data:` payload. Multi-line `data:` fields are joined
 ///   with `\n`.

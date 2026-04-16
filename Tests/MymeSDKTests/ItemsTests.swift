@@ -23,7 +23,7 @@ struct ItemsTests {
                 properties: ["title": .string("Test Note")],
                 schemaVersion: 1,
                 source: "sdk-test",
-                state: .new,
+                state: .active,
                 timestamp: "2026-01-01T00:00:00Z",
                 type: "core.note",
                 updatedAt: "2026-01-01T00:00:00Z",
@@ -50,7 +50,7 @@ struct ItemsTests {
 
         #expect(item.id == "test-id")
         #expect(item.type == "core.note")
-        #expect(item.state == .new)
+        #expect(item.state == .active)
         #expect(mock.calls.count == 1)
         #expect(mock.calls[0].method == .post)
         #expect(mock.calls[0].path == "/items")
