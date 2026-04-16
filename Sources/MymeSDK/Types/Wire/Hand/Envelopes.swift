@@ -51,12 +51,12 @@ struct DeliveriesResponse: Codable, Sendable {
     let deliveries: [WebhookDelivery]
 }
 
-/// Response from thread endpoints: `{ "thread": ... }`.
-struct ThreadResponse: Codable, Sendable {
-    let thread: MymeThread
-}
-
 /// Response from GET /keys: `{ "keys": [ApiKey] }`.
 struct KeysListResponse: Codable, Sendable {
     let keys: [ApiKey]
+}
+
+/// Response from single-edge endpoints: `{ "edge": ... }`.
+struct EdgeResponse: Codable, Sendable {
+    let edge: Edge
 }

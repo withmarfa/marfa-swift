@@ -38,8 +38,6 @@ struct WireRoundTripTests {
 
     @Test("Version") func version() throws { try assertRoundTrip(Version.self, fixture: "version") }
 
-    @Test("MymeThread") func thread() throws { try assertRoundTrip(MymeThread.self, fixture: "myme_thread") }
-
     @Test("ApiKey") func apiKey() throws { try assertRoundTrip(ApiKey.self, fixture: "api_key") }
 
     @Test("CreatedKey") func createdKey() throws { try assertRoundTrip(CreatedKey.self, fixture: "created_key") }

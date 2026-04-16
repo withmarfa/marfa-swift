@@ -15,12 +15,23 @@ public final class MockTransport: Transport, @unchecked Sendable {
         public let path: String
         public let body: Data?
         public let query: [(String, String)]?
+        /// Populated only for `eventStream(...)` calls — the `Last-Event-ID`
+        /// the SDK passed when opening the SSE stream. Lets tests assert
+        /// cursor-resume behaviour.
+        public let lastEventID: String?
 
-        public init(method: HTTPMethod, path: String, body: Data?, query: [(String, String)]?) {
+        public init(
+            method: HTTPMethod,
+            path: String,
+            body: Data?,
+            query: [(String, String)]?,
+            lastEventID: String? = nil
+        ) {
             self.method = method
             self.path = path
             self.body = body
             self.query = query
+            self.lastEventID = lastEventID
         }
     }
 
@@ -165,10 +176,13 @@ public final class MockTransport: Transport, @unchecked Sendable {
             case noneQueued
         }
         let outcome: EventOutcome = lock.withLock {
-            _calls.append(Call(method: .get, path: path, body: nil, query: query))
+            _calls.append(Call(method: .get, path: path, body: nil, query: query, lastEventID: lastEventID))
+            // Prefer a queued event sequence over a shared error. Tests that
+            // want `eventStream` to throw can enqueue an error *without*
+            // enqueueing events, in which case the error branch fires.
+            if !eventStreams.isEmpty { return .events(eventStreams.removeFirst()) }
             if !errors.isEmpty { return .error(errors.removeFirst()) }
-            if eventStreams.isEmpty { return .noneQueued }
-            return .events(eventStreams.removeFirst())
+            return .noneQueued
         }
         return AsyncThrowingStream { continuation in
             switch outcome {

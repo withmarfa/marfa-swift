@@ -10,6 +10,8 @@ import Foundation
 public struct EdgesNamespace: Sendable {
 
     let transport: any Transport
+    let localStore: LocalStore?
+    let mutationQueue: MutationQueue?
 
     // MARK: - Mutations
 
@@ -20,6 +22,18 @@ public struct EdgesNamespace: Sendable {
         edgeType: String,
         properties: [String: JSONValue]? = nil
     ) async throws -> Edge {
+        if let store = localStore {
+            let edge = try await store.createEdge(
+                source: source, target: target,
+                edgeType: edgeType, properties: properties
+            )
+            try await mutationQueue?.enqueueCreateEdge(
+                source: source, target: target,
+                edgeType: edgeType, properties: properties,
+                localEdgeId: edge.id
+            )
+            return edge
+        }
         let body = CreateEdgeBody(
             sourceId: source,
             targetId: target,
@@ -32,12 +46,16 @@ public struct EdgesNamespace: Sendable {
         return response.edge
     }
 
-    /// Updates an edge's properties. `edge_type`, `source_id`, and `target_id`
-    /// are immutable — the server rejects changes to those.
+    /// Updates an edge's properties.
     public func update(
         id: String,
         properties: [String: JSONValue]
     ) async throws -> Edge {
+        if let store = localStore {
+            let edge = try await store.updateEdge(id: id, properties: properties)
+            try await mutationQueue?.enqueueUpdateEdge(id: id, properties: properties)
+            return edge
+        }
         let body = UpdateEdgeBody(properties: properties)
         let response: EdgeResponse = try await transport.request(
             method: .patch, path: "/edges/\(id)", body: body, query: nil
@@ -47,6 +65,11 @@ public struct EdgesNamespace: Sendable {
 
     /// Deletes an edge.
     public func delete(id: String) async throws {
+        if let store = localStore {
+            try await store.deleteEdge(id: id)
+            try await mutationQueue?.enqueueDeleteEdge(id: id)
+            return
+        }
         let _: EmptyResponse = try await transport.request(
             method: .delete, path: "/edges/\(id)", body: nil, query: nil
         )
@@ -54,15 +77,18 @@ public struct EdgesNamespace: Sendable {
 
     // MARK: - Reads
 
-    /// Lists outbound edges from a source item — edges where `source_id == sourceId`.
-    /// Mirrors `client.items.edges(id:)`; exposed here for symmetry when the
-    /// caller is thinking about the edge graph directly.
+    /// Lists outbound edges from a source item.
     public func listFromSource(
         sourceId: String,
         edgeType: String? = nil,
         cursor: String? = nil,
         limit: Int? = nil
     ) async throws -> PaginatedResult<Edge> {
+        if let store = localStore {
+            return try await store.fetchEdgesFromSource(
+                sourceId: sourceId, edgeType: edgeType, limit: limit
+            )
+        }
         var query: [(String, String)] = []
         if let edgeType { query.append(("edge_type", edgeType)) }
         if let cursor { query.append(("cursor", cursor)) }
@@ -73,14 +99,18 @@ public struct EdgesNamespace: Sendable {
         )
     }
 
-    /// Lists inbound edges pointing at a target item — edges where
-    /// `target_id == targetId`. Mirrors `client.items.backrefs(id:)`.
+    /// Lists inbound edges pointing at a target item.
     public func listToTarget(
         targetId: String,
         edgeType: String? = nil,
         cursor: String? = nil,
         limit: Int? = nil
     ) async throws -> PaginatedResult<Edge> {
+        if let store = localStore {
+            return try await store.fetchEdgesToTarget(
+                targetId: targetId, edgeType: edgeType, limit: limit
+            )
+        }
         var query: [(String, String)] = []
         if let edgeType { query.append(("edge_type", edgeType)) }
         if let cursor { query.append(("cursor", cursor)) }
@@ -93,8 +123,7 @@ public struct EdgesNamespace: Sendable {
 
     // MARK: - Paginated sequences
 
-    /// Async sequence walking every outbound edge from `sourceId`, paging
-    /// through cursors automatically.
+    /// Async sequence walking every outbound edge from `sourceId`.
     public func allFromSource(
         sourceId: String,
         edgeType: String? = nil,
@@ -110,8 +139,7 @@ public struct EdgesNamespace: Sendable {
         }
     }
 
-    /// Async sequence walking every inbound edge to `targetId`, paging
-    /// through cursors automatically.
+    /// Async sequence walking every inbound edge to `targetId`.
     public func allToTarget(
         targetId: String,
         edgeType: String? = nil,
@@ -148,9 +176,4 @@ struct CreateEdgeBody: Codable, Sendable {
 /// Request body for `PATCH /edges/:id`.
 struct UpdateEdgeBody: Codable, Sendable {
     let properties: [String: JSONValue]
-}
-
-/// Response envelope for single-edge endpoints: `{ "edge": ... }`.
-struct EdgeResponse: Codable, Sendable {
-    let edge: Edge
 }

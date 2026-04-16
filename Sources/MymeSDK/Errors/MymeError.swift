@@ -99,6 +99,26 @@ public final class ConflictError: MymeError, @unchecked Sendable {
     }
 }
 
+// MARK: - Local Mode
+
+/// 501 — Operation requires a live server connection and is not available on a
+/// pure-local ``MymeClient`` created with ``MymeClient/local(path:)``.
+/// Blob uploads and downloads throw this when called on a local-only client.
+public final class LocalModeUnsupportedError: MymeError, @unchecked Sendable {
+    /// Name of the operation that was attempted (e.g. `"blobs.upload"`).
+    public let operation: String
+
+    public init(operation: String) {
+        self.operation = operation
+        super.init(
+            code: "local_mode_unsupported",
+            message:
+                "\(operation) requires a live server connection. Use MymeClient.synced(...) or MymeClient(url:apiKey:) instead.",
+            status: 501
+        )
+    }
+}
+
 // MARK: - Network Error
 
 /// Transport-level failure (no connectivity, timeout, DNS, etc.).

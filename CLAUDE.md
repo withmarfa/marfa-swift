@@ -5,7 +5,7 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 ## Architecture
 
 - **SPM package**, zero external dependencies. Built from Foundation, Security, and `os`.
-- **Platforms:** iOS/macOS/visionOS/watchOS/tvOS v26. No back-deployment.
+- **Platforms:** iOS 17+, macOS 14+, visionOS 1+, watchOS 10+, tvOS 17+.
 - **Swift 6** language mode with complete strict concurrency.
 - **Two products:**
   - `MymeSDK` — the client library
@@ -15,6 +15,24 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 - **`JSONValue`** enum for arbitrary JSON (Codable, Sendable, Hashable).
 - **Dates as ISO 8601 strings**, not `Date` — apps parse as needed.
 - **Error hierarchy:** `open class MymeError` base with `final class` subclasses (`NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ValidationError`, `ConflictError`, `NetworkError`, `ResponseDecodingError`). Pattern-match on subclasses: `catch let error as NotFoundError`.
+
+### Local store & sync
+
+- **LocalStore** (`actor`) — GRDB `DatabasePool` (WAL mode) with v1 migration (items, edges, item_metadata tables + 4 indexes). Used in pure-local mode (`MymeClient.local(path:)`) and synced mode.
+- **MutationQueue** (`actor`) — shares LocalStore's `DatabasePool`; v2 migration adds `pending_mutations` and `sync_state` tables. Enqueues 13 mutation kinds; `fetchAll()`/`remove(id:)`/`recordFailure(id:error:)` drain API. Persists `last_event_id` cursor for SSE reconnection.
+- **ConnectionState** — `.offline`, `.connecting`, `.online`, `.syncing`. `isReachable` helper.
+- **ConnectionStateManager** (`actor`) — wraps `NWPathMonitor`; bridges from `DispatchQueue` to actor via `Task { await self?.handlePath(_:) }`. Multicasts to `AsyncStream<ConnectionState>` subscribers via UUID-keyed `continuations`. `markSyncing()`/`markOnline()` for engine transitions.
+- **SyncEngine** (`actor`) — observes `ConnectionStateManager.stateUpdates`; on `.connecting` opens `GET /events` SSE stream with `Last-Event-ID` cursor; applies `item.*`, `edge.*`, `metadata.changed` events to LocalStore via upsert; after stream closes, drains MutationQueue (markSyncing while replaying, markOnline when done); reconciles local-id → server-id for `createItem` replays.
+- **`MymeClient.local(path:)`** — pure-local, no mutations enqueued. `MymeClient.synced(url:apiKey:storePath:connectionManager:)` — wires all four actors together; caller calls `client.syncEngine?.start()`.
+
+### Reactive layer (@Observable, SwiftUI)
+
+- **MymeStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (returns `nil` for network-only clients). Factory for live query objects.
+- **ItemQuery** — tracks `[Item]` for a `ListFilters`; GRDB `ValueObservation` on the items table with `.mainQueue` scheduler. Fields: `items`, `isLoading`, `error`. `stop()` cancels.
+- **TypedItemQuery<T: MymeItem>** — like `ItemQuery` but maps records through `T.init?(from:)`, producing `[T]`.
+- **SingleItemQuery** — tracks one item by id; `item` is `nil` when purged.
+- **EdgesQuery** — tracks outbound edges for a `sourceId`; optional `edgeType` and `limit`.
+- All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`.
 
 ### Transport subsystems
 
@@ -31,13 +49,7 @@ swift build
 swift test
 ```
 
-Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests against staging:
-
-```bash
-MYME_API_URL=http://100.127.105.110:8601 MYME_API_KEY=<key> swift test
-```
-
-Never run conformance or integration tests against production (`:8600`). Always staging (`:8601`).
+Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at the V0 staging server via `MYME_API_URL` and `MYME_API_KEY`. Never run conformance or integration tests against production.
 
 ## Conventions
 
@@ -103,3 +115,43 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 2. Widen `numericIntFields` in `scripts/wire-types.json` if a field expected as `Int` came out `Double`.
 3. Add a per-type `fieldOverrides` entry for local overrides.
 4. Add an `enumOverrides` entry to point a string-enum field at an existing hand-written enum.
+
+## Codegen — domain models
+
+Typed Swift structs per Myme core type live under `Sources/MymeSDK/DomainModels/Generated/`. Each struct wraps a generic `Item` and exposes typed property accessors, a failable `init?(from:)` that validates the type string and required fields, and `toProperties()` for round-tripping into create/update calls.
+
+All 21 active core types are generated (bookmark, entity, entity.person, entity.place, event, file, file.audio, file.image, file.video, highlight, media, media.album, media.article, media.book, media.film, media.podcast, media.series, media.song, media.tv_episode, note, task).
+
+### Regenerate
+
+From the repo root:
+
+```bash
+# If the monorepo's type schemas have changed:
+./scripts/sync-types.sh
+
+# Otherwise (snapshot is current):
+swift run codegen-domain
+```
+
+`sync-types.sh` copies from `../myme/packages/types/core/` into `scripts/core-types/` then runs `codegen-domain`.
+
+### Freshness check
+
+CI runs `swift run codegen-domain && git diff --exit-code` against `Sources/MymeSDK/DomainModels/Generated/`.
+
+### MymeItem protocol
+
+Hand-written at `Sources/MymeSDK/DomainModels/MymeItem.swift`. Provides:
+- `typeIdentifier: String` — the Myme type ID
+- `item: Item` — backing generic item
+- `init?(from item: Item)` — failable init
+- `toProperties() -> [String: JSONValue]` — build properties dict for create/update
+- Default accessors for `id`, `type`, `state`, `createdAt`, `updatedAt`, `timestamp`, `version`, `source`, `sourceId`, `origin`, `library`, `isActive`, `isTrashed`, `isArchived`
+
+### Field conventions
+
+- Required fields are non-optional with `?? ""` / `?? 0` / `?? false` fallback (init? already guards presence).
+- Optional fields are `T?`, returning `nil` when absent.
+- Enum schema fields surface as `String?` (values documented in property doc comments).
+- Child type fields shadow same-named parent fields for doc comments; the type mapping is identical either way.

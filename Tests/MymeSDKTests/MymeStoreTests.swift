@@ -1,0 +1,315 @@
+import Testing
+import Foundation
+@testable import MymeSDK
+
+/// Tests for ``MymeStore``, ``ItemQuery``, ``TypedItemQuery``, ``SingleItemQuery``,
+/// and ``EdgesQuery``.
+///
+/// All tests run in an in-memory SQLite store. Because the query objects are
+/// `@MainActor @Observable`, all test bodies run with `@MainActor` isolation
+/// so Swift Testing routes them onto the main thread.
+@Suite("MymeStore reactive queries")
+@MainActor
+struct MymeStoreTests {
+
+    // MARK: - Helpers
+
+    private func makeClient() throws -> MymeClient {
+        try MymeClient.local(path: ":memory:")
+    }
+
+    private func noteInput(body: String) -> CreateItemInput {
+        CreateItemInput(type: "core.note", properties: ["body": .string(body)])
+    }
+
+    // MARK: - makeStore
+
+    @Test("makeStore returns non-nil for local client") func makeStoreLocal() throws {
+        let client = try makeClient()
+        let store = client.makeStore()
+        #expect(store != nil)
+    }
+
+    @Test("makeStore returns nil for network-only client") func makeStoreNetwork() {
+        let client = MymeClient(
+            url: URL(string: "https://example.com")!,
+            apiKey: "key"
+        )
+        let store = client.makeStore()
+        #expect(store == nil)
+    }
+
+    // MARK: - ItemQuery
+
+    @Test("ItemQuery starts loading then delivers items") func itemQueryBasic() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        // Create two items via the client namespace (write to local store).
+        _ = try await client.items.create(noteInput(body: "Alpha"))
+        _ = try await client.items.create(noteInput(body: "Beta"))
+
+        let query = store.query()
+
+        // Wait for the ValueObservation to fire.
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count >= 2 }
+
+        #expect(query.items.count == 2)
+        #expect(query.isLoading == false)
+        #expect(query.error == nil)
+        query.stop()
+    }
+
+    @Test("ItemQuery filters by type") func itemQueryFilterType() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "Note"))
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.task", properties: ["title": .string("Task")])
+        )
+
+        let query = store.query(filters: ListFilters(type: "core.note"))
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count >= 1 }
+
+        #expect(query.items.count == 1)
+        #expect(query.items[0].type == "core.note")
+        query.stop()
+    }
+
+    @Test("ItemQuery filters by state") func itemQueryFilterState() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let active = try await client.items.create(noteInput(body: "Keep"))
+        let toTrash = try await client.items.create(noteInput(body: "Trash"))
+        try await client.items.delete(id: toTrash.id)
+
+        let query = store.query(filters: ListFilters(state: .active))
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+
+        let ids = query.items.map(\.id)
+        #expect(ids.contains(active.id))
+        #expect(!ids.contains(toTrash.id))
+        query.stop()
+    }
+
+    @Test("ItemQuery updates when a new item is created") func itemQueryLiveUpdate() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let query = store.query(filters: ListFilters(type: "core.note"))
+        // Wait for first (empty) result.
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.items.isEmpty)
+
+        // Insert a note — the observation should fire and update `items`.
+        _ = try await client.items.create(noteInput(body: "Live update"))
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+
+        #expect(query.items[0].properties["body"] == .string("Live update"))
+        query.stop()
+    }
+
+    @Test("ItemQuery updates when an item is deleted") func itemQueryLiveDelete() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let item = try await client.items.create(noteInput(body: "Will be trashed"))
+        let query = store.query()
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+
+        // Trash the item — it changes state, so the query sees 1 item still (state changed).
+        // Use a state filter to confirm.
+        let activeQuery = store.query(filters: ListFilters(state: .active))
+        try await waitForCondition(timeout: .seconds(2)) { activeQuery.items.count == 1 }
+
+        try await client.items.delete(id: item.id)
+        try await waitForCondition(timeout: .seconds(2)) { activeQuery.items.isEmpty }
+
+        #expect(activeQuery.items.isEmpty)
+        query.stop()
+        activeQuery.stop()
+    }
+
+    // MARK: - SingleItemQuery
+
+    @Test("SingleItemQuery returns item by ID") func singleItemQuery() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let created = try await client.items.create(noteInput(body: "Single"))
+        let query = store.queryItem(id: created.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.item != nil }
+
+        #expect(query.item?.id == created.id)
+        #expect(query.item?.properties["body"] == .string("Single"))
+        query.stop()
+    }
+
+    @Test("SingleItemQuery returns nil for non-existent item") func singleItemQueryMissing() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let query = store.queryItem(id: "does-not-exist")
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+
+        #expect(query.item == nil)
+        #expect(query.error == nil)
+        query.stop()
+    }
+
+    @Test("SingleItemQuery updates on property change") func singleItemQueryUpdate() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let created = try await client.items.create(noteInput(body: "Original"))
+        let query = store.queryItem(id: created.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.item != nil }
+
+        _ = try await client.items.update(
+            id: created.id,
+            properties: ["body": .string("Updated")]
+        )
+        try await waitForCondition(timeout: .seconds(2)) {
+            query.item?.properties["body"] == .string("Updated")
+        }
+
+        #expect(query.item?.properties["body"] == .string("Updated"))
+        query.stop()
+    }
+
+    // MARK: - TypedItemQuery
+
+    @Test("TypedItemQuery returns CoreNote instances") func typedItemQuery() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "Typed note"))
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.task", properties: ["title": .string("Task")])
+        )
+
+        let query = store.typedQuery(CoreNote.self)
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count >= 1 }
+
+        #expect(query.items.count == 1)
+        #expect(query.items[0].body == "Typed note")
+        query.stop()
+    }
+
+    @Test("TypedItemQuery is empty for wrong type") func typedItemQueryWrongType() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "Note"))
+
+        let query = store.typedQuery(CoreTask.self)
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+
+        #expect(query.items.isEmpty)
+        query.stop()
+    }
+
+    // MARK: - EdgesQuery
+
+    @Test("EdgesQuery returns outbound edges") func edgesQueryReturnsOutboundEdges() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let a = try await client.items.create(noteInput(body: "A"))
+        let b = try await client.items.create(noteInput(body: "B"))
+        _ = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
+
+        let query = store.queryEdges(from: a.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.edges.count >= 1 }
+
+        #expect(query.edges.count == 1)
+        #expect(query.edges[0].edgeType == "about")
+        #expect(query.edges[0].sourceId == a.id)
+        #expect(query.edges[0].targetId == b.id)
+        query.stop()
+    }
+
+    @Test("EdgesQuery filters by edgeType") func edgesQueryFiltersByEdgeType() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let a = try await client.items.create(noteInput(body: "A"))
+        let b = try await client.items.create(noteInput(body: "B"))
+        let c = try await client.items.create(noteInput(body: "C"))
+        _ = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
+        _ = try await client.edges.create(source: a.id, target: c.id, edgeType: "annotates")
+
+        let aboutQuery = store.queryEdges(from: a.id, edgeType: "about")
+        try await waitForCondition(timeout: .seconds(2)) { aboutQuery.edges.count >= 1 }
+
+        #expect(aboutQuery.edges.count == 1)
+        #expect(aboutQuery.edges[0].edgeType == "about")
+        aboutQuery.stop()
+    }
+
+    @Test("EdgesQuery updates when edge is deleted") func edgesQueryUpdatesWhenEdgeIsDeleted() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let a = try await client.items.create(noteInput(body: "A"))
+        let b = try await client.items.create(noteInput(body: "B"))
+        let edge = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
+
+        let query = store.queryEdges(from: a.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.edges.count == 1 }
+
+        try await client.edges.delete(id: edge.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.edges.isEmpty }
+
+        #expect(query.edges.isEmpty)
+        query.stop()
+    }
+}
+
+// MARK: - Test utilities
+
+/// Polls `condition` up to `timeout` by yielding the main actor on each check.
+/// Throws `CancellationError` if the deadline is exceeded.
+@MainActor
+private func waitForCondition(
+    timeout: Duration,
+    condition: () -> Bool
+) async throws {
+    let deadline = ContinuousClock().now + timeout
+    while !condition() {
+        guard ContinuousClock().now < deadline else {
+            throw CancellationError()
+        }
+        // Yield to let ValueObservation callbacks land on the main actor.
+        await Task.yield()
+        try await Task.sleep(for: .milliseconds(10))
+    }
+}
