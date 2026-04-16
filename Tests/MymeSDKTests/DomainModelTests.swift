@@ -398,6 +398,88 @@ struct DomainModelTests {
         #expect(event.duration == 3600.0)
     }
 
+    // MARK: - Wrong-type rejection across all 21 generated types
+
+    /// Every typed wrapper's `init?(from:)` must return `nil` when the backing
+    /// `Item.type` doesn't match the wrapper's `typeIdentifier`. Adding a new
+    /// type requires registering it here so the contract is enforced.
+    @Test("init?(from:) returns nil when item type mismatches for all 21 types")
+    func rejectsWrongTypeAcrossAllGeneratedTypes() {
+        let impostorNote = Item(
+            createdAt: "2026-01-01T00:00:00Z", id: "id",
+            library: false, origin: .user,
+            properties: ["body": .string("irrelevant"), "title": .string("t")],
+            schemaVersion: 1, source: "test", state: .active,
+            timestamp: "2026-01-01T00:00:00Z", type: "core.note",
+            updatedAt: "2026-01-01T00:00:00Z", version: 1
+        )
+        let impostorTask = Item(
+            createdAt: "2026-01-01T00:00:00Z", id: "id",
+            library: false, origin: .user,
+            properties: ["title": .string("t")],
+            schemaVersion: 1, source: "test", state: .active,
+            timestamp: "2026-01-01T00:00:00Z", type: "core.task",
+            updatedAt: "2026-01-01T00:00:00Z", version: 1
+        )
+        // Non-note wrappers are tested against a core.note item; the note
+        // wrapper itself is tested against a core.task item.
+        #expect(CoreBookmark(from: impostorNote) == nil)
+        #expect(CoreEntity(from: impostorNote) == nil)
+        #expect(CoreEntityPerson(from: impostorNote) == nil)
+        #expect(CoreEntityPlace(from: impostorNote) == nil)
+        #expect(CoreEvent(from: impostorNote) == nil)
+        #expect(CoreFile(from: impostorNote) == nil)
+        #expect(CoreFileAudio(from: impostorNote) == nil)
+        #expect(CoreFileImage(from: impostorNote) == nil)
+        #expect(CoreFileVideo(from: impostorNote) == nil)
+        #expect(CoreHighlight(from: impostorNote) == nil)
+        #expect(CoreMedia(from: impostorNote) == nil)
+        #expect(CoreMediaAlbum(from: impostorNote) == nil)
+        #expect(CoreMediaArticle(from: impostorNote) == nil)
+        #expect(CoreMediaBook(from: impostorNote) == nil)
+        #expect(CoreMediaFilm(from: impostorNote) == nil)
+        #expect(CoreMediaPodcast(from: impostorNote) == nil)
+        #expect(CoreMediaSeries(from: impostorNote) == nil)
+        #expect(CoreMediaSong(from: impostorNote) == nil)
+        #expect(CoreMediaTvEpisode(from: impostorNote) == nil)
+        #expect(CoreTask(from: impostorNote) == nil)
+        #expect(CoreNote(from: impostorTask) == nil)
+    }
+
+    // MARK: - JSON round-trip smoke
+
+    /// `Item` is `Codable`, so round-tripping a domain instance through JSON
+    /// proves that `toProperties()` + `init?(from:)` preserve payload shape.
+    /// One rep covering optional + required + string fields is enough — if
+    /// the generator regresses, the freshness check catches generator-level
+    /// drift before this.
+    @Test("CoreNote JSON round-trips through Item encoder") func coreNoteRoundTripsThroughJSON() throws {
+        let original = Item(
+            createdAt: "2026-01-01T00:00:00Z", id: "note-1",
+            library: false, origin: .user,
+            properties: ["body": .string("Hello"), "title": .string("Greeting"), "language": .string("en")],
+            schemaVersion: 1, source: "test", state: .active,
+            timestamp: "2026-01-01T00:00:00Z", type: "core.note",
+            updatedAt: "2026-01-01T00:00:00Z", version: 1
+        )
+        let wrapped = CoreNote(from: original)!
+        // Re-derive properties from the wrapper and rebuild an Item — this is
+        // the exact path a caller takes when updating a note.
+        let rebuilt = Item(
+            createdAt: original.createdAt, id: original.id,
+            library: original.library, origin: original.origin,
+            properties: wrapped.toProperties(),
+            schemaVersion: original.schemaVersion, source: original.source,
+            state: original.state, timestamp: original.timestamp,
+            type: original.type, updatedAt: original.updatedAt, version: original.version
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let lhs = try encoder.encode(original)
+        let rhs = try encoder.encode(rebuilt)
+        #expect(lhs == rhs)
+    }
+
     // MARK: - typeIdentifier coverage
 
     @Test("All 21 generated types have correct typeIdentifier")

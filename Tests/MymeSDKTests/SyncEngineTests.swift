@@ -257,9 +257,146 @@ struct SyncEngineTests {
             await engine.stop()  // second stop is a no-op
         }
 
-        // SSE event application, mutation replay-failure accounting, and
-        // cursor resume are covered in ``SyncEngineIntegrationTests`` — those
-        // tests depend on a ``ConnectionStateManager`` test seam and are added
-        // alongside it in the next polish pass.
+        // MARK: - SSE event application
+
+        @Test("SSE item.* events apply to local store") func ssEEventsApplyToLocalStore() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+
+            // Build item.created and item.updated events that together mutate
+            // the same server-side item.
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let v1 = Item(
+                createdAt: now, id: "server-1", library: false,
+                origin: .user, properties: ["body": .string("v1")],
+                schemaVersion: 1, source: "test", state: .active,
+                timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            let v2 = Item(
+                createdAt: now, id: "server-1", library: false,
+                origin: .user, properties: ["body": .string("v2")],
+                schemaVersion: 1, source: "test", state: .active,
+                timestamp: now, type: "core.note", updatedAt: now, version: 2
+            )
+            struct ItemPayload: Encodable { let item: Item }
+            let enc = JSONEncoder()
+            let evt1 = SSEEvent(
+                id: "evt-1", event: "item.created",
+                data: String(data: try enc.encode(ItemPayload(item: v1)), encoding: .utf8)!
+            )
+            let evt2 = SSEEvent(
+                id: "evt-2", event: "item.updated",
+                data: String(data: try enc.encode(ItemPayload(item: v2)), encoding: .utf8)!
+            )
+            transport.enqueueEvents([evt1, evt2])
+
+            await engine.start()
+            // Drive the engine out of `.offline` via the test seam; runLoop
+            // opens the SSE stream, drains our events, and finishes.
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await store.fetchItem(id: "server-1"))?.properties["body"] == .string("v2")
+            }
+
+            let fetched = try await store.fetchItem(id: "server-1")
+            #expect(fetched.properties["body"] == .string("v2"))
+            // Cursor should land on the last event.
+            let cursor = try await queue.loadSyncState(key: "last_event_id")
+            #expect(cursor == "evt-2")
+            await engine.stop()
+        }
+
+        // MARK: - Mutation replay failure accounting
+
+        @Test("mutation replay records failure when transport throws") func mutationReplayRecordsFailure() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // A single pending delete the engine will try to replay.
+            try await queue.enqueueDeleteItem(id: "server-x")
+
+            // Empty SSE stream (so runLoop proceeds to replay), then the
+            // DELETE itself throws a network-class error.
+            transport.enqueueEvents([])
+            let netError = NetworkError(
+                NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
+            )
+            transport.enqueueError(netError)
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                let all = try? await queue.fetchAll()
+                return (all?.first?.attemptCount ?? 0) >= 1
+            }
+
+            let remaining = try await queue.fetchAll()
+            #expect(remaining.count == 1)
+            #expect(remaining[0].attemptCount == 1)
+            #expect(remaining[0].lastError?.contains("offline") == true)
+            await engine.stop()
+        }
+
+        // MARK: - Cursor resume
+
+        @Test("opens second SSE stream with Last-Event-ID after reconnect") func cursorResumeOnReconnect() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // First connection: yield one event then close. Cursor should persist.
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let item = Item(
+                createdAt: now, id: "server-rc", library: false,
+                origin: .user, properties: ["body": .string("hi")],
+                schemaVersion: 1, source: "test", state: .active,
+                timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            struct ItemPayload: Encodable { let item: Item }
+            let enc = JSONEncoder()
+            let evt = SSEEvent(
+                id: "evt-A", event: "item.created",
+                data: String(data: try enc.encode(ItemPayload(item: item)), encoding: .utf8)!
+            )
+            transport.enqueueEvents([evt])
+            // Second connection: just close cleanly. We only care about how it's opened.
+            transport.enqueueEvents([])
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.loadSyncState(key: "last_event_id")) == "evt-A"
+            }
+
+            // Simulate a drop + reconnect.
+            await connManager.applyStateForTesting(.offline)
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await transport.calls.filter { $0.path == "/events" }.count >= 2
+            }
+
+            let sseCalls = await transport.calls.filter { $0.path == "/events" }
+            #expect(sseCalls.count >= 2)
+            #expect(sseCalls.first?.lastEventID == nil)            // first call had no cursor
+            #expect(sseCalls.last?.lastEventID == "evt-A")         // second call resumes from cursor
+            await engine.stop()
+        }
+
+        // Simple polling helper — SSE consumption is task-driven and can't be
+        // pinned to a known deadline. Poll until `condition` returns true or
+        // the timeout elapses. Keeps tests deterministic without hard sleeps.
+        private func waitUntil(
+            timeout: Duration,
+            every: Duration = .milliseconds(10),
+            _ condition: @Sendable () async throws -> Bool
+        ) async throws {
+            let start = ContinuousClock.now
+            while ContinuousClock.now - start < timeout {
+                if try await condition() { return }
+                try await Task.sleep(for: every)
+            }
+            if try await condition() { return }
+            Issue.record("waitUntil: condition never satisfied within \(timeout)")
+        }
     }
 }

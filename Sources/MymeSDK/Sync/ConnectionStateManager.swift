@@ -112,4 +112,15 @@ public actor ConnectionStateManager {
     private func removeContinuation(id: UUID) {
         continuations.removeValue(forKey: id)
     }
+
+    // MARK: - Test seam
+
+    /// Drives a state transition without going through `NWPathMonitor`.
+    /// Intended for unit tests — `NWPathMonitor` is hard to simulate and
+    /// varies per host — and for host apps that want to override reachability
+    /// (e.g. "airplane mode" toggles in dev builds). Marked `internal` so
+    /// `@testable import MymeSDK` tests can call it; no public API.
+    internal func applyStateForTesting(_ state: ConnectionState) {
+        applyState(state)
+    }
 }

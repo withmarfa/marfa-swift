@@ -98,20 +98,27 @@ public actor SyncEngine {
     // MARK: - Lifecycle
 
     /// Starts the sync engine. Idempotent — calling again while already running
-    /// is a no-op.
-    public func start() {
+    /// is a no-op. Also starts the underlying ``ConnectionStateManager`` (which
+    /// is itself idempotent) so `NWPathMonitor` begins delivering reachability
+    /// updates; without this the engine's run loop would await on an inert
+    /// stream stuck at `.offline`.
+    public func start() async {
         guard !running else { return }
         running = true
+        await connectionManager.start()
         streamTask = Task { [weak self] in
             await self?.runLoop()
         }
     }
 
-    /// Stops the sync engine and cancels the active SSE connection.
-    public func stop() {
+    /// Stops the sync engine and cancels the active SSE connection. Also stops
+    /// the underlying ``ConnectionStateManager`` so `NWPathMonitor` releases
+    /// its queue and any open `stateUpdates` streams finish.
+    public func stop() async {
         running = false
         streamTask?.cancel()
         streamTask = nil
+        await connectionManager.stop()
     }
 
     // MARK: - Main run loop
