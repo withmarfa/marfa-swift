@@ -162,7 +162,10 @@ public actor MutationQueue {
         guard let json = String(data: data, encoding: .utf8) else {
             throw LocalStoreError.encodingFailure("mutation payload")
         }
-        let now = ISO8601DateFormatter().string(from: Date())
+        // `Date.ISO8601FormatStyle` is `Sendable`; `ISO8601DateFormatter` is
+        // not, so creating one here would violate Swift 6 strict concurrency
+        // on every enqueue even though it works at runtime.
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
         let record = PendingMutationRecord(
             id: UUID().uuidString.lowercased(),
             kind: kind,
