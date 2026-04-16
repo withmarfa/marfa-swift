@@ -27,7 +27,7 @@ public struct EdgesNamespace: Sendable {
                 source: source, target: target,
                 edgeType: edgeType, properties: properties
             )
-            try? await mutationQueue?.enqueueCreateEdge(
+            try await mutationQueue?.enqueueCreateEdge(
                 source: source, target: target,
                 edgeType: edgeType, properties: properties,
                 localEdgeId: edge.id
@@ -53,7 +53,7 @@ public struct EdgesNamespace: Sendable {
     ) async throws -> Edge {
         if let store = localStore {
             let edge = try await store.updateEdge(id: id, properties: properties)
-            try? await mutationQueue?.enqueueUpdateEdge(id: id, properties: properties)
+            try await mutationQueue?.enqueueUpdateEdge(id: id, properties: properties)
             return edge
         }
         let body = UpdateEdgeBody(properties: properties)
@@ -67,7 +67,7 @@ public struct EdgesNamespace: Sendable {
     public func delete(id: String) async throws {
         if let store = localStore {
             try await store.deleteEdge(id: id)
-            try? await mutationQueue?.enqueueDeleteEdge(id: id)
+            try await mutationQueue?.enqueueDeleteEdge(id: id)
             return
         }
         let _: EmptyResponse = try await transport.request(

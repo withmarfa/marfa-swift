@@ -27,6 +27,7 @@ public actor ConnectionStateManager {
 
     private let monitor: NWPathMonitor
     private let monitorQueue = DispatchQueue(label: "myme.sdk.path_monitor", qos: .utility)
+    private var started = false
 
     // MARK: - Init
 
@@ -36,8 +37,10 @@ public actor ConnectionStateManager {
 
     // MARK: - Lifecycle
 
-    /// Starts monitoring. Call once; calling again is a no-op.
+    /// Starts monitoring. Idempotent — calling again while already started is a no-op.
     public func start() {
+        guard !started else { return }
+        started = true
         monitor.pathUpdateHandler = { [weak self] path in
             // Bridge from DispatchQueue into the actor.
             Task { [weak self] in
@@ -78,14 +81,16 @@ public actor ConnectionStateManager {
         let current = state
         return AsyncStream { continuation in
             let id = UUID()
-            // Deliver the current state to the new subscriber immediately.
-            continuation.yield(current)
+            // Register before yielding so onTermination can never fire for
+            // an id that isn't yet in the dictionary.
             self.continuations[id] = continuation
             continuation.onTermination = { [weak self] _ in
                 Task { [weak self] in
                     await self?.removeContinuation(id: id)
                 }
             }
+            // Deliver the current state to the new subscriber immediately.
+            continuation.yield(current)
         }
     }
 

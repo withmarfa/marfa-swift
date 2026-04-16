@@ -12,7 +12,7 @@ public struct ItemsNamespace: Sendable {
     public func create(_ input: CreateItemInput) async throws -> Item {
         if let store = localStore {
             let item = try await store.createItem(input)
-            try? await mutationQueue?.enqueueCreateItem(input, localId: item.id)
+            try await mutationQueue?.enqueueCreateItem(input, localId: item.id)
             return item
         }
         let response: ItemResponse = try await transport.request(
@@ -78,7 +78,7 @@ public struct ItemsNamespace: Sendable {
     ) async throws -> Item {
         if let store = localStore {
             let item = try await store.updateItem(id: id, properties: properties)
-            try? await mutationQueue?.enqueueUpdateItem(id: id, properties: properties)
+            try await mutationQueue?.enqueueUpdateItem(id: id, properties: properties)
             return item
         }
         let resolvedVersion: Int
@@ -102,7 +102,7 @@ public struct ItemsNamespace: Sendable {
     public func delete(id: String) async throws {
         if let store = localStore {
             try await store.trashItem(id: id)
-            try? await mutationQueue?.enqueueDeleteItem(id: id)
+            try await mutationQueue?.enqueueDeleteItem(id: id)
             return
         }
         let _: EmptyResponse = try await transport.request(
@@ -114,7 +114,7 @@ public struct ItemsNamespace: Sendable {
     public func restore(id: String) async throws -> Item {
         if let store = localStore {
             let item = try await store.restoreItem(id: id)
-            try? await mutationQueue?.enqueueRestoreItem(id: id)
+            try await mutationQueue?.enqueueRestoreItem(id: id)
             return item
         }
         let response: ItemResponse = try await transport.request(
@@ -127,7 +127,7 @@ public struct ItemsNamespace: Sendable {
     public func transition(id: String, to state: String) async throws -> Item {
         if let store = localStore {
             let item = try await store.transitionItem(id: id, to: state)
-            try? await mutationQueue?.enqueueTransitionItem(id: id, to: state)
+            try await mutationQueue?.enqueueTransitionItem(id: id, to: state)
             return item
         }
         let response: ItemResponse = try await transport.request(
@@ -171,7 +171,7 @@ public struct ItemsNamespace: Sendable {
     public func purge(id: String) async throws {
         if let store = localStore {
             try await store.purgeItem(id: id)
-            try? await mutationQueue?.enqueuePurgeItem(id: id)
+            try await mutationQueue?.enqueuePurgeItem(id: id)
             return
         }
         let _: EmptyResponse = try await transport.request(

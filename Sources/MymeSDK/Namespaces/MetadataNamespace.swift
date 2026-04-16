@@ -22,7 +22,7 @@ public struct MetadataNamespace: Sendable {
     public func set(itemId: String, input: MetadataInput) async throws -> Metadata {
         if let store = localStore {
             let metadata = try await store.setMetadata(itemId: itemId, input: input)
-            try? await mutationQueue?.enqueueSetMetadata(itemId: itemId, input: input)
+            try await mutationQueue?.enqueueSetMetadata(itemId: itemId, input: input)
             return metadata
         }
         let response: MetadataResponse = try await transport.request(
@@ -35,7 +35,7 @@ public struct MetadataNamespace: Sendable {
     public func merge(itemId: String, input: MetadataInput) async throws -> Metadata {
         if let store = localStore {
             let metadata = try await store.mergeMetadata(itemId: itemId, input: input)
-            try? await mutationQueue?.enqueueMergeMetadata(itemId: itemId, input: input)
+            try await mutationQueue?.enqueueMergeMetadata(itemId: itemId, input: input)
             return metadata
         }
         let response: MetadataResponse = try await transport.request(
@@ -48,7 +48,7 @@ public struct MetadataNamespace: Sendable {
     public func addTags(itemId: String, tags: [String]) async throws -> Metadata {
         if let store = localStore {
             let metadata = try await store.addTags(itemId: itemId, tags: tags)
-            try? await mutationQueue?.enqueueAddTags(itemId: itemId, tags: tags)
+            try await mutationQueue?.enqueueAddTags(itemId: itemId, tags: tags)
             return metadata
         }
         let response: MetadataResponse = try await transport.request(
@@ -62,7 +62,7 @@ public struct MetadataNamespace: Sendable {
     public func removeTag(itemId: String, tag: String) async throws {
         if let store = localStore {
             try await store.removeTag(itemId: itemId, tag: tag)
-            try? await mutationQueue?.enqueueRemoveTag(itemId: itemId, tag: tag)
+            try await mutationQueue?.enqueueRemoveTag(itemId: itemId, tag: tag)
             return
         }
         let encoded = tag.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? tag
