@@ -3,15 +3,20 @@ import Foundation
 /// Edges API namespace. Manages typed relationships between items.
 ///
 /// An edge is `(source, target, edge_type, properties)` where `source`/`target`
-/// are item IDs and `edge_type` is one of the registered edge types
-/// (`in-thread`, `parent-of`, `annotates`, `about`, `authored-by`,
-/// `pinned-to`, `derived-from`, `supersedes`). Edge-type registration is
-/// intentionally not exposed here — it's an admin-level concern.
+/// are item IDs and `edge_type` is one of the registered edge types — eight
+/// core types (`in-thread`, `parent-of`, `annotates`, `about`, `authored-by`,
+/// `pinned-to`, `derived-from`, `supersedes`) plus any custom types the
+/// tenant has registered via ``edgeTypes``.
 public struct EdgesNamespace: Sendable {
 
     let transport: any Transport
     let localStore: LocalStore?
     let mutationQueue: MutationQueue?
+
+    /// Custom edge-type registration. Admin-only on the server.
+    public var edgeTypes: EdgeTypesAPI {
+        EdgeTypesAPI(transport: transport)
+    }
 
     // MARK: - Mutations
 
@@ -153,6 +158,49 @@ public struct EdgesNamespace: Sendable {
                 limit: pageSize
             )
         }
+    }
+}
+
+// MARK: - Edge-types sub-namespace
+
+/// Custom edge-type registration and listing.
+///
+/// Mirrors the TypeScript SDK's `client.edges.types` surface. Registration
+/// (`create`) and deletion (`delete`) are admin-only on the server; non-admin
+/// keys receive a 403.
+public struct EdgeTypesAPI: Sendable {
+
+    let transport: any Transport
+
+    /// Registers a new custom edge type.
+    ///
+    /// - Throws: ``ForbiddenError`` when the API key lacks admin permission,
+    ///   ``ValidationError`` when the schema conflicts with an existing type
+    ///   or fails validation.
+    @discardableResult
+    public func create(_ input: CreateEdgeTypeInput) async throws -> EdgeType {
+        let response: EdgeTypeResponse = try await transport.request(
+            method: .post, path: "/edges/types", body: input, query: nil
+        )
+        return response.edgeType
+    }
+
+    /// Lists all registered edge types — the eight core types plus any
+    /// custom types registered by the tenant.
+    public func list() async throws -> [EdgeType] {
+        let response: EdgeTypesListResponse = try await transport.request(
+            method: .get, path: "/edges/types", body: nil, query: nil
+        )
+        return response.edgeTypes
+    }
+
+    /// Deletes a custom edge type by id. Core edge types cannot be deleted —
+    /// the server rejects with a ``ValidationError``. Only custom types
+    /// registered via ``create(_:)`` can be removed.
+    public func delete(id: String) async throws {
+        let _: EmptyResponse = try await transport.request(
+            method: .delete, path: "/edges/types/\(id)", body: nil, query: nil
+        )
     }
 }
 

@@ -60,3 +60,21 @@ struct KeysListResponse: Codable, Sendable {
 struct EdgeResponse: Codable, Sendable {
     let edge: Edge
 }
+
+/// Response from GET /edges/types: `{ "edge_types": [...] }`.
+struct EdgeTypesListResponse: Codable, Sendable {
+    let edgeTypes: [EdgeType]
+
+    enum CodingKeys: String, CodingKey {
+        case edgeTypes = "edge_types"
+    }
+}
+
+/// Response from POST /edges/types: `{ "edge_type": ... }`.
+struct EdgeTypeResponse: Codable, Sendable {
+    let edgeType: EdgeType
+
+    enum CodingKeys: String, CodingKey {
+        case edgeType = "edge_type"
+    }
+}
