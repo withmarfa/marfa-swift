@@ -56,7 +56,7 @@ public final class EdgesQuery {
 
         cancellable = observation.start(
             in: pool,
-            scheduling: .mainQueue,
+            scheduling: .mainActor,
             onError: { [weak self] error in
                 self?.error = error
                 self?.isLoading = false
@@ -75,9 +75,5 @@ public final class EdgesQuery {
     public func stop() {
         cancellable?.cancel()
         cancellable = nil
-    }
-
-    deinit {
-        cancellable?.cancel()
     }
 }

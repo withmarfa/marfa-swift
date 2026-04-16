@@ -43,7 +43,7 @@ public final class SingleItemQuery {
 
         cancellable = observation.start(
             in: pool,
-            scheduling: .mainQueue,
+            scheduling: .mainActor,
             onError: { [weak self] error in
                 self?.error = error
                 self?.isLoading = false
@@ -62,9 +62,5 @@ public final class SingleItemQuery {
     public func stop() {
         cancellable?.cancel()
         cancellable = nil
-    }
-
-    deinit {
-        cancellable?.cancel()
     }
 }

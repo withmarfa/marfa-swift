@@ -41,6 +41,7 @@ public final class ItemQuery {
 
     // MARK: - Internals
 
+    // AnyDatabaseCancellable cancels the observation on dealloc — no need for deinit.
     private var cancellable: AnyDatabaseCancellable?
 
     // MARK: - Init
@@ -67,9 +68,11 @@ public final class ItemQuery {
             return try query.fetchAll(db)
         }
 
+        // .mainActor scheduler (GRDB 7) runs callbacks under @MainActor isolation,
+        // making @Observable property assignments sound in Swift 6.
         cancellable = observation.start(
             in: pool,
-            scheduling: .mainQueue,
+            scheduling: .mainActor,
             onError: { [weak self] error in
                 self?.error = error
                 self?.isLoading = false
@@ -89,12 +92,6 @@ public final class ItemQuery {
     public func stop() {
         cancellable?.cancel()
         cancellable = nil
-    }
-
-    deinit {
-        // Cancellable is a value type (struct) that holds a reference internally;
-        // it cancels its underlying observation when deallocated.
-        cancellable?.cancel()
     }
 }
 
@@ -148,7 +145,7 @@ public final class TypedItemQuery<T: MymeItem> {
 
         cancellable = observation.start(
             in: pool,
-            scheduling: .mainQueue,
+            scheduling: .mainActor,
             onError: { [weak self] error in
                 self?.error = error
                 self?.isLoading = false
@@ -170,9 +167,5 @@ public final class TypedItemQuery<T: MymeItem> {
     public func stop() {
         cancellable?.cancel()
         cancellable = nil
-    }
-
-    deinit {
-        cancellable?.cancel()
     }
 }
