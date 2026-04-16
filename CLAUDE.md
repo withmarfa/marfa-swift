@@ -49,13 +49,7 @@ swift build
 swift test
 ```
 
-Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests against staging:
-
-```bash
-MYME_API_URL=http://100.127.105.110:8601 MYME_API_KEY=<key> swift test
-```
-
-Never run conformance or integration tests against production (`:8600`). Always staging (`:8601`).
+Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at the V0 staging server via `MYME_API_URL` and `MYME_API_KEY`. Never run conformance or integration tests against production.
 
 ## Conventions
 

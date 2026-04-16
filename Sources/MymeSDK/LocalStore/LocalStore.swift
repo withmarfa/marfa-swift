@@ -42,7 +42,8 @@ public actor LocalStore {
     public init(path: String) throws {
         let resolvedPath: String
         if path == ":memory:" {
-            resolvedPath = FileManager.default
+            resolvedPath =
+                FileManager.default
                 .temporaryDirectory
                 .appendingPathComponent("myme-\(UUID().uuidString).sqlite")
                 .path
@@ -279,9 +280,10 @@ public actor LocalStore {
                 db,
                 sql: "SELECT state, COUNT(*) as count FROM items GROUP BY state"
             )
-            return Dictionary(uniqueKeysWithValues: rows.map {
-                ($0["state"] as String, $0["count"] as Int)
-            })
+            return Dictionary(
+                uniqueKeysWithValues: rows.map {
+                    ($0["state"] as String, $0["count"] as Int)
+                })
         }
     }
 
@@ -531,7 +533,7 @@ public actor LocalStore {
     ) -> [String: [String: JSONValue]] {
         var map: [String: [String: JSONValue]] = [:]
         for (namespace, value) in extensions {
-            if case let .dictionary(dict) = value {
+            if case .dictionary(let dict) = value {
                 map[namespace] = dict
             }
         }

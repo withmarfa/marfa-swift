@@ -14,11 +14,11 @@ struct PendingMutationRecord: Codable, FetchableRecord, PersistableRecord {
         case setExtension, deleteExtension
     }
 
-    var id: String          // UUID of this mutation record
+    var id: String  // UUID of this mutation record
     var kind: Kind
-    var payloadJson: String // JSON-encoded payload (type depends on kind)
-    var sourceId: String?   // UUIDv7 sourceId for create idempotency (items only)
-    var localId: String?    // local item/edge ID for reference
+    var payloadJson: String  // JSON-encoded payload (type depends on kind)
+    var sourceId: String?  // UUIDv7 sourceId for create idempotency (items only)
+    var localId: String?  // local item/edge ID for reference
     var createdAt: String
     var attemptCount: Int
     var lastError: String?
@@ -210,7 +210,9 @@ public actor MutationQueue {
         try enqueue(kind: .purgeItem, payload: IDPayload(id: id), localId: id)
     }
 
-    func enqueueCreateEdge(source: String, target: String, edgeType: String, properties: [String: JSONValue]?, localEdgeId: String) throws {
+    func enqueueCreateEdge(
+        source: String, target: String, edgeType: String, properties: [String: JSONValue]?, localEdgeId: String
+    ) throws {
         try enqueue(
             kind: .createEdge,
             payload: CreateEdgePayload(source: source, target: target, edgeType: edgeType, properties: properties),
@@ -284,11 +286,11 @@ public actor MutationQueue {
         try pool.write { db in
             try db.execute(
                 sql: """
-                     UPDATE pending_mutations
-                        SET attempt_count = attempt_count + 1,
-                            last_error = ?
-                      WHERE id = ?
-                     """,
+                    UPDATE pending_mutations
+                       SET attempt_count = attempt_count + 1,
+                           last_error = ?
+                     WHERE id = ?
+                    """,
                 arguments: [error, id]
             )
         }

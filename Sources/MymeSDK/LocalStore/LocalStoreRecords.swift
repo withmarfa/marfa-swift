@@ -13,7 +13,7 @@ struct ItemRecord: Codable, FetchableRecord, PersistableRecord {
     var id: String
     var type: String
     var state: String
-    var propertiesJson: String   // JSON-encoded [String: JSONValue]
+    var propertiesJson: String  // JSON-encoded [String: JSONValue]
     var source: String
     var sourceId: String?
     var origin: String
@@ -103,7 +103,7 @@ struct EdgeRecord: Codable, FetchableRecord, PersistableRecord {
     var sourceId: String
     var targetId: String
     var edgeType: String
-    var propertiesJson: String   // JSON-encoded [String: JSONValue]
+    var propertiesJson: String  // JSON-encoded [String: JSONValue]
     var tenantId: String?
     var createdAt: String
     var updatedAt: String
@@ -163,8 +163,8 @@ struct MetadataRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "item_metadata"
 
     var itemId: String
-    var tagsJson: String            // JSON-encoded [String]
-    var extensionsJson: String      // JSON-encoded [String: JSONValue]
+    var tagsJson: String  // JSON-encoded [String]
+    var extensionsJson: String  // JSON-encoded [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
@@ -190,7 +190,8 @@ struct MetadataRecord: Codable, FetchableRecord, PersistableRecord {
         let tagsData = try JSONEncoder().encode(metadata.tags)
         let extData = try JSONEncoder().encode(metadata.extensions)
         guard let tagsJson = String(data: tagsData, encoding: .utf8),
-              let extensionsJson = String(data: extData, encoding: .utf8) else {
+            let extensionsJson = String(data: extData, encoding: .utf8)
+        else {
             throw LocalStoreError.encodingFailure("metadata")
         }
         return MetadataRecord(

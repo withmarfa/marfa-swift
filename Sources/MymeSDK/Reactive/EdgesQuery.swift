@@ -43,7 +43,8 @@ public final class EdgesQuery {
     ///   - limit: Optional cap on the result count.
     init(pool: DatabasePool, sourceId: String, edgeType: String?, limit: Int?) {
         let observation = ValueObservation.tracking { db -> [EdgeRecord] in
-            var query = EdgeRecord
+            var query =
+                EdgeRecord
                 .filter(Column("source_id") == sourceId)
                 .order(Column("created_at").asc)
             if let edgeType {

@@ -49,60 +49,60 @@ public protocol MymeItem: Sendable {
 
 // MARK: - Default convenience accessors
 
-public extension MymeItem {
+extension MymeItem {
 
     // MARK: Identity
 
     /// The server-assigned item ID.
-    var id: String { item.id }
+    public var id: String { item.id }
 
     /// The Myme type string (same as ``typeIdentifier``).
-    var type: String { item.type }
+    public var type: String { item.type }
 
     // MARK: Lifecycle
 
     /// Current lifecycle state.
-    var state: ItemState { item.state }
+    public var state: ItemState { item.state }
 
     /// `true` when the item is in the ``ItemState/active`` state.
-    var isActive: Bool { item.state == .active }
+    public var isActive: Bool { item.state == .active }
 
     /// `true` when the item is in the ``ItemState/trashed`` state.
-    var isTrashed: Bool { item.state == .trashed }
+    public var isTrashed: Bool { item.state == .trashed }
 
     /// `true` when the item is in the ``ItemState/archived`` state.
-    var isArchived: Bool { item.state == .archived }
+    public var isArchived: Bool { item.state == .archived }
 
     // MARK: Timestamps
 
     /// ISO 8601 creation timestamp.
-    var createdAt: String { item.createdAt }
+    public var createdAt: String { item.createdAt }
 
     /// ISO 8601 last-update timestamp.
-    var updatedAt: String { item.updatedAt }
+    public var updatedAt: String { item.updatedAt }
 
     /// ISO 8601 user-facing timestamp (may differ from `createdAt`).
-    var timestamp: String { item.timestamp }
+    public var timestamp: String { item.timestamp }
 
     // MARK: Versioning
 
     /// Monotonically increasing server version counter.
-    var version: Int { item.version }
+    public var version: Int { item.version }
 
     /// Schema version at the time the item was last written.
-    var schemaVersion: Int { item.schemaVersion }
+    public var schemaVersion: Int { item.schemaVersion }
 
     // MARK: Provenance
 
     /// The source client that created this item.
-    var source: String { item.source }
+    public var source: String { item.source }
 
     /// The client-assigned idempotency key (UUIDv7).
-    var sourceId: String? { item.sourceId }
+    public var sourceId: String? { item.sourceId }
 
     /// How this item entered the user's library.
-    var origin: Origin { item.origin }
+    public var origin: Origin { item.origin }
 
     /// Whether this item is part of the user's library.
-    var library: Bool { item.library }
+    public var library: Bool { item.library }
 }

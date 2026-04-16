@@ -112,7 +112,8 @@ public final class LocalModeUnsupportedError: MymeError, @unchecked Sendable {
         self.operation = operation
         super.init(
             code: "local_mode_unsupported",
-            message: "\(operation) requires a live server connection. Use MymeClient.synced(...) or MymeClient(url:apiKey:) instead.",
+            message:
+                "\(operation) requires a live server connection. Use MymeClient.synced(...) or MymeClient(url:apiKey:) instead.",
             status: 501
         )
     }

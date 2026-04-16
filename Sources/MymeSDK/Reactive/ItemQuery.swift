@@ -132,7 +132,8 @@ public final class TypedItemQuery<T: MymeItem> {
     init(pool: DatabasePool, filters: ListFilters? = nil) {
         let typeId = T.typeIdentifier
         let observation = ValueObservation.tracking { db -> [ItemRecord] in
-            var query = ItemRecord
+            var query =
+                ItemRecord
                 .filter(Column("type") == typeId)
                 .order(Column("created_at").asc)
             if let state = filters?.state {

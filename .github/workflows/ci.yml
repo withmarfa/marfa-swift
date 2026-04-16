@@ -32,10 +32,18 @@ jobs:
       - name: Test
         run: swift test --parallel
 
-      - name: Codegen freshness
+      - name: Codegen freshness (wire types)
         run: |
           swift run codegen-wire
           if ! git diff --exit-code -- Sources/MymeSDK/Types/Wire/Generated; then
             echo "::error::codegen-wire output is stale. Run 'swift run codegen-wire' (or './scripts/sync-openapi.sh' if the OpenAPI snapshot is behind) locally and commit the delta."
+            exit 1
+          fi
+
+      - name: Codegen freshness (domain models)
+        run: |
+          swift run codegen-domain
+          if ! git diff --exit-code -- Sources/MymeSDK/DomainModels/Generated; then
+            echo "::error::codegen-domain output is stale. Run 'swift run codegen-domain' (or './scripts/sync-types.sh' if the core-types snapshot is behind) locally and commit the delta."
             exit 1
           fi
