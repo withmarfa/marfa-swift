@@ -403,6 +403,7 @@ public actor LocalStore {
     }
 
     /// Replaces all metadata for an item.
+    @discardableResult
     func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
         let metadata = Metadata(
             extensions: [:],
@@ -417,6 +418,7 @@ public actor LocalStore {
     }
 
     /// Merges (union) metadata with existing values.
+    @discardableResult
     func mergeMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
         let existing = try fetchMetadata(itemId: itemId)
         let merged = Metadata(
@@ -432,6 +434,7 @@ public actor LocalStore {
     }
 
     /// Adds tags to an item (union with existing tags).
+    @discardableResult
     func addTags(itemId: String, tags: [String]) throws -> Metadata {
         return try mergeMetadata(itemId: itemId, input: MetadataInput(tags: tags))
     }
