@@ -16,6 +16,24 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 - **Dates as ISO 8601 strings**, not `Date` — apps parse as needed.
 - **Error hierarchy:** `open class MymeError` base with `final class` subclasses (`NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ValidationError`, `ConflictError`, `NetworkError`, `ResponseDecodingError`). Pattern-match on subclasses: `catch let error as NotFoundError`.
 
+### Local store & sync
+
+- **LocalStore** (`actor`) — GRDB `DatabasePool` (WAL mode) with v1 migration (items, edges, item_metadata tables + 4 indexes). Used in pure-local mode (`MymeClient.local(path:)`) and synced mode.
+- **MutationQueue** (`actor`) — shares LocalStore's `DatabasePool`; v2 migration adds `pending_mutations` and `sync_state` tables. Enqueues 13 mutation kinds; `fetchAll()`/`remove(id:)`/`recordFailure(id:error:)` drain API. Persists `last_event_id` cursor for SSE reconnection.
+- **ConnectionState** — `.offline`, `.connecting`, `.online`, `.syncing`. `isReachable` helper.
+- **ConnectionStateManager** (`actor`) — wraps `NWPathMonitor`; bridges from `DispatchQueue` to actor via `Task { await self?.handlePath(_:) }`. Multicasts to `AsyncStream<ConnectionState>` subscribers via UUID-keyed `continuations`. `markSyncing()`/`markOnline()` for engine transitions.
+- **SyncEngine** (`actor`) — observes `ConnectionStateManager.stateUpdates`; on `.connecting` opens `GET /events` SSE stream with `Last-Event-ID` cursor; applies `item.*`, `edge.*`, `metadata.changed` events to LocalStore via upsert; after stream closes, drains MutationQueue (markSyncing while replaying, markOnline when done); reconciles local-id → server-id for `createItem` replays.
+- **`MymeClient.local(path:)`** — pure-local, no mutations enqueued. `MymeClient.synced(url:apiKey:storePath:connectionManager:)` — wires all four actors together; caller calls `client.syncEngine?.start()`.
+
+### Reactive layer (@Observable, SwiftUI)
+
+- **MymeStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (returns `nil` for network-only clients). Factory for live query objects.
+- **ItemQuery** — tracks `[Item]` for a `ListFilters`; GRDB `ValueObservation` on the items table with `.mainQueue` scheduler. Fields: `items`, `isLoading`, `error`. `stop()` cancels.
+- **TypedItemQuery<T: MymeItem>** — like `ItemQuery` but maps records through `T.init?(from:)`, producing `[T]`.
+- **SingleItemQuery** — tracks one item by id; `item` is `nil` when purged.
+- **EdgesQuery** — tracks outbound edges for a `sourceId`; optional `edgeType` and `limit`.
+- All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`.
+
 ### Transport subsystems
 
 - **Error parsing** — internal free function `parseMymeError(data:statusCode:decoder:)` in `Errors/ErrorParsing.swift`. All non-2xx paths route through it.
