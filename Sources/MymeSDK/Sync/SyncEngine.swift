@@ -325,6 +325,22 @@ public actor SyncEngine {
             let _: MetadataResponse = try await transport.request(
                 method: .delete, path: "/items/\(p.itemId)/tags/\(p.tag)", body: nil, query: nil
             )
+
+        case .setExtension:
+            let p = try decoder.decode(SetExtensionPayload.self, from: data)
+            let encoded = p.namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.namespace
+            let _: ExtensionsResponse = try await transport.request(
+                method: .put, path: "/items/\(p.itemId)/extensions/\(encoded)",
+                body: p.data, query: nil
+            )
+
+        case .deleteExtension:
+            let p = try decoder.decode(DeleteExtensionPayload.self, from: data)
+            let encoded = p.namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.namespace
+            let _: EmptyResponse = try await transport.request(
+                method: .delete, path: "/items/\(p.itemId)/extensions/\(encoded)",
+                body: nil, query: nil
+            )
         }
     }
 }

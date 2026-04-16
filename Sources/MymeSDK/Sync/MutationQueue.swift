@@ -11,6 +11,7 @@ struct PendingMutationRecord: Codable, FetchableRecord, PersistableRecord {
         case createItem, updateItem, deleteItem, restoreItem, transitionItem, purgeItem
         case createEdge, updateEdge, deleteEdge
         case setMetadata, mergeMetadata, addTags, removeTag
+        case setExtension, deleteExtension
     }
 
     var id: String          // UUID of this mutation record
@@ -87,6 +88,19 @@ struct AddTagsPayload: Codable, Sendable {
 struct RemoveTagPayload: Codable, Sendable {
     let itemId: String
     let tag: String
+}
+
+/// Payload for `setExtension`.
+struct SetExtensionPayload: Codable, Sendable {
+    let itemId: String
+    let namespace: String
+    let data: [String: JSONValue]
+}
+
+/// Payload for `deleteExtension`.
+struct DeleteExtensionPayload: Codable, Sendable {
+    let itemId: String
+    let namespace: String
 }
 
 // MARK: - MutationQueue actor
@@ -226,6 +240,22 @@ public actor MutationQueue {
 
     func enqueueRemoveTag(itemId: String, tag: String) throws {
         try enqueue(kind: .removeTag, payload: RemoveTagPayload(itemId: itemId, tag: tag), localId: itemId)
+    }
+
+    func enqueueSetExtension(itemId: String, namespace: String, data: [String: JSONValue]) throws {
+        try enqueue(
+            kind: .setExtension,
+            payload: SetExtensionPayload(itemId: itemId, namespace: namespace, data: data),
+            localId: itemId
+        )
+    }
+
+    func enqueueDeleteExtension(itemId: String, namespace: String) throws {
+        try enqueue(
+            kind: .deleteExtension,
+            payload: DeleteExtensionPayload(itemId: itemId, namespace: namespace),
+            localId: itemId
+        )
     }
 
     // MARK: - Dequeue / drain

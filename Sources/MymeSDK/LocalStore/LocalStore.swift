@@ -470,4 +470,81 @@ public actor LocalStore {
             try record.save(db)
         }
     }
+
+    // MARK: - Extension CRUD
+
+    /// Writes data to a namespaced extension on an item, merging it into any
+    /// existing extensions map. Returns the full extensions dictionary.
+    @discardableResult
+    func setExtension(
+        itemId: String,
+        namespace: String,
+        data: [String: JSONValue]
+    ) throws -> [String: [String: JSONValue]] {
+        let existing = try fetchMetadata(itemId: itemId)
+        var map = Self.unwrapExtensions(existing.extensions)
+        map[namespace] = data
+        let merged = Metadata(
+            extensions: Self.wrapExtensions(map),
+            itemId: itemId,
+            tags: existing.tags
+        )
+        let record = try MetadataRecord.from(merged)
+        try pool.write { db in
+            try record.save(db)
+        }
+        return map
+    }
+
+    /// Removes a namespaced extension from an item.
+    func deleteExtension(itemId: String, namespace: String) throws {
+        let existing = try fetchMetadata(itemId: itemId)
+        var map = Self.unwrapExtensions(existing.extensions)
+        map.removeValue(forKey: namespace)
+        let merged = Metadata(
+            extensions: Self.wrapExtensions(map),
+            itemId: itemId,
+            tags: existing.tags
+        )
+        let record = try MetadataRecord.from(merged)
+        try pool.write { db in
+            try record.save(db)
+        }
+    }
+
+    /// Returns all extension namespaces for an item.
+    func fetchExtensions(itemId: String) throws -> [String: [String: JSONValue]] {
+        Self.unwrapExtensions(try fetchMetadata(itemId: itemId).extensions)
+    }
+
+    /// Returns a single extension namespace for an item, or `nil` if absent.
+    func fetchExtension(itemId: String, namespace: String) throws -> [String: JSONValue]? {
+        try fetchExtensions(itemId: itemId)[namespace]
+    }
+
+    // Each namespace's stored value is an object. The wire type models the
+    // extensions map as `[String: JSONValue]` (any value), but in practice
+    // every namespace holds a dictionary. These helpers unwrap/rewrap between
+    // the two shapes without losing type information.
+    private static func unwrapExtensions(
+        _ extensions: [String: JSONValue]
+    ) -> [String: [String: JSONValue]] {
+        var map: [String: [String: JSONValue]] = [:]
+        for (namespace, value) in extensions {
+            if case let .dictionary(dict) = value {
+                map[namespace] = dict
+            }
+        }
+        return map
+    }
+
+    private static func wrapExtensions(
+        _ map: [String: [String: JSONValue]]
+    ) -> [String: JSONValue] {
+        var wrapped: [String: JSONValue] = [:]
+        for (namespace, dict) in map {
+            wrapped[namespace] = .dictionary(dict)
+        }
+        return wrapped
+    }
 }

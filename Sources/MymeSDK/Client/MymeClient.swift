@@ -98,11 +98,18 @@ public final class MymeClient: Sendable {
             localStore: localStore,
             mutationQueue: mutationQueue
         )
-        self.extensions = ExtensionsNamespace(transport: transport)
+        self.extensions = ExtensionsNamespace(
+            transport: transport,
+            localStore: localStore,
+            mutationQueue: mutationQueue
+        )
+        // Pure-local mode has a local store but no sync engine — blob ops
+        // can't round-trip through the server and must throw early.
         self.blobs = BlobsNamespace(
             transport: transport,
             apiBaseURL: configuration.url,
-            cdnBaseURL: configuration.cdnBaseURL
+            cdnBaseURL: configuration.cdnBaseURL,
+            isLocalMode: localStore != nil && syncEngine == nil
         )
         self.types = TypesNamespace(transport: transport)
         self.keys = KeysNamespace(transport: transport)
