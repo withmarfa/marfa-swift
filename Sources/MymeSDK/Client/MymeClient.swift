@@ -57,6 +57,12 @@ public final class MymeClient: Sendable {
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
+    /// The underlying `DatabasePool`, non-nil when a local store is configured.
+    ///
+    /// Used by ``makeStore()`` to create ``MymeStore`` instances. The pool is
+    /// `Sendable` and safe to store on `MymeClient`.
+    private let pool: DatabasePool?
+
     // MARK: - Init
 
     /// Designated init — used by every other init path, including tests.
@@ -65,11 +71,13 @@ public final class MymeClient: Sendable {
         transport: any Transport,
         localStore: LocalStore? = nil,
         mutationQueue: MutationQueue? = nil,
-        syncEngine: SyncEngine? = nil
+        syncEngine: SyncEngine? = nil,
+        pool: DatabasePool? = nil
     ) {
         self.configuration = configuration
         self.transport = transport
         self.syncEngine = syncEngine
+        self.pool = pool
 
         let items = ItemsNamespace(
             transport: transport,
@@ -130,7 +138,8 @@ public final class MymeClient: Sendable {
         return MymeClient(
             configuration: config,
             transport: URLSessionTransport(configuration: config),
-            localStore: store
+            localStore: store,
+            pool: store.pool
         )
     }
 
@@ -170,7 +179,8 @@ public final class MymeClient: Sendable {
             transport: transport,
             localStore: store,
             mutationQueue: queue,
-            syncEngine: engine
+            syncEngine: engine,
+            pool: store.pool
         )
     }
 
@@ -222,6 +232,29 @@ public final class MymeClient: Sendable {
     ) async throws {
         let storage = KeychainStorage(service: service, accessGroup: accessGroup)
         try await storage.set(configuration.apiKey, for: account)
+    }
+
+    // MARK: - Reactive store
+
+    /// Creates a ``MymeStore`` for use with SwiftUI and `@Observable`.
+    ///
+    /// Returns `nil` when the client has no local store configured (i.e., it
+    /// was created with ``MymeClient/init(url:apiKey:)`` or
+    /// ``MymeClient/init(configuration:)`` without a local store path).
+    ///
+    /// Must be called from a `@MainActor` context. Callers typically hold the
+    /// returned store as a `@State` or environment object in a SwiftUI view:
+    ///
+    ///     @State private var store = client.makeStore()
+    ///     // ...
+    ///     let notes = store?.query(filters: ListFilters(type: "core.note"))
+    ///
+    /// Each call to `makeStore()` returns a new `MymeStore` instance backed by
+    /// the same underlying database — multiple stores observe the same data.
+    @MainActor
+    public func makeStore() -> MymeStore? {
+        guard let pool else { return nil }
+        return MymeStore(pool: pool)
     }
 
     // MARK: - Top-Level Methods
