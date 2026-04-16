@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaPodcast`` — typed wrapper for `core.media.podcast` items.
 ///
 /// A podcast episode. Inherits all core.media fields.

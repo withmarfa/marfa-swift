@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreBookmark`` — typed wrapper for `core.bookmark` items.
 ///
 /// Content you captured from elsewhere — a saved URL, a highlight, an excerpt, a clipped paragraph.

@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaSong`` — typed wrapper for `core.media.song` items.
 ///
 /// A song. Inherits all core.media fields.

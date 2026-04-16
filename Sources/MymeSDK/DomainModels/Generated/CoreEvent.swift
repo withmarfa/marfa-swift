@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreEvent`` — typed wrapper for `core.event` items.
 ///
 /// Something that happens at a time.
@@ -46,7 +45,7 @@ public struct CoreEvent: MymeItem {
     /// Allowed values: `year`, `month`, `day`, `time`.
     public var precision: String? { item.properties["precision"]?.stringValue }
 
-    /// When to start
+    /// Start time
     public var startsAt: String? { item.properties["starts_at"]?.stringValue }
 
     /// Recommended values: tentative, confirmed, cancelled, rescheduled

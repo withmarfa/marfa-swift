@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreFileImage`` — typed wrapper for `core.file.image` items.
 ///
 /// Photos, screenshots, diagrams. Inherits all core.file fields.

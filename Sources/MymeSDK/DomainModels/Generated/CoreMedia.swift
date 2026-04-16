@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMedia`` — typed wrapper for `core.media` items.
 ///
 /// Content produced by someone that the user engages with — a film, podcast, book, article, song, show.

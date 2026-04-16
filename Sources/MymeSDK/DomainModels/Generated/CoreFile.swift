@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreFile`` — typed wrapper for `core.file` items.
 ///
 /// A file or binary reference — the generic fallback for non-media files.

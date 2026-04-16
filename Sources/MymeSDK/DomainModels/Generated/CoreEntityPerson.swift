@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreEntityPerson`` — typed wrapper for `core.entity.person` items.
 ///
 /// Contact information for an individual. Inherits all core.entity fields.

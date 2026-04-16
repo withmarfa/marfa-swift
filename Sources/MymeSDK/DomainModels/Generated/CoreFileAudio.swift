@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreFileAudio`` — typed wrapper for `core.file.audio` items.
 ///
 /// Recordings, music files, voice memos. Inherits all core.file fields.

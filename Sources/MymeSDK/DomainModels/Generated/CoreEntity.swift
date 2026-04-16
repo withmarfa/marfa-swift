@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreEntity`` — typed wrapper for `core.entity` items.
 ///
 /// A non-person entity — a company, band, team, charity, brand, school.

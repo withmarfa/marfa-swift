@@ -52,12 +52,6 @@
       "identifiableKey": "id"
     },
     {
-      "name": "MymeThread",
-      "pointer": "/paths/~1threads~1{id}/get/responses/200/content/application~1json/schema/properties/thread",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
-      "identifiableKey": "id"
-    },
-    {
       "name": "ApiKey",
       "pointer": "/paths/~1keys/get/responses/200/content/application~1json/schema/properties/keys/items",
       "conformances": ["Codable", "Sendable", "Identifiable"],

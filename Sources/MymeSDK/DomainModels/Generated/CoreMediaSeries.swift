@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaSeries`` — typed wrapper for `core.media.series` items.
 ///
 /// A TV show or series. Inherits all core.media fields.

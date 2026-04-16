@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaArticle`` — typed wrapper for `core.media.article` items.
 ///
 /// An article. Inherits all core.media fields.

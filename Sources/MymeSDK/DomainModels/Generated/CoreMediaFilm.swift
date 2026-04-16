@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaFilm`` — typed wrapper for `core.media.film` items.
 ///
 /// A film. Inherits all core.media fields.

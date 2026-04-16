@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaAlbum`` — typed wrapper for `core.media.album` items.
 ///
 /// An album. Inherits all core.media fields.

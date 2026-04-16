@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreEntityPlace`` — typed wrapper for `core.entity.place` items.
 ///
 /// A location or venue. Inherits all core.entity fields.

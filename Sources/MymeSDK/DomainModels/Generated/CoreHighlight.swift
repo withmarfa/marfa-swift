@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreHighlight`` — typed wrapper for `core.highlight` items.
 ///
 /// A user's engagement with content — the highlighted passage plus optional annotation. The canonical relationship (what was highlighted) is carried by an annotates edge; the moment of highlighting is the system timestamp.

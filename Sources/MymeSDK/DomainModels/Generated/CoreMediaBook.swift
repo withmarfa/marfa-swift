@@ -4,7 +4,6 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-
 /// ``CoreMediaBook`` — typed wrapper for `core.media.book` items.
 ///
 /// A book. Inherits all core.media fields.
