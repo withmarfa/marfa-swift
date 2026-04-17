@@ -97,16 +97,65 @@ struct LocalStoreTests {
         #expect(!actives.data.map(\.id).contains(toTrash.id))
     }
 
-    @Test("updateItem replaces properties and increments version") func updateItemReplacesPropertiesAndIncrementsVersion() async throws {
+    @Test("updateItem merges properties and increments version") func updateItemMergesPropertiesAndIncrementsVersion() async throws {
         let store = try makeStore()
-        let item = try await store.createItem(noteInput(body: "original"))
+        let item = try await store.createItem(
+            noteInput(body: "original", title: "Original title")
+        )
+        // Delta only carries `body`. Server-PATCH parity means `title` survives.
         let updated = try await store.updateItem(
             id: item.id,
-            properties: ["body": .string("revised"), "title": .string("New Title")]
+            properties: ["body": .string("revised")]
         )
         #expect(updated.version == 2)
         #expect(updated.properties["body"] == .string("revised"))
-        #expect(updated.properties["title"] == .string("New Title"))
+        #expect(updated.properties["title"] == .string("Original title"))
+    }
+
+    @Test("updateItem with no library override preserves existing flag") func updateItemPreservesLibraryWhenAbsent() async throws {
+        let store = try makeStore()
+        let input = CreateItemInput(
+            type: "core.note",
+            properties: ["body": .string("x")],
+            library: true
+        )
+        let item = try await store.createItem(input)
+        #expect(item.library == true)
+        let updated = try await store.updateItem(
+            id: item.id,
+            properties: ["body": .string("y")]
+        )
+        #expect(updated.library == true)
+    }
+
+    @Test("updateItem with library override applies the new value") func updateItemAppliesLibraryOverride() async throws {
+        let store = try makeStore()
+        let item = try await store.createItem(noteInput())
+        #expect(item.library == false)
+        let updated = try await store.updateItem(
+            id: item.id,
+            properties: [:],
+            library: true
+        )
+        #expect(updated.library == true)
+    }
+
+    @Test("newId generates UUIDv7 (timestamp-prefixed)") func newIdGeneratesUUIDv7() throws {
+        // RFC 9562: byte 6 high nibble is the version (= 7).
+        // String position 14 (0-indexed) sits within the third hex group.
+        let id = UUIDv7.generateString()
+        let chars = Array(id)
+        // Format: xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx
+        #expect(chars[14] == "7", "Expected version-7 nibble at position 14, got id=\(id)")
+        // Variant nibble at position 19 should be 8, 9, a, or b (binary 10xx).
+        let variant = chars[19]
+        #expect(["8", "9", "a", "b"].contains(variant), "Expected RFC 9562 variant nibble, got \(variant) (id=\(id))")
+        // Sortability: two IDs generated back-to-back should compare in order.
+        let a = UUIDv7.generateString()
+        // Tiny sleep to guarantee a millisecond tick between generations.
+        Thread.sleep(forTimeInterval: 0.005)
+        let b = UUIDv7.generateString()
+        #expect(a < b, "UUIDv7 should be lexicographically sortable by time (a=\(a), b=\(b))")
     }
 
     @Test("trashItem sets state to trashed") func trashItemSetsStateToTrashed() async throws {

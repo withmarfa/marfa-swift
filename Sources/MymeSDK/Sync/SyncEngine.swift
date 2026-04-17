@@ -81,6 +81,39 @@ public actor SyncEngine {
     // Sync-state key stored in the mutation-queue's sync_state table.
     private let cursorKey = "last_event_id"
 
+    // MARK: - Event stream
+
+    /// Reactive stream of typed sync events for app subscribers (e.g. a
+    /// SwiftUI view backing a "Last synced" footer or a merge-toast surface).
+    /// Past events are not replayed to late subscribers; the engine yields
+    /// each event once per running consumer.
+    public nonisolated var events: AsyncStream<SyncEvent> {
+        AsyncStream<SyncEvent> { continuation in
+            Task { await self.subscribe(continuation) }
+            continuation.onTermination = { @Sendable _ in
+                // Continuation finished — nothing to clean up explicitly;
+                // the actor's stored continuations are pruned when their
+                // `yield` returns `.terminated`.
+            }
+        }
+    }
+
+    private var continuations: [AsyncStream<SyncEvent>.Continuation] = []
+
+    private func subscribe(_ continuation: AsyncStream<SyncEvent>.Continuation) {
+        continuations.append(continuation)
+    }
+
+    /// Yield to every active subscriber. Drops finished continuations.
+    private func emit(_ event: SyncEvent) {
+        continuations.removeAll { c in
+            switch c.yield(event) {
+            case .terminated: return true
+            default: return false
+            }
+        }
+    }
+
     // MARK: - Init
 
     public init(
@@ -229,32 +262,43 @@ public actor SyncEngine {
         let decoder = JSONDecoder()
 
         switch eventType {
-        case "item.created", "item.updated", "item.restored", "item.state_changed":
+        case "item.created":
             if let payload = try? decoder.decode(ItemEventPayload.self, from: data) {
                 try? await localStore.upsertItem(payload.item)
+                emit(.itemCreated(id: payload.item.id))
+            }
+
+        case "item.updated", "item.restored", "item.state_changed":
+            if let payload = try? decoder.decode(ItemEventPayload.self, from: data) {
+                try? await localStore.upsertItem(payload.item)
+                emit(.itemUpdated(id: payload.item.id))
             }
 
         case "item.deleted":
             // Server sends the deleted item with state = trashed/purged.
             if let payload = try? decoder.decode(ItemEventPayload.self, from: data) {
                 try? await localStore.upsertItem(payload.item)
+                emit(.itemDeleted(id: payload.item.id))
             }
 
         case "edge.created":
             if let payload = try? decoder.decode(EdgeEventPayload.self, from: data) {
                 try? await localStore.upsertEdge(payload.edge)
+                emit(.edgeCreated(id: payload.edge.id))
             }
 
         case "edge.deleted":
             // Edge deletes carry just the edge ID in the data envelope.
             if let payload = try? decoder.decode(EdgeEventPayload.self, from: data) {
                 try? await localStore.deleteEdge(id: payload.edge.id)
+                emit(.edgeDeleted(id: payload.edge.id))
             }
 
         case "metadata.changed":
             if let payload = try? decoder.decode(MetadataEventPayload.self, from: data) {
                 let input = MetadataInput(tags: payload.metadata.tags)
                 _ = try? await localStore.setMetadata(itemId: payload.itemId, input: input)
+                emit(.itemUpdated(id: payload.itemId))
             }
 
         default:
@@ -265,11 +309,16 @@ public actor SyncEngine {
     // MARK: - Mutation replay
 
     private func replayMutations() async {
-        guard let pending = try? await mutationQueue.fetchAll(), !pending.isEmpty else { return }
+        guard let pending = try? await mutationQueue.fetchAll(), !pending.isEmpty else {
+            // Nothing to replay; signal a clean sync if the engine is up.
+            if running { emit(.synced(at: Date())) }
+            return
+        }
 
         await connectionManager.markSyncing()
         let decoder = JSONDecoder()
 
+        var lastError: Error?
         for record in pending {
             guard running else { break }
 
@@ -277,8 +326,15 @@ public actor SyncEngine {
                 try await replayRecord(record, decoder: decoder)
                 try? await mutationQueue.remove(id: record.id)
             } catch {
+                lastError = error
                 try? await mutationQueue.recordFailure(id: record.id, error: error.localizedDescription)
             }
+        }
+
+        if let lastError {
+            emit(.failed(error: lastError))
+        } else if running {
+            emit(.synced(at: Date()))
         }
     }
 
@@ -300,10 +356,40 @@ public actor SyncEngine {
 
         case .updateItem:
             let p = try decoder.decode(UpdateItemPayload.self, from: data)
-            let body = UpdateItemBody(properties: p.properties, version: nil, snapshot: nil)
-            let _: ItemResponse = try await transport.request(
-                method: .patch, path: "/items/\(p.id)", body: body, query: nil
-            )
+            // If the call site recorded a `version`, the queued mutation
+            // wants conflict-aware replay — go through `handleConflictUpdate`
+            // so the captured strategy is applied against any 409 the server
+            // returns. `.callback` degrades to `.auto` because the resolver
+            // closure isn't serialisable.
+            if let v = p.version {
+                let strategy: ConflictStrategy = {
+                    switch p.conflict ?? .auto {
+                    case .callback: return .auto
+                    case let other: return other
+                    }
+                }()
+                _ = try await handleConflictUpdate(
+                    transport: transport,
+                    itemId: p.id,
+                    clientPatch: p.properties,
+                    version: v,
+                    strategy: strategy,
+                    resolver: nil,
+                    library: p.library
+                )
+            } else {
+                // No version → fast-merge path on the server. Library still
+                // travels if the call site set it.
+                let body = UpdateItemBody(
+                    properties: p.properties,
+                    version: nil,
+                    snapshot: nil,
+                    library: p.library
+                )
+                let _: ItemResponse = try await transport.request(
+                    method: .patch, path: "/items/\(p.id)", body: body, query: nil
+                )
+            }
 
         case .deleteItem:
             let p = try decoder.decode(IDPayload.self, from: data)

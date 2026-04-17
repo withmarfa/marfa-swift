@@ -101,9 +101,10 @@ public struct CreateItemEdge: Codable, Sendable, Hashable {
 
 /// Body for PATCH /items/:id.
 struct UpdateItemBody: Codable, Sendable {
-    var properties: [String: JSONValue]
+    var properties: [String: JSONValue]?
     var version: Int?
     var snapshot: Bool?
+    var library: Bool?
 }
 
 /// Options for item update operations.
@@ -111,15 +112,20 @@ public struct UpdateOptions: Sendable {
     public var version: Int?
     public var conflict: ConflictStrategy?
     public var resolve: ConflictResolver?
+    /// Toggle the item's library / ambient flag as part of this update.
+    /// Independent of the version-merge path; never conflicts.
+    public var library: Bool?
 
     public init(
         version: Int? = nil,
         conflict: ConflictStrategy? = nil,
-        resolve: ConflictResolver? = nil
+        resolve: ConflictResolver? = nil,
+        library: Bool? = nil
     ) {
         self.version = version
         self.conflict = conflict
         self.resolve = resolve
+        self.library = library
     }
 }
 
