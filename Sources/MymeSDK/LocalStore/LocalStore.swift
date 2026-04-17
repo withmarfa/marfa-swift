@@ -138,7 +138,11 @@ public actor LocalStore {
     /// ID since there is no server in pure-local mode.
     func createItem(_ input: CreateItemInput) throws -> Item {
         let now = now()
-        let id = newId()
+        // Respect a client-provided id when set — lets consumers generate the
+        // id up front to avoid the local-id → server-id reconciliation race
+        // that otherwise invalidates pending update mutations. Falls back to
+        // a locally-generated id for legacy callers.
+        let id = input.id ?? newId()
         let item = Item(
             captureLatitude: input.captureLatitude,
             captureLongitude: input.captureLongitude,
