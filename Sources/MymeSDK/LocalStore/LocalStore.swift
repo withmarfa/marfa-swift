@@ -387,6 +387,28 @@ public actor LocalStore {
         return PaginatedResult(data: edges, cursor: nil, hasMore: false)
     }
 
+    /// Global edge listing across the entire local store, optionally filtered
+    /// by type. Used by the SDK's `edges.list(edgeType:)` to satisfy
+    /// "all edges of type X" without an N+1 walk over items. Cursor pagination
+    /// not implemented here (synced-mode local store is small enough to
+    /// return in one go); the remote-mode path uses real cursors against
+    /// `GET /edges`.
+    func fetchEdges(
+        edgeType: String?,
+        limit: Int?
+    ) throws -> PaginatedResult<Edge> {
+        let records = try pool.read { db in
+            var request: QueryInterfaceRequest<EdgeRecord> = EdgeRecord.all()
+            if let edgeType {
+                request = request.filter(Column("edge_type") == edgeType)
+            }
+            if let limit { request = request.limit(limit) }
+            return try request.fetchAll(db)
+        }
+        let edges = try records.map { try $0.toEdge() }
+        return PaginatedResult(data: edges, cursor: nil, hasMore: false)
+    }
+
     /// Lists edges where `target_id == targetId`, optionally filtered by type.
     func fetchEdgesToTarget(
         targetId: String,

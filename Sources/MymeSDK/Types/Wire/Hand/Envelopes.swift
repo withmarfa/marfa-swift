@@ -78,3 +78,19 @@ struct EdgeTypeResponse: Codable, Sendable {
         case edgeType = "edge_type"
     }
 }
+
+/// A tag with its usage count, returned by `GET /metadata/tags`.
+public struct TagWithCount: Codable, Sendable, Hashable {
+    public let tag: String
+    public let count: Int
+
+    public init(tag: String, count: Int) {
+        self.tag = tag
+        self.count = count
+    }
+}
+
+/// Response from GET /metadata/tags: `{ "tags": [{ tag, count }] }`.
+struct TagListResponse: Codable, Sendable {
+    let tags: [TagWithCount]
+}

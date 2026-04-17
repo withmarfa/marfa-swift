@@ -82,6 +82,32 @@ public struct EdgesNamespace: Sendable {
 
     // MARK: - Reads
 
+    /// Global tenant-scoped edge listing, optionally filtered by type.
+    /// Use this when you need "all edges of type X" (thread-root counting,
+    /// taxonomy traversal) — replaces the walk-every-item N+1 pattern.
+    /// Per-target filters live on ``listFromSource`` / ``listToTarget``.
+    ///
+    /// In synced mode the SDK satisfies the call from the local store
+    /// directly (fast, no round-trip); in remote mode it hits
+    /// `GET /edges?edge_type=...`.
+    public func list(
+        edgeType: String? = nil,
+        cursor: String? = nil,
+        limit: Int? = nil
+    ) async throws -> PaginatedResult<Edge> {
+        if let store = localStore {
+            return try await store.fetchEdges(edgeType: edgeType, limit: limit)
+        }
+        var query: [(String, String)] = []
+        if let edgeType { query.append(("edge_type", edgeType)) }
+        if let cursor { query.append(("cursor", cursor)) }
+        if let limit { query.append(("limit", String(limit))) }
+        return try await transport.request(
+            method: .get, path: "/edges", body: nil,
+            query: query.isEmpty ? nil : query
+        )
+    }
+
     /// Lists outbound edges from a source item.
     public func listFromSource(
         sourceId: String,

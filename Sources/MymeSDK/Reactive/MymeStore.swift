@@ -90,4 +90,21 @@ public final class MymeStore {
     ) -> EdgesQuery {
         EdgesQuery(pool: pool, sourceId: sourceId, edgeType: edgeType, limit: limit)
     }
+
+    /// Creates a live query over **all edges of a given type** across the
+    /// entire local store. Backs taxonomy-style "every reply", "every
+    /// annotation" surfaces — replaces the walk-every-item polling that
+    /// app authors were writing as a workaround.
+    ///
+    ///     let allReplies = store.queryEdges(ofType: "in-thread")
+    ///
+    /// - Parameters:
+    ///   - edgeType: Edge type to track.
+    ///   - limit: Optional row cap.
+    public func queryEdges(
+        ofType edgeType: String,
+        limit: Int? = nil
+    ) -> EdgesQuery {
+        EdgesQuery(pool: pool, edgeType: edgeType, limit: limit)
+    }
 }

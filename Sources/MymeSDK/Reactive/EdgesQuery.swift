@@ -71,6 +71,44 @@ public final class EdgesQuery {
         )
     }
 
+    /// Creates a live query over **all edges of a given type** across the
+    /// entire local store. Used for taxonomy-style "show every reply"
+    /// surfaces — replaces the walk-every-item polling that consumers had
+    /// to write before this method existed.
+    ///
+    /// - Parameters:
+    ///   - pool: Shared ``DatabasePool`` from the ``LocalStore``.
+    ///   - edgeType: Edge type to track. Required (no global "all edges"
+    ///     variant — at that point the caller probably wants per-source
+    ///     filtering instead).
+    ///   - limit: Optional cap on the result count.
+    init(pool: DatabasePool, edgeType: String, limit: Int? = nil) {
+        let observation = ValueObservation.tracking { db -> [EdgeRecord] in
+            var query =
+                EdgeRecord
+                .filter(Column("edge_type") == edgeType)
+                .order(Column("created_at").asc)
+            if let limit {
+                query = query.limit(limit)
+            }
+            return try query.fetchAll(db)
+        }
+
+        cancellable = observation.start(
+            in: pool,
+            scheduling: .mainActor,
+            onError: { [weak self] error in
+                self?.error = error
+                self?.isLoading = false
+            },
+            onChange: { [weak self] records in
+                self?.edges = records.compactMap { try? $0.toEdge() }
+                self?.isLoading = false
+                self?.error = nil
+            }
+        )
+    }
+
     // MARK: - Lifecycle
 
     /// Stops the observation.
