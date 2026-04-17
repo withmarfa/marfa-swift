@@ -42,9 +42,18 @@ struct CreateItemPayload: Codable, Sendable {
 }
 
 /// Payload stored for an `updateItem` mutation.
+///
+/// `version` and `conflict` capture the per-call conflict context so a
+/// replay can apply the same strategy the caller chose. The `.callback`
+/// resolver closure is not serialisable — on replay, `.callback` degrades
+/// to `.auto`. `library` mirrors the server's separate library-axis flip
+/// on `PATCH /items/:id`.
 struct UpdateItemPayload: Codable, Sendable {
     let id: String
     let properties: [String: JSONValue]
+    var version: Int?
+    var conflict: ConflictStrategy?
+    var library: Bool?
 }
 
 /// Payload for mutations that just need an item/edge ID.
@@ -193,8 +202,24 @@ public actor MutationQueue {
         )
     }
 
-    func enqueueUpdateItem(id: String, properties: [String: JSONValue]) throws {
-        try enqueue(kind: .updateItem, payload: UpdateItemPayload(id: id, properties: properties), localId: id)
+    func enqueueUpdateItem(
+        id: String,
+        properties: [String: JSONValue],
+        version: Int? = nil,
+        conflict: ConflictStrategy? = nil,
+        library: Bool? = nil
+    ) throws {
+        try enqueue(
+            kind: .updateItem,
+            payload: UpdateItemPayload(
+                id: id,
+                properties: properties,
+                version: version,
+                conflict: conflict,
+                library: library
+            ),
+            localId: id
+        )
     }
 
     func enqueueDeleteItem(id: String) throws {

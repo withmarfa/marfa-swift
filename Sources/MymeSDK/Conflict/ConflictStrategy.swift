@@ -1,7 +1,12 @@
 import Foundation
 
 /// Strategy for resolving version conflicts during item updates.
-public enum ConflictStrategy: Sendable {
+///
+/// `Codable` so the strategy can be persisted with queued mutations and
+/// re-applied during replay. The `.callback` resolver closure itself is
+/// not serialisable; on replay, `.callback` degrades to `.auto` because
+/// the original resolver function no longer exists in memory.
+public enum ConflictStrategy: String, Codable, Sendable {
     /// Auto-merge non-conflicting fields. Server wins on conflicts. Retries up to 3 times.
     case auto
 

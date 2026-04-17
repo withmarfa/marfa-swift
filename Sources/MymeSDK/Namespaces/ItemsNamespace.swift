@@ -69,16 +69,30 @@ public struct ItemsNamespace: Sendable {
 
     /// Updates an item's properties with conflict resolution.
     ///
-    /// In local mode the update is applied directly (no conflict resolution needed).
-    /// In network mode the client's default conflict strategy applies.
+    /// In local mode the update is applied directly (no conflict resolution
+    /// needed). In synced mode the local store is updated immediately and the
+    /// mutation enqueued for replay; the per-call conflict strategy is
+    /// captured with the queued mutation so replay can apply it on a 409
+    /// (note: the `.callback` resolver closure is not persisted — on replay,
+    /// `.callback` degrades to `.auto`).
     public func update(
         id: String,
         properties: [String: JSONValue],
         options: UpdateOptions? = nil
     ) async throws -> Item {
         if let store = localStore {
-            let item = try await store.updateItem(id: id, properties: properties)
-            try await mutationQueue?.enqueueUpdateItem(id: id, properties: properties)
+            let item = try await store.updateItem(
+                id: id,
+                properties: properties,
+                library: options?.library
+            )
+            try await mutationQueue?.enqueueUpdateItem(
+                id: id,
+                properties: properties,
+                version: options?.version,
+                conflict: options?.conflict ?? defaultConflictStrategy,
+                library: options?.library
+            )
             return item
         }
         let resolvedVersion: Int
@@ -94,7 +108,8 @@ public struct ItemsNamespace: Sendable {
             clientPatch: properties,
             version: resolvedVersion,
             strategy: strategy,
-            resolver: options?.resolve
+            resolver: options?.resolve,
+            library: options?.library
         )
     }
 

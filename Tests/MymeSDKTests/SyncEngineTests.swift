@@ -149,6 +149,45 @@ struct SyncEngineTests {
             #expect(kinds.contains(.addTags))
             #expect(kinds.contains(.removeTag))
         }
+
+        @Test("enqueueUpdateItem captures version + conflict + library on the payload") func captureUpdateOptions() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+            try await queue.enqueueUpdateItem(
+                id: "i1",
+                properties: ["body": .string("x")],
+                version: 5,
+                conflict: .manual,
+                library: true
+            )
+            let records = try await queue.fetchAll()
+            let updateRecord = try #require(records.first { $0.kind == .updateItem })
+            let payload = try JSONDecoder().decode(
+                UpdateItemPayload.self,
+                from: updateRecord.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(payload.version == 5)
+            #expect(payload.conflict == .manual)
+            #expect(payload.library == true)
+        }
+
+        @Test("enqueueUpdateItem with no options leaves version/conflict/library nil") func captureNoUpdateOptions() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+            try await queue.enqueueUpdateItem(
+                id: "i1",
+                properties: ["body": .string("x")]
+            )
+            let records = try await queue.fetchAll()
+            let updateRecord = try #require(records.first { $0.kind == .updateItem })
+            let payload = try JSONDecoder().decode(
+                UpdateItemPayload.self,
+                from: updateRecord.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(payload.version == nil)
+            #expect(payload.conflict == nil)
+            #expect(payload.library == nil)
+        }
     }
 
     // MARK: - ConnectionStateManager unit tests

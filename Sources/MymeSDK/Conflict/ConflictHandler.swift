@@ -13,15 +13,42 @@ func handleConflictUpdate(
     clientPatch: [String: JSONValue],
     version: Int,
     strategy: ConflictStrategy,
-    resolver: ConflictResolver?
+    resolver: ConflictResolver?,
+    library: Bool? = nil
 ) async throws -> Item {
+    let result = try await handleConflictUpdateWithStats(
+        transport: transport,
+        itemId: itemId,
+        clientPatch: clientPatch,
+        version: version,
+        strategy: strategy,
+        resolver: resolver,
+        library: library
+    )
+    return result.item
+}
+
+/// Returns the resolved item plus the number of conflict-resolution retries
+/// that fired (0 when the first attempt succeeded). Callers that surface a
+/// "merged" event (e.g. ``SyncEngine`` for replay-time auto-merges) use the
+/// retry count to decide whether to emit ``SyncEvent/conflictAutoMerged``.
+func handleConflictUpdateWithStats(
+    transport: any Transport,
+    itemId: String,
+    clientPatch: [String: JSONValue],
+    version: Int,
+    strategy: ConflictStrategy,
+    resolver: ConflictResolver?,
+    library: Bool? = nil
+) async throws -> (item: Item, retries: Int) {
     var properties = clientPatch
     var currentVersion = version
 
     for attempt in 0...maxRetries {
         let body = UpdateItemBody(
             properties: properties,
-            version: currentVersion
+            version: currentVersion,
+            library: library
         )
 
         let result: ConflictResult<ItemResponse> = try await transport.requestWithConflict(
@@ -33,7 +60,7 @@ func handleConflictUpdate(
 
         switch result {
         case .success(let response):
-            return response.item
+            return (item: response.item, retries: attempt)
 
         case .conflict(let conflictResponse):
             // Manual strategy: always throw immediately

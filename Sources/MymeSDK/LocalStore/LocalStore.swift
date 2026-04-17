@@ -128,20 +128,28 @@ public actor LocalStore {
         LocalStore.iso8601(Date())
     }
 
+    /// Generate a fresh ID for a new item / edge / record.
+    ///
+    /// Uses **UUIDv7** — Myme's canonical ID format. Timestamp-prefixed and
+    /// globally unique, so client-generated IDs round-trip cleanly to the
+    /// server with no reconciliation race. The previous fallback returned
+    /// `UUID()` (random v4) which broke timestamp-locality on local reads
+    /// and was incompatible with the server's UUIDv7 expectation.
     private func newId() -> String {
-        UUID().uuidString.lowercased()
+        UUIDv7.generateString()
     }
 
     // MARK: - Item CRUD
 
-    /// Creates an item from the given input. Assigns a new UUID as the server
-    /// ID since there is no server in pure-local mode.
+    /// Creates an item from the given input. Assigns a new UUIDv7 if the
+    /// caller didn't supply one — passing `input.id` explicitly is fully
+    /// supported and remains the right choice for callers that need to
+    /// reference the new id before `createItem` returns. With UUIDv7 as the
+    /// default, the local-id → server-id reconciliation race documented in
+    /// `SyncEngine.replayRecord` no longer fires for callers that omit
+    /// `input.id` either — server and client agree on the id.
     func createItem(_ input: CreateItemInput) throws -> Item {
         let now = now()
-        // Respect a client-provided id when set — lets consumers generate the
-        // id up front to avoid the local-id → server-id reconciliation race
-        // that otherwise invalidates pending update mutations. Falls back to
-        // a locally-generated id for legacy callers.
         let id = input.id ?? newId()
         let item = Item(
             captureLatitude: input.captureLatitude,
@@ -216,9 +224,25 @@ public actor LocalStore {
 
     /// Updates an item's properties. Increments the version and sets `updated_at`.
     @discardableResult
-    func updateItem(id: String, properties: [String: JSONValue]) throws -> Item {
+    /// Updates an item with **partial-merge semantics for properties**, mirroring
+    /// the server's `PATCH /items/:id` behaviour. Caller passes only the fields
+    /// it wants to change; existing keys not in the delta are preserved.
+    /// `library` is an optional metadata-axis flag — if provided, it overrides
+    /// the existing value; otherwise the existing value is preserved.
+    func updateItem(
+        id: String,
+        properties: [String: JSONValue],
+        library: Bool? = nil
+    ) throws -> Item {
         let now = now()
         let existing = try fetchItem(id: id)
+        // Merge the delta into the existing properties dict. New keys win on
+        // collision (last-write-wins); unmentioned keys survive untouched.
+        // This is the parity fix with the server's PATCH semantics.
+        var merged = existing.properties
+        for (key, value) in properties {
+            merged[key] = value
+        }
         let updated = Item(
             captureLatitude: existing.captureLatitude,
             captureLongitude: existing.captureLongitude,
@@ -226,9 +250,9 @@ public actor LocalStore {
             device: existing.device,
             edges: nil,
             id: existing.id,
-            library: existing.library,
+            library: library ?? existing.library,
             origin: existing.origin,
-            properties: properties,
+            properties: merged,
             schemaVersion: existing.schemaVersion,
             source: existing.source,
             sourceId: existing.sourceId,
