@@ -123,6 +123,9 @@ public struct SearchFilters: Sendable {
     public var type: String?
     public var state: ItemState?
     public var library: LibraryFilter?
+    /// Items must have ALL specified tags. Mirrors `ListFilters.tags` and
+    /// `/items?tags=`. Comma-joined when serialised.
+    public var tags: [String]?
     public var filter: String?
     public var limit: Int?
 
@@ -130,12 +133,14 @@ public struct SearchFilters: Sendable {
         type: String? = nil,
         state: ItemState? = nil,
         library: LibraryFilter? = nil,
+        tags: [String]? = nil,
         filter: String? = nil,
         limit: Int? = nil
     ) {
         self.type = type
         self.state = state
         self.library = library
+        self.tags = tags
         self.filter = filter
         self.limit = limit
     }
@@ -145,6 +150,9 @@ public struct SearchFilters: Sendable {
         if let type { params.append(("type", type)) }
         if let state { params.append(("state", state.rawValue)) }
         if let library { params.append(("library", library.rawValue)) }
+        if let tags, !tags.isEmpty {
+            params.append(("tags", tags.joined(separator: ",")))
+        }
         if let filter { params.append(("filter", filter)) }
         if let limit { params.append(("limit", String(limit))) }
         return params

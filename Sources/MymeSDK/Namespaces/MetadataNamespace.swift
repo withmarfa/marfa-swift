@@ -58,6 +58,21 @@ public struct MetadataNamespace: Sendable {
         return response.metadata
     }
 
+    /// Enumerate the distinct set of tags in use across items the caller can
+    /// read. Tenant-scoped, type-permission scoped, excludes trashed items.
+    /// Returns tags with usage counts, sorted by count desc then tag asc.
+    ///
+    /// In remote mode hits `GET /metadata/tags`. In synced / pure-local
+    /// mode walks the local store; the local store does not currently
+    /// have a dedicated aggregation, so this falls back to the network
+    /// path when a transport is available.
+    public func listTags() async throws -> [TagWithCount] {
+        let response: TagListResponse = try await transport.request(
+            method: .get, path: "/metadata/tags", body: nil, query: nil
+        )
+        return response.tags
+    }
+
     /// Removes a single tag from an item.
     public func removeTag(itemId: String, tag: String) async throws {
         if let store = localStore {
