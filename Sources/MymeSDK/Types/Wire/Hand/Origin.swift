@@ -1,5 +1,6 @@
-/// Origin of an item or credential action: human (user), agent (ai), or
-/// background process (worker). Matches the V0 three-value set.
+/// Origin of an item or credential action: human (`user`), agent (`ai`),
+/// background process (`worker`), or server-generated (`system`). Matches
+/// the Myme V0 origin set.
 ///
 /// Declared on the wire as a plain `string` in most responses; the SDK
 /// imposes the closed set so consumers get compile-time safety. If the
@@ -8,4 +9,5 @@ public enum Origin: String, Codable, Sendable, Hashable, CaseIterable {
     case user
     case ai
     case worker
+    case system
 }
