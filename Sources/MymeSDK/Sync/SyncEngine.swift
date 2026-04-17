@@ -133,9 +133,13 @@ public actor SyncEngine {
     /// ``ItemsNamespace/list(filters:)`` or add a per-item edge fetch.
     ///
     /// - Parameter pageSize: Server-side page size for each request.
-    /// - Throws: Transport errors from the pagination requests.
-    public func performInitialSync(pageSize: Int = 200) async throws {
+    /// - Returns: The total number of items imported across all pages.
+    /// - Throws: Transport errors from the pagination requests, or upsert
+    ///   errors from the local store.
+    @discardableResult
+    public func performInitialSync(pageSize: Int = 200) async throws -> Int {
         var cursor: String? = nil
+        var imported = 0
         repeat {
             var query: [(String, String)] = [
                 ("limit", String(pageSize)),
@@ -148,9 +152,10 @@ public actor SyncEngine {
             )
 
             for pair in page.data {
-                try? await localStore.upsertItem(pair.item)
+                try await localStore.upsertItem(pair.item)
                 let input = MetadataInput(tags: pair.metadata.tags)
-                _ = try? await localStore.setMetadata(itemId: pair.item.id, input: input)
+                _ = try await localStore.setMetadata(itemId: pair.item.id, input: input)
+                imported += 1
             }
 
             if !page.hasMore {
@@ -158,6 +163,7 @@ public actor SyncEngine {
             }
             cursor = page.cursor
         } while cursor != nil
+        return imported
     }
 
     // MARK: - Main run loop
