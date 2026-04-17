@@ -62,10 +62,12 @@ public struct MetadataNamespace: Sendable {
     /// read. Tenant-scoped, type-permission scoped, excludes trashed items.
     /// Returns tags with usage counts, sorted by count desc then tag asc.
     ///
-    /// In remote mode hits `GET /metadata/tags`. In synced / pure-local
-    /// mode walks the local store; the local store does not currently
-    /// have a dedicated aggregation, so this falls back to the network
-    /// path when a transport is available.
+    /// **Network-only.** Hits `GET /metadata/tags`. The local store does
+    /// not yet expose a tag-aggregation helper, so synced-mode callers
+    /// also pay a round-trip; pure-local clients
+    /// (`MymeClient.local(path:)`) cannot serve this — calling it will
+    /// surface a transport error against the stub URL. A local
+    /// aggregation path will land when a real consumer surfaces.
     public func listTags() async throws -> [TagWithCount] {
         let response: TagListResponse = try await transport.request(
             method: .get, path: "/metadata/tags", body: nil, query: nil
