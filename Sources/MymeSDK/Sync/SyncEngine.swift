@@ -368,7 +368,7 @@ public actor SyncEngine {
                     case let other: return other
                     }
                 }()
-                _ = try await handleConflictUpdate(
+                let result = try await handleConflictUpdateWithStats(
                     transport: transport,
                     itemId: p.id,
                     clientPatch: p.properties,
@@ -377,6 +377,10 @@ public actor SyncEngine {
                     resolver: nil,
                     library: p.library
                 )
+                if result.retries > 0 {
+                    emit(.conflictAutoMerged(itemId: p.id))
+                }
+                emit(.itemUpdated(id: p.id))
             } else {
                 // No version → fast-merge path on the server. Library still
                 // travels if the call site set it.
