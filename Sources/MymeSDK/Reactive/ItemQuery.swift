@@ -49,7 +49,7 @@ public final class ItemQuery {
 
     init(pool: DatabasePool, filters: ListFilters?) {
         let observation = ValueObservation.tracking { db -> [ItemRecord] in
-            var query = ItemRecord.order(Column("created_at").asc)
+            var query = ItemRecord.all()
 
             if let type = filters?.type {
                 query = query.filter(Column("type") == type)
@@ -66,6 +66,7 @@ public final class ItemQuery {
             if let limit = filters?.limit {
                 query = query.limit(limit)
             }
+            query = query.order(Self.orderExpression(for: filters))
             return try query.fetchAll(db)
         }
 
@@ -93,6 +94,13 @@ public final class ItemQuery {
     public func stop() {
         cancellable?.cancel()
         cancellable = nil
+    }
+
+    /// Order expression honoring `filters.sort` / `filters.direction`. Default
+    /// is `updated_at DESC`, matching the server-side default for `GET /items`.
+    nonisolated static func orderExpression(for filters: ListFilters?) -> SQLOrderingTerm {
+        let column = Column(filters?.sort?.rawValue ?? "updated_at")
+        return filters?.direction == .ascending ? column.asc : column.desc
     }
 }
 
@@ -132,16 +140,14 @@ public final class TypedItemQuery<T: MymeItem> {
     init(pool: DatabasePool, filters: ListFilters? = nil) {
         let typeId = T.typeIdentifier
         let observation = ValueObservation.tracking { db -> [ItemRecord] in
-            var query =
-                ItemRecord
-                .filter(Column("type") == typeId)
-                .order(Column("created_at").asc)
+            var query = ItemRecord.filter(Column("type") == typeId)
             if let state = filters?.state {
                 query = query.filter(Column("state") == state.rawValue)
             }
             if let limit = filters?.limit {
                 query = query.limit(limit)
             }
+            query = query.order(ItemQuery.orderExpression(for: filters))
             return try query.fetchAll(db)
         }
 
