@@ -121,6 +121,45 @@ public actor SyncEngine {
         await connectionManager.stop()
     }
 
+    /// Performs a one-shot catch-up import: paginates through `GET
+    /// /items?include=metadata` and upserts each item plus its metadata into
+    /// the local store. SSE alone only delivers events since the cursor, so
+    /// without this call a freshly-signed-in app shows an empty store even
+    /// when the server has history.
+    ///
+    /// Safe to call repeatedly — `upsertItem` / `setMetadata` are idempotent.
+    /// Edges are not imported here; they arrive via SSE once emitted. V1
+    /// apps that need thread/about edges for initial state should call
+    /// ``ItemsNamespace/list(filters:)`` or add a per-item edge fetch.
+    ///
+    /// - Parameter pageSize: Server-side page size for each request.
+    /// - Throws: Transport errors from the pagination requests.
+    public func performInitialSync(pageSize: Int = 200) async throws {
+        var cursor: String? = nil
+        repeat {
+            var query: [(String, String)] = [
+                ("limit", String(pageSize)),
+                ("include", "metadata"),
+            ]
+            if let cursor { query.append(("cursor", cursor)) }
+
+            let page: PaginatedResult<ItemWithMetadata> = try await transport.request(
+                method: .get, path: "/items", body: nil, query: query
+            )
+
+            for pair in page.data {
+                try? await localStore.upsertItem(pair.item)
+                let input = MetadataInput(tags: pair.metadata.tags)
+                _ = try? await localStore.setMetadata(itemId: pair.item.id, input: input)
+            }
+
+            if !page.hasMore {
+                break
+            }
+            cursor = page.cursor
+        } while cursor != nil
+    }
+
     // MARK: - Main run loop
 
     private func runLoop() async {
