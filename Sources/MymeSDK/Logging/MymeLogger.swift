@@ -6,13 +6,37 @@ import os
 ///
 /// Subsystem is fixed to `"sdk.myme"` so consumers can filter logs and
 /// signposts to the SDK in Console.app or Instruments. Active categories:
-/// `"transport"`, `"retry"`, `"sse"`, `"keychain"`.
+/// `"transport"`, `"sse"`, `"sync"`, `"keychain"`.
+///
+/// ## Log shape
+///
+/// Message strings follow `event.name key=value key=value` so they're
+/// readable in Console.app and greppable from the `log` CLI. Apps
+/// consuming the SDK should mirror this shape in their own
+/// `os.Logger` calls for sync-related events. Conventional keys:
+///
+///     request_id     — X-Request-ID on the wire (stamped by transport)
+///     method, path   — HTTP method and endpoint path
+///     status         — HTTP status code
+///     url_error      — URLError raw value on connection failures
+///     kind           — PendingMutationRecord.Kind raw value
+///     item_id        — local or server item ID for sync events
+///     attempt        — 1-based attempt count
+///     code           — server-reported error code
+///
+/// Missing values are written as `-` so every entry has consistent key
+/// presence.
+///
+/// ## Privacy
 ///
 /// Privacy is the caller's responsibility at the interpolation site:
 ///
-///     logger.log.info("\(method, privacy: .public) \(path, privacy: .public) \(status, privacy: .public)")
+///     logger.log.info("http.request method=\(method, privacy: .public) path=\(path, privacy: .public) request_id=\(requestId, privacy: .public)")
 ///
-/// Bearer tokens and full bodies belong behind `privacy: .private`.
+/// Request IDs, paths, statuses, error codes, and mutation kinds are
+/// `.public` — they're diagnostic, not sensitive. Bearer tokens and full
+/// request/response bodies belong behind `privacy: .private` and are only
+/// logged when `ClientConfiguration.debugLogging` is on.
 public struct MymeLogger: Sendable {
 
     /// Subsystem used by every SDK logger and signposter.

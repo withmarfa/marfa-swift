@@ -14,18 +14,35 @@ import Security
 /// (sortable insertions, `created_at`-ordered local reads stay efficient),
 /// globally unique, and client-generatable without server coordination —
 /// the same property the server's UUIDv7 generator relies on.
-enum UUIDv7 {
+///
+/// ## Client-owned IDs
+///
+/// The Myme server rejects non-UUIDv7 IDs with `400 INVALID_ID` — in
+/// particular, `Foundation.UUID().uuidString` (UUIDv4 on Apple platforms)
+/// is invalid. When an app needs to pre-allocate an ID for optimistic UI
+/// (e.g., a reply shown before the server acknowledges it), use
+/// ``generateString()``:
+///
+///     let newItem = try await client.items.create(CreateItemInput(
+///         type: CoreNote.typeIdentifier,
+///         properties: [...],
+///         id: UUIDv7.generateString()
+///     ))
+///
+/// Most create paths can omit the `id:` argument entirely and let the SDK
+/// assign one. The helper is provided for cases where the caller needs the
+/// ID before the create resolves.
+public enum UUIDv7 {
     /// Generate a fresh UUIDv7. Returns the lowercase canonical string form
-    /// (`xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx`) for direct use anywhere the
-    /// SDK previously emitted `UUID().uuidString.lowercased()`.
-    static func generateString() -> String {
+    /// (`xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx`) suitable for `CreateItemInput.id`.
+    public static func generateString() -> String {
         let bytes = generateBytes()
         return formatString(bytes: bytes)
     }
 
     /// Generate the raw 16-byte UUIDv7 value. Useful in callers that want
     /// to bridge into `Foundation.UUID(uuid:)` directly.
-    static func generateBytes() -> [UInt8] {
+    public static func generateBytes() -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: 16)
         let now = Date().timeIntervalSince1970
         let ms = UInt64(now * 1000)

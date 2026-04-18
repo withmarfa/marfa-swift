@@ -38,4 +38,19 @@ public enum SyncEvent: Sendable {
 
     /// An edge was deleted.
     case edgeDeleted(id: String)
+
+    /// A queued mutation was dropped because the server rejected it with a
+    /// permanent error (`400`, `403`, `404`). The mutation was removed from
+    /// the queue and will not be retried — further retries would get the
+    /// same result.
+    ///
+    /// Apps should surface this to the user (e.g., "Some edits couldn't be
+    /// saved"). The `error` carries the specific failure (`ValidationError`,
+    /// `NotFoundError`, `ForbiddenError`) so apps can tailor the message.
+    ///
+    /// `kind` is the raw value of `PendingMutationRecord.Kind` — stable
+    /// across SDK versions (`createItem`, `updateItem`, `createEdge`, …).
+    /// `itemId` is the target item ID (or edge ID / local ID, depending on
+    /// the mutation); `nil` for records that don't carry one.
+    case mutationDropped(kind: String, itemId: String?, attempt: Int, error: MymeError)
 }

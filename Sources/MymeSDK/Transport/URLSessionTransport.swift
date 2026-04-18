@@ -58,7 +58,7 @@ final class URLSessionTransport: Transport {
                     clientPatch: [:]
                 )
             }
-            logger.log.error("409 body failed to decode as ConflictResponse; falling back to generic error")
+            logger.log.error("http.conflict.decode_failed path=\(path, privacy: .public) reason=conflict_body_not_decodable")
             throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
@@ -96,7 +96,7 @@ final class URLSessionTransport: Transport {
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 return .conflict(conflict)
             }
-            logger.log.error("409 body failed to decode as ConflictResponse; falling back to generic error")
+            logger.log.error("http.conflict.decode_failed path=\(path, privacy: .public) reason=conflict_body_not_decodable")
             throw parseMymeError(data: data, statusCode: 409, decoder: decoder)
         }
 
@@ -124,6 +124,13 @@ final class URLSessionTransport: Transport {
         request.httpMethod = method.rawValue
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
+        // Stamp an `X-Request-ID` on every request so the server-side log
+        // line and this client-side log line can be correlated when a
+        // mutation fails. Preserved across in-request retries — it's one
+        // logical call from the app's perspective.
+        let requestId = UUIDv7.generateString()
+        request.setValue(requestId, forHTTPHeaderField: "X-Request-ID")
+
         if let contentType {
             request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         }
@@ -139,10 +146,12 @@ final class URLSessionTransport: Transport {
         )
         defer { logger.signposter.endInterval("HTTP request", interval) }
 
-        logger.log.info("→ \(method.rawValue, privacy: .public) \(path, privacy: .public)")
+        logger.log.info(
+            "http.request method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) request_id=\(requestId, privacy: .public)"
+        )
         if debugLogging, let body {
             logger.log.debug(
-                "request body: \(String(data: body, encoding: .utf8) ?? "<binary>", privacy: .private)"
+                "http.request.body request_id=\(requestId, privacy: .public) body=\(String(data: body, encoding: .utf8) ?? "<binary>", privacy: .private)"
             )
         }
 
@@ -160,7 +169,7 @@ final class URLSessionTransport: Transport {
                     try await Task.sleep(for: .seconds(effective))
                 }
                 logger.log.debug(
-                    "retry attempt \(attempt, privacy: .public)/\(self.retryPolicy.maxAttempts, privacy: .public) after \(effective, privacy: .public)s"
+                    "http.retry.delay request_id=\(requestId, privacy: .public) attempt=\(attempt, privacy: .public) max=\(self.retryPolicy.maxAttempts, privacy: .public) delay_s=\(effective, privacy: .public)"
                 )
             }
 
@@ -168,7 +177,9 @@ final class URLSessionTransport: Transport {
                 let (data, response) = try await session.data(for: request)
 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    logger.log.error("✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) not-http")
+                    logger.log.error(
+                        "http.error request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) reason=not_http"
+                    )
                     throw NetworkError(URLError(.badServerResponse))
                 }
 
@@ -182,17 +193,17 @@ final class URLSessionTransport: Transport {
 
                 if shouldRetry {
                     logger.log.info(
-                        "↻ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public) — will retry"
+                        "http.retry request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) status=\(httpResponse.statusCode, privacy: .public) attempt=\(attempt, privacy: .public)"
                     )
                     continue
                 }
 
                 logger.log.info(
-                    "← \(method.rawValue, privacy: .public) \(path, privacy: .public) \(httpResponse.statusCode, privacy: .public)"
+                    "http.response request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) status=\(httpResponse.statusCode, privacy: .public)"
                 )
                 if debugLogging, !data.isEmpty {
                     logger.log.debug(
-                        "response body: \(String(data: data, encoding: .utf8) ?? "<binary>", privacy: .private)"
+                        "http.response.body request_id=\(requestId, privacy: .public) body=\(String(data: data, encoding: .utf8) ?? "<binary>", privacy: .private)"
                     )
                 }
                 return (data, httpResponse)
@@ -207,19 +218,19 @@ final class URLSessionTransport: Transport {
                 )
                 if shouldRetry {
                     logger.log.info(
-                        "↻ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public) — will retry"
+                        "http.retry request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) url_error=\(error.code.rawValue, privacy: .public) attempt=\(attempt, privacy: .public)"
                     )
                     continue
                 }
                 logger.log.error(
-                    "✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(error.code.rawValue, privacy: .public)"
+                    "http.error request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) url_error=\(error.code.rawValue, privacy: .public)"
                 )
                 throw NetworkError(error)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 logger.log.error(
-                    "✗ \(method.rawValue, privacy: .public) \(path, privacy: .public) \(String(describing: error), privacy: .public)"
+                    "http.error request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) reason=\(String(describing: error), privacy: .public)"
                 )
                 throw NetworkError(error)
             }
@@ -254,7 +265,9 @@ final class URLSessionTransport: Transport {
                     }
 
                     let sseLogger = MymeLogger(category: "sse")
-                    sseLogger.log.info("→ SSE \(path, privacy: .public)")
+                    sseLogger.log.info(
+                        "sse.open path=\(path, privacy: .public) last_event_id=\(lastEventID ?? "-", privacy: .public)"
+                    )
 
                     let (bytes, response) = try await session.bytes(for: request)
                     guard let httpResponse = response as? HTTPURLResponse else {
@@ -295,7 +308,7 @@ final class URLSessionTransport: Transport {
                     if let final = parser.consume(line: "") {
                         continuation.yield(final)
                     }
-                    sseLogger.log.info("← SSE \(path, privacy: .public) closed")
+                    sseLogger.log.info("sse.close path=\(path, privacy: .public)")
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())

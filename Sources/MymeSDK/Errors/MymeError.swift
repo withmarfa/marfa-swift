@@ -31,6 +31,23 @@ open class MymeError: Error, @unchecked Sendable {
         self.status = status
         self.details = details
     }
+
+    /// Whether this error is permanent — i.e., retrying the same request
+    /// would produce the same failure. Used by ``SyncEngine`` to drop
+    /// queued mutations that will never succeed (malformed IDs, validation
+    /// failures, references to items the server no longer has) instead of
+    /// replaying them on every sync cycle.
+    ///
+    /// Permanent: `400` (validation), `403` (forbidden), `404` (not found).
+    /// Transient: everything else — network failures, `5xx`, timeouts,
+    /// `401` (credentials may be refreshed), `409` (resolvable via conflict
+    /// strategy), `429` (rate-limited, caller should retry).
+    public var isPermanent: Bool {
+        switch status {
+        case 400, 403, 404: return true
+        default: return false
+        }
+    }
 }
 
 extension MymeError: LocalizedError {
