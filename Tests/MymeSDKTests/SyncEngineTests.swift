@@ -376,6 +376,143 @@ struct SyncEngineTests {
             await engine.stop()
         }
 
+        // MARK: - Permanent-error drop
+
+        @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // Queue an update against an item the server "doesn't have"
+            // (matches the `019da086-…` pattern from the bug report).
+            try await queue.enqueueUpdateItem(
+                id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+                properties: ["body": .string("stale")]
+            )
+
+            // Subscribe before triggering the cycle so we can catch the
+            // `.mutationDropped` event.
+            let events = await engine.events
+            let collector = Task { () -> [SyncEvent] in
+                var out: [SyncEvent] = []
+                for await event in events {
+                    out.append(event)
+                    if case .mutationDropped = event { return out }
+                    if case .synced = event { return out }
+                }
+                return out
+            }
+
+            transport.enqueueEvents([])
+            transport.enqueueError(NotFoundError(message: "Item not found"))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            // The replay should remove the record (no retry on permanent error).
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+
+            let collected = await collector.value
+            let dropEvent = collected.first { if case .mutationDropped = $0 { return true } else { return false } }
+            #expect(dropEvent != nil)
+            if case let .mutationDropped(kind, itemId, attempt, error) = dropEvent {
+                #expect(kind == "updateItem")
+                #expect(itemId == "019da086-d675-7cd8-ba3f-3dc4e6e7bd42")
+                #expect(attempt == 1)
+                #expect(error is NotFoundError)
+            }
+
+            await engine.stop()
+        }
+
+        @Test("mutation replay drops queued record on 400 ValidationError") func mutationReplayDropsOn400() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // Matches the `6837a0e8-…` UUIDv4 pattern from the bug report —
+            // server would reject the ID with INVALID_ID (400).
+            try await queue.enqueueUpdateItem(
+                id: "6837a0e8-d316-4433-ac4c-d1e40f19615f",
+                properties: ["body": .string("bad id")]
+            )
+
+            transport.enqueueEvents([])
+            transport.enqueueError(ValidationError(message: "Invalid item ID"))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+            await engine.stop()
+        }
+
+        @Test("mutation replay retains queued record on transient 5xx") func mutationReplayRetainsOn5xx() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            try await queue.enqueueUpdateItem(
+                id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+                properties: ["body": .string("temp fail")]
+            )
+
+            transport.enqueueEvents([])
+            // 500 is transient — MymeError base class, not a permanent subclass.
+            transport.enqueueError(MymeError(
+                code: "server_error", message: "boom", status: 500
+            ))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                let all = try? await queue.fetchAll()
+                return (all?.first?.attemptCount ?? 0) >= 1
+            }
+
+            let remaining = try await queue.fetchAll()
+            #expect(remaining.count == 1)
+            #expect(remaining[0].attemptCount == 1)
+            await engine.stop()
+        }
+
+        @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // Two mutations: first fails permanently (404), second fails
+            // transiently (network). First should be dropped, second should
+            // stay queued. Order matters — replay processes in creation order.
+            try await queue.enqueueUpdateItem(
+                id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+                properties: ["body": .string("stale")]
+            )
+            try await queue.enqueueUpdateItem(
+                id: "019eb000-0000-7000-8000-000000000000",
+                properties: ["body": .string("transient")]
+            )
+
+            transport.enqueueEvents([])
+            transport.enqueueError(NotFoundError(message: "gone"))
+            transport.enqueueError(NetworkError(
+                NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
+            ))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                let all = try? await queue.fetchAll()
+                return (all?.count == 1) && ((all?.first?.attemptCount ?? 0) >= 1)
+            }
+
+            let remaining = try await queue.fetchAll()
+            #expect(remaining.count == 1)
+            #expect(remaining[0].localId == "019eb000-0000-7000-8000-000000000000")
+            #expect(remaining[0].attemptCount == 1)
+            await engine.stop()
+        }
+
         // MARK: - Cursor resume
 
         @Test("opens second SSE stream with Last-Event-ID after reconnect") func cursorResumeOnReconnect() async throws {

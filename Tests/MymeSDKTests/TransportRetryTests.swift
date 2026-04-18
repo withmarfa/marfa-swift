@@ -203,6 +203,50 @@ struct TransportRetryTests {
         #expect(remaining == 7)
     }
 
+    @Test("X-Request-ID header is stamped on every request and preserved across retries")
+    func stampsRequestIdAcrossRetries() async throws {
+        StubURLProtocol.reset(with: [
+            .init(statusCode: 500, headers: [:], body: Data(), delay: 0, error: nil),
+            .ok(),
+        ])
+
+        let policy = RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, jitter: 0)
+        let transport = makeStubbedTransport(retryPolicy: policy)
+
+        _ = try await transport.rawRequest(
+            method: .get, path: "/items", body: nil, contentType: nil, query: nil
+        )
+
+        let recorded = StubURLProtocol.recorded()
+        #expect(recorded.count == 2)
+        let first = recorded[0].value(forHTTPHeaderField: "X-Request-ID")
+        let second = recorded[1].value(forHTTPHeaderField: "X-Request-ID")
+        #expect(first != nil)
+        #expect(first == second)  // preserved across retries — one logical request
+        // UUIDv7 shape: `xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx`
+        #expect(first?.count == 36)
+        let parts = first?.split(separator: "-") ?? []
+        #expect(parts.count == 5)
+        #expect(parts[2].first == "7")
+    }
+
+    @Test("X-Request-ID differs between distinct rawRequest calls")
+    func distinctRequestIdsPerCall() async throws {
+        StubURLProtocol.reset(with: [.ok(), .ok()])
+
+        let policy = RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, jitter: 0)
+        let transport = makeStubbedTransport(retryPolicy: policy)
+
+        _ = try await transport.rawRequest(method: .get, path: "/a", body: nil, contentType: nil, query: nil)
+        _ = try await transport.rawRequest(method: .get, path: "/b", body: nil, contentType: nil, query: nil)
+
+        let recorded = StubURLProtocol.recorded()
+        #expect(recorded.count == 2)
+        let a = recorded[0].value(forHTTPHeaderField: "X-Request-ID")
+        let b = recorded[1].value(forHTTPHeaderField: "X-Request-ID")
+        #expect(a != nil && b != nil && a != b)
+    }
+
     @Test("Task cancellation throws CancellationError")
     func taskCancellationThrows() async throws {
         StubURLProtocol.reset(with: [

@@ -72,6 +72,7 @@ public actor SyncEngine {
     private let localStore: LocalStore
     private let mutationQueue: MutationQueue
     private let connectionManager: ConnectionStateManager
+    private let logger = MymeLogger(category: "sync")
 
     // MARK: - Internals
 
@@ -318,21 +319,39 @@ public actor SyncEngine {
         await connectionManager.markSyncing()
         let decoder = JSONDecoder()
 
-        var lastError: Error?
+        // Track only transient errors for the cycle-level `.failed` emit.
+        // Permanent errors (400/403/404) drop the offending record and emit
+        // `.mutationDropped` — they don't mean "sync failed," they mean
+        // "this mutation will never succeed, don't keep trying."
+        var transientError: Error?
         for record in pending {
             guard running else { break }
 
             do {
                 try await replayRecord(record, decoder: decoder)
                 try? await mutationQueue.remove(id: record.id)
+            } catch let mymeError as MymeError where mymeError.isPermanent {
+                try? await mutationQueue.remove(id: record.id)
+                logger.log.error(
+                    "sync.mutation.dropped kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) status=\(mymeError.status, privacy: .public) code=\(mymeError.code, privacy: .public)"
+                )
+                emit(.mutationDropped(
+                    kind: record.kind.rawValue,
+                    itemId: record.localId,
+                    attempt: record.attemptCount + 1,
+                    error: mymeError
+                ))
             } catch {
-                lastError = error
+                transientError = error
                 try? await mutationQueue.recordFailure(id: record.id, error: error.localizedDescription)
+                logger.log.info(
+                    "sync.mutation.failed kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
+                )
             }
         }
 
-        if let lastError {
-            emit(.failed(error: lastError))
+        if let transientError {
+            emit(.failed(error: transientError))
         } else if running {
             emit(.synced(at: Date()))
         }
