@@ -4,6 +4,10 @@
   "fields": { "title": { "type": "string" }, "body": { "type": "string" } },
   "id": "core.note",
   "label": "Note",
+  "merge_policy": {
+    "default": "last_writer_wins",
+    "fields": { "body": "keep_both_copies", "notes": "keep_both_copies" }
+  },
   "parent": "core.item",
   "version": 1,
   "version_policy": {

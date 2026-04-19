@@ -11,6 +11,7 @@ public struct TypeSchema: Codable, Sendable {
     public let fields: [String: JSONValue]
     public let id: String
     public let label: String?
+    public let mergePolicy: MergePolicy?
     public let parent: String?
     public let version: Int
     public let versionPolicy: TypeSchemaVersionPolicy?
@@ -21,6 +22,7 @@ public struct TypeSchema: Codable, Sendable {
         fields: [String: JSONValue],
         id: String,
         label: String? = nil,
+        mergePolicy: MergePolicy? = nil,
         parent: String? = nil,
         version: Int,
         versionPolicy: TypeSchemaVersionPolicy? = nil
@@ -30,6 +32,7 @@ public struct TypeSchema: Codable, Sendable {
         self.fields = fields
         self.id = id
         self.label = label
+        self.mergePolicy = mergePolicy
         self.parent = parent
         self.version = version
         self.versionPolicy = versionPolicy
@@ -41,6 +44,7 @@ public struct TypeSchema: Codable, Sendable {
         case fields
         case id
         case label
+        case mergePolicy = "merge_policy"
         case parent
         case version
         case versionPolicy = "version_policy"

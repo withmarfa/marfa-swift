@@ -11,6 +11,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let createdAt: String
     public let device: String?
     public let edges: [String: ItemEdgeGroup]?
+    public let extensions: [String: [String: JSONValue]]?
     public let id: String
     public let library: Bool
     public let origin: Origin
@@ -30,6 +31,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         createdAt: String,
         device: String? = nil,
         edges: [String: ItemEdgeGroup]? = nil,
+        extensions: [String: [String: JSONValue]]? = nil,
         id: String,
         library: Bool,
         origin: Origin,
@@ -48,6 +50,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         self.createdAt = createdAt
         self.device = device
         self.edges = edges
+        self.extensions = extensions
         self.id = id
         self.library = library
         self.origin = origin
@@ -68,6 +71,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         case createdAt = "created_at"
         case device
         case edges
+        case extensions
         case id
         case library
         case origin

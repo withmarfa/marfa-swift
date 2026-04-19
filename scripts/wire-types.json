@@ -6,6 +6,7 @@
     "schema_version",
     "attempt",
     "status_code",
+    "status",
     "size",
     "expires_in",
     "recent_days",
@@ -111,7 +112,34 @@
     {
       "name": "TypeSchema",
       "pointer": "/paths/~1types~1{id}/get/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable"]
+      "conformances": ["Codable", "Sendable"],
+      "fieldOverrides": {
+        "merge_policy": "MergePolicy"
+      }
+    },
+    {
+      "name": "MergePolicy",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/properties/merge_policy",
+      "conformances": ["Codable", "Sendable", "Hashable"],
+      "enumOverrides": {
+        "default": "MergePolicyStrategy",
+        "fields": "MergePolicyStrategy"
+      }
+    },
+    {
+      "name": "ConflictSnapshot",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/properties/current",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "ConflictResponse",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable"],
+      "fieldOverrides": {
+        "current": "ConflictSnapshot",
+        "ancestor": "ConflictSnapshot",
+        "merge_policy": "MergePolicy"
+      }
     }
   ]
 }

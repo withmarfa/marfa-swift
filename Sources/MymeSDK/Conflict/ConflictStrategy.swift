@@ -7,7 +7,10 @@ import Foundation
 /// not serialisable; on replay, `.callback` degrades to `.auto` because
 /// the original resolver function no longer exists in memory.
 public enum ConflictStrategy: String, Codable, Sendable {
-    /// Auto-merge non-conflicting fields. Server wins on conflicts. Retries up to 3 times.
+    /// Auto-merge non-conflicting fields. For conflicting fields, follow
+    /// the type's `merge_policy` (server-resolved, embedded in the 409
+    /// response): `last_writer_wins` keeps the server's value; `keep_both_copies`
+    /// spawns a sibling item tagged `conflicted-copy`. Retries up to 3 times.
     case auto
 
     /// Throw `ConflictError` immediately, letting the caller handle resolution.
@@ -30,37 +33,11 @@ public struct ConflictData: Sendable {
 
     /// The properties the client attempted to write.
     public let clientPatch: [String: JSONValue]
-}
 
-/// A point-in-time snapshot of item version and properties.
-public struct ConflictSnapshot: Codable, Sendable, Hashable {
-    public let version: Int
-    public let properties: [String: JSONValue]
-}
-
-/// Server conflict response (HTTP 409).
-///
-/// TODO: The OpenAPI spec's 409 response currently only describes the generic
-/// `{ error: { code, message } }` envelope — it does not capture the
-/// conflict-specific `current` / `ancestor` / `conflicting_fields` fields the
-/// server actually emits. When the monorepo extends the 409 schema, this
-/// struct graduates to `Sources/MymeSDK/Types/Wire/Generated/` via codegen
-/// and the hand-written version deletes.
-public struct ConflictResponse: Codable, Sendable {
-    public let error: ConflictErrorInfo
-    public let current: ConflictSnapshot
-    public let ancestor: ConflictSnapshot
-    public let conflictingFields: [String]
-
-    public struct ConflictErrorInfo: Codable, Sendable {
-        public let code: String
-        public let status: Int?
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case error, current, ancestor
-        case conflictingFields = "conflicting_fields"
-    }
+    /// The type's resolved merge policy, as emitted by the server in the 409
+    /// response. Always present for V0 servers; the SDK falls back to
+    /// last-writer-wins per field if absent (legacy / future-proof).
+    public let mergePolicy: MergePolicy?
 }
 
 /// A function that resolves a version conflict by producing merged properties.

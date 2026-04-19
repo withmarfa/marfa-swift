@@ -163,11 +163,13 @@ func normalize(_ raw: Any) throws -> NormalizedSchema {
     let nullable = (dict["nullable"] as? Bool) ?? false
 
     if let enumValues = dict["enum"] as? [Any] {
-        let strings = try enumValues.map { value -> String in
-            if let s = value as? String { return s }
-            throw CodegenError("enum values must be strings: \(value)")
+        // String enums become Swift enums. Numeric/other enums fall through
+        // to the underlying scalar type (used e.g. for `status: { type:
+        // number, enum: [409] }` in the conflict envelope — modelled as Int).
+        if enumValues.allSatisfy({ $0 is String }) {
+            let strings = enumValues.compactMap { $0 as? String }
+            return NormalizedSchema(node: .stringEnum(strings), isNullable: nullable)
         }
-        return NormalizedSchema(node: .stringEnum(strings), isNullable: nullable)
     }
 
     let type = dict["type"] as? String
@@ -341,12 +343,16 @@ func renderStruct(
             context: &context
         )
         let swiftType = optional ? "\(inner)?" : inner
-        let swiftProp = toCamelCase(prop.key)
+        let camel = toCamelCase(prop.key)
+        let swiftProp = escapeSwiftIdentifier(camel)
+        // CodingKey is needed when (a) the JSON key differs from the
+        // unescaped camelCase name, or (b) the Swift identifier had to be
+        // backticked (force explicit mapping for clarity).
         fields.append(ResolvedField(
             jsonKey: prop.key,
             swiftProp: swiftProp,
             swiftType: swiftType,
-            needsCodingKey: swiftProp != prop.key
+            needsCodingKey: camel != prop.key || swiftProp != camel
         ))
     }
 
@@ -431,8 +437,16 @@ func resolveType(
     }
     if let override = typeSpec.enumOverrides?[fieldName] {
         switch node {
-        case .string, .stringEnum:
+        case .string, .stringEnum(_):
             return override
+        case .constrainedMap(let valueNode, let valueNullable):
+            // Map-of-stringEnum: route the value type through the override and
+            // register the shared enum exactly once.
+            if case let .stringEnum(values) = valueNode {
+                registerSharedEnum(name: override, cases: values, context: &context)
+                let wrapped = valueNullable ? "\(override)?" : override
+                return "[String: \(wrapped)]"
+            }
         default:
             break
         }
@@ -482,7 +496,34 @@ func resolveType(
     }
 }
 
+/// Register a sibling enum by canonical name, deduping repeat registrations.
+/// Used by `enumOverrides` so that several fields can share the same enum
+/// declaration in the generated file.
+func registerSharedEnum(
+    name: String,
+    cases: [String],
+    context: inout EmitContext
+) {
+    if context.pendingEnums.contains(where: { $0.name == name }) { return }
+    context.pendingEnums.append((name: name, cases: cases))
+}
+
 // MARK: - Naming helpers
+
+/// Swift keywords that must be backticked when used as property or case names.
+/// JSON property names that round-trip as Swift identifiers go through this
+/// list; CodingKeys still emit the raw JSON key as the string mapping.
+let reservedSwiftKeywords: Set<String> = [
+    "default", "class", "struct", "enum", "protocol", "extension", "func",
+    "var", "let", "init", "deinit", "self", "super", "case", "switch", "if",
+    "else", "for", "while", "do", "try", "catch", "throw", "throws",
+    "return", "break", "continue", "guard", "defer", "in", "is", "as",
+    "true", "false", "nil", "where", "operator", "import", "associatedtype",
+    "typealias", "fileprivate", "internal", "private", "public", "open",
+    "static", "final", "lazy", "weak", "unowned", "convenience", "override",
+    "required", "mutating", "nonmutating", "repeat", "fallthrough",
+    "rethrows", "async", "await", "any", "some", "Type", "inout",
+]
 
 func toCamelCase(_ snake: String) -> String {
     let parts = snake.split(whereSeparator: { $0 == "_" || $0 == "-" })
@@ -492,6 +533,14 @@ func toCamelCase(_ snake: String) -> String {
         result += segment.capitalized(firstOnly: true)
     }
     return result
+}
+
+/// Wraps a Swift identifier in backticks if it collides with a language
+/// keyword. Used in property declarations, init signatures, and CodingKeys
+/// case labels — never in CodingKeys raw-string mappings (those carry the
+/// original JSON key).
+func escapeSwiftIdentifier(_ name: String) -> String {
+    reservedSwiftKeywords.contains(name) ? "`\(name)`" : name
 }
 
 func pascal(_ snake: String) -> String {
