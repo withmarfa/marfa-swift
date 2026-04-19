@@ -236,6 +236,15 @@
                               "has_more"
                             ]
                           }
+                        },
+                        "extensions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -668,6 +677,15 @@
                                     "has_more"
                                   ]
                                 }
+                              },
+                              "extensions": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                }
                               }
                             },
                             "required": [
@@ -833,6 +851,15 @@
                                         "edges",
                                         "has_more"
                                       ]
+                                    }
+                                  },
+                                  "extensions": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
                                     }
                                   }
                                 },
@@ -1196,6 +1223,15 @@
                               "has_more"
                             ]
                           }
+                        },
+                        "extensions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -1360,6 +1396,9 @@
                   "snapshot": {
                     "type": "boolean"
                   },
+                  "library": {
+                    "type": "boolean"
+                  },
                   "edges": {
                     "type": "object",
                     "additionalProperties": {
@@ -1507,6 +1546,15 @@
                               "edges",
                               "has_more"
                             ]
+                          }
+                        },
+                        "extensions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
                           }
                         }
                       },
@@ -1736,13 +1784,36 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "merge_policy": {
+                      "type": "object",
+                      "properties": {
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "last_writer_wins",
+                              "keep_both_copies"
+                            ]
+                          }
+                        },
+                        "default": {
+                          "type": "string",
+                          "enum": [
+                            "last_writer_wins",
+                            "keep_both_copies"
+                          ]
+                        }
+                      }
                     }
                   },
                   "required": [
                     "error",
                     "current",
                     "ancestor",
-                    "conflicting_fields"
+                    "conflicting_fields",
+                    "merge_policy"
                   ]
                 }
               }
@@ -1985,6 +2056,15 @@
                               "edges",
                               "has_more"
                             ]
+                          }
+                        },
+                        "extensions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
                           }
                         }
                       },
@@ -2288,6 +2368,15 @@
                               "edges",
                               "has_more"
                             ]
+                          }
+                        },
+                        "extensions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
                           }
                         }
                       },
@@ -4725,6 +4814,190 @@
       }
     },
     "/edges": {
+      "get": {
+        "tags": [
+          "Edges"
+        ],
+        "summary": "List all edges across the tenant, filtered by edge type",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated edge types. Up to 10 entries. Omit to list every edge."
+            },
+            "required": false,
+            "description": "Comma-separated edge types. Up to 10 entries. Omit to list every edge.",
+            "name": "edge_type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Edges, paginated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "tenant_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "source_id": {
+                            "type": "string"
+                          },
+                          "target_id": {
+                            "type": "string"
+                          },
+                          "edge_type": {
+                            "type": "string"
+                          },
+                          "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "source_id",
+                          "target_id",
+                          "edge_type",
+                          "properties",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "cursor",
+                    "has_more"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (e.g. too many edge types in filter)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Edges"
@@ -5743,6 +6016,28 @@
                             "type": "number"
                           }
                         }
+                      },
+                      "merge_policy": {
+                        "type": "object",
+                        "properties": {
+                          "fields": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "enum": [
+                                "last_writer_wins",
+                                "keep_both_copies"
+                              ]
+                            }
+                          },
+                          "default": {
+                            "type": "string",
+                            "enum": [
+                              "last_writer_wins",
+                              "keep_both_copies"
+                            ]
+                          }
+                        }
                       }
                     },
                     "required": [
@@ -5873,6 +6168,28 @@
                             },
                             "max_versions": {
                               "type": "number"
+                            }
+                          }
+                        },
+                        "merge_policy": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string",
+                                "enum": [
+                                  "last_writer_wins",
+                                  "keep_both_copies"
+                                ]
+                              }
+                            },
+                            "default": {
+                              "type": "string",
+                              "enum": [
+                                "last_writer_wins",
+                                "keep_both_copies"
+                              ]
                             }
                           }
                         }
@@ -6041,6 +6358,28 @@
                         },
                         "max_versions": {
                           "type": "number"
+                        }
+                      }
+                    },
+                    "merge_policy": {
+                      "type": "object",
+                      "properties": {
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "last_writer_wins",
+                              "keep_both_copies"
+                            ]
+                          }
+                        },
+                        "default": {
+                          "type": "string",
+                          "enum": [
+                            "last_writer_wins",
+                            "keep_both_copies"
+                          ]
                         }
                       }
                     }
@@ -6218,6 +6557,28 @@
                             },
                             "max_versions": {
                               "type": "number"
+                            }
+                          }
+                        },
+                        "merge_policy": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string",
+                                "enum": [
+                                  "last_writer_wins",
+                                  "keep_both_copies"
+                                ]
+                              }
+                            },
+                            "default": {
+                              "type": "string",
+                              "enum": [
+                                "last_writer_wins",
+                                "keep_both_copies"
+                              ]
                             }
                           }
                         }
@@ -6533,6 +6894,14 @@
           },
           {
             "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "tags",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 1,
               "maximum": 100,
@@ -6702,6 +7071,15 @@
                                     "has_more"
                                   ]
                                 }
+                              },
+                              "extensions": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                }
                               }
                             },
                             "required": [
@@ -6770,6 +7148,90 @@
                   },
                   "required": [
                     "results"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metadata/tags": {
+      "get": {
+        "tags": [
+          "Metadata"
+        ],
+        "summary": "Enumerate distinct tags in use across visible items",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Distinct tags with usage counts, sorted by count descending then tag ascending. Tenant-scoped; type-permission scoped; trashed items excluded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tag": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "tag",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "tags"
                   ]
                 }
               }
@@ -7914,6 +8376,325 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Keys"
+        ],
+        "summary": "Update an API key in place",
+        "description": "Updates mutable fields on an API key. `source` and `role` are immutable after creation and rejected with 400 if present. Admin only.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "default_origin": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "ai",
+                      "worker"
+                    ]
+                  },
+                  "default_library": {
+                    "type": "boolean"
+                  },
+                  "type_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "none"
+                      ]
+                    }
+                  },
+                  "extension_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
+                  },
+                  "edge_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
+                  },
+                  "source": {
+                    "nullable": true
+                  },
+                  "role": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Key updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "member"
+                      ]
+                    },
+                    "default_origin": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "ai",
+                        "worker"
+                      ]
+                    },
+                    "default_library": {
+                      "type": "boolean"
+                    },
+                    "type_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write",
+                          "none"
+                        ]
+                      }
+                    },
+                    "extension_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
+                    "edge_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "last_used_at": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "source",
+                    "role",
+                    "default_origin",
+                    "default_library",
+                    "type_permissions",
+                    "created_at",
+                    "last_used_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update (e.g. attempt to mutate an immutable field)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Key not found",
             "content": {
               "application/json": {
                 "schema": {

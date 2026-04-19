@@ -396,8 +396,8 @@ public actor SyncEngine {
                     resolver: nil,
                     library: p.library
                 )
-                if result.retries > 0 {
-                    emit(.conflictAutoMerged(itemId: p.id))
+                if let summary = result.mergeSummary {
+                    emit(.conflictAutoMerged(payload: summary))
                 }
                 emit(.itemUpdated(id: p.id))
             } else {
