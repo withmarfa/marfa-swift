@@ -79,6 +79,10 @@ public actor SyncEngine {
     private var streamTask: Task<Void, Never>?
     private var running = false
 
+    // Prevents overlapping `performInitialSync` runs when multiple
+    // `catchup_too_old` events land during reconnection churn.
+    private var resyncing = false
+
     // Sync-state key stored in the mutation-queue's sync_state table.
     private let cursorKey = "last_event_id"
 
@@ -251,6 +255,14 @@ public actor SyncEngine {
 
     // MARK: - Event application
 
+    /// Test seam — drives `applyEvent` directly from unit tests so we can
+    /// exercise reentry-sensitive branches (e.g. the `catchup_too_old`
+    /// concurrency guard) that the serial SSE for-await loop can't reproduce.
+    /// Not part of the public API.
+    internal func _applyEventForTesting(_ event: SSEEvent) async {
+        await applyEvent(event)
+    }
+
     private func applyEvent(_ event: SSEEvent) async {
         // Persist Last-Event-ID cursor before applying so we don't reprocess
         // on reconnect even if applying fails (events are idempotent upserts).
@@ -302,6 +314,32 @@ public actor SyncEngine {
                 emit(.itemUpdated(id: payload.itemId))
             }
 
+        case "catchup_too_old":
+            // Server signalled the requested Last-Event-ID is older than the
+            // retention window. The stream is closed after this event; clear
+            // our cursor and run a fresh full resync so the next reconnect
+            // opens a stream with no cursor.
+            //
+            // The `resyncing` guard is checked and set *before* the first
+            // suspension point (`clearSyncState` hops to MutationQueue) so
+            // that a concurrent `catchup_too_old` entering on actor reentry
+            // observes the guard as already taken.
+            guard !resyncing else {
+                logger.log.info("sync.catchup_too_old — resync already in progress, skipping")
+                break
+            }
+            resyncing = true
+            logger.log.info("sync.catchup_too_old — clearing cursor and triggering full resync")
+            try? await mutationQueue.clearSyncState(key: cursorKey)
+            do {
+                _ = try await performInitialSync()
+            } catch {
+                logger.log.error("sync.catchup_too_old.resync_failed reason=\(String(describing: type(of: error)), privacy: .public)")
+            }
+            resyncing = false
+            // SSE stream was closed by the server; outer reconnect loop will
+            // reopen it with no `Last-Event-ID` header.
+
         default:
             break
         }
@@ -324,12 +362,23 @@ public actor SyncEngine {
         // `.mutationDropped` — they don't mean "sync failed," they mean
         // "this mutation will never succeed, don't keep trying."
         var transientError: Error?
-        for record in pending {
+        var remaining = pending
+        while !remaining.isEmpty {
+            let record = remaining.removeFirst()
             guard running else { break }
 
             do {
-                try await replayRecord(record, decoder: decoder)
+                let didRewrite = try await replayRecord(record, decoder: decoder)
                 try? await mutationQueue.remove(id: record.id)
+                if didRewrite {
+                    // A createItem replay returned a server id that differed
+                    // from the client-supplied id. The queue rows downstream
+                    // of this createItem have been rewritten on disk, but
+                    // our in-memory `remaining` list still carries the stale
+                    // payloads — re-fetch so the next iteration uses the
+                    // rewritten ids.
+                    remaining = (try? await mutationQueue.fetchAll()) ?? []
+                }
             } catch let mymeError as MymeError where mymeError.isPermanent {
                 try? await mutationQueue.remove(id: record.id)
                 logger.log.error(
@@ -357,7 +406,10 @@ public actor SyncEngine {
         }
     }
 
-    private func replayRecord(_ record: PendingMutationRecord, decoder: JSONDecoder) async throws {
+    /// Returns `true` if the replay rewrote a local-id in the queue, signalling
+    /// to the caller that the in-memory replay list is stale.
+    @discardableResult
+    private func replayRecord(_ record: PendingMutationRecord, decoder: JSONDecoder) async throws -> Bool {
         let data = record.payloadJson.data(using: .utf8) ?? Data()
 
         switch record.kind {
@@ -367,11 +419,17 @@ public actor SyncEngine {
             let response: ItemResponse = try await transport.request(
                 method: .post, path: "/items", body: p.input, query: nil
             )
-            // Reconcile local-id → server-id in the local store.
+            // Reconcile local-id → server-id in the local store and in any
+            // dependent queued mutations. Under today's UUIDv7 client-owned
+            // ID model this branch never fires; it protects against any
+            // future server-assigned-id path.
             if let localId = record.localId, localId != response.item.id {
+                try await mutationQueue.rewriteLocalId(from: localId, to: response.item.id)
                 try? await localStore.upsertItem(response.item)
                 try? await localStore.purgeItem(id: localId)
+                return true
             }
+            return false
 
         case .updateItem:
             let p = try decoder.decode(UpdateItemPayload.self, from: data)
@@ -503,5 +561,9 @@ public actor SyncEngine {
                 body: nil, query: nil
             )
         }
+
+        // Only the `createItem` path returns `true`; every other replay is a
+        // straight server call and never rewrites the queue.
+        return false
     }
 }
