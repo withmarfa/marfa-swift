@@ -51,6 +51,20 @@ swift test
 
 Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at the V0 staging server via `MYME_API_URL` and `MYME_API_KEY`. Never run conformance or integration tests against production.
 
+## CI — tiered validation
+
+**CI is deliberately cheap on PR and thorough on main. Do not "strengthen" PR CI without a deliberate decision and update to this note.**
+
+- **PR pushes** run `swift build --build-tests` only — compile + typecheck, no test run. Fast feedback, catches ~the same class of breakage as the full suite at roughly 30% the cost.
+- **Merges to `main`** run the full suite: `swift build`, `swift test --parallel`, and both codegen freshness checks (wire types, domain models).
+- **Both tiers** cache the `.build/checkouts` and `.build` directories keyed on `Package.resolved` + source hashes, so iterative source-only changes hit a warm cache.
+
+**Why it's structured this way.** macOS runners bill at 10x Ubuntu. Running the full suite on every PR push was the single largest CI cost driver across the org (~$5/mo from this repo alone). The project is pre-release with no auto-deploy — main breakages are a "fix before tagging" signal, not a user-facing incident. The trade-off was made deliberately; full rationale lives in `~/aic-vault/Projects/myme-A1ZB0/Artifacts/32-state-of-play/CI Actions Review.md`.
+
+**When to revisit.** If this SDK ships to the App Store or picks up external consumers, the PR/main split needs to be re-evaluated. The tradeoff is a shipping decision, not a calendar one.
+
+**Local before pushing.** Run `swift test` locally before opening a PR or after a main-breaking change. CI on main will catch it, but pushing a broken main wastes minutes for everyone.
+
 ## Conventions
 
 - American English.
