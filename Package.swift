@@ -13,6 +13,9 @@ let package = Package(
     products: [
         .library(name: "MymeSDK", targets: ["MymeSDK"]),
         .library(name: "MymeSDKTestSupport", targets: ["MymeSDKTestSupport"]),
+        .executable(name: "codegen-custom-types", targets: ["codegen-custom-types"]),
+        .executable(name: "sync-custom-types", targets: ["sync-custom-types"]),
+        .plugin(name: "GenerateMymeCustomTypes", targets: ["GenerateMymeCustomTypes"]),
     ],
     dependencies: [
         // GRDB — SQLite wrapper for the local mirror store.
@@ -35,12 +38,16 @@ let package = Package(
             dependencies: ["MymeSDK", "MymeSDKTestSupport"],
             resources: [.copy("Fixtures")]
         ),
+
+        // MARK: - Codegen — wire types + core domain models (existing)
+
         .executableTarget(
             name: "codegen-wire",
             path: "scripts",
             exclude: [
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
-                "core-types", "sync-types.sh", "codegen-domain.swift",
+                "sync-types.sh", "codegen-domain.swift",
+                "MymeCodegenCore", "codegen-custom-types", "sync-custom-types",
             ],
             sources: ["codegen-wire.swift"]
         ),
@@ -49,9 +56,60 @@ let package = Package(
             path: "scripts",
             exclude: [
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
-                "core-types", "sync-types.sh", "codegen-wire.swift",
+                "sync-types.sh", "codegen-wire.swift",
+                "MymeCodegenCore", "codegen-custom-types", "sync-custom-types",
             ],
             sources: ["codegen-domain.swift"]
+        ),
+
+        // MARK: - Codegen — custom types (new)
+
+        .target(
+            name: "MymeCodegenCore",
+            path: "scripts/MymeCodegenCore",
+            resources: [.copy("core-types")]
+        ),
+        .executableTarget(
+            name: "codegen-custom-types",
+            dependencies: ["MymeCodegenCore"],
+            path: "scripts/codegen-custom-types"
+        ),
+        .executableTarget(
+            name: "sync-custom-types",
+            dependencies: ["MymeCodegenCore"],
+            path: "scripts/sync-custom-types"
+        ),
+        .plugin(
+            name: "GenerateMymeCustomTypes",
+            capability: .command(
+                intent: .custom(
+                    verb: "generate-myme-custom-types",
+                    description: "Generate typed Swift wrappers for custom Myme types."
+                ),
+                permissions: [
+                    .writeToPackageDirectory(
+                        reason: "Write generated Swift files into the package's output directory."
+                    ),
+                    .allowNetworkConnections(
+                        scope: .all(),
+                        reason: "Fetch custom type schemas from a live Myme instance (only when --sync is passed)."
+                    ),
+                ]
+            ),
+            dependencies: ["codegen-custom-types", "sync-custom-types"],
+            path: "Plugins/GenerateMymeCustomTypes"
+        ),
+        .testTarget(
+            name: "CodegenCustomTypesTests",
+            dependencies: ["MymeCodegenCore", "MymeSDK"],
+            path: "Tests/CodegenCustomTypesTests",
+            exclude: ["CompileCheck"],
+            resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "CodegenCompileCheckTests",
+            dependencies: ["MymeSDK"],
+            path: "Tests/CodegenCustomTypesTests/CompileCheck"
         ),
     ],
     swiftLanguageModes: [.v6]

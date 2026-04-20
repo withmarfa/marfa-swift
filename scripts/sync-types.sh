@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # sync-types.sh — copies core type and edge type schemas from the sibling
-# myme monorepo into scripts/core-types/ (vendored snapshot used by codegen-domain).
+# myme monorepo into scripts/MymeCodegenCore/core-types/ (vendored snapshot
+# used by codegen-domain and bundled as a resource by the MymeCodegenCore
+# library for custom-type codegen parent-chain resolution).
 # Run from the swift-sdk repo root: ./scripts/sync-types.sh
 set -euo pipefail
 
 MYME_TYPES="${1:-../myme/packages/types/core}"
-DEST="$(dirname "$0")/core-types"
+DEST="$(dirname "$0")/MymeCodegenCore/core-types"
 
 if [[ ! -d "$MYME_TYPES" ]]; then
   echo "error: myme types directory not found at $MYME_TYPES" >&2

@@ -70,6 +70,87 @@ Integration tests against a running server opt in via environment variables:
 MYME_API_URL=… MYME_API_KEY=… swift test
 ```
 
+## Generating custom type wrappers
+
+If your app registers its own Myme types (`myapp.booking`, `myapp.user`, …), generate typed Swift wrappers instead of hand-writing them. The generated structs look just like `CoreNote` / `CoreMediaBook` — `typeIdentifier`, typed property accessors, `init?(from:)`, `toProperties()` — with parent fields flat-inlined.
+
+### 1. Config file at your repo root
+
+```jsonc
+// myme-codegen.json
+{
+  "schema": 1,
+  "source": { "mode": "local", "directory": "MymeTypes" },
+  "output": { "directory": "Sources/MyApp/MymeTypes/Generated", "accessLevel": "public" },
+  "types": { "include": ["myapp.*"] }
+}
+```
+
+Drop one `<type.id>.json` file per type under `MymeTypes/`:
+
+```json
+{
+  "id": "myapp.booking",
+  "parent": "core.note",
+  "version": 1,
+  "fields": {
+    "start_at": { "type": "string", "format": "datetime" },
+    "party_size": { "type": "integer" }
+  },
+  "required": ["start_at"]
+}
+```
+
+### 2. Generate
+
+Three entry points, pick one:
+
+```bash
+# As a SwiftPM command plugin — one shot, sandboxed:
+swift package --allow-writing-to-package-directory generate-myme-custom-types
+
+# Pull schemas from a live Myme instance first, then generate:
+swift package --allow-writing-to-package-directory --allow-network-connections all \
+    generate-myme-custom-types --sync
+
+# Or invoke the executables directly (CI-friendly, no sandbox prompts):
+swift run codegen-custom-types
+MYME_API_URL=… MYME_API_KEY=… swift run sync-custom-types
+```
+
+The `--sync` / `sync-custom-types` path calls `GET /types`, so `MYME_API_KEY` must be an API key with the `list_types` permission. Local-mode codegen needs no credentials.
+
+Switch the config to `"mode": "live"` (with `cacheDirectory` instead of `directory`) to let `sync-custom-types` populate the cache from `GET /types` on demand.
+
+### 3. Use the generated types
+
+```swift
+let booking = try await client.items.create(
+    CreateItemInput(
+        type: MyappBooking.typeIdentifier,
+        properties: [
+            "start_at": .string("2026-05-01T18:00:00Z"),
+            "party_size": .int(4),
+            "body": .string("Dinner with J and S"),
+        ]
+    )
+)
+guard let typed = MyappBooking(from: booking) else { return }
+print(typed.startAt, typed.partySize ?? 0, typed.title ?? "")
+```
+
+### 4. Keep it fresh
+
+Commit the generated files. Add a freshness check to CI:
+
+```yaml
+- run: |
+    swift run codegen-custom-types
+    git diff --exit-code -- Sources/MyApp/MymeTypes/Generated
+```
+
+Core schema parents (`core.note`, `core.media.book`, …) resolve automatically — the SDK ships them as a bundled resource. `core.*` IDs are always excluded from generation regardless of your include/exclude globs, so a misconfigured glob can't clobber SDK-shipped types.
+
 ## Documentation
 
 - Architecture, conventions, and codegen workflow: [`CLAUDE.md`](./CLAUDE.md)
