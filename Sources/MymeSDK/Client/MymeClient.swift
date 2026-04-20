@@ -89,7 +89,8 @@ public final class MymeClient: Sendable {
         let edges = EdgesNamespace(
             transport: transport,
             localStore: localStore,
-            mutationQueue: mutationQueue
+            mutationQueue: mutationQueue,
+            maxBackrefBatchConcurrency: configuration.maxBackrefBatchConcurrency
         )
         self.items = items
         self.edges = edges

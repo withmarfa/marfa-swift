@@ -431,6 +431,39 @@ public actor LocalStore {
         return PaginatedResult(data: edges, cursor: nil, hasMore: false)
     }
 
+    /// Batched inbound-edge lookup. Returns a dictionary keyed by every
+    /// distinct target ID in the input (unknown IDs map to an empty array),
+    /// with the `limit` applied per target. One SQL round-trip; the
+    /// `idx_edges_target (target_id, edge_type)` index backs the `IN` clause.
+    func fetchEdgesToTargets(
+        targetIds: [String],
+        edgeType: String?,
+        limit: Int?
+    ) throws -> [String: [Edge]] {
+        guard !targetIds.isEmpty else { return [:] }
+        let distinctIds = Array(Set(targetIds))
+        let records = try pool.read { db in
+            var request = EdgeRecord.filter(distinctIds.contains(Column("target_id")))
+            if let edgeType {
+                request = request.filter(Column("edge_type") == edgeType)
+            }
+            return try request.fetchAll(db)
+        }
+        var result: [String: [Edge]] = Dictionary(
+            uniqueKeysWithValues: distinctIds.map { ($0, []) }
+        )
+        for record in records {
+            let edge = try record.toEdge()
+            result[edge.targetId, default: []].append(edge)
+        }
+        if let limit {
+            for (key, edges) in result where edges.count > limit {
+                result[key] = Array(edges.prefix(limit))
+            }
+        }
+        return result
+    }
+
     /// Updates an edge's properties.
     func updateEdge(id: String, properties: [String: JSONValue]) throws -> Edge {
         let existing = try fetchEdge(id: id)
@@ -524,6 +557,34 @@ public actor LocalStore {
         let record = try MetadataRecord.from(updated)
         try pool.write { db in
             try record.save(db)
+        }
+    }
+
+    /// Aggregates every distinct tag in use across non-trashed items in the
+    /// local store, with usage counts. Sorted count DESC, tag ASC — matches
+    /// the server's `GET /metadata/tags` ordering.
+    ///
+    /// Implementation: SQLite `json_each` expands each item's `tags_json`
+    /// array into rows, joined with `items` so we can exclude `state = 'trashed'`.
+    /// `json_each` is part of the SQLite JSON1 extension, which Apple ships
+    /// built-in on the iOS 17 / macOS 14 floors this SDK targets.
+    func listTags() throws -> [TagWithCount] {
+        try pool.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT je.value AS tag, COUNT(*) AS count
+                    FROM item_metadata m
+                    JOIN items i ON i.id = m.item_id
+                    JOIN json_each(m.tags_json) je
+                    WHERE i.state != 'trashed'
+                    GROUP BY je.value
+                    ORDER BY count DESC, tag ASC
+                    """
+            )
+            return rows.map {
+                TagWithCount(tag: $0["tag"] as String, count: $0["count"] as Int)
+            }
         }
     }
 

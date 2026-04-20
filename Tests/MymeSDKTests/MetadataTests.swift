@@ -91,4 +91,41 @@ struct MetadataTests {
         #expect(meta.tags == ["x"])
         #expect(meta.extensions["theme"] == .string("dark"))
     }
+
+    // MARK: - listTags (remote)
+
+    @Test("listTags sends GET /metadata/tags with no query in remote mode")
+    func listTagsRemote() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(TagListResponsePayload(tags: [
+            TagWithCount(tag: "work", count: 3),
+            TagWithCount(tag: "dev", count: 2),
+        ]))
+
+        let tags = try await client.metadata.listTags()
+
+        #expect(tags.count == 2)
+        #expect(tags[0].tag == "work")
+        #expect(tags[0].count == 3)
+        #expect(mock.calls[0].method == .get)
+        #expect(mock.calls[0].path == "/metadata/tags")
+        #expect(mock.calls[0].query == nil)
+    }
+
+    @Test("listTags propagates transport errors")
+    func listTagsRemoteError() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueueError(URLError(.notConnectedToInternet))
+
+        await #expect(throws: URLError.self) {
+            _ = try await client.metadata.listTags()
+        }
+    }
+}
+
+// Test-only mirror of the internal `TagListResponse` envelope. Declared here
+// rather than exposing the internal type for tests — the wire shape
+// (`{"tags": [{tag, count}]}`) is what matters.
+private struct TagListResponsePayload: Codable {
+    let tags: [TagWithCount]
 }

@@ -57,6 +57,29 @@ var body: some View {
 }
 ```
 
+Live `TagsQuery` (tag cloud / counts) and `BackrefsQuery` (inbound edges for a batch of targets) are available on the same store:
+
+```swift
+let tags = store.queryTags()                                                 // [TagWithCount]
+let backrefs = store.queryBackrefs(to: items.map(\.id), edgeType: "in-thread")
+// backrefs.edgesByTarget["msg-1"]?.count  → reply count per message
+```
+
+Local-first batched reads:
+
+```swift
+// Aggregates tags from the local store in synced / pure-local mode; hits
+// GET /metadata/tags only in remote mode.
+let tags = try await client.metadata.listTags()
+
+// One SQL query in synced/pure-local mode; bounded TaskGroup fan-out in
+// remote mode (cap via ClientConfiguration.maxBackrefBatchConcurrency).
+let backrefs = try await client.edges.listToTargets(
+    targetIds: items.map(\.id),
+    edgeType: "in-thread"
+)
+```
+
 ## Build and test
 
 ```bash

@@ -12,6 +12,8 @@ public struct EdgesNamespace: Sendable {
     let transport: any Transport
     let localStore: LocalStore?
     let mutationQueue: MutationQueue?
+    /// Carries the max-fan-out cap used by ``listToTargets`` in remote mode.
+    let maxBackrefBatchConcurrency: Int
 
     /// Custom edge-type registration. Admin-only on the server.
     public var edgeTypes: EdgeTypesAPI {
@@ -150,6 +152,66 @@ public struct EdgesNamespace: Sendable {
             method: .get, path: "/items/\(targetId)/backrefs", body: nil,
             query: query.isEmpty ? nil : query
         )
+    }
+
+    /// Batched backrefs lookup. Returns a dictionary keyed by every
+    /// distinct target ID in `targetIds` (unknown IDs map to `[]`),
+    /// with `limit` applied per target.
+    ///
+    /// Dispatches per client mode:
+    /// - **Synced / pure-local** — one local SQL query over
+    ///   `idx_edges_target`. `limit` caps the list per target.
+    /// - **Remote-only** — fans out to `GET /items/:id/backrefs` with a
+    ///   bounded concurrency window
+    ///   (``ClientConfiguration/maxBackrefBatchConcurrency``, default 8).
+    ///   Each per-target call observes its own `limit`; cursor-based
+    ///   pagination is not supported in the batched variant. Callers
+    ///   needing more pages per target should use ``listToTarget`` on the
+    ///   specific ID.
+    ///
+    /// Empty `targetIds` short-circuits to `[:]` with no network or DB
+    /// access. Duplicate IDs in the input are collapsed to distinct.
+    public func listToTargets(
+        targetIds: [String],
+        edgeType: String? = nil,
+        limit: Int? = nil
+    ) async throws -> [String: [Edge]] {
+        guard !targetIds.isEmpty else { return [:] }
+        let distinct = Array(Set(targetIds))
+        if let store = localStore {
+            return try await store.fetchEdgesToTargets(
+                targetIds: distinct, edgeType: edgeType, limit: limit
+            )
+        }
+        let cap = max(1, maxBackrefBatchConcurrency)
+        return try await withThrowingTaskGroup(of: (String, [Edge]).self) { group in
+            var iterator = distinct.makeIterator()
+            var launched = 0
+            while launched < cap, let id = iterator.next() {
+                group.addTask {
+                    let page = try await self.listToTarget(
+                        targetId: id, edgeType: edgeType, cursor: nil, limit: limit
+                    )
+                    return (id, page.data)
+                }
+                launched += 1
+            }
+            var out: [String: [Edge]] = Dictionary(
+                uniqueKeysWithValues: distinct.map { ($0, []) }
+            )
+            while let (id, edges) = try await group.next() {
+                out[id] = edges
+                if let next = iterator.next() {
+                    group.addTask {
+                        let page = try await self.listToTarget(
+                            targetId: next, edgeType: edgeType, cursor: nil, limit: limit
+                        )
+                        return (next, page.data)
+                    }
+                }
+            }
+            return out
+        }
     }
 
     // MARK: - Paginated sequences

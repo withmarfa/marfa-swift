@@ -292,6 +292,149 @@ struct MymeStoreTests {
         #expect(query.edges.isEmpty)
         query.stop()
     }
+
+    // MARK: - TagsQuery
+
+    @Test("TagsQuery emits aggregated tag counts") func tagsQueryAggregates() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let a = try await client.items.create(noteInput(body: "A"))
+        let b = try await client.items.create(noteInput(body: "B"))
+        _ = try await client.metadata.addTags(itemId: a.id, tags: ["work", "dev"])
+        _ = try await client.metadata.addTags(itemId: b.id, tags: ["work"])
+
+        let query = store.queryTags()
+        try await waitForCondition(timeout: .seconds(2)) { query.tags.count >= 2 }
+
+        #expect(query.tags == [
+            TagWithCount(tag: "work", count: 2),
+            TagWithCount(tag: "dev", count: 1),
+        ])
+        query.stop()
+    }
+
+    @Test("TagsQuery updates live when a tag is added") func tagsQueryLiveAdd() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let item = try await client.items.create(noteInput(body: "live"))
+        let query = store.queryTags()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.tags.isEmpty)
+
+        _ = try await client.metadata.addTags(itemId: item.id, tags: ["fresh"])
+        try await waitForCondition(timeout: .seconds(2)) { !query.tags.isEmpty }
+
+        #expect(query.tags == [TagWithCount(tag: "fresh", count: 1)])
+        query.stop()
+    }
+
+    @Test("TagsQuery drops trashed items live") func tagsQueryLiveTrash() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let item = try await client.items.create(noteInput(body: "soon-trashed"))
+        _ = try await client.metadata.addTags(itemId: item.id, tags: ["tmp"])
+
+        let query = store.queryTags()
+        try await waitForCondition(timeout: .seconds(2)) { query.tags.count == 1 }
+
+        try await client.items.delete(id: item.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.tags.isEmpty }
+
+        #expect(query.tags.isEmpty)
+        query.stop()
+    }
+
+    // MARK: - BackrefsQuery
+
+    @Test("BackrefsQuery groups inbound edges by target") func backrefsQueryGroups() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let src = try await client.items.create(noteInput(body: "src"))
+        let t1 = try await client.items.create(noteInput(body: "t1"))
+        let t2 = try await client.items.create(noteInput(body: "t2"))
+        _ = try await client.edges.create(source: src.id, target: t1.id, edgeType: "in-thread")
+        _ = try await client.edges.create(source: src.id, target: t1.id, edgeType: "in-thread")
+        _ = try await client.edges.create(source: src.id, target: t2.id, edgeType: "in-thread")
+
+        let query = store.queryBackrefs(to: [t1.id, t2.id], edgeType: "in-thread")
+        try await waitForCondition(timeout: .seconds(2)) {
+            (query.edgesByTarget[t1.id]?.count ?? 0) == 2
+        }
+
+        #expect(query.edgesByTarget[t1.id]?.count == 2)
+        #expect(query.edgesByTarget[t2.id]?.count == 1)
+        query.stop()
+    }
+
+    @Test("BackrefsQuery updates when an edge is deleted") func backrefsQueryLiveDelete() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let src = try await client.items.create(noteInput(body: "src"))
+        let tgt = try await client.items.create(noteInput(body: "tgt"))
+        let edge = try await client.edges.create(
+            source: src.id, target: tgt.id, edgeType: "about"
+        )
+
+        let query = store.queryBackrefs(to: [tgt.id])
+        try await waitForCondition(timeout: .seconds(2)) {
+            query.edgesByTarget[tgt.id]?.count == 1
+        }
+
+        try await client.edges.delete(id: edge.id)
+        try await waitForCondition(timeout: .seconds(2)) {
+            query.edgesByTarget[tgt.id]?.isEmpty == true
+        }
+
+        #expect(query.edgesByTarget[tgt.id]?.isEmpty == true)
+        query.stop()
+    }
+
+    @Test("BackrefsQuery with empty targetIds loads immediately empty") func backrefsQueryEmpty() throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let query = store.queryBackrefs(to: [])
+        #expect(query.isLoading == false)
+        #expect(query.edgesByTarget.isEmpty)
+        query.stop()
+    }
+
+    @Test("BackrefsQuery keeps unknown target IDs with empty value") func backrefsQueryUnknownKeys() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let src = try await client.items.create(noteInput(body: "src"))
+        let real = try await client.items.create(noteInput(body: "real"))
+        _ = try await client.edges.create(source: src.id, target: real.id, edgeType: "about")
+
+        let query = store.queryBackrefs(to: [real.id, "ghost-id"])
+        try await waitForCondition(timeout: .seconds(2)) {
+            query.edgesByTarget[real.id]?.count == 1
+        }
+
+        #expect(query.edgesByTarget[real.id]?.count == 1)
+        #expect(query.edgesByTarget["ghost-id"]?.isEmpty == true)
+        query.stop()
+    }
 }
 
 // MARK: - Test utilities
