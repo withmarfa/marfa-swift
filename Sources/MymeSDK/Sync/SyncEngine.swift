@@ -79,6 +79,14 @@ public actor SyncEngine {
     private var streamTask: Task<Void, Never>?
     private var running = false
 
+    /// Detached task that sleeps for the reconnect back-off and then flips
+    /// ``ConnectionStateManager`` back to `.connecting`. Detached so the
+    /// SSE consumer loop inside `openStream` can return promptly and let
+    /// ``runLoop`` observe any state changes (network drop, test-driven
+    /// transition, `catchup_too_old` finalise) that happen during the wait.
+    /// Cancelled and replaced on every reconnect cycle and on `stop()`.
+    private var reconnectTask: Task<Void, Never>?
+
     // Prevents overlapping `performInitialSync` runs when multiple
     // `catchup_too_old` events land during reconnection churn.
     private var resyncing = false
@@ -156,6 +164,8 @@ public actor SyncEngine {
         running = false
         streamTask?.cancel()
         streamTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
         await connectionManager.stop()
     }
 
@@ -236,14 +246,18 @@ public actor SyncEngine {
             lastEventID: cursor
         )
 
+        var eventsConsumed = 0
+        var errored = false
         do {
             for try await event in stream {
                 guard running else { break }
                 await applyEvent(event)
+                eventsConsumed += 1
             }
         } catch {
             // Network/server error — record and let ConnectionStateManager
             // handle reconnect when the path recovers.
+            errored = true
         }
 
         // Stream ended or errored — drain the mutation queue and go online.
@@ -251,6 +265,86 @@ public actor SyncEngine {
         if running {
             await connectionManager.markOnline()
         }
+
+        // Reconnect nudge. Without this, a closed-but-not-errored SSE stream
+        // (server-side idle timeout, catchup_too_old finalise, transport
+        // timeout) would leave the engine parked on `.online` forever —
+        // `runLoop` only re-enters `openStream` on a `.connecting` transition
+        // from `NWPathMonitor`. After a brief back-off we flip
+        // ConnectionStateManager back to `.connecting`, which runLoop picks
+        // up and re-opens the stream. See Bug C in the v3.2.0 PR for the
+        // "last synced 31 seconds ago" symptom this closes.
+        //
+        // A fast-fail (no events consumed AND an error thrown) stacks
+        // exponential back-off to avoid hammering an unreachable server.
+        // A healthy close (any event consumed, or clean finish) resets to
+        // the base delay so SSE idle-reconnects stay snappy.
+        //
+        // Scheduled as a detached task — otherwise `openStream` wouldn't
+        // return until the back-off elapsed, blocking `runLoop` from
+        // observing state transitions (a real network drop, a manual
+        // offline → connecting flip) that arrive during the wait.
+        let fastFail = (eventsConsumed == 0 && errored)
+        if fastFail {
+            consecutiveFastFailures += 1
+        } else {
+            consecutiveFastFailures = 0
+        }
+        scheduleReconnectNudge()
+    }
+
+    /// Cancels any outstanding nudge and schedules a new one. The detached
+    /// task sleeps for the back-off, then flips
+    /// ``ConnectionStateManager`` back to `.connecting` so `runLoop`
+    /// re-opens the SSE stream. `markConnecting` is a no-op when offline,
+    /// so a real network drop during the wait can't spoof us into claiming
+    /// connectivity we don't have.
+    private func scheduleReconnectNudge() {
+        reconnectTask?.cancel()
+        let delay = reconnectDelay(for: consecutiveFastFailures)
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            if Task.isCancelled { return }
+            await self?.nudgeReconnect()
+        }
+    }
+
+    private func nudgeReconnect() async {
+        guard running else { return }
+        await connectionManager.markConnecting()
+    }
+
+    /// Back-off schedule. Healthy close (no consecutive fast-fails) uses
+    /// ``reconnectBaseDelay``; fast-fails escalate exponentially and cap at
+    /// ``reconnectMaxDelay``, with a ±20% jitter so coordinated client
+    /// wake-ups don't pile onto the server simultaneously.
+    private func reconnectDelay(for fastFailures: Int) -> TimeInterval {
+        guard fastFailures > 0 else { return reconnectBaseDelay }
+        let exponential = reconnectBaseDelay * pow(2.0, Double(fastFailures - 1))
+        let capped = min(exponential, reconnectMaxDelay)
+        return capped * Double.random(in: 0.8...1.2)
+    }
+
+    /// Counter for consecutive fast-fail reconnects. Reset on any healthy
+    /// stream close (events consumed or clean finish).
+    private var consecutiveFastFailures = 0
+
+    /// Baseline delay between an SSE close and the next reconnect nudge.
+    /// Internal so tests can compress the schedule. One second gives the
+    /// server a breath without being user-visible.
+    internal var reconnectBaseDelay: TimeInterval = 1.0
+
+    /// Upper bound on the exponential reconnect back-off. Internal so tests
+    /// can compress the schedule. Thirty seconds keeps the long tail bounded
+    /// while letting a genuinely unreachable server recover without client
+    /// spam.
+    internal var reconnectMaxDelay: TimeInterval = 30.0
+
+    /// Actor-isolated test seam — tests compress the reconnect back-off to
+    /// milliseconds so they don't hang on the default 1–30s schedule.
+    internal func setReconnectDelaysForTesting(base: TimeInterval, max: TimeInterval) {
+        self.reconnectBaseDelay = base
+        self.reconnectMaxDelay = max
     }
 
     // MARK: - Event application
@@ -390,6 +484,29 @@ public actor SyncEngine {
                     attempt: record.attemptCount + 1,
                     error: mymeError
                 ))
+
+                // Cascade: if a createItem was dropped, every downstream
+                // mutation keyed off its local id would 404 on replay. Drop
+                // them together and purge the ghost local row so the UI
+                // stops showing an item that can never sync.
+                if record.kind == .createItem, let localId = record.localId {
+                    let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(localId)) ?? []
+                    try? await localStore.purgeItem(id: localId)
+                    for ghost in cascaded {
+                        logger.log.error(
+                            "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
+                        )
+                        emit(.mutationDropped(
+                            kind: ghost.kind.rawValue,
+                            itemId: ghost.localId,
+                            attempt: ghost.attemptCount + 1,
+                            error: mymeError
+                        ))
+                    }
+                    // In-memory replay list is now stale — refetch so we
+                    // don't try to replay the cascade-deleted rows.
+                    remaining = (try? await mutationQueue.fetchAll()) ?? []
+                }
             } catch {
                 transientError = error
                 try? await mutationQueue.recordFailure(id: record.id, error: error.localizedDescription)
@@ -420,9 +537,11 @@ public actor SyncEngine {
                 method: .post, path: "/items", body: p.input, query: nil
             )
             // Reconcile local-id → server-id in the local store and in any
-            // dependent queued mutations. Under today's UUIDv7 client-owned
-            // ID model this branch never fires; it protects against any
-            // future server-assigned-id path.
+            // dependent queued mutations. Under the current flow this branch
+            // never fires — `ItemsNamespace.create` stamps the local UUIDv7
+            // into `input.id` so the server echoes it back. Preserved as
+            // defence against a future server-assigned-id path or direct
+            // callers that bypass the namespace.
             if let localId = record.localId, localId != response.item.id {
                 try await mutationQueue.rewriteLocalId(from: localId, to: response.item.id)
                 try? await localStore.upsertItem(response.item)

@@ -144,10 +144,14 @@ public actor LocalStore {
     /// Creates an item from the given input. Assigns a new UUIDv7 if the
     /// caller didn't supply one — passing `input.id` explicitly is fully
     /// supported and remains the right choice for callers that need to
-    /// reference the new id before `createItem` returns. With UUIDv7 as the
-    /// default, the local-id → server-id reconciliation race documented in
-    /// `SyncEngine.replayRecord` no longer fires for callers that omit
-    /// `input.id` either — server and client agree on the id.
+    /// reference the new id before `createItem` returns.
+    ///
+    /// In synced mode callers go through `ItemsNamespace.create`, which
+    /// stamps a UUIDv7 into `input.id` before calling in, so the queued
+    /// mutation payload carries the same id as the stored row. The
+    /// local-id → server-id reconcile path in `SyncEngine.replayRecord`
+    /// therefore never fires under normal use. Direct callers in
+    /// pure-local mode may still omit `input.id` safely.
     func createItem(_ input: CreateItemInput) throws -> Item {
         let now = now()
         let id = input.id ?? newId()

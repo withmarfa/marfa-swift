@@ -9,10 +9,22 @@ public struct ItemsNamespace: Sendable {
     let mutationQueue: MutationQueue?
 
     /// Creates a new item.
+    ///
+    /// In synced mode the SDK stamps a client-minted UUIDv7 into `input.id`
+    /// before the local write and the mutation-queue enqueue, so the replay
+    /// payload travels with the same id the local store knows about. Without
+    /// the stamp, the server would mint its own id on replay, triggering
+    /// `SyncEngine.replayRecord`'s reconcile path — which `purgeItem`s the
+    /// original local row and leaves any app view holding that id pointing at
+    /// a phantom. Callers that already supply `input.id` are unaffected.
     public func create(_ input: CreateItemInput) async throws -> Item {
         if let store = localStore {
-            let item = try await store.createItem(input)
-            try await mutationQueue?.enqueueCreateItem(input, localId: item.id)
+            var stamped = input
+            if stamped.id == nil {
+                stamped.id = UUIDv7.generateString()
+            }
+            let item = try await store.createItem(stamped)
+            try await mutationQueue?.enqueueCreateItem(stamped, localId: item.id)
             return item
         }
         let response: ItemResponse = try await transport.request(
