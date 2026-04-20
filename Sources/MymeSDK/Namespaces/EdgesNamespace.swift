@@ -171,6 +171,12 @@ public struct EdgesNamespace: Sendable {
     ///
     /// Empty `targetIds` short-circuits to `[:]` with no network or DB
     /// access. Duplicate IDs in the input are collapsed to distinct.
+    ///
+    /// > Note: The local path binds all distinct `targetIds` into a single
+    /// > `IN(...)` clause, so SQLite's host-parameter limit applies
+    /// > (typically 32,766 per statement). Callers with very large batches
+    /// > (~30k+ IDs after de-duplication) should chunk the input themselves
+    /// > and merge the per-chunk dictionaries.
     public func listToTargets(
         targetIds: [String],
         edgeType: String? = nil,
