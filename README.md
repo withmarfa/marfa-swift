@@ -118,6 +118,8 @@ swift run codegen-custom-types
 MYME_API_URL=… MYME_API_KEY=… swift run sync-custom-types
 ```
 
+The `--sync` / `sync-custom-types` path calls `GET /types`, so `MYME_API_KEY` must be an API key with the `list_types` permission. Local-mode codegen needs no credentials.
+
 Switch the config to `"mode": "live"` (with `cacheDirectory` instead of `directory`) to let `sync-custom-types` populate the cache from `GET /types` on demand.
 
 ### 3. Use the generated types
