@@ -107,4 +107,38 @@ public final class MymeStore {
     ) -> EdgesQuery {
         EdgesQuery(pool: pool, edgeType: edgeType, limit: limit)
     }
+
+    /// Creates a live query over **inbound edges for a batch of targets**.
+    /// See ``BackrefsQuery``. Duplicate IDs are collapsed; unknown IDs
+    /// remain present in the result keyed to an empty array.
+    ///
+    ///     let backrefs = store.queryBackrefs(to: items.map(\.id), edgeType: "in-thread")
+    ///     Text("\(backrefs.edgesByTarget[item.id]?.count ?? 0) replies")
+    ///
+    /// - Parameters:
+    ///   - targetIds: Item IDs whose inbound edges should be tracked.
+    ///   - edgeType: Restrict to this edge type, or `nil` for all.
+    ///   - limit: Optional cap per target.
+    public func queryBackrefs(
+        to targetIds: [String],
+        edgeType: String? = nil,
+        limit: Int? = nil
+    ) -> BackrefsQuery {
+        BackrefsQuery(pool: pool, targetIds: targetIds, edgeType: edgeType, limit: limit)
+    }
+
+    // MARK: - Tag queries
+
+    /// Creates a live query over tag usage across the local store.
+    /// See ``TagsQuery``. Emits `[TagWithCount]` sorted count DESC, tag ASC
+    /// — identical to the one-shot ``MetadataNamespace/listTags()`` and
+    /// the server's `GET /metadata/tags`.
+    ///
+    ///     let tags = store.queryTags()
+    ///     ForEach(tags.tags, id: \.tag) { entry in
+    ///         TagChip(entry.tag, count: entry.count)
+    ///     }
+    public func queryTags() -> TagsQuery {
+        TagsQuery(pool: pool)
+    }
 }

@@ -30,6 +30,14 @@ public struct ClientConfiguration: Sendable {
     /// and idempotent-method 5xx responses.
     public var retryPolicy: RetryPolicy
 
+    /// Maximum concurrent per-target calls made by
+    /// ``EdgesNamespace/listToTargets(targetIds:edgeType:limit:)`` in
+    /// remote mode. Ignored in synced / pure-local mode, where the batched
+    /// lookup is a single local SQL query. Default `8` — conservative
+    /// against server rate limits while keeping realistic thread/feed
+    /// fan-outs fast. Values `< 1` are clamped to `1`.
+    public var maxBackrefBatchConcurrency: Int
+
     public init(
         url: URL,
         apiKey: String,
@@ -38,7 +46,8 @@ public struct ClientConfiguration: Sendable {
         resourceTimeout: TimeInterval = 120,
         cdnBaseURL: URL? = nil,
         debugLogging: Bool = false,
-        retryPolicy: RetryPolicy = .default
+        retryPolicy: RetryPolicy = .default,
+        maxBackrefBatchConcurrency: Int = 8
     ) {
         self.url = url
         self.apiKey = apiKey
@@ -48,6 +57,7 @@ public struct ClientConfiguration: Sendable {
         self.cdnBaseURL = cdnBaseURL
         self.debugLogging = debugLogging
         self.retryPolicy = retryPolicy
+        self.maxBackrefBatchConcurrency = maxBackrefBatchConcurrency
     }
 
     /// Creates a configuration from environment variables.

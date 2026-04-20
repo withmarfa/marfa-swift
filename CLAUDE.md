@@ -24,6 +24,7 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 - **ConnectionStateManager** (`actor`) — wraps `NWPathMonitor`; bridges from `DispatchQueue` to actor via `Task { await self?.handlePath(_:) }`. Multicasts to `AsyncStream<ConnectionState>` subscribers via UUID-keyed `continuations`. `markSyncing()`/`markOnline()` for engine transitions.
 - **SyncEngine** (`actor`) — observes `ConnectionStateManager.stateUpdates`; on `.connecting` opens `GET /events` SSE stream with `Last-Event-ID` cursor; applies `item.*`, `edge.*`, `metadata.changed` events to LocalStore via upsert; after stream closes, drains MutationQueue (markSyncing while replaying, markOnline when done); reconciles local-id → server-id for `createItem` replays.
 - **`MymeClient.local(path:)`** — pure-local, no mutations enqueued. `MymeClient.synced(url:apiKey:storePath:connectionManager:)` — wires all four actors together; caller calls `client.syncEngine?.start()`.
+- **Local-first reads** — `metadata.listTags()` aggregates tags from `item_metadata.tags_json` via SQLite `json_each` when a local store is present (synced + pure-local). `edges.listToTargets(targetIds:edgeType:limit:)` batches inbound-edge lookup: one SQL query locally, bounded `TaskGroup` fan-out remotely (cap via `ClientConfiguration.maxBackrefBatchConcurrency`, default 8).
 
 ### Reactive layer (@Observable, SwiftUI)
 
@@ -32,6 +33,8 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 - **TypedItemQuery<T: MymeItem>** — like `ItemQuery` but maps records through `T.init?(from:)`, producing `[T]`.
 - **SingleItemQuery** — tracks one item by id; `item` is `nil` when purged.
 - **EdgesQuery** — tracks outbound edges for a `sourceId`; optional `edgeType` and `limit`.
+- **BackrefsQuery** — tracks inbound edges for a batch of `targetIds`; `edgesByTarget: [String: [Edge]]` keyed by every requested id (unknown ids stay present with `[]`). Factory: `store.queryBackrefs(to:edgeType:limit:)`.
+- **TagsQuery** — tracks `[TagWithCount]` sorted count desc, tag asc — same ordering as `metadata.listTags()` and the server. Factory: `store.queryTags()`.
 - All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`.
 
 ### Transport subsystems

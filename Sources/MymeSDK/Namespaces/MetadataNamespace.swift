@@ -58,17 +58,23 @@ public struct MetadataNamespace: Sendable {
         return response.metadata
     }
 
-    /// Enumerate the distinct set of tags in use across items the caller can
-    /// read. Tenant-scoped, type-permission scoped, excludes trashed items.
-    /// Returns tags with usage counts, sorted by count desc then tag asc.
+    /// Enumerate the distinct set of tags in use, with per-tag counts,
+    /// sorted by count desc then tag asc. Excludes trashed items.
     ///
-    /// **Network-only.** Hits `GET /metadata/tags`. The local store does
-    /// not yet expose a tag-aggregation helper, so synced-mode callers
-    /// also pay a round-trip; pure-local clients
-    /// (`MymeClient.local(path:)`) cannot serve this — calling it will
-    /// surface a transport error against the stub URL. A local
-    /// aggregation path will land when a real consumer surfaces.
+    /// Dispatches per client mode:
+    /// - **Synced / pure-local** — aggregates from the local store. No
+    ///   network round-trip. An empty local store returns `[]`; synced
+    ///   mode does not fall back to the network, matching the
+    ///   eventual-consistency contract of every other synced read.
+    /// - **Remote-only** — hits `GET /metadata/tags`. Tenant-scoped and
+    ///   type-permission scoped server-side.
+    ///
+    /// In synced mode type-permission scoping is enforced naturally:
+    /// the local store only contains items the caller's key synced.
     public func listTags() async throws -> [TagWithCount] {
+        if let store = localStore {
+            return try await store.listTags()
+        }
         let response: TagListResponse = try await transport.request(
             method: .get, path: "/metadata/tags", body: nil, query: nil
         )

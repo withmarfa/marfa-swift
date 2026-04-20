@@ -324,6 +324,137 @@ struct LocalStoreTests {
         #expect(Set(meta.tags) == ["a", "c"])
     }
 
+    // MARK: - listTags (local aggregation)
+
+    @Test("listTags on empty store returns empty array") func listTagsEmpty() async throws {
+        let store = try makeStore()
+        let tags = try await store.listTags()
+        #expect(tags.isEmpty)
+    }
+
+    @Test("listTags aggregates across items, sorted count desc then tag asc") func listTagsAggregates() async throws {
+        let store = try makeStore()
+        let a = try await store.createItem(noteInput(body: "A"))
+        let b = try await store.createItem(noteInput(body: "B"))
+        let c = try await store.createItem(noteInput(body: "C"))
+        _ = try await store.setMetadata(itemId: a.id, input: MetadataInput(tags: ["work", "dev"]))
+        _ = try await store.setMetadata(itemId: b.id, input: MetadataInput(tags: ["work", "dev"]))
+        _ = try await store.setMetadata(itemId: c.id, input: MetadataInput(tags: ["work"]))
+
+        let tags = try await store.listTags()
+        #expect(tags == [
+            TagWithCount(tag: "work", count: 3),
+            TagWithCount(tag: "dev", count: 2),
+        ])
+    }
+
+    @Test("listTags excludes trashed items") func listTagsExcludesTrashed() async throws {
+        let store = try makeStore()
+        let keep = try await store.createItem(noteInput(body: "keep"))
+        let gone = try await store.createItem(noteInput(body: "gone"))
+        _ = try await store.setMetadata(itemId: keep.id, input: MetadataInput(tags: ["shared"]))
+        _ = try await store.setMetadata(itemId: gone.id, input: MetadataInput(tags: ["shared"]))
+        try await store.trashItem(id: gone.id)
+
+        let tags = try await store.listTags()
+        #expect(tags == [TagWithCount(tag: "shared", count: 1)])
+    }
+
+    @Test("listTags includes archived items") func listTagsIncludesArchived() async throws {
+        let store = try makeStore()
+        let item = try await store.createItem(noteInput())
+        _ = try await store.setMetadata(itemId: item.id, input: MetadataInput(tags: ["keep"]))
+        _ = try await store.transitionItem(id: item.id, to: "archived")
+
+        let tags = try await store.listTags()
+        #expect(tags == [TagWithCount(tag: "keep", count: 1)])
+    }
+
+    @Test("listTags tie-breaks alphabetically") func listTagsTieBreaks() async throws {
+        let store = try makeStore()
+        let a = try await store.createItem(noteInput(body: "A"))
+        let b = try await store.createItem(noteInput(body: "B"))
+        _ = try await store.setMetadata(itemId: a.id, input: MetadataInput(tags: ["banana"]))
+        _ = try await store.setMetadata(itemId: b.id, input: MetadataInput(tags: ["apple"]))
+
+        let tags = try await store.listTags()
+        #expect(tags.map(\.tag) == ["apple", "banana"])
+    }
+
+    @Test("listTags ignores items without metadata rows") func listTagsIgnoresMetadataless() async throws {
+        let store = try makeStore()
+        _ = try await store.createItem(noteInput())
+        let tagged = try await store.createItem(noteInput())
+        _ = try await store.setMetadata(itemId: tagged.id, input: MetadataInput(tags: ["x"]))
+
+        let tags = try await store.listTags()
+        #expect(tags == [TagWithCount(tag: "x", count: 1)])
+    }
+
+    // MARK: - fetchEdgesToTargets (batched backrefs)
+
+    @Test("fetchEdgesToTargets empty input returns empty dict") func fetchEdgesToTargetsEmpty() async throws {
+        let store = try makeStore()
+        let result = try await store.fetchEdgesToTargets(targetIds: [], edgeType: nil, limit: nil)
+        #expect(result.isEmpty)
+    }
+
+    @Test("fetchEdgesToTargets groups edges by target id, includes empty keys") func fetchEdgesToTargetsGroups() async throws {
+        let store = try makeStore()
+        let src = try await store.createItem(noteInput(body: "src"))
+        let t1 = try await store.createItem(noteInput(body: "t1"))
+        let t2 = try await store.createItem(noteInput(body: "t2"))
+        let t3 = try await store.createItem(noteInput(body: "t3"))
+        _ = try await store.createEdge(source: src.id, target: t1.id, edgeType: "about", properties: nil)
+        _ = try await store.createEdge(source: src.id, target: t1.id, edgeType: "about", properties: nil)
+        _ = try await store.createEdge(source: src.id, target: t2.id, edgeType: "about", properties: nil)
+        // t3 has no inbound edges.
+
+        let result = try await store.fetchEdgesToTargets(
+            targetIds: [t1.id, t2.id, t3.id], edgeType: nil, limit: nil
+        )
+
+        #expect(result[t1.id]?.count == 2)
+        #expect(result[t2.id]?.count == 1)
+        #expect(result[t3.id]?.isEmpty == true)
+    }
+
+    @Test("fetchEdgesToTargets filters by edgeType") func fetchEdgesToTargetsFiltersType() async throws {
+        let store = try makeStore()
+        let src = try await store.createItem(noteInput())
+        let target = try await store.createItem(noteInput())
+        _ = try await store.createEdge(source: src.id, target: target.id, edgeType: "about", properties: nil)
+        _ = try await store.createEdge(source: src.id, target: target.id, edgeType: "annotates", properties: nil)
+
+        let aboutOnly = try await store.fetchEdgesToTargets(
+            targetIds: [target.id], edgeType: "about", limit: nil
+        )
+        #expect(aboutOnly[target.id]?.count == 1)
+        #expect(aboutOnly[target.id]?.first?.edgeType == "about")
+    }
+
+    @Test("fetchEdgesToTargets caps per-target with limit") func fetchEdgesToTargetsLimit() async throws {
+        let store = try makeStore()
+        let src = try await store.createItem(noteInput())
+        let target = try await store.createItem(noteInput())
+        for _ in 0..<5 {
+            _ = try await store.createEdge(source: src.id, target: target.id, edgeType: "about", properties: nil)
+        }
+        let capped = try await store.fetchEdgesToTargets(
+            targetIds: [target.id], edgeType: nil, limit: 3
+        )
+        #expect(capped[target.id]?.count == 3)
+    }
+
+    @Test("fetchEdgesToTargets collapses duplicates") func fetchEdgesToTargetsDedup() async throws {
+        let store = try makeStore()
+        let target = try await store.createItem(noteInput())
+        let result = try await store.fetchEdgesToTargets(
+            targetIds: [target.id, target.id], edgeType: nil, limit: nil
+        )
+        #expect(result.keys.count == 1)
+    }
+
     // MARK: - Pure-local mode via MymeClient.local(path:)
 
     @Suite("Pure-local client (MymeClient.local)")

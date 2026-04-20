@@ -177,6 +177,96 @@ struct EdgesTests {
         #expect(mock.calls[0].path == "/items/item-1/backrefs")
         #expect(mock.calls[0].query == nil)
     }
+
+    // MARK: - listToTargets (remote)
+
+    @Test("listToTargets with empty input returns empty dict and makes no calls")
+    func listToTargetsEmpty() async throws {
+        let (client, mock) = makeClient()
+
+        let result = try await client.edges.listToTargets(targetIds: [])
+
+        #expect(result.isEmpty)
+        #expect(mock.calls.isEmpty)
+    }
+
+    @Test("listToTargets fans out one call per distinct target")
+    func listToTargetsFanOut() async throws {
+        let (client, mock) = makeClient()
+        // Three identical empty responses — the tasks drain them concurrently
+        // and MockTransport hands them out in FIFO order regardless of path.
+        for _ in 0..<3 {
+            mock.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+        }
+
+        let result = try await client.edges.listToTargets(
+            targetIds: ["t1", "t2", "t3"],
+            edgeType: "in-thread"
+        )
+
+        #expect(Set(result.keys) == ["t1", "t2", "t3"])
+        #expect(result.values.allSatisfy { $0.isEmpty })
+        #expect(mock.calls.count == 3)
+        #expect(mock.calls.allSatisfy { $0.method == .get })
+        let paths = Set(mock.calls.map(\.path))
+        #expect(paths == [
+            "/items/t1/backrefs",
+            "/items/t2/backrefs",
+            "/items/t3/backrefs",
+        ])
+        // Every fan-out call carries the edgeType query parameter.
+        #expect(mock.calls.allSatisfy { call in
+            call.query?.contains(where: { $0.0 == "edge_type" && $0.1 == "in-thread" }) == true
+        })
+    }
+
+    @Test("listToTargets keys each response to its request target id")
+    func listToTargetsKeying() async throws {
+        let (client, mock) = makeClient()
+        // Single target → response-to-request mapping is deterministic.
+        mock.enqueue(PaginatedResult<Edge>(
+            data: [sampleEdge(id: "e1", targetId: "solo")],
+            cursor: nil, hasMore: false
+        ))
+
+        let result = try await client.edges.listToTargets(targetIds: ["solo"])
+
+        #expect(result["solo"]?.count == 1)
+        #expect(result["solo"]?.first?.id == "e1")
+    }
+
+    @Test("listToTargets collapses duplicate target IDs")
+    func listToTargetsDedup() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+        mock.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+
+        let result = try await client.edges.listToTargets(targetIds: ["a", "a", "b"])
+
+        #expect(Set(result.keys) == ["a", "b"])
+        #expect(mock.calls.count == 2)
+    }
+
+    @Test("listToTargets propagates a per-target transport error")
+    func listToTargetsError() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueueError(URLError(.timedOut))
+        mock.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+
+        await #expect(throws: URLError.self) {
+            _ = try await client.edges.listToTargets(targetIds: ["t1", "t2"])
+        }
+    }
+
+    @Test("listToTargets passes per-target limit on each fan-out call")
+    func listToTargetsLimit() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+
+        _ = try await client.edges.listToTargets(targetIds: ["only"], limit: 25)
+
+        #expect(mock.calls[0].query?.contains(where: { $0.0 == "limit" && $0.1 == "25" }) == true)
+    }
 }
 
 private extension String {
