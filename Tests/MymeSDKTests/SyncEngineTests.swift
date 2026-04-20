@@ -3,6 +3,80 @@ import Foundation
 @testable import MymeSDK
 @testable import MymeSDKTestSupport
 
+// Test-only Transport used by the concurrency-guard test. Its `request` call
+// suspends on a continuation until the test calls `release(...)`, simulating
+// a real network round-trip and forcing actor reentry. The `eventStream`
+// side mirrors MockTransport's minimal semantics.
+fileprivate actor BlockingTransport: Transport {
+    private var eventStreams: [[SSEEvent]] = []
+    private var continuation: CheckedContinuation<Data, Never>?
+    private(set) var itemsCallCount = 0
+
+    func enqueueEvents(_ events: [SSEEvent]) {
+        eventStreams.append(events)
+    }
+
+    func release<T: Encodable>(result: T) {
+        let data = try! JSONEncoder().encode(result)
+        continuation?.resume(returning: data)
+        continuation = nil
+    }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        if path == "/items" && method == .get {
+            itemsCallCount += 1
+            let data: Data = await withCheckedContinuation { cont in
+                self.continuation = cont
+            }
+            return try JSONDecoder().decode(T.self, from: data)
+        }
+        fatalError("BlockingTransport: unexpected request \(method.rawValue) \(path)")
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        fatalError("BlockingTransport: requestWithConflict not supported")
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        fatalError("BlockingTransport: rawRequest not supported")
+    }
+
+    nonisolated func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                let events = await self.popEventStream()
+                for event in events { continuation.yield(event) }
+                continuation.finish()
+            }
+        }
+    }
+
+    private func popEventStream() -> [SSEEvent] {
+        guard !eventStreams.isEmpty else { return [] }
+        return eventStreams.removeFirst()
+    }
+}
+
 /// Tests for ``SyncEngine``, ``MutationQueue``, and ``ConnectionStateManager``.
 ///
 /// All tests use in-memory SQLite (`:memory:`) and ``MockTransport`` — no real
@@ -573,6 +647,289 @@ struct SyncEngineTests {
             }
             if try await condition() { return }
             Issue.record("waitUntil: condition never satisfied within \(timeout)")
+        }
+
+        // MARK: - catchup_too_old handler
+
+        @Test("catchup_too_old clears cursor and triggers full resync")
+        func catchupTooOldClearsCursorAndTriggersResync() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // Seed the cursor as if we'd been running for a while.
+            try await queue.saveSyncState(key: "last_event_id", value: "evt-stale")
+            #expect(try await queue.loadSyncState(key: "last_event_id") == "evt-stale")
+
+            // First connection: server emits catchup_too_old and closes.
+            let catchup = SSEEvent(
+                id: nil,
+                event: "catchup_too_old",
+                data: #"{"type":"catchup_too_old","min_retained_id":100,"requested":50}"#
+            )
+            transport.enqueueEvents([catchup])
+            // performInitialSync will issue a GET /items — return an empty page.
+            transport.enqueue(PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false))
+            // Second SSE connection after reconnect — empty.
+            transport.enqueueEvents([])
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            // Wait for the cursor to be cleared.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.loadSyncState(key: "last_event_id")) == nil
+            }
+
+            // GET /items should have been issued by the resync.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await transport.calls.contains { $0.path == "/items" && $0.method == .get }
+            }
+
+            // Reconnect and assert the new SSE call carries no Last-Event-ID.
+            await connManager.applyStateForTesting(.offline)
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await transport.calls.filter { $0.path == "/events" }.count >= 2
+            }
+
+            let sseCalls = await transport.calls.filter { $0.path == "/events" }
+            #expect(sseCalls.last?.lastEventID == nil)
+            await engine.stop()
+        }
+
+        @Test("catchup_too_old concurrency guard short-circuits a reentrant call")
+        func catchupTooOldConcurrencyGuard() async throws {
+            // The `resyncing` guard exists to protect against actor-reentry:
+            // if `applyEvent` is suspended inside `performInitialSync()` on
+            // a real network call, a second `applyEvent` that enters on the
+            // same actor must observe the guard as set and short-circuit.
+            //
+            // The single SSE for-await loop consumes events serially, so we
+            // can't trigger reentry from a single stream in the mock harness.
+            // Instead we drive two concurrent `applyEvent` invocations via
+            // the internal test seam `_applyEventForTesting` and assert only
+            // one `GET /items` is issued.
+            let store = try LocalStore(path: ":memory:")
+            let queue = try MutationQueue(pool: store.pool)
+            let transport = BlockingTransport()
+            let connManager = ConnectionStateManager()
+            let engine = SyncEngine(
+                transport: transport,
+                localStore: store,
+                mutationQueue: queue,
+                connectionManager: connManager
+            )
+
+            try await queue.saveSyncState(key: "last_event_id", value: "evt-stale")
+
+            let catchup = SSEEvent(
+                id: nil,
+                event: "catchup_too_old",
+                data: #"{"type":"catchup_too_old","min_retained_id":100,"requested":50}"#
+            )
+
+            // Kick off two concurrent applyEvent calls. The first will take
+            // the guard and suspend inside GET /items; the second must see
+            // the guard and short-circuit.
+            async let first: Void = engine._applyEventForTesting(catchup)
+            // Ensure the first has entered the actor and taken the guard.
+            try await Task.sleep(for: .milliseconds(20))
+            async let second: Void = engine._applyEventForTesting(catchup)
+
+            // Wait for the first to enter GET /items.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await transport.itemsCallCount >= 1
+            }
+
+            // Give the second call time to hit the guard.
+            try await Task.sleep(for: .milliseconds(50))
+
+            // Release so the first resync completes.
+            await transport.release(
+                result: PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
+            )
+
+            _ = try await (first, second)
+
+            let count = await transport.itemsCallCount
+            #expect(count == 1, "expected exactly one resync; got \(count)")
+        }
+
+        // MARK: - rewriteLocalId integration
+
+        @Test("createItem replay with a different server id rewrites dependents")
+        func replayRewritesDependentsOnDifferentServerId() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+
+            // Queue: createItem(localId = client-A), then an updateItem that
+            // references client-A. Server will return a different id — the
+            // update must be rewritten so it targets the server id, not a 404.
+            let input = CreateItemInput(type: "core.note", properties: ["body": .string("v1")])
+            try await queue.enqueueCreateItem(input, localId: "client-A")
+            try await queue.enqueueUpdateItem(id: "client-A", properties: ["body": .string("v2")])
+
+            // Empty SSE stream so runLoop proceeds to replay.
+            transport.enqueueEvents([])
+
+            // POST /items returns a server-assigned id.
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let serverItem = Item(
+                createdAt: now, id: "server-A", library: false,
+                origin: .user, properties: ["body": .string("v1")],
+                schemaVersion: 1, source: "test", state: .active,
+                timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            transport.enqueue(ItemResponse(item: serverItem, metadata: nil))
+            // PATCH /items/server-A succeeds with the updated body.
+            let updated = Item(
+                createdAt: now, id: "server-A", library: false,
+                origin: .user, properties: ["body": .string("v2")],
+                schemaVersion: 1, source: "test", state: .active,
+                timestamp: now, type: "core.note", updatedAt: now, version: 2
+            )
+            transport.enqueue(ItemResponse(item: updated, metadata: nil))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+
+            let patchCalls = await transport.calls.filter {
+                $0.method == .patch && $0.path == "/items/server-A"
+            }
+            #expect(patchCalls.count == 1, "update should have been retargeted to server id")
+
+            // And no PATCH should have been issued to the stale local id.
+            let stalePatch = await transport.calls.filter {
+                $0.method == .patch && $0.path == "/items/client-A"
+            }
+            #expect(stalePatch.isEmpty)
+            await engine.stop()
+        }
+    }
+
+    // MARK: - MutationQueue.rewriteLocalId unit tests
+
+    @Suite("MutationQueue.rewriteLocalId")
+    struct RewriteLocalIdTests {
+
+        private func makeStore() throws -> LocalStore { try LocalStore(path: ":memory:") }
+        private func makeQueue(store: LocalStore) throws -> MutationQueue {
+            try MutationQueue(pool: store.pool)
+        }
+
+        @Test("rewrites update and edge endpoint references, leaves createItem alone")
+        func rewritesDependents() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+            try await queue.enqueueCreateItem(input, localId: "A")
+            try await queue.enqueueUpdateItem(id: "A", properties: ["body": .string("y")])
+            try await queue.enqueueCreateEdge(
+                source: "A", target: "B", edgeType: "about", properties: nil, localEdgeId: "E1"
+            )
+
+            try await queue.rewriteLocalId(from: "A", to: "A'")
+
+            let records = try await queue.fetchAll()
+
+            // createItem: localId unchanged (it owns "A" as its identity).
+            let create = try #require(records.first { $0.kind == .createItem })
+            #expect(create.localId == "A")
+
+            // updateItem: localId and payload.id both rewritten to "A'".
+            let update = try #require(records.first { $0.kind == .updateItem })
+            #expect(update.localId == "A'")
+            let updatePayload = try JSONDecoder().decode(
+                UpdateItemPayload.self,
+                from: update.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(updatePayload.id == "A'")
+
+            // createEdge: source rewritten to "A'", target unchanged.
+            let edge = try #require(records.first { $0.kind == .createEdge })
+            let edgePayload = try JSONDecoder().decode(
+                CreateEdgePayload.self,
+                from: edge.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(edgePayload.source == "A'")
+            #expect(edgePayload.target == "B")
+        }
+
+        @Test("rewrites target endpoint when oldId was on the target side of an edge")
+        func rewritesEdgeTargetEndpoint() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            try await queue.enqueueCreateEdge(
+                source: "X", target: "A", edgeType: "about", properties: nil, localEdgeId: "E1"
+            )
+
+            try await queue.rewriteLocalId(from: "A", to: "A'")
+
+            let records = try await queue.fetchAll()
+            let edge = try #require(records.first { $0.kind == .createEdge })
+            let payload = try JSONDecoder().decode(
+                CreateEdgePayload.self,
+                from: edge.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(payload.source == "X")
+            #expect(payload.target == "A'")
+        }
+
+        @Test("rewrites metadata / tags / extension kinds keyed off item id")
+        func rewritesMetadataAndExtensions() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            try await queue.enqueueSetMetadata(itemId: "A", input: MetadataInput(tags: ["a"]))
+            try await queue.enqueueAddTags(itemId: "A", tags: ["b"])
+            try await queue.enqueueRemoveTag(itemId: "A", tag: "c")
+            try await queue.enqueueSetExtension(
+                itemId: "A", namespace: "com.example", data: ["k": .string("v")]
+            )
+            try await queue.enqueueDeleteExtension(itemId: "A", namespace: "com.example")
+
+            try await queue.rewriteLocalId(from: "A", to: "Z")
+
+            let records = try await queue.fetchAll()
+            for record in records {
+                #expect(record.localId == "Z", "\(record.kind) should have localId rewritten")
+            }
+
+            let meta = try #require(records.first { $0.kind == .setMetadata })
+            let metaPayload = try JSONDecoder().decode(
+                MetadataPayload.self, from: meta.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(metaPayload.itemId == "Z")
+
+            let addTags = try #require(records.first { $0.kind == .addTags })
+            let addTagsPayload = try JSONDecoder().decode(
+                AddTagsPayload.self, from: addTags.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(addTagsPayload.itemId == "Z")
+
+            let setExt = try #require(records.first { $0.kind == .setExtension })
+            let setExtPayload = try JSONDecoder().decode(
+                SetExtensionPayload.self, from: setExt.payloadJson.data(using: .utf8) ?? Data()
+            )
+            #expect(setExtPayload.itemId == "Z")
+        }
+
+        @Test("no-op when from == to")
+        func noOpOnEquality() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            try await queue.enqueueUpdateItem(id: "A", properties: ["body": .string("y")])
+            try await queue.rewriteLocalId(from: "A", to: "A")
+
+            let records = try await queue.fetchAll()
+            #expect(records.count == 1)
+            #expect(records[0].localId == "A")
         }
     }
 }

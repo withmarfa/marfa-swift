@@ -353,4 +353,194 @@ public actor MutationQueue {
             )
         }
     }
+
+    /// Clears a persisted `sync_state` key. Used by the `catchup_too_old`
+    /// handler to reset the `Last-Event-ID` cursor so the next SSE reconnect
+    /// opens a fresh stream with no resume token.
+    func clearSyncState(key: String) throws {
+        try pool.write { db in
+            try db.execute(
+                sql: "DELETE FROM sync_state WHERE key = ?",
+                arguments: [key]
+            )
+        }
+    }
+
+    // MARK: - Local-id rewriting
+
+    /// Rewrite any queued record whose `local_id` or embedded payload id
+    /// references `from` to use `to`. Called after `createItem` replay when
+    /// the server-returned id differs from the client-supplied id.
+    ///
+    /// Under today's UUIDv7 client-owned ID model this never fires, but it
+    /// protects against any future server-assigned-id path and makes the
+    /// invariant explicit. The `createItem` record itself is the source of
+    /// truth for its own local id and is not rewritten.
+    ///
+    /// Rewrites span: `updateItem`, `deleteItem`, `restoreItem`,
+    /// `transitionItem`, `purgeItem`, `setMetadata`, `mergeMetadata`,
+    /// `addTags`, `removeTag`, `setExtension`, `deleteExtension`, and the
+    /// source/target fields of `createEdge`.
+    ///
+    /// All updates run in a single write transaction.
+    public func rewriteLocalId(from oldId: String, to newId: String) throws {
+        guard oldId != newId else { return }
+        try pool.write { db in
+            // Fetch every row whose local_id matches — item-scoped mutations
+            // and the two edge endpoints all key off local_id for direct
+            // dependents. We still need to rewrite embedded payload ids
+            // field-by-field since the payload JSON holds them redundantly.
+            let rows = try PendingMutationRecord
+                .filter(Column("local_id") == oldId)
+                .fetchAll(db)
+
+            for row in rows {
+                // `createItem` is the source of truth for its own local id —
+                // leave it untouched. The reconciler only calls us after the
+                // createItem has been removed from the queue, so in practice
+                // this branch is a belt-and-braces guard.
+                if row.kind == .createItem { continue }
+
+                let rewritten = try Self.rewritePayload(row: row, from: oldId, to: newId)
+                try db.execute(
+                    sql: """
+                        UPDATE pending_mutations
+                           SET local_id = ?,
+                               payload_json = ?
+                         WHERE id = ?
+                        """,
+                    arguments: [newId, rewritten, row.id]
+                )
+            }
+
+            // Edge rows with target == oldId aren't caught above because the
+            // edge's local_id is the edge id, not an endpoint id. Rewrite
+            // those by scanning the createEdge rows whose payload references
+            // the old id as target (source was already caught above via
+            // local_id? No — createEdge's local_id is the edge id. So scan
+            // all createEdge rows for either endpoint match).
+            let edgeRows = try PendingMutationRecord
+                .filter(Column("kind") == PendingMutationRecord.Kind.createEdge.rawValue)
+                .fetchAll(db)
+            for row in edgeRows {
+                let (rewritten, changed) = try Self.rewriteEdgeEndpoints(
+                    payloadJson: row.payloadJson, from: oldId, to: newId
+                )
+                if changed {
+                    try db.execute(
+                        sql: "UPDATE pending_mutations SET payload_json = ? WHERE id = ?",
+                        arguments: [rewritten, row.id]
+                    )
+                }
+            }
+        }
+    }
+
+    // Rewrite the id fields inside a payload JSON for non-edge item-scoped
+    // mutations. Returns the rewritten JSON string.
+    private static func rewritePayload(
+        row: PendingMutationRecord,
+        from oldId: String,
+        to newId: String
+    ) throws -> String {
+        let data = row.payloadJson.data(using: .utf8) ?? Data()
+        let encoded: Data
+        switch row.kind {
+        case .createItem:
+            // Left untouched at the call site; encode round-trip for safety.
+            return row.payloadJson
+
+        case .updateItem:
+            var p = try decoder.decode(UpdateItemPayload.self, from: data)
+            if p.id == oldId {
+                p = UpdateItemPayload(
+                    id: newId,
+                    properties: p.properties,
+                    version: p.version,
+                    conflict: p.conflict,
+                    library: p.library
+                )
+            }
+            encoded = try encoder.encode(p)
+
+        case .deleteItem, .restoreItem, .purgeItem, .deleteEdge:
+            var p = try decoder.decode(IDPayload.self, from: data)
+            if p.id == oldId { p = IDPayload(id: newId) }
+            encoded = try encoder.encode(p)
+
+        case .transitionItem:
+            var p = try decoder.decode(TransitionPayload.self, from: data)
+            if p.id == oldId { p = TransitionPayload(id: newId, state: p.state) }
+            encoded = try encoder.encode(p)
+
+        case .createEdge:
+            var p = try decoder.decode(CreateEdgePayload.self, from: data)
+            let source = p.source == oldId ? newId : p.source
+            let target = p.target == oldId ? newId : p.target
+            p = CreateEdgePayload(
+                source: source, target: target,
+                edgeType: p.edgeType, properties: p.properties
+            )
+            encoded = try encoder.encode(p)
+
+        case .updateEdge:
+            var p = try decoder.decode(UpdateEdgePayload.self, from: data)
+            if p.id == oldId { p = UpdateEdgePayload(id: newId, properties: p.properties) }
+            encoded = try encoder.encode(p)
+
+        case .setMetadata, .mergeMetadata:
+            var p = try decoder.decode(MetadataPayload.self, from: data)
+            if p.itemId == oldId { p = MetadataPayload(itemId: newId, input: p.input) }
+            encoded = try encoder.encode(p)
+
+        case .addTags:
+            var p = try decoder.decode(AddTagsPayload.self, from: data)
+            if p.itemId == oldId { p = AddTagsPayload(itemId: newId, tags: p.tags) }
+            encoded = try encoder.encode(p)
+
+        case .removeTag:
+            var p = try decoder.decode(RemoveTagPayload.self, from: data)
+            if p.itemId == oldId { p = RemoveTagPayload(itemId: newId, tag: p.tag) }
+            encoded = try encoder.encode(p)
+
+        case .setExtension:
+            var p = try decoder.decode(SetExtensionPayload.self, from: data)
+            if p.itemId == oldId {
+                p = SetExtensionPayload(itemId: newId, namespace: p.namespace, data: p.data)
+            }
+            encoded = try encoder.encode(p)
+
+        case .deleteExtension:
+            var p = try decoder.decode(DeleteExtensionPayload.self, from: data)
+            if p.itemId == oldId {
+                p = DeleteExtensionPayload(itemId: newId, namespace: p.namespace)
+            }
+            encoded = try encoder.encode(p)
+        }
+
+        return String(data: encoded, encoding: .utf8) ?? row.payloadJson
+    }
+
+    // Rewrite source/target endpoints inside a createEdge payload. Returns
+    // the (possibly unchanged) JSON and a flag indicating whether any change
+    // was made.
+    private static func rewriteEdgeEndpoints(
+        payloadJson: String,
+        from oldId: String,
+        to newId: String
+    ) throws -> (String, Bool) {
+        let data = payloadJson.data(using: .utf8) ?? Data()
+        let p = try decoder.decode(CreateEdgePayload.self, from: data)
+        let newSource = p.source == oldId ? newId : p.source
+        let newTarget = p.target == oldId ? newId : p.target
+        guard newSource != p.source || newTarget != p.target else {
+            return (payloadJson, false)
+        }
+        let rewritten = CreateEdgePayload(
+            source: newSource, target: newTarget,
+            edgeType: p.edgeType, properties: p.properties
+        )
+        let encoded = try encoder.encode(rewritten)
+        return (String(data: encoded, encoding: .utf8) ?? payloadJson, true)
+    }
 }
