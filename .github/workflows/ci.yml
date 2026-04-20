@@ -2,18 +2,51 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'LICENSE'
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'LICENSE'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Tiered validation pattern.
+#
+# macOS runners are 10x Ubuntu on GitHub Actions billing. Before this split
+# the full test suite + freshness checks ran on every PR push, driving ~$5/mo
+# of the org's CI bill from this repo alone. The decision and rationale live
+# in `~/aic-vault/Projects/myme-A1ZB0/Artifacts/32-state-of-play/CI Actions Review.md`.
+#
+# - PR tier (`pr-check`): compile + typecheck only. Fast feedback on every
+#   push. Catches ~the same class of breakage at ~30% the cost.
+# - Main tier (`main-validate`): full build + `swift test --parallel` +
+#   both freshness checks. Runs on merge to main. Breakages are a
+#   "fix main before cutting a tag" signal, not an incident — nothing
+#   auto-deploys from main.
+#
+# Caching is applied to both tiers: SPM checkouts + DerivedData. Cache key
+# includes Package.resolved so a dependency bump gets a fresh build, but
+# iterative source-only changes hit cache warm.
+#
+# If this repo ever ships externally (App Store, public SDK consumers),
+# revisit: PR-time safety may need to trade back against cost.
 
 jobs:
-  build-test:
-    name: Build, test, codegen freshness
+  pr-check:
+    name: PR check (compile + typecheck)
+    if: github.event_name == 'pull_request'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: List installed Xcode versions
-        run: ls -1 /Applications/ | grep -i '^Xcode' || true
 
       - name: Select latest Xcode (for Swift 6.2)
         run: |
@@ -25,6 +58,73 @@ jobs:
           echo "Selecting /Applications/$latest"
           sudo xcode-select -s "/Applications/$latest/Contents/Developer"
           swift --version
+
+      - name: Cache SPM checkouts
+        uses: actions/cache@v4
+        with:
+          path: .build/checkouts
+          key: ${{ runner.os }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-checkouts-
+
+      - name: Cache SPM build artefacts
+        uses: actions/cache@v4
+        with:
+          # Cache the whole .build directory (except checkouts, cached
+          # separately with a finer key). Keyed by Package.resolved +
+          # the hash of all Swift sources, so source-only edits still
+          # get an incremental-compile hit and dependency bumps miss
+          # cleanly.
+          path: |
+            .build
+            !.build/checkouts
+          key: ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved') }}-
+            ${{ runner.os }}-spm-build-
+
+      - name: Compile library + tests (typecheck, no test run)
+        # `swift build --build-tests` compiles test targets too, which
+        # exercises the full type surface without actually running tests.
+        # This is the cheap pre-merge signal.
+        run: swift build --build-tests
+
+  main-validate:
+    name: Full build + test + freshness
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode (for Swift 6.2)
+        run: |
+          latest=$(ls -1 /Applications/ | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
+          if [[ -z "$latest" ]]; then
+            echo "::error::No Xcode found in /Applications"
+            exit 1
+          fi
+          echo "Selecting /Applications/$latest"
+          sudo xcode-select -s "/Applications/$latest/Contents/Developer"
+          swift --version
+
+      - name: Cache SPM checkouts
+        uses: actions/cache@v4
+        with:
+          path: .build/checkouts
+          key: ${{ runner.os }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-checkouts-
+
+      - name: Cache SPM build artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            !.build/checkouts
+          key: ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved') }}-
+            ${{ runner.os }}-spm-build-
 
       - name: Build
         run: swift build
