@@ -436,6 +436,100 @@ public actor MutationQueue {
         }
     }
 
+    // MARK: - Cascade drop
+
+    /// Remove every queued mutation that references `localId` as its
+    /// item-scope target or as an edge endpoint. Called from
+    /// ``SyncEngine`` after a permanent `createItem` drop so dependent
+    /// mutations (updates, metadata writes, edges spawned from the item)
+    /// don't spam 404s one-by-one on subsequent replay cycles.
+    ///
+    /// Cascade coverage:
+    /// - Item-scoped mutations keyed on `local_id`: `updateItem`,
+    ///   `deleteItem`, `restoreItem`, `transitionItem`, `purgeItem`,
+    ///   `setMetadata`, `mergeMetadata`, `addTags`, `removeTag`,
+    ///   `setExtension`, `deleteExtension`.
+    /// - `createEdge` rows whose payload source or target matches
+    ///   `localId`.
+    /// - `updateEdge` / `deleteEdge` rows keyed on an edge id that was
+    ///   about to be created by one of the cascade-dropped `createEdge`
+    ///   rows. We never ship the edge to the server, so these follow-ups
+    ///   are guaranteed orphans.
+    ///
+    /// The `createItem` record itself is *not* removed by this call —
+    /// ``SyncEngine`` removes it first via ``remove(id:)`` so attempt
+    /// bookkeeping fires once for the root failure. `rewriteLocalId`'s
+    /// sibling comment applies.
+    ///
+    /// Runs inside a single write transaction. Returns the cascade-deleted
+    /// records (excluding the already-removed `createItem` root) so the
+    /// caller can emit one ``SyncEvent/mutationDropped`` per orphan.
+    // Internal because `PendingMutationRecord` is an internal type — SDK
+    // consumers have no reason to reach into the queue directly; this API
+    // exists so `SyncEngine` can cascade-drop after a permanent `createItem`
+    // failure. Tests import `@testable` and can call it freely.
+    @discardableResult
+    func dropMutationsReferencingLocalId(_ localId: String) throws -> [PendingMutationRecord] {
+        try pool.write { db in
+            // Pass 1 — item-scope direct matches (local_id column).
+            let directMatches = try PendingMutationRecord
+                .filter(Column("local_id") == localId)
+                .fetchAll(db)
+
+            // `createItem` is owned by the caller's drop path; leave it for
+            // them to remove + emit their own event. Cascading drops for any
+            // *other* kind keyed off this local id — e.g. an earlier update
+            // queued against the same id — are this method's job.
+            let itemScopeDeletes = directMatches.filter { $0.kind != .createItem }
+
+            // Pass 2 — createEdge rows whose payload references localId.
+            let allEdgeCreates = try PendingMutationRecord
+                .filter(Column("kind") == PendingMutationRecord.Kind.createEdge.rawValue)
+                .fetchAll(db)
+            var edgeCreateDeletes: [PendingMutationRecord] = []
+            var cascadedEdgeIds = Set<String>()
+            for row in allEdgeCreates {
+                let data = row.payloadJson.data(using: .utf8) ?? Data()
+                guard let payload = try? Self.decoder.decode(CreateEdgePayload.self, from: data) else {
+                    continue
+                }
+                if payload.source == localId || payload.target == localId {
+                    edgeCreateDeletes.append(row)
+                    if let edgeId = row.localId {
+                        cascadedEdgeIds.insert(edgeId)
+                    }
+                }
+            }
+
+            // Pass 3 — orphaned updateEdge / deleteEdge follow-ups for any
+            // edge id we just cascade-deleted. Those edges never reach the
+            // server, so the follow-ups would 404 on replay.
+            var edgeFollowUpDeletes: [PendingMutationRecord] = []
+            if !cascadedEdgeIds.isEmpty {
+                let candidates = try PendingMutationRecord
+                    .filter([
+                        PendingMutationRecord.Kind.updateEdge.rawValue,
+                        PendingMutationRecord.Kind.deleteEdge.rawValue,
+                    ].contains(Column("kind")))
+                    .fetchAll(db)
+                for row in candidates {
+                    if let localId = row.localId, cascadedEdgeIds.contains(localId) {
+                        edgeFollowUpDeletes.append(row)
+                    }
+                }
+            }
+
+            let allDeletes = itemScopeDeletes + edgeCreateDeletes + edgeFollowUpDeletes
+            for row in allDeletes {
+                try db.execute(
+                    sql: "DELETE FROM pending_mutations WHERE id = ?",
+                    arguments: [row.id]
+                )
+            }
+            return allDeletes
+        }
+    }
+
     // Rewrite the id fields inside a payload JSON for non-edge item-scoped
     // mutations. Returns the rewritten JSON string.
     private static func rewritePayload(

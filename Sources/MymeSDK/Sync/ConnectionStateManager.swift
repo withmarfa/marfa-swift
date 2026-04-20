@@ -73,6 +73,20 @@ public actor ConnectionStateManager {
         applyState(.online)
     }
 
+    /// Called by the ``SyncEngine`` to nudge the state machine back into
+    /// `.connecting` after an SSE stream closes. `NWPathMonitor` only
+    /// emits transitions on real network flaps, so without this the engine
+    /// would drain the mutation queue once per network event and then park
+    /// on `.online` forever — new mutations would sit unsynced until the
+    /// next reachability change. Guarded against calling while offline so
+    /// we never claim "connecting" when the network is actually down;
+    /// `NWPathMonitor`'s own offline → connecting transition handles
+    /// resume from loss.
+    public func markConnecting() {
+        guard state != .offline else { return }
+        applyState(.connecting)
+    }
+
     // MARK: - AsyncStream factory
 
     /// An `AsyncStream` that yields the current state immediately, then any

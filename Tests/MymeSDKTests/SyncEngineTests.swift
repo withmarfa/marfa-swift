@@ -755,6 +755,226 @@ struct SyncEngineTests {
             #expect(count == 1, "expected exactly one resync; got \(count)")
         }
 
+        // MARK: - Fix A: ItemsNamespace.create id stamping
+
+        @Test("ItemsNamespace.create stamps a UUIDv7 into the queued payload when input.id is nil")
+        func createStampsIdIntoEnqueuedPayload() async throws {
+            let (store, queue, transport, _, _) = try makeFixture()
+            let items = ItemsNamespace(
+                transport: transport,
+                defaultConflictStrategy: .auto,
+                localStore: store,
+                mutationQueue: queue
+            )
+
+            let created = try await items.create(
+                CreateItemInput(type: "core.note", properties: ["body": .string("fresh")])
+            )
+
+            // The returned id is the UUIDv7 the SDK stamped.
+            #expect(created.id.isEmpty == false)
+
+            let records = try await queue.fetchAll()
+            #expect(records.count == 1)
+            let payload = try JSONDecoder().decode(
+                CreateItemPayload.self,
+                from: records[0].payloadJson.data(using: .utf8) ?? Data()
+            )
+            // Critical: the enqueued payload carries the same id the local
+            // store knows about. Without this, the server mints its own id
+            // and `SyncEngine.replayRecord` purges the local row, breaking
+            // any app view holding `created.id`.
+            #expect(payload.input.id == created.id)
+            #expect(records[0].localId == created.id)
+        }
+
+        @Test("createItem replay with stamped id takes the no-op path (no rewrite, no purge)")
+        func createReplayWithStampedIdIsNoOpReconcile() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+            // Compress reconnect schedule so the test doesn't hang waiting
+            // on back-off sleeps after the stream closes.
+            await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+            let items = ItemsNamespace(
+                transport: transport,
+                defaultConflictStrategy: .auto,
+                localStore: store,
+                mutationQueue: queue
+            )
+
+            let created = try await items.create(
+                CreateItemInput(type: "core.note", properties: ["body": .string("v1")])
+            )
+
+            // Empty SSE + server echoes the client id on POST /items.
+            transport.enqueueEvents([])
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let echoed = Item(
+                createdAt: now, id: created.id, library: false,
+                origin: .user, properties: ["body": .string("v1")],
+                schemaVersion: 1, source: "test", state: .active,
+                timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            transport.enqueue(ItemResponse(item: echoed, metadata: nil))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+
+            // Local row still present under the stamped id — no purge fired.
+            let fetched = try await store.fetchItem(id: created.id)
+            #expect(fetched.id == created.id)
+            await engine.stop()
+        }
+
+        // MARK: - Fix B: cascade drop on permanent createItem failure
+
+        @Test("permanent createItem drop cascades to dependent mutations and purges the local row")
+        func createItemCascadeDropsDependents() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+            await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+
+            // Seed the local store + queue as if the app had created a note,
+            // edited it, and spun off a reply edge — all before sync fires.
+            // "A" is the note that will fail server-side; "X" and "Y" are
+            // unrelated siblings that must survive.
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let ghost = Item(
+                createdAt: now, id: "A", library: false, origin: .user,
+                properties: ["body": .string("")], schemaVersion: 1, source: "test",
+                state: .active, timestamp: now, type: "core.note",
+                updatedAt: now, version: 1
+            )
+            try await store.upsertItem(ghost)
+            let survivor = Item(
+                createdAt: now, id: "Y", library: false, origin: .user,
+                properties: ["body": .string("kept")], schemaVersion: 1, source: "test",
+                state: .active, timestamp: now, type: "core.note",
+                updatedAt: now, version: 1
+            )
+            try await store.upsertItem(survivor)
+
+            let createInput = CreateItemInput(
+                type: "core.note", properties: ["body": .string("")], id: "A"
+            )
+            try await queue.enqueueCreateItem(createInput, localId: "A")
+            try await queue.enqueueUpdateItem(id: "A", properties: ["body": .string("typed")])
+            try await queue.enqueueCreateEdge(
+                source: "A", target: "X", edgeType: "in-thread",
+                properties: nil, localEdgeId: "E-AX"
+            )
+            try await queue.enqueueUpdateItem(id: "Y", properties: ["body": .string("untouched")])
+
+            // Collect `.mutationDropped` events so we can assert cascade emission.
+            let events = await engine.events
+            let collector = Task { () -> [SyncEvent] in
+                var out: [SyncEvent] = []
+                for await event in events {
+                    out.append(event)
+                    // Stop once we've seen a `.synced` or `.failed` terminal.
+                    if case .synced = event { return out }
+                    if case .failed = event { return out }
+                }
+                return out
+            }
+
+            transport.enqueueEvents([])
+            // POST /items → 400 ValidationError (permanent, triggers cascade).
+            transport.enqueueError(ValidationError(message: "bad create"))
+            // PATCH /items/Y still needs a response — the sibling survives
+            // and replays successfully.
+            let updatedY = Item(
+                createdAt: now, id: "Y", library: false, origin: .user,
+                properties: ["body": .string("untouched")], schemaVersion: 1, source: "test",
+                state: .active, timestamp: now, type: "core.note",
+                updatedAt: now, version: 2
+            )
+            transport.enqueue(ItemResponse(item: updatedY, metadata: nil))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+
+            // Queue is fully drained — A's createItem + cascade dropped,
+            // Y's updateItem replayed successfully.
+            #expect(try await queue.isEmpty)
+
+            // Ghost A purged from local store; survivor Y intact.
+            let ghostFetch = try? await store.fetchItem(id: "A")
+            #expect(ghostFetch == nil)
+            let survivorFetch = try await store.fetchItem(id: "Y")
+            #expect(survivorFetch.id == "Y")
+
+            let collected = await collector.value
+            let drops = collected.compactMap { event -> (String, String?)? in
+                if case let .mutationDropped(kind, itemId, _, _) = event {
+                    return (kind, itemId)
+                }
+                return nil
+            }
+            // Three drops total: the createItem root + the cascaded
+            // updateItem + createEdge. Y's updateItem is *not* dropped.
+            #expect(drops.count == 3)
+            let droppedKinds = Set(drops.map { $0.0 })
+            #expect(droppedKinds == Set(["createItem", "updateItem", "createEdge"]))
+            // Every drop carries a local id matching "A" or the cascaded
+            // edge id "E-AX".
+            let droppedItemIds = Set(drops.compactMap { $0.1 })
+            #expect(droppedItemIds == Set(["A", "E-AX"]))
+            await engine.stop()
+        }
+
+        // MARK: - Fix C: SSE reconnect nudge drains queue without network flap
+
+        @Test("SSE reconnect nudge drains mutations queued after the first replay")
+        func sseReconnectDrainsLaterMutations() async throws {
+            let (_, queue, transport, connManager, engine) = try makeFixture()
+            // Compress the back-off so the test runs in tens of ms, not seconds.
+            await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+            // First SSE stream: empty, finishes cleanly. No mutations queued
+            // yet, so the first replay emits `.synced` (no drops / no failures).
+            transport.enqueueEvents([])
+            // Second SSE stream (reached via the reconnect nudge): also empty.
+            transport.enqueueEvents([])
+            // Subsequent streams (any further reconnect cycles): empty too.
+            transport.enqueueEvents([])
+            transport.enqueueEvents([])
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            // Wait for the first SSE stream to be observed.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await transport.calls.filter { $0.path == "/events" }.count >= 1
+            }
+
+            // Now enqueue a mutation AFTER the first replay cycle has
+            // already ticked. Without the reconnect nudge, this mutation
+            // would sit forever — no network transition will fire.
+            try await queue.enqueueDeleteItem(id: "019eb000-0000-7000-8000-000000000042")
+            transport.enqueueError(NotFoundError(message: "server gone"))
+
+            // Assert the mutation drains without us manually re-triggering
+            // `.connecting`.
+            try await waitUntil(timeout: .milliseconds(800)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+
+            // And assert we actually opened the SSE stream more than once —
+            // the reconnect nudge drove the re-open.
+            let sseCallCount = await transport.calls.filter { $0.path == "/events" }.count
+            #expect(sseCallCount >= 2, "expected reconnect nudge to re-open SSE at least once; got \(sseCallCount)")
+
+            await engine.stop()
+        }
+
         // MARK: - rewriteLocalId integration
 
         @Test("createItem replay with a different server id rewrites dependents")
@@ -930,6 +1150,114 @@ struct SyncEngineTests {
             let records = try await queue.fetchAll()
             #expect(records.count == 1)
             #expect(records[0].localId == "A")
+        }
+    }
+
+    // MARK: - MutationQueue.dropMutationsReferencingLocalId unit tests
+
+    @Suite("MutationQueue.dropMutationsReferencingLocalId")
+    struct DropMutationsReferencingLocalIdTests {
+
+        private func makeStore() throws -> LocalStore { try LocalStore(path: ":memory:") }
+        private func makeQueue(store: LocalStore) throws -> MutationQueue {
+            try MutationQueue(pool: store.pool)
+        }
+
+        @Test("drops item-scope mutations keyed on local_id, leaves createItem for caller")
+        func dropsItemScope() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+            try await queue.enqueueCreateItem(input, localId: "A")
+            try await queue.enqueueUpdateItem(id: "A", properties: ["body": .string("y")])
+            try await queue.enqueueSetMetadata(itemId: "A", input: MetadataInput(tags: ["t"]))
+            try await queue.enqueueDeleteItem(id: "A")
+
+            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+
+            // Everything keyed off "A" was scheduled for drop, except the
+            // createItem root (the caller removes that separately so their
+            // own `.mutationDropped` emit fires for the root failure).
+            #expect(deleted.count == 3)
+            let kinds = Set(deleted.map { $0.kind })
+            #expect(kinds == Set([.updateItem, .setMetadata, .deleteItem]))
+
+            let remaining = try await queue.fetchAll()
+            #expect(remaining.count == 1)
+            #expect(remaining[0].kind == .createItem)
+        }
+
+        @Test("drops createEdge rows whose source or target matches the local id")
+        func dropsEdgesByEndpoint() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            try await queue.enqueueCreateEdge(
+                source: "A", target: "B", edgeType: "about",
+                properties: nil, localEdgeId: "E-AB"
+            )
+            try await queue.enqueueCreateEdge(
+                source: "X", target: "A", edgeType: "in-thread",
+                properties: nil, localEdgeId: "E-XA"
+            )
+            try await queue.enqueueCreateEdge(
+                source: "X", target: "Y", edgeType: "about",
+                properties: nil, localEdgeId: "E-XY"
+            )
+
+            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+
+            // Both A-touching edges cascade; the unrelated X→Y survives.
+            #expect(deleted.count == 2)
+            let remaining = try await queue.fetchAll()
+            #expect(remaining.count == 1)
+            #expect(remaining[0].localId == "E-XY")
+        }
+
+        @Test("drops updateEdge / deleteEdge follow-ups for cascade-deleted createEdge rows")
+        func dropsEdgeFollowUps() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            // createEdge whose source is the dropped item; follow-up
+            // updateEdge + deleteEdge reference the same edge id.
+            try await queue.enqueueCreateEdge(
+                source: "A", target: "B", edgeType: "about",
+                properties: nil, localEdgeId: "E-AB"
+            )
+            try await queue.enqueueUpdateEdge(id: "E-AB", properties: ["note": .string("x")])
+            try await queue.enqueueDeleteEdge(id: "E-AB")
+
+            // Sibling edge not connected to A — its follow-ups should survive.
+            try await queue.enqueueCreateEdge(
+                source: "X", target: "Y", edgeType: "about",
+                properties: nil, localEdgeId: "E-XY"
+            )
+            try await queue.enqueueUpdateEdge(id: "E-XY", properties: ["note": .string("z")])
+
+            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+
+            // createEdge + updateEdge + deleteEdge for E-AB, but NOT the
+            // sibling E-XY or its updateEdge.
+            #expect(deleted.count == 3)
+
+            let remaining = try await queue.fetchAll()
+            let remainingKinds = Set(remaining.map { $0.kind })
+            #expect(remainingKinds == Set([.createEdge, .updateEdge]))
+            let remainingLocalIds = Set(remaining.compactMap { $0.localId })
+            #expect(remainingLocalIds == Set(["E-XY"]))
+        }
+
+        @Test("no-op when no rows reference the local id")
+        func noOpWhenUnreferenced() async throws {
+            let store = try makeStore()
+            let queue = try makeQueue(store: store)
+
+            try await queue.enqueueUpdateItem(id: "B", properties: ["body": .string("y")])
+            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+            #expect(deleted.isEmpty)
+            #expect(try await queue.fetchAll().count == 1)
         }
     }
 }
