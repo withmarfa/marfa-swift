@@ -403,7 +403,7 @@ func locateRepoRoot() -> URL {
 }
 
 let repoRoot = locateRepoRoot()
-let typesDir = repoRoot.appendingPathComponent("scripts/core-types")
+let typesDir = repoRoot.appendingPathComponent("scripts/MymeCodegenCore/core-types")
 let outputDir = repoRoot
     .appendingPathComponent("Sources/MymeSDK/DomainModels/Generated")
 

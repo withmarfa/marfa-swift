@@ -1,0 +1,32 @@
+{
+  "id": "myapp.all_types",
+  "label": "All types",
+  "description": "Exercises every FieldType the emitter supports.",
+  "version": 1,
+  "fields": {
+    "title": { "type": "string", "description": "A plain string" },
+    "rating": { "type": "number", "description": "Floating-point" },
+    "count": { "type": "integer", "description": "Integer" },
+    "is_active": { "type": "boolean", "description": "Flag" },
+    "status": {
+      "type": "enum",
+      "description": "Status enum",
+      "enum_values": ["draft", "published", "archived"]
+    },
+    "tags": {
+      "type": "array",
+      "description": "List of tags",
+      "items_type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form dictionary"
+    },
+    "link": {
+      "type": "string",
+      "description": "A URL",
+      "format": "url"
+    }
+  },
+  "required": ["title"]
+}

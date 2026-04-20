@@ -1,0 +1,19 @@
+{
+  "id": "myapp.booking",
+  "parent": "core.note",
+  "label": "Booking",
+  "description": "A time-bounded reservation against a person or place.",
+  "version": 1,
+  "fields": {
+    "start_at": {
+      "type": "string",
+      "description": "Start of the booking",
+      "format": "datetime"
+    },
+    "party_size": {
+      "type": "integer",
+      "description": "Number of guests"
+    }
+  },
+  "required": ["start_at"]
+}

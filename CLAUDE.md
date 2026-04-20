@@ -148,7 +148,7 @@ From the repo root:
 swift run codegen-domain
 ```
 
-`sync-types.sh` copies from `../myme/packages/types/core/` into `scripts/core-types/` then runs `codegen-domain`.
+`sync-types.sh` copies from `../myme/packages/types/core/` into `scripts/MymeCodegenCore/core-types/` then runs `codegen-domain`. (The snapshot lives under `MymeCodegenCore/` because that library bundles it as a resource for custom-type codegen parent-chain resolution; `codegen-domain` reads it from the same path.)
 
 ### Freshness check
 
@@ -169,3 +169,73 @@ Hand-written at `Sources/MymeSDK/DomainModels/MymeItem.swift`. Provides:
 - Optional fields are `T?`, returning `nil` when absent.
 - Enum schema fields surface as `String?` (values documented in property doc comments).
 - Child type fields shadow same-named parent fields for doc comments; the type mapping is identical either way.
+
+## Codegen — custom types
+
+Parallel tool for **consumer apps** with their own custom Myme types. Generates the same-shaped `MymeItem`-conforming struct as `codegen-domain`, with inheritance flattened into one struct per type.
+
+Ships as two executables and one SwiftPM command plugin, all products of `MymeSDK`:
+
+- `swift run codegen-custom-types` — reads `myme-codegen.json`, generates Swift from local JSON schemas.
+- `swift run sync-custom-types` — `GET /types` against a live Myme instance, writes schemas to the cache directory, then generates.
+- `swift package generate-myme-custom-types` — command-plugin wrapper around both. Pass `--sync` to invoke sync first.
+
+All three consume a single `myme-codegen.json` at the consumer's repo root. Core schemas for parent-chain resolution (`parent: core.note`, etc.) ship bundled in the `MymeCodegenCore` resource — consumers never vendor core types.
+
+### Architecture
+
+- `MymeCodegenCore` — internal library target, Foundation-only. Contains `ConfigLoader`, `SchemaLoader`, `SchemaResolver`, `NameMapper`, `CodeEmitter`, `FileWriter`, `Generator`, `SyncRunner`, plus the bundled `core-types/` JSON resource. Not exposed as a product.
+- `codegen-custom-types` — executable target at `scripts/codegen-custom-types/`. Thin arg parsing over `Generator.run()`.
+- `sync-custom-types` — executable target at `scripts/sync-custom-types/`. Thin arg parsing over `SyncRunner.run()`. URLSession directly, no `MymeSDK` runtime dep.
+- `GenerateMymeCustomTypes` — command plugin at `Plugins/GenerateMymeCustomTypes/`. Declares `writeToPackageDirectory` and `allowNetworkConnections(.all)` permissions.
+- `CodegenCustomTypesTests` — unit + golden + flow + sync tests.
+- `CodegenCompileCheckTests` — a second test target whose sources ARE the pre-generated Swift files. Target fails to build if codegen output shape ever regresses.
+
+### Input contract — `myme-codegen.json`
+
+```json
+{
+  "schema": 1,
+  "source": { "mode": "local", "directory": "MymeTypes" },
+  "output": { "directory": "Sources/MyApp/MymeTypes/Generated", "accessLevel": "public" },
+  "types": { "include": ["myapp.*"], "exclude": ["myapp.internal.**"] }
+}
+```
+
+Mode `"live"` replaces `directory` with `cacheDirectory` and reads `MYME_API_URL` / `MYME_API_KEY` from env. Unknown `schema` versions fail fast. Any `core.*` id found in the source directory is rejected — the `core.*` namespace is always out of scope regardless of include/exclude globs.
+
+### Output shape
+
+Mirrors `codegen-domain` output for core types (`public static let typeIdentifier`, typed property accessors, `init?(from:)`, `toProperties()`) with custom-type additions:
+
+- `public static let typeSchemaVersion` — the schema version this struct was generated against. Consumers compare with `MymeItem.schemaVersion` at runtime for drift detection.
+- `Sendable` conformance explicit.
+- Parent fields grouped under `// MARK: - Inherited from <parent.id>` sections (one per ancestor).
+- Swift-keyword field names emit with backtick escaping (`` `init` ``, `` `class` ``).
+- Access level toggled by `output.accessLevel` — `public` (default) or `internal`.
+
+### Freshness check (consumer CI)
+
+Standard pattern — consumers add to their own CI:
+
+```yaml
+- run: |
+    swift run codegen-custom-types
+    git diff --exit-code -- Sources/MyApp/MymeTypes/Generated
+```
+
+### Testing model
+
+- Unit tests cover `NameMapper`, `ConfigLoader`, `SchemaResolver`, filters, and the `Generator` flow.
+- `GoldenTests` runs the full generator against `Fixtures/schemas/*.json` and byte-compares output to `Fixtures/expected/*.swift`.
+- `CodegenCompileCheckTests` — pre-generated Swift in `Tests/CodegenCustomTypesTests/CompileCheck/` compiles as part of the test target; regressions fail the build.
+- `SyncTests` uses an in-memory `HTTPFetcher` mock (no URLProtocol plumbing).
+
+No live-server integration test — the MockFetcher covers the contract and keeps CI hermetic.
+
+### Refreshing golden files after an intentional emitter change
+
+1. Update `scripts/MymeCodegenCore/CodeEmitter.swift`.
+2. Run the generator against `Tests/CodegenCustomTypesTests/Fixtures/schemas/` into a scratch dir.
+3. Copy the outputs over both `Fixtures/expected/*.swift` and `CompileCheck/*.swift`.
+4. `swift test --filter CodegenCustomTypesTests` to verify.
