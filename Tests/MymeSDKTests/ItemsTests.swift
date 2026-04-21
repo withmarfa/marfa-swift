@@ -199,4 +199,67 @@ struct ItemsTests {
         #expect(stats["active"] == 10)
         #expect(mock.calls[0].path == "/items/stats")
     }
+
+    @Test("versions fetches server history in synced mode")
+    func versionsSyncedModeHitsNetwork() async throws {
+        // Synced mode is `localStore != nil && mutationQueue != nil`.
+        // Previously this degenerated to `[currentItem]` wrapped as one
+        // Version. It must hit `GET /items/:id/versions`.
+        let store = try LocalStore(path: ":memory:")
+        let queue = try MutationQueue(pool: store.pool)
+        let transport = MockTransport()
+        let items = ItemsNamespace(
+            transport: transport,
+            defaultConflictStrategy: .auto,
+            localStore: store,
+            mutationQueue: queue
+        )
+
+        let v1 = Version(
+            createdAt: "2026-01-01T00:00:00Z",
+            id: "ver-1",
+            itemId: "item-A",
+            properties: ["body": .string("v1")],
+            version: 1
+        )
+        let v2 = Version(
+            createdAt: "2026-01-02T00:00:00Z",
+            id: "ver-2",
+            itemId: "item-A",
+            properties: ["body": .string("v2")],
+            version: 2
+        )
+        transport.enqueue(VersionsResponse(versions: [v1, v2]))
+
+        let result = try await items.versions(id: "item-A")
+
+        #expect(result.count == 2)
+        #expect(result[0].version == 1)
+        #expect(result[1].version == 2)
+        #expect(transport.calls.count == 1)
+        #expect(transport.calls[0].method == .get)
+        #expect(transport.calls[0].path == "/items/item-A/versions")
+    }
+
+    @Test("versions returns single current version in pure-local mode")
+    func versionsPureLocalModeSkipsNetwork() async throws {
+        let store = try LocalStore(path: ":memory:")
+        let transport = MockTransport()
+        let items = ItemsNamespace(
+            transport: transport,
+            defaultConflictStrategy: .auto,
+            localStore: store,
+            mutationQueue: nil
+        )
+
+        let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+        let item = try await store.createItem(input)
+
+        let result = try await items.versions(id: item.id)
+
+        #expect(result.count == 1)
+        #expect(result[0].itemId == item.id)
+        #expect(result[0].version == item.version)
+        #expect(transport.calls.isEmpty)
+    }
 }

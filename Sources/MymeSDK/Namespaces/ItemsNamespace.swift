@@ -171,10 +171,18 @@ public struct ItemsNamespace: Sendable {
 
     /// Lists an item's version history.
     ///
-    /// Not supported in pure-local mode (always returns the current single version).
+    /// Version history is server-owned — the local store only tracks the
+    /// current revision. Mode routing splits on `mutationQueue`, not
+    /// `localStore`, because both pure-local and synced clients populate a
+    /// local store:
+    ///
+    /// - **Pure-local** (`mutationQueue == nil`) — no remote to call; returns
+    ///   a single-element array wrapping the current item.
+    /// - **Synced** (`mutationQueue != nil`) — issues `GET /items/:id/versions`
+    ///   and returns the server's history, same as the network-only path.
     public func versions(id: String) async throws -> [Version] {
-        if localStore != nil {
-            let item = try await get(id: id)
+        if let store = localStore, mutationQueue == nil {
+            let item = try await store.fetchItem(id: id)
             return [Version(
                 createdAt: item.createdAt,
                 id: item.id,

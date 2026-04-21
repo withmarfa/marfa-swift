@@ -1028,6 +1028,74 @@ struct SyncEngineTests {
             #expect(stalePatch.isEmpty)
             await engine.stop()
         }
+
+        // MARK: - hasPendingMutations / lastFullSyncAt accessors
+
+        @Test("hasPendingMutations is false on a fresh engine")
+        func hasPendingMutationsFalseWhenEmpty() async throws {
+            let (_, _, _, _, engine) = try makeFixture()
+            #expect(try await engine.hasPendingMutations == false)
+        }
+
+        @Test("hasPendingMutations tracks enqueue and remove")
+        func hasPendingMutationsTracksQueue() async throws {
+            let (_, queue, _, _, engine) = try makeFixture()
+
+            try await queue.enqueueDeleteItem(id: "server-1")
+            #expect(try await engine.hasPendingMutations == true)
+
+            let records = try await queue.fetchAll()
+            try await queue.remove(id: records[0].id)
+            #expect(try await engine.hasPendingMutations == false)
+        }
+
+        @Test("lastFullSyncAt is nil on a fresh store")
+        func lastFullSyncAtNilOnFreshStore() async throws {
+            let (_, _, _, _, engine) = try makeFixture()
+            let stamped = await engine.lastFullSyncAt
+            #expect(stamped == nil)
+        }
+
+        @Test("performInitialSync stamps lastFullSyncAt")
+        func performInitialSyncStampsLastFullSyncAt() async throws {
+            let (_, _, transport, _, engine) = try makeFixture()
+            transport.enqueue(
+                PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
+            )
+
+            let before = Date()
+            _ = try await engine.performInitialSync()
+            let after = Date()
+
+            let stamped = await engine.lastFullSyncAt
+            #expect(stamped != nil)
+            if let s = stamped {
+                #expect(s >= before.addingTimeInterval(-1))
+                #expect(s <= after.addingTimeInterval(1))
+            }
+        }
+
+        @Test("lastFullSyncAt persists across SyncEngine instances on the same store")
+        func lastFullSyncAtPersistsAcrossEngines() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+            transport.enqueue(
+                PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
+            )
+            _ = try await engine.performInitialSync()
+            let first = await engine.lastFullSyncAt
+            #expect(first != nil)
+
+            // Fresh engine sharing the same local store + queue reads the
+            // same `sync_state` rows.
+            let engine2 = SyncEngine(
+                transport: transport,
+                localStore: store,
+                mutationQueue: queue,
+                connectionManager: connManager
+            )
+            let second = await engine2.lastFullSyncAt
+            #expect(second == first)
+        }
     }
 
     // MARK: - MutationQueue.rewriteLocalId unit tests
