@@ -125,7 +125,12 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
-    /// Soft-deletes an item (transitions to trashed).
+    /// Soft-deletes an item by transitioning it to the `trashed` state.
+    ///
+    /// The item remains retrievable (``restore(id:)`` reverts it) and continues
+    /// to occupy its id. Use ``purge(id:)`` to remove a trashed item for good.
+    ///
+    /// - Parameter id: The item id.
     public func delete(id: String) async throws {
         if let store = localStore {
             try await store.trashItem(id: id)
@@ -194,7 +199,12 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
-    /// Permanently deletes a trashed item (admin only).
+    /// Permanently removes a trashed item. Irreversible.
+    ///
+    /// The item must already be in the `trashed` state — call ``delete(id:)``
+    /// first if needed. Requires the `admin:purge` scope on the API key.
+    ///
+    /// - Parameter id: The item id.
     public func purge(id: String) async throws {
         if let store = localStore {
             try await store.purgeItem(id: id)

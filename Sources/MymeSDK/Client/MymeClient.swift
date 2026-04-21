@@ -140,8 +140,10 @@ public final class MymeClient: Sendable {
         let store = try LocalStore(path: path)
         // The transport is never invoked in pure-local mode: every namespace
         // method checks `localStore` first before touching the transport.
+        // URL is a placeholder; the fallback guards against the synthetic
+        // `local://offline` scheme ever failing to parse in a future SDK.
         let config = ClientConfiguration(
-            url: URL(string: "local://offline")!,
+            url: URL(string: "local://offline") ?? URL(fileURLWithPath: "/dev/null"),
             apiKey: ""
         )
         return MymeClient(

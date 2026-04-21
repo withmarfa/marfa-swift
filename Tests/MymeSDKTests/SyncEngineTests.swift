@@ -277,7 +277,7 @@ struct SyncEngineTests {
 
         @Test("stateUpdates yields current state immediately") func stateUpdatesYieldsCurrentStateImmediately() async throws {
             let manager = ConnectionStateManager()
-            let stream = await manager.stateUpdates
+            let stream = manager.stateUpdates
             var iter = stream.makeAsyncIterator()
             let first = await iter.next()
             #expect(first == .offline)
@@ -304,7 +304,7 @@ struct SyncEngineTests {
             // Collect events from the stream in a background task, then stop.
             let collected = await withTaskGroup(of: [ConnectionState].self) { group in
                 group.addTask {
-                    let stream = await manager.stateUpdates
+                    let stream = manager.stateUpdates
                     var results: [ConnectionState] = []
                     for await state in stream {
                         results.append(state)
