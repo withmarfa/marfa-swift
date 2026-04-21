@@ -127,6 +127,22 @@ public actor SyncEngine {
         }
     }
 
+    // MARK: - Sync status (consumer-facing signals)
+
+    /// `true` when the mutation queue holds one or more pending writes that
+    /// haven't yet been replayed to the server. Consumers can read this
+    /// before deciding whether to trigger a user-visible "unsynced changes"
+    /// affordance, or to defer a fresh pull until the local queue has drained.
+    ///
+    /// Thin actor-isolated wrapper over ``MutationQueue/isEmpty`` — rethrows
+    /// any GRDB read error so callers can distinguish "no pending mutations"
+    /// from "couldn't check".
+    public var hasPendingMutations: Bool {
+        get async throws {
+            !(try await mutationQueue.isEmpty)
+        }
+    }
+
     // MARK: - Init
 
     public init(
