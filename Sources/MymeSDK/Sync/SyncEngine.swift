@@ -91,8 +91,9 @@ public actor SyncEngine {
     // `catchup_too_old` events land during reconnection churn.
     private var resyncing = false
 
-    // Sync-state key stored in the mutation-queue's sync_state table.
+    // Sync-state keys stored in the mutation-queue's sync_state table.
     private let cursorKey = "last_event_id"
+    private let fullSyncKey = "last_full_sync_at"
 
     // MARK: - Event stream
 
@@ -140,6 +141,33 @@ public actor SyncEngine {
     public var hasPendingMutations: Bool {
         get async throws {
             !(try await mutationQueue.isEmpty)
+        }
+    }
+
+    /// Timestamp of the most recent successful ``performInitialSync(pageSize:)``
+    /// completion against this local store, or `nil` if one has never run.
+    /// Persisted in the `sync_state` table so the value survives app restarts
+    /// and is keyed to the on-disk store (not the client instance).
+    ///
+    /// Consumers can read this before deciding whether to trigger a fresh
+    /// initial sync — a `nil` value or one that's older than the consumer's
+    /// freshness budget is a signal to pull, even when the local store already
+    /// holds items from an earlier session.
+    ///
+    /// Serialised as ISO 8601 with fractional seconds
+    /// (`Date.ISO8601FormatStyle(includingFractionalSeconds: true)`). Returns
+    /// `nil` when the value is absent or fails to parse — unreadable and
+    /// never-synced are indistinguishable to the caller and both warrant a
+    /// pull.
+    public var lastFullSyncAt: Date? {
+        get async {
+            guard
+                let raw = try? await mutationQueue.loadSyncState(key: fullSyncKey),
+                let parsed = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            else {
+                return nil
+            }
+            return parsed
         }
     }
 
@@ -227,6 +255,14 @@ public actor SyncEngine {
             }
             cursor = page.cursor
         } while cursor != nil
+
+        // Stamp the completion so consumers can gate fresh pulls on recency
+        // rather than "is the local store empty?". Uses the same ISO 8601
+        // with fractional seconds as the mutation queue's created_at for
+        // consistency and to stay off the non-Sendable `ISO8601DateFormatter`.
+        let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        try? await mutationQueue.saveSyncState(key: fullSyncKey, value: stamp)
+
         return imported
     }
 
