@@ -91,21 +91,28 @@ public actor ConnectionStateManager {
 
     /// An `AsyncStream` that yields the current state immediately, then any
     /// subsequent state changes. The stream ends when ``stop()`` is called.
-    public var stateUpdates: AsyncStream<ConnectionState> {
-        let current = state
-        return AsyncStream { continuation in
+    ///
+    /// Marked `nonisolated` so callers subscribe without an actor hop; the
+    /// registration and initial-state send happen inside an internal
+    /// actor-isolated task. Mirrors the shape of ``SyncEngine/events``.
+    public nonisolated var stateUpdates: AsyncStream<ConnectionState> {
+        AsyncStream { continuation in
             let id = UUID()
-            // Register before yielding so onTermination can never fire for
-            // an id that isn't yet in the dictionary.
-            self.continuations[id] = continuation
+            Task { await self.subscribe(id: id, continuation: continuation) }
             continuation.onTermination = { [weak self] _ in
                 Task { [weak self] in
                     await self?.removeContinuation(id: id)
                 }
             }
-            // Deliver the current state to the new subscriber immediately.
-            continuation.yield(current)
         }
+    }
+
+    private func subscribe(
+        id: UUID,
+        continuation: AsyncStream<ConnectionState>.Continuation
+    ) {
+        continuations[id] = continuation
+        continuation.yield(state)
     }
 
     // MARK: - Private

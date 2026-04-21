@@ -217,7 +217,7 @@ public actor SyncEngine {
     // MARK: - Main run loop
 
     private func runLoop() async {
-        for await state in await connectionManager.stateUpdates {
+        for await state in connectionManager.stateUpdates {
             guard running else { break }
 
             switch state {
