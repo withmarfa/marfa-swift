@@ -35,7 +35,11 @@ let package = Package(
         ),
         .testTarget(
             name: "MymeSDKTests",
-            dependencies: ["MymeSDK", "MymeSDKTestSupport"],
+            dependencies: [
+                "MymeSDK",
+                "MymeSDKTestSupport",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ],
             resources: [.copy("Fixtures")]
         ),
 

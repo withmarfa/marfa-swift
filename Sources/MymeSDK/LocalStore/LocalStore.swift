@@ -120,6 +120,96 @@ public actor LocalStore {
                 columns: ["target_id", "edge_type"]
             )
         }
+
+        migrator.registerMigration("v3_rewrite_uuid4_to_uuid7") { db in
+            // Pre-commit 1d68a68, the SDK generated IDs using Foundation.UUID()
+            // (UUIDv4 on Apple platforms) instead of UUIDv7. The server rejects
+            // UUIDv4 IDs with 400 INVALID_ID, so any row with a v4 ID was never
+            // synced — it only exists locally. This migration rewrites all such
+            // rows to fresh UUIDv7 IDs and propagates the change across every
+            // table and column that references the affected IDs.
+            //
+            // UUIDv4 detection: in the standard 8-4-4-4-12 format, the version
+            // nibble sits at character position 15 (1-indexed). UUIDv4 has '4'
+            // there; UUIDv7 has '7'. Checking lower(id) handles any uppercase
+            // IDs written by older Foundation UUID formatting.
+            //
+            // Mutation-queue payload rewriting uses SQLite REPLACE() on the JSON
+            // string. UUIDs are 36-character hyphenated hex strings; the
+            // probability of one appearing verbatim in user-authored property
+            // values is negligible and the consequence (a property value
+            // updated to the new UUID) is harmless.
+
+            // --- Items ---
+            let itemIds = try String.fetchAll(
+                db, sql: "SELECT id FROM items WHERE substr(lower(id), 15, 1) = '4'"
+            )
+            for oldId in itemIds {
+                let newId = UUIDv7.generateString()
+                try db.execute(
+                    sql: "UPDATE items SET id = ? WHERE id = ?",
+                    arguments: [newId, oldId]
+                )
+                try db.execute(
+                    sql: "UPDATE edges SET source_id = ? WHERE source_id = ?",
+                    arguments: [newId, oldId]
+                )
+                try db.execute(
+                    sql: "UPDATE edges SET target_id = ? WHERE target_id = ?",
+                    arguments: [newId, oldId]
+                )
+                try db.execute(
+                    sql: "UPDATE item_metadata SET item_id = ? WHERE item_id = ?",
+                    arguments: [newId, oldId]
+                )
+                if try db.tableExists("pending_mutations") {
+                    try db.execute(
+                        sql: "UPDATE pending_mutations SET local_id = ? WHERE local_id = ?",
+                        arguments: [newId, oldId]
+                    )
+                    try db.execute(
+                        sql: "UPDATE pending_mutations SET source_id = ? WHERE source_id = ?",
+                        arguments: [newId, oldId]
+                    )
+                    try db.execute(
+                        sql: """
+                            UPDATE pending_mutations
+                               SET payload_json = REPLACE(payload_json, ?, ?)
+                             WHERE payload_json LIKE ?
+                            """,
+                        arguments: [oldId, newId, "%\(oldId)%"]
+                    )
+                }
+            }
+
+            // --- Edges ---
+            // Edge IDs appear as local_id in updateEdge/deleteEdge mutations and
+            // as the payload id field in those same records. Rewrite both.
+            let edgeIds = try String.fetchAll(
+                db, sql: "SELECT id FROM edges WHERE substr(lower(id), 15, 1) = '4'"
+            )
+            for oldId in edgeIds {
+                let newId = UUIDv7.generateString()
+                try db.execute(
+                    sql: "UPDATE edges SET id = ? WHERE id = ?",
+                    arguments: [newId, oldId]
+                )
+                if try db.tableExists("pending_mutations") {
+                    try db.execute(
+                        sql: "UPDATE pending_mutations SET local_id = ? WHERE local_id = ?",
+                        arguments: [newId, oldId]
+                    )
+                    try db.execute(
+                        sql: """
+                            UPDATE pending_mutations
+                               SET payload_json = REPLACE(payload_json, ?, ?)
+                             WHERE payload_json LIKE ?
+                            """,
+                        arguments: [oldId, newId, "%\(oldId)%"]
+                    )
+                }
+            }
+        }
     }
 
     // MARK: - Helpers
