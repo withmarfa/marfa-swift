@@ -53,7 +53,7 @@ struct MymeStoreTests {
 
         let query = store.query()
 
-        // Wait for the ValueObservation to fire.
+        // Wait for the didSave-driven refetch to land.
         try await waitForCondition(timeout: .seconds(2)) { query.items.count >= 2 }
 
         #expect(query.items.count == 2)
@@ -582,7 +582,7 @@ private func waitForCondition(
         guard ContinuousClock().now < deadline else {
             throw CancellationError()
         }
-        // Yield to let ValueObservation callbacks land on the main actor.
+        // Yield so the debounced refetch task lands on the main actor.
         await Task.yield()
         try await Task.sleep(for: .milliseconds(10))
     }
