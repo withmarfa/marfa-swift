@@ -10,12 +10,13 @@ struct ExtensionsLocalFirstTests {
 
     // MARK: - Helpers
 
-    private func makeStore() throws -> LocalStore {
-        try LocalStore(path: ":memory:")
+    private func makeStoreAndQueue() async throws -> (LocalStore, MutationQueue) {
+        let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
+        return (store, queue)
     }
 
-    private func makeQueue(store: LocalStore) throws -> MutationQueue {
-        try MutationQueue(pool: store.pool)
+    private func makeStore() async throws -> LocalStore {
+        try await MymeSDKTest.makeInMemoryLocalStore()
     }
 
     private func noteInput() -> CreateItemInput {
@@ -25,7 +26,7 @@ struct ExtensionsLocalFirstTests {
     // MARK: - Local store direct
 
     @Test("setExtension writes a single namespace") func setExtensionWritesANamespace() async throws {
-        let store = try makeStore()
+        let store = try await makeStore()
         let item = try await store.createItem(noteInput())
 
         let data: [String: JSONValue] = ["status": .string("indexed"), "hits": .int(3)]
@@ -37,7 +38,7 @@ struct ExtensionsLocalFirstTests {
     }
 
     @Test("setExtension preserves other namespaces") func setExtensionPreservesOtherNamespaces() async throws {
-        let store = try makeStore()
+        let store = try await makeStore()
         let item = try await store.createItem(noteInput())
 
         _ = try await store.setExtension(itemId: item.id, namespace: "a", data: ["k": .string("a1")])
@@ -49,7 +50,7 @@ struct ExtensionsLocalFirstTests {
     }
 
     @Test("deleteExtension removes a namespace") func deleteExtensionRemovesNamespace() async throws {
-        let store = try makeStore()
+        let store = try await makeStore()
         let item = try await store.createItem(noteInput())
 
         _ = try await store.setExtension(itemId: item.id, namespace: "a", data: ["k": .string("v")])
@@ -65,8 +66,7 @@ struct ExtensionsLocalFirstTests {
     // MARK: - Namespace + queue in synced-mode shape
 
     @Test("ExtensionsNamespace.set writes locally and enqueues") func namespaceSetEnqueues() async throws {
-        let store = try makeStore()
-        let queue = try makeQueue(store: store)
+        let (store, queue) = try await makeStoreAndQueue()
         let transport = MockTransport()
         let ns = ExtensionsNamespace(transport: transport, localStore: store, mutationQueue: queue)
 
@@ -89,8 +89,7 @@ struct ExtensionsLocalFirstTests {
     }
 
     @Test("ExtensionsNamespace.delete removes locally and enqueues") func namespaceDeleteEnqueues() async throws {
-        let store = try makeStore()
-        let queue = try makeQueue(store: store)
+        let (store, queue) = try await makeStoreAndQueue()
         let transport = MockTransport()
         let ns = ExtensionsNamespace(transport: transport, localStore: store, mutationQueue: queue)
 
@@ -109,7 +108,7 @@ struct ExtensionsLocalFirstTests {
     // MARK: - Pure-local blobs guard
 
     @Test("Blobs upload throws LocalModeUnsupportedError on local client") func blobsUploadThrowsOnLocalClient() async throws {
-        let client = try MymeClient.local(path: ":memory:")
+        let client = try await MymeClient.local(path: ":memory:")
         do {
             _ = try await client.blobs.upload(data: Data("hello".utf8), mimeType: "text/plain")
             Issue.record("expected LocalModeUnsupportedError")
@@ -120,7 +119,7 @@ struct ExtensionsLocalFirstTests {
     }
 
     @Test("Blobs download throws LocalModeUnsupportedError on local client") func blobsDownloadThrowsOnLocalClient() async throws {
-        let client = try MymeClient.local(path: ":memory:")
+        let client = try await MymeClient.local(path: ":memory:")
         do {
             _ = try await client.blobs.download(hash: "sha256:abc123")
             Issue.record("expected LocalModeUnsupportedError")

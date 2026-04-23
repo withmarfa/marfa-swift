@@ -6,8 +6,12 @@
 //
 // Rules, byte-for-byte:
 //
-// 1. Never use `prop.isEmpty == false` — use `!prop.isEmpty`. The first
-//    compiles cleanly and crashes at runtime.
+// 1. Never use `prop.isEmpty == false`. The form compiles cleanly and
+//    crashes at runtime. In practice `!prop.isEmpty` also misbehaves
+//    on String columns under current SwiftData (silently returns true
+//    for every row). Use the captured-value short-circuit form with an
+//    explicit `prop != ""` test instead — see PredicateSafetyTests
+//    for the canonical shape.
 //
 // 2. No regular expressions in predicates — `String.contains(/regex/)`
 //    compiles and crashes at runtime.

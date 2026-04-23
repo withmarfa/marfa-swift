@@ -1,37 +1,74 @@
 import Foundation
-import GRDB
+import SwiftData
 
-// MARK: - Pending mutation record
+// MARK: - Pending mutation record (Sendable DTO)
 
-/// A serialised SDK write operation awaiting server replay.
-struct PendingMutationRecord: Codable, FetchableRecord, PersistableRecord {
-    static let databaseTableName = "pending_mutations"
+/// Sendable value snapshot of a queued mutation.
+///
+/// `MutationQueue` translates between this DTO and ``PendingMutationModel``
+/// at the actor boundary — `@Model` instances must never cross actors,
+/// so every API surface (``fetchAll``, ``rewriteLocalId``,
+/// ``dropMutationsReferencingLocalId``) returns these.
+///
+/// The shape is byte-for-byte the legacy GRDB struct, so consumers
+/// (`SyncEngine`, the rewrite logic, the test suite) compile unchanged.
+public struct PendingMutationRecord: Sendable, Codable, Equatable {
+    /// UUIDv4 of this mutation record (the server never sees it).
+    public var id: String
+    public var kind: MutationKind
+    public var payloadJson: String
+    public var sourceId: String?
+    public var localId: String?
+    public var createdAt: String
+    public var attemptCount: Int
+    public var lastError: String?
 
-    enum Kind: String, Codable {
-        case createItem, updateItem, deleteItem, restoreItem, transitionItem, purgeItem
-        case createEdge, updateEdge, deleteEdge
-        case setMetadata, mergeMetadata, addTags, removeTag
-        case setExtension, deleteExtension
-        case uploadBlob
+    public init(
+        id: String,
+        kind: MutationKind,
+        payloadJson: String,
+        sourceId: String? = nil,
+        localId: String? = nil,
+        createdAt: String,
+        attemptCount: Int = 0,
+        lastError: String? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.payloadJson = payloadJson
+        self.sourceId = sourceId
+        self.localId = localId
+        self.createdAt = createdAt
+        self.attemptCount = attemptCount
+        self.lastError = lastError
+    }
+}
+
+extension PendingMutationModel {
+    /// Snapshots this `@Model` row into a Sendable wire DTO.
+    func toRecord() -> PendingMutationRecord {
+        PendingMutationRecord(
+            id: id,
+            kind: kind,
+            payloadJson: payloadJson,
+            sourceId: sourceId,
+            localId: localId,
+            createdAt: createdAt,
+            attemptCount: attemptCount,
+            lastError: lastError
+        )
     }
 
-    var id: String  // UUID of this mutation record
-    var kind: Kind
-    var payloadJson: String  // JSON-encoded payload (type depends on kind)
-    var sourceId: String?  // UUIDv7 sourceId for create idempotency (items only)
-    var localId: String?  // local item/edge ID for reference
-    var createdAt: String
-    var attemptCount: Int
-    var lastError: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, kind
-        case payloadJson = "payload_json"
-        case sourceId = "source_id"
-        case localId = "local_id"
-        case createdAt = "created_at"
-        case attemptCount = "attempt_count"
-        case lastError = "last_error"
+    /// Mutates this model in place from a record. Used by re-write paths.
+    func apply(_ record: PendingMutationRecord) {
+        id = record.id
+        kindRaw = record.kind.rawValue
+        payloadJson = record.payloadJson
+        sourceId = record.sourceId
+        localId = record.localId
+        createdAt = record.createdAt
+        attemptCount = record.attemptCount
+        lastError = record.lastError
     }
 }
 
@@ -115,11 +152,12 @@ struct DeleteExtensionPayload: Codable, Sendable {
 
 /// Payload for `uploadBlob`.
 ///
-/// The binary data itself is stored in `pending_blobs` keyed by `hash`
-/// so `payload_json` stays lean. `hash` is the SHA-256 content address
-/// (`"sha256:<hex>"`), identical to what the server returns on successful
-/// upload — callers can use it immediately after queuing to create items
-/// and edges that reference the blob before it reaches the server.
+/// The binary data itself is stored in `PendingBlobModel` keyed by
+/// `hash` so `payload_json` stays lean. `hash` is the SHA-256 content
+/// address (`"sha256:<hex>"`), identical to what the server returns on
+/// successful upload — callers can use it immediately after queuing to
+/// create items and edges that reference the blob before it reaches
+/// the server.
 struct UploadBlobPayload: Codable, Sendable {
     let hash: String
     let mimeType: String
@@ -130,72 +168,24 @@ struct UploadBlobPayload: Codable, Sendable {
 
 /// Durable queue of pending server writes.
 ///
-/// Mutations are appended immediately in the namespace's local-write path and
-/// dequeued by ``SyncEngine`` when the client goes online. Idempotency for
-/// item creates is enforced via the `source_id` field: the server returns 409
-/// `duplicate_source` when the (source, sourceId) pair already exists, which
-/// the engine treats as a successful no-op.
+/// Mutations are appended immediately in the namespace's local-write
+/// path and dequeued by ``SyncEngine`` when the client goes online.
+/// Idempotency for item creates is enforced via the `sourceId` field:
+/// the server returns 409 `duplicate_source` when the (source, sourceId)
+/// pair already exists, which the engine treats as a successful no-op.
+///
+/// `@ModelActor`-isolated. Shares its ``ModelContainer`` with
+/// ``LocalStore``; cross-actor saves serialise at the SQLite layer.
+@ModelActor
 public actor MutationQueue {
 
-    private let pool: DatabasePool
     private static let encoder = JSONEncoder()
     private static let decoder = JSONDecoder()
-
-    // MARK: - Init
-
-    /// Shares the same `DatabasePool` as ``LocalStore`` so mutations are
-    /// committed in the same WAL journal.
-    init(pool: DatabasePool) throws {
-        self.pool = pool
-        var migrator = DatabaseMigrator()
-        MutationQueue.registerMigrations(into: &migrator)
-        try migrator.migrate(pool)
-    }
-
-    // MARK: - Schema
-
-    private static func registerMigrations(into migrator: inout DatabaseMigrator) {
-        migrator.registerMigration("v2_mutation_queue") { db in
-            try db.create(table: "pending_mutations", ifNotExists: true) { t in
-                t.primaryKey("id", .text)
-                t.column("kind", .text).notNull()
-                t.column("payload_json", .text).notNull()
-                t.column("source_id", .text)
-                t.column("local_id", .text)
-                t.column("created_at", .text).notNull()
-                t.column("attempt_count", .integer).notNull().defaults(to: 0)
-                t.column("last_error", .text)
-            }
-            try db.create(table: "sync_state", ifNotExists: true) { t in
-                t.primaryKey("key", .text)
-                t.column("value", .text).notNull()
-            }
-        }
-
-        migrator.registerMigration("v4_pending_blobs") { db in
-            // Stores binary data for queued blob uploads. Keyed by content
-            // hash so identical blobs only occupy one row even if enqueued
-            // twice. The corresponding `pending_mutations` row (kind =
-            // `uploadBlob`) carries hash + mimeType + size in its
-            // `payload_json`; this table holds the raw bytes separately so
-            // `pending_mutations` reads stay lean.
-            //
-            // Rows are deleted by `SyncEngine` after a successful upload.
-            // An orphaned row (mutation was dropped, data row was not cleaned
-            // up) is harmless — it occupies space until the database is next
-            // vacuumed or the app is reinstalled.
-            try db.create(table: "pending_blobs", ifNotExists: true) { t in
-                t.primaryKey("hash", .text)  // "sha256:<hex>"
-                t.column("data", .blob).notNull()
-                t.column("mime_type", .text).notNull()
-            }
-        }
-    }
 
     // MARK: - Enqueue helpers
 
     private func enqueue(
-        kind: PendingMutationRecord.Kind,
+        kind: MutationKind,
         payload: some Encodable & Sendable,
         sourceId: String? = nil,
         localId: String? = nil
@@ -204,23 +194,21 @@ public actor MutationQueue {
         guard let json = String(data: data, encoding: .utf8) else {
             throw LocalStoreError.encodingFailure("mutation payload")
         }
-        // `Date.ISO8601FormatStyle` is `Sendable`; `ISO8601DateFormatter` is
-        // not, so creating one here would violate Swift 6 strict concurrency
-        // on every enqueue even though it works at runtime.
+        // `Date.ISO8601FormatStyle` is `Sendable`; `ISO8601DateFormatter`
+        // is not, so creating one here would violate Swift 6 strict
+        // concurrency on every enqueue even though it works at runtime.
         let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
-        let record = PendingMutationRecord(
-            id: UUID().uuidString.lowercased(),
-            kind: kind,
-            payloadJson: json,
-            sourceId: sourceId,
-            localId: localId,
-            createdAt: now,
-            attemptCount: 0,
-            lastError: nil
-        )
-        try pool.write { db in
-            try record.insert(db)
-        }
+        let model = PendingMutationModel()
+        model.id = UUID().uuidString.lowercased()
+        model.kind = kind
+        model.payloadJson = json
+        model.sourceId = sourceId
+        model.localId = localId
+        model.createdAt = now
+        model.attemptCount = 0
+        model.lastError = nil
+        modelContext.insert(model)
+        try modelContext.save()
     }
 
     // MARK: - Enqueue public API
@@ -321,14 +309,16 @@ public actor MutationQueue {
         )
     }
 
-    /// Enqueues a blob upload. Inserts the binary data into `pending_blobs`
-    /// (keyed by hash) and records an `uploadBlob` mutation. Both writes run
-    /// in a single transaction so the mutation is never left without its data.
+    /// Enqueues a blob upload. Inserts the binary data into the
+    /// `PendingBlobModel` table (keyed by hash) and records an
+    /// `uploadBlob` mutation. Both writes run in a single
+    /// `modelContext.save()` so the mutation is never left without its
+    /// data — atomicity guarantee from the legacy schema, preserved.
     ///
-    /// If a `pending_blobs` row for this hash already exists (same data
-    /// uploaded twice while offline), the existing row is preserved and a
-    /// second `pending_mutations` row is still inserted — the second drain
-    /// will find the row missing and treat the upload as already complete.
+    /// If a blob row for this hash already exists (same data uploaded
+    /// twice while offline), the existing row is preserved and a second
+    /// mutation row is still inserted — the second drain will find the
+    /// row missing and treat the upload as already complete.
     func enqueueBlobUpload(hash: String, data: Data, mimeType: String) throws {
         let payload = UploadBlobPayload(hash: hash, mimeType: mimeType, size: data.count)
         let payloadData = try MutationQueue.encoder.encode(payload)
@@ -336,197 +326,186 @@ public actor MutationQueue {
             throw LocalStoreError.encodingFailure("uploadBlob payload")
         }
         let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
-        let record = PendingMutationRecord(
-            id: UUID().uuidString.lowercased(),
-            kind: .uploadBlob,
-            payloadJson: json,
-            sourceId: nil,
-            localId: nil,
-            createdAt: now,
-            attemptCount: 0,
-            lastError: nil
-        )
-        try pool.write { db in
-            // INSERT OR IGNORE: a second enqueue of the same hash doesn't
-            // clobber an existing pending_blobs row.
-            try db.execute(
-                sql: "INSERT OR IGNORE INTO pending_blobs (hash, data, mime_type) VALUES (?, ?, ?)",
-                arguments: [hash, data, mimeType]
-            )
-            try record.insert(db)
+
+        // INSERT-OR-IGNORE equivalent: only insert a fresh blob row if
+        // there isn't already one for this hash. A re-enqueue of the
+        // same content keeps the existing bytes intact.
+        let blobPredicate = #Predicate<PendingBlobModel> { $0.contentHash == hash }
+        var blobDescriptor = FetchDescriptor<PendingBlobModel>(predicate: blobPredicate)
+        blobDescriptor.fetchLimit = 1
+        if try modelContext.fetch(blobDescriptor).first == nil {
+            let blob = PendingBlobModel()
+            blob.contentHash = hash
+            blob.data = data
+            blob.mimeType = mimeType
+            modelContext.insert(blob)
         }
+
+        let model = PendingMutationModel()
+        model.id = UUID().uuidString.lowercased()
+        model.kind = .uploadBlob
+        model.payloadJson = json
+        model.sourceId = nil
+        model.localId = nil
+        model.createdAt = now
+        model.attemptCount = 0
+        model.lastError = nil
+        modelContext.insert(model)
+
+        // One save commits both rows as a single SQLite transaction.
+        try modelContext.save()
     }
 
     // MARK: - Pending blob access
 
-    /// Returns the raw bytes stored for a pending blob upload, or `nil` if
-    /// the row has already been deleted (upload succeeded or was dropped).
+    /// Returns the raw bytes stored for a pending blob upload, or `nil`
+    /// if the row has already been deleted (upload succeeded or was
+    /// dropped).
     func fetchPendingBlob(hash: String) throws -> Data? {
-        try pool.read { db in
-            try Row.fetchOne(
-                db,
-                sql: "SELECT data FROM pending_blobs WHERE hash = ?",
-                arguments: [hash]
-            ).map { $0["data"] as Data }
-        }
+        let predicate = #Predicate<PendingBlobModel> { $0.contentHash == hash }
+        var descriptor = FetchDescriptor<PendingBlobModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.data
     }
 
     /// Removes a pending blob data row after a successful upload.
     func deletePendingBlob(hash: String) throws {
-        try pool.write { db in
-            try db.execute(
-                sql: "DELETE FROM pending_blobs WHERE hash = ?",
-                arguments: [hash]
-            )
-        }
+        let predicate = #Predicate<PendingBlobModel> { $0.contentHash == hash }
+        var descriptor = FetchDescriptor<PendingBlobModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        modelContext.delete(model)
+        try modelContext.save()
     }
 
     // MARK: - Dequeue / drain
 
-    /// Returns all pending mutations in creation order.
+    /// Returns all pending mutations in creation order, snapshotted into
+    /// Sendable DTOs.
     func fetchAll() throws -> [PendingMutationRecord] {
-        try pool.read { db in
-            try PendingMutationRecord
-                .order(Column("created_at").asc)
-                .fetchAll(db)
-        }
+        let descriptor = FetchDescriptor<PendingMutationModel>(
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        return try modelContext.fetch(descriptor).map { $0.toRecord() }
     }
 
     /// Removes a successfully replayed mutation.
     func remove(id: String) throws {
-        try pool.write { db in
-            try db.execute(
-                sql: "DELETE FROM pending_mutations WHERE id = ?",
-                arguments: [id]
-            )
-        }
+        let predicate = #Predicate<PendingMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        modelContext.delete(model)
+        try modelContext.save()
     }
 
     /// Records a failed replay attempt.
     func recordFailure(id: String, error: String) throws {
-        try pool.write { db in
-            try db.execute(
-                sql: """
-                    UPDATE pending_mutations
-                       SET attempt_count = attempt_count + 1,
-                           last_error = ?
-                     WHERE id = ?
-                    """,
-                arguments: [error, id]
-            )
-        }
+        let predicate = #Predicate<PendingMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        model.attemptCount += 1
+        model.lastError = error
+        try modelContext.save()
     }
 
-    /// Returns `true` if there are any pending mutations.
+    /// `true` when the queue is empty.
     var isEmpty: Bool {
         get throws {
-            try pool.read { db in
-                try PendingMutationRecord.fetchCount(db) == 0
-            }
+            var descriptor = FetchDescriptor<PendingMutationModel>()
+            descriptor.fetchLimit = 1
+            return try modelContext.fetch(descriptor).isEmpty
         }
     }
 
     // MARK: - Sync state (Last-Event-ID cursor)
 
     func loadSyncState(key: String) throws -> String? {
-        try pool.read { db in
-            try Row.fetchOne(
-                db,
-                sql: "SELECT value FROM sync_state WHERE key = ?",
-                arguments: [key]
-            ).map { $0["value"] as String }
-        }
+        let predicate = #Predicate<SyncStateModel> { $0.key == key }
+        var descriptor = FetchDescriptor<SyncStateModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.value
     }
 
     func saveSyncState(key: String, value: String) throws {
-        try pool.write { db in
-            try db.execute(
-                sql: "INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)",
-                arguments: [key, value]
-            )
+        let predicate = #Predicate<SyncStateModel> { $0.key == key }
+        var descriptor = FetchDescriptor<SyncStateModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        if let existing = try modelContext.fetch(descriptor).first {
+            existing.value = value
+        } else {
+            let model = SyncStateModel()
+            model.key = key
+            model.value = value
+            modelContext.insert(model)
         }
+        try modelContext.save()
     }
 
-    /// Clears a persisted `sync_state` key. Used by the `catchup_too_old`
-    /// handler to reset the `Last-Event-ID` cursor so the next SSE reconnect
-    /// opens a fresh stream with no resume token.
+    /// Clears a persisted `sync_state` key. Used by the
+    /// `catchup_too_old` handler to reset the `Last-Event-ID` cursor so
+    /// the next SSE reconnect opens a fresh stream with no resume token.
     func clearSyncState(key: String) throws {
-        try pool.write { db in
-            try db.execute(
-                sql: "DELETE FROM sync_state WHERE key = ?",
-                arguments: [key]
-            )
-        }
+        let predicate = #Predicate<SyncStateModel> { $0.key == key }
+        var descriptor = FetchDescriptor<SyncStateModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        modelContext.delete(model)
+        try modelContext.save()
     }
 
     // MARK: - Local-id rewriting
 
-    /// Rewrite any queued record whose `local_id` or embedded payload id
-    /// references `from` to use `to`. Called after `createItem` replay when
-    /// the server-returned id differs from the client-supplied id.
+    /// Rewrite any queued record whose `localId` or embedded payload id
+    /// references `from` to use `to`. Called after `createItem` replay
+    /// when the server-returned id differs from the client-supplied id.
     ///
-    /// Under today's UUIDv7 client-owned ID model this never fires, but it
-    /// protects against any future server-assigned-id path and makes the
-    /// invariant explicit. The `createItem` record itself is the source of
-    /// truth for its own local id and is not rewritten.
+    /// Under today's UUIDv7 client-owned ID model this never fires, but
+    /// it protects against any future server-assigned-id path and makes
+    /// the invariant explicit. The `createItem` record itself is the
+    /// source of truth for its own local id and is not rewritten.
     ///
     /// Rewrites span: `updateItem`, `deleteItem`, `restoreItem`,
     /// `transitionItem`, `purgeItem`, `setMetadata`, `mergeMetadata`,
-    /// `addTags`, `removeTag`, `setExtension`, `deleteExtension`, and the
-    /// source/target fields of `createEdge`.
+    /// `addTags`, `removeTag`, `setExtension`, `deleteExtension`, and
+    /// the source/target fields of `createEdge`.
     ///
-    /// All updates run in a single write transaction.
+    /// All updates run in a single `modelContext.save()`.
     public func rewriteLocalId(from oldId: String, to newId: String) throws {
         guard oldId != newId else { return }
-        try pool.write { db in
-            // Fetch every row whose local_id matches — item-scoped mutations
-            // and the two edge endpoints all key off local_id for direct
-            // dependents. We still need to rewrite embedded payload ids
-            // field-by-field since the payload JSON holds them redundantly.
-            let rows = try PendingMutationRecord
-                .filter(Column("local_id") == oldId)
-                .fetchAll(db)
 
-            for row in rows {
-                // `createItem` is the source of truth for its own local id —
-                // leave it untouched. The reconciler only calls us after the
-                // createItem has been removed from the queue, so in practice
-                // this branch is a belt-and-braces guard.
-                if row.kind == .createItem { continue }
+        // Pass 1 — every row whose `localId` matches.
+        let directPredicate = #Predicate<PendingMutationModel> { $0.localId == oldId }
+        let directDescriptor = FetchDescriptor<PendingMutationModel>(predicate: directPredicate)
+        let direct = try modelContext.fetch(directDescriptor)
+        for model in direct {
+            // `createItem` is the source of truth for its own local id —
+            // leave it untouched. Belt-and-braces: the reconciler only
+            // calls us after `createItem` has been removed from the queue.
+            if model.kind == .createItem { continue }
+            let rewritten = try Self.rewritePayload(record: model.toRecord(), from: oldId, to: newId)
+            model.localId = newId
+            model.payloadJson = rewritten
+        }
 
-                let rewritten = try Self.rewritePayload(row: row, from: oldId, to: newId)
-                try db.execute(
-                    sql: """
-                        UPDATE pending_mutations
-                           SET local_id = ?,
-                               payload_json = ?
-                         WHERE id = ?
-                        """,
-                    arguments: [newId, rewritten, row.id]
-                )
-            }
-
-            // Edge rows with target == oldId aren't caught above because the
-            // edge's local_id is the edge id, not an endpoint id. Rewrite
-            // those by scanning the createEdge rows whose payload references
-            // the old id as target (source was already caught above via
-            // local_id? No — createEdge's local_id is the edge id. So scan
-            // all createEdge rows for either endpoint match).
-            let edgeRows = try PendingMutationRecord
-                .filter(Column("kind") == PendingMutationRecord.Kind.createEdge.rawValue)
-                .fetchAll(db)
-            for row in edgeRows {
-                let (rewritten, changed) = try Self.rewriteEdgeEndpoints(
-                    payloadJson: row.payloadJson, from: oldId, to: newId
-                )
-                if changed {
-                    try db.execute(
-                        sql: "UPDATE pending_mutations SET payload_json = ? WHERE id = ?",
-                        arguments: [rewritten, row.id]
-                    )
-                }
+        // Pass 2 — createEdge rows whose payload references oldId on
+        // the target side. Source-side matches are caught by pass 1
+        // since createEdge's localId is the edge id, not an endpoint.
+        let createEdgeRaw = MutationKind.createEdge.rawValue
+        let edgePredicate = #Predicate<PendingMutationModel> { $0.kindRaw == createEdgeRaw }
+        let edgeDescriptor = FetchDescriptor<PendingMutationModel>(predicate: edgePredicate)
+        let edges = try modelContext.fetch(edgeDescriptor)
+        for model in edges {
+            let (rewritten, changed) = try Self.rewriteEdgeEndpoints(
+                payloadJson: model.payloadJson, from: oldId, to: newId
+            )
+            if changed {
+                model.payloadJson = rewritten
             }
         }
+
+        try modelContext.save()
     }
 
     // MARK: - Cascade drop
@@ -538,7 +517,7 @@ public actor MutationQueue {
     /// don't spam 404s one-by-one on subsequent replay cycles.
     ///
     /// Cascade coverage:
-    /// - Item-scoped mutations keyed on `local_id`: `updateItem`,
+    /// - Item-scoped mutations keyed on `localId`: `updateItem`,
     ///   `deleteItem`, `restoreItem`, `transitionItem`, `purgeItem`,
     ///   `setMetadata`, `mergeMetadata`, `addTags`, `removeTag`,
     ///   `setExtension`, `deleteExtension`.
@@ -546,96 +525,87 @@ public actor MutationQueue {
     ///   `localId`.
     /// - `updateEdge` / `deleteEdge` rows keyed on an edge id that was
     ///   about to be created by one of the cascade-dropped `createEdge`
-    ///   rows. We never ship the edge to the server, so these follow-ups
-    ///   are guaranteed orphans.
+    ///   rows. We never ship the edge to the server, so these
+    ///   follow-ups are guaranteed orphans.
     ///
     /// The `createItem` record itself is *not* removed by this call —
     /// ``SyncEngine`` removes it first via ``remove(id:)`` so attempt
-    /// bookkeeping fires once for the root failure. `rewriteLocalId`'s
-    /// sibling comment applies.
+    /// bookkeeping fires once for the root failure.
     ///
-    /// Runs inside a single write transaction. Returns the cascade-deleted
-    /// records (excluding the already-removed `createItem` root) so the
-    /// caller can emit one ``SyncEvent/mutationDropped`` per orphan.
-    // Internal because `PendingMutationRecord` is an internal type — SDK
-    // consumers have no reason to reach into the queue directly; this API
-    // exists so `SyncEngine` can cascade-drop after a permanent `createItem`
-    // failure. Tests import `@testable` and can call it freely.
+    /// All deletes run in a single `modelContext.save()`. Returns the
+    /// cascade-deleted records (excluding the already-removed
+    /// `createItem` root) so the caller can emit one
+    /// ``SyncEvent/mutationDropped`` per orphan.
     @discardableResult
     func dropMutationsReferencingLocalId(_ localId: String) throws -> [PendingMutationRecord] {
-        try pool.write { db in
-            // Pass 1 — item-scope direct matches (local_id column).
-            let directMatches = try PendingMutationRecord
-                .filter(Column("local_id") == localId)
-                .fetchAll(db)
+        // Pass 1 — item-scope direct matches (`localId` column).
+        let directPredicate = #Predicate<PendingMutationModel> { $0.localId == localId }
+        let directDescriptor = FetchDescriptor<PendingMutationModel>(predicate: directPredicate)
+        let directMatches = try modelContext.fetch(directDescriptor)
+        let itemScopeDeletes = directMatches.filter { $0.kind != .createItem }
 
-            // `createItem` is owned by the caller's drop path; leave it for
-            // them to remove + emit their own event. Cascading drops for any
-            // *other* kind keyed off this local id — e.g. an earlier update
-            // queued against the same id — are this method's job.
-            let itemScopeDeletes = directMatches.filter { $0.kind != .createItem }
+        // Pass 2 — createEdge rows whose payload references `localId`.
+        let createEdgeRaw = MutationKind.createEdge.rawValue
+        let edgePredicate = #Predicate<PendingMutationModel> { $0.kindRaw == createEdgeRaw }
+        let edgeDescriptor = FetchDescriptor<PendingMutationModel>(predicate: edgePredicate)
+        let edgeCreates = try modelContext.fetch(edgeDescriptor)
 
-            // Pass 2 — createEdge rows whose payload references localId.
-            let allEdgeCreates = try PendingMutationRecord
-                .filter(Column("kind") == PendingMutationRecord.Kind.createEdge.rawValue)
-                .fetchAll(db)
-            var edgeCreateDeletes: [PendingMutationRecord] = []
-            var cascadedEdgeIds = Set<String>()
-            for row in allEdgeCreates {
-                let data = row.payloadJson.data(using: .utf8) ?? Data()
-                guard let payload = try? Self.decoder.decode(CreateEdgePayload.self, from: data) else {
-                    continue
-                }
-                if payload.source == localId || payload.target == localId {
-                    edgeCreateDeletes.append(row)
-                    if let edgeId = row.localId {
-                        cascadedEdgeIds.insert(edgeId)
-                    }
+        var edgeCreateDeletes: [PendingMutationModel] = []
+        var cascadedEdgeIds = Set<String>()
+        for model in edgeCreates {
+            let data = model.payloadJson.data(using: .utf8) ?? Data()
+            guard let payload = try? Self.decoder.decode(CreateEdgePayload.self, from: data) else {
+                continue
+            }
+            if payload.source == localId || payload.target == localId {
+                edgeCreateDeletes.append(model)
+                if let edgeId = model.localId {
+                    cascadedEdgeIds.insert(edgeId)
                 }
             }
-
-            // Pass 3 — orphaned updateEdge / deleteEdge follow-ups for any
-            // edge id we just cascade-deleted. Those edges never reach the
-            // server, so the follow-ups would 404 on replay.
-            var edgeFollowUpDeletes: [PendingMutationRecord] = []
-            if !cascadedEdgeIds.isEmpty {
-                let candidates = try PendingMutationRecord
-                    .filter([
-                        PendingMutationRecord.Kind.updateEdge.rawValue,
-                        PendingMutationRecord.Kind.deleteEdge.rawValue,
-                    ].contains(Column("kind")))
-                    .fetchAll(db)
-                for row in candidates {
-                    if let localId = row.localId, cascadedEdgeIds.contains(localId) {
-                        edgeFollowUpDeletes.append(row)
-                    }
-                }
-            }
-
-            let allDeletes = itemScopeDeletes + edgeCreateDeletes + edgeFollowUpDeletes
-            for row in allDeletes {
-                try db.execute(
-                    sql: "DELETE FROM pending_mutations WHERE id = ?",
-                    arguments: [row.id]
-                )
-            }
-            return allDeletes
         }
+
+        // Pass 3 — orphaned updateEdge / deleteEdge follow-ups for any
+        // edge id we just cascade-deleted. Those edges never reach the
+        // server, so the follow-ups would 404 on replay.
+        var edgeFollowUpDeletes: [PendingMutationModel] = []
+        if !cascadedEdgeIds.isEmpty {
+            let updateRaw = MutationKind.updateEdge.rawValue
+            let deleteRaw = MutationKind.deleteEdge.rawValue
+            let followUpPredicate = #Predicate<PendingMutationModel> { model in
+                model.kindRaw == updateRaw || model.kindRaw == deleteRaw
+            }
+            let followUpDescriptor = FetchDescriptor<PendingMutationModel>(predicate: followUpPredicate)
+            let candidates = try modelContext.fetch(followUpDescriptor)
+            for model in candidates {
+                if let id = model.localId, cascadedEdgeIds.contains(id) {
+                    edgeFollowUpDeletes.append(model)
+                }
+            }
+        }
+
+        let allDeletes = itemScopeDeletes + edgeCreateDeletes + edgeFollowUpDeletes
+        let snapshot = allDeletes.map { $0.toRecord() }
+        for model in allDeletes {
+            modelContext.delete(model)
+        }
+        try modelContext.save()
+        return snapshot
     }
 
-    // Rewrite the id fields inside a payload JSON for non-edge item-scoped
-    // mutations. Returns the rewritten JSON string.
+    // Rewrite the id fields inside a payload JSON for non-edge
+    // item-scoped mutations. Returns the rewritten JSON string.
     private static func rewritePayload(
-        row: PendingMutationRecord,
+        record: PendingMutationRecord,
         from oldId: String,
         to newId: String
     ) throws -> String {
-        let data = row.payloadJson.data(using: .utf8) ?? Data()
+        let data = record.payloadJson.data(using: .utf8) ?? Data()
         let encoded: Data
-        switch row.kind {
+        switch record.kind {
         case .createItem:
             // Left untouched at the call site; encode round-trip for safety.
-            return row.payloadJson
+            return record.payloadJson
 
         case .updateItem:
             var p = try decoder.decode(UpdateItemPayload.self, from: data)
@@ -705,17 +675,17 @@ public actor MutationQueue {
             encoded = try encoder.encode(p)
 
         case .uploadBlob:
-            // Blob uploads carry a content hash, not an item ID — nothing to
-            // rewrite when a createItem's local ID changes.
-            return row.payloadJson
+            // Blob uploads carry a content hash, not an item ID —
+            // nothing to rewrite when a createItem's local ID changes.
+            return record.payloadJson
         }
 
-        return String(data: encoded, encoding: .utf8) ?? row.payloadJson
+        return String(data: encoded, encoding: .utf8) ?? record.payloadJson
     }
 
-    // Rewrite source/target endpoints inside a createEdge payload. Returns
-    // the (possibly unchanged) JSON and a flag indicating whether any change
-    // was made.
+    // Rewrite source/target endpoints inside a createEdge payload.
+    // Returns the (possibly unchanged) JSON and a flag indicating
+    // whether any change was made.
     private static func rewriteEdgeEndpoints(
         payloadJson: String,
         from oldId: String,

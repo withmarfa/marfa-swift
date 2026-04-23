@@ -16,7 +16,11 @@ import SwiftData
 @Model
 final class PendingBlobModel {
     /// `"sha256:hex"` content address. Logical key.
-    var hash: String = ""
+    /// Renamed from `hash` because every Swift type carries a `hash`
+    /// method via `Hashable`; that conflict appears to confuse the
+    /// SwiftData runtime metadata pipeline (NSNumber/NSString cast
+    /// failure on save with the legacy name).
+    var contentHash: String = ""
 
     @Attribute(.externalStorage) var data: Data = Data()
 
@@ -26,5 +30,5 @@ final class PendingBlobModel {
 
     // MARK: - Indexes
 
-    #Index<PendingBlobModel>([\.hash])
+    #Index<PendingBlobModel>([\.contentHash])
 }

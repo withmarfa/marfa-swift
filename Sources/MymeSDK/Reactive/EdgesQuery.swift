@@ -1,13 +1,26 @@
 import Foundation
-import GRDB
 import Observation
+import SwiftData
+
+// MARK: - Predicate safety
+//
+// See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift`.
+// Predicates compare against stored String columns `sourceId`,
+// `targetId`, `edgeType`. The captured-value short-circuit pattern
+// (rule 8) handles the optional `edgeType` filter.
 
 // MARK: - EdgesQuery
 
-/// A live, observable query over edges from a source item.
+/// A live, observable query over edges from a source item or by type.
 ///
-/// The observation fires whenever any edge whose `source_id` equals `sourceId`
-/// changes — create, update, or delete.
+/// Two factory variants:
+/// - **Outbound**: ``MymeStore/queryEdges(from:edgeType:limit:)`` — all
+///   edges where `sourceId` matches.
+/// - **By type only**: ``MymeStore/queryEdges(ofType:limit:)`` —
+///   tenant-scoped, every edge of a given type.
+///
+/// Sorted by `createdAt` ascending. Updated on every applicable
+/// `ModelContext.didSave`.
 ///
 /// ## Usage
 ///
@@ -19,101 +32,71 @@ public final class EdgesQuery {
 
     // MARK: - Published state
 
-    /// Current list of edges, in creation order. Updated automatically.
     public private(set) var edges: [Edge] = []
-
-    /// `true` while the initial fetch is in flight.
     public private(set) var isLoading: Bool = true
-
-    /// Most recent observation error.
     public private(set) var error: Error?
 
     // MARK: - Internals
 
-    private var cancellable: AnyDatabaseCancellable?
+    private let context: ModelContext
+    private let sourceId: String?
+    private let edgeType: String?
+    private let limit: Int?
+    private var observer: RefetchObserver?
 
-    // MARK: - Init
+    // MARK: - Init (outbound)
 
-    /// Creates a live outbound-edge query.
-    ///
-    /// - Parameters:
-    ///   - pool: Shared ``DatabasePool`` from the ``LocalStore``.
-    ///   - sourceId: ID of the source item.
-    ///   - edgeType: Restrict to this edge type, or `nil` for all types.
-    ///   - limit: Optional cap on the result count.
-    init(pool: DatabasePool, sourceId: String, edgeType: String?, limit: Int?) {
-        let observation = ValueObservation.tracking { db -> [EdgeRecord] in
-            var query =
-                EdgeRecord
-                .filter(Column("source_id") == sourceId)
-                .order(Column("created_at").asc)
-            if let edgeType {
-                query = query.filter(Column("edge_type") == edgeType)
-            }
-            if let limit {
-                query = query.limit(limit)
-            }
-            return try query.fetchAll(db)
-        }
-
-        cancellable = observation.start(
-            in: pool,
-            scheduling: .mainActor,
-            onError: { [weak self] error in
-                self?.error = error
-                self?.isLoading = false
-            },
-            onChange: { [weak self] records in
-                self?.edges = records.compactMap { try? $0.toEdge() }
-                self?.isLoading = false
-                self?.error = nil
-            }
-        )
+    init(container: ModelContainer, sourceId: String, edgeType: String?, limit: Int?) {
+        self.context = ModelContext(container)
+        self.sourceId = sourceId
+        self.edgeType = edgeType
+        self.limit = limit
+        Task { @MainActor [weak self] in self?.refetch() }
+        self.observer = RefetchObserver { [weak self] in self?.refetch() }
     }
 
-    /// Creates a live query over **all edges of a given type** across the
-    /// entire local store. Used for taxonomy-style "show every reply"
-    /// surfaces — replaces the walk-every-item polling that consumers had
-    /// to write before this method existed.
-    ///
-    /// - Parameters:
-    ///   - pool: Shared ``DatabasePool`` from the ``LocalStore``.
-    ///   - edgeType: Edge type to track. Required (no global "all edges"
-    ///     variant — at that point the caller probably wants per-source
-    ///     filtering instead).
-    ///   - limit: Optional cap on the result count.
-    init(pool: DatabasePool, edgeType: String, limit: Int? = nil) {
-        let observation = ValueObservation.tracking { db -> [EdgeRecord] in
-            var query =
-                EdgeRecord
-                .filter(Column("edge_type") == edgeType)
-                .order(Column("created_at").asc)
-            if let limit {
-                query = query.limit(limit)
-            }
-            return try query.fetchAll(db)
-        }
+    // MARK: - Init (by type only)
 
-        cancellable = observation.start(
-            in: pool,
-            scheduling: .mainActor,
-            onError: { [weak self] error in
-                self?.error = error
-                self?.isLoading = false
-            },
-            onChange: { [weak self] records in
-                self?.edges = records.compactMap { try? $0.toEdge() }
-                self?.isLoading = false
-                self?.error = nil
+    init(container: ModelContainer, edgeType: String, limit: Int? = nil) {
+        self.context = ModelContext(container)
+        self.sourceId = nil
+        self.edgeType = edgeType
+        self.limit = limit
+        Task { @MainActor [weak self] in self?.refetch() }
+        self.observer = RefetchObserver { [weak self] in self?.refetch() }
+    }
+
+    // MARK: - Refetch
+
+    private func refetch() {
+        do {
+            let sourceFilter = sourceId ?? ""
+            let hasSourceFilter = sourceId != nil
+            let typeFilter = edgeType ?? ""
+            let hasTypeFilter = edgeType != nil
+            let predicate = #Predicate<MymeEdgeModel> { edge in
+                (!hasSourceFilter || edge.sourceId == sourceFilter) &&
+                (!hasTypeFilter   || edge.edgeType == typeFilter)
             }
-        )
+            var descriptor = FetchDescriptor<MymeEdgeModel>(
+                predicate: predicate,
+                sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+            )
+            if let limit { descriptor.fetchLimit = limit }
+            let models = try context.fetch(descriptor)
+            self.edges = models.map { $0.toWireEdge() }
+            self.isLoading = false
+            self.error = nil
+        } catch {
+            self.error = error
+            self.isLoading = false
+        }
     }
 
     // MARK: - Lifecycle
 
-    /// Stops the observation.
     public func stop() {
-        cancellable?.cancel()
-        cancellable = nil
+        observer?.cancel()
+        observer = nil
     }
 }
