@@ -10,7 +10,7 @@ import SwiftData
 /// off-main, then bind to the actor's executor.
 public enum MymeSDKTest {
 
-    /// Builds an in-memory ``ModelContainer`` against the v1 schema.
+    /// Builds an in-memory ``ModelContainer`` against the current schema.
     public static func makeInMemoryContainer() throws -> ModelContainer {
         try MymeModelContainer.make(path: ":memory:")
     }

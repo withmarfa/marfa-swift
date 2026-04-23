@@ -28,11 +28,11 @@ public enum MymeModelContainer {
     ) throws -> ModelContainer {
         if path == ":memory:" {
             return try ModelContainer(
-                for: Schema(MymeSchemaV1.models),
+                for: Schema(MymeSchemaV2.models),
                 migrationPlan: MymeMigrationPlan.self,
                 configurations: ModelConfiguration(
                     "myme",
-                    schema: Schema(MymeSchemaV1.models),
+                    schema: Schema(MymeSchemaV2.models),
                     isStoredInMemoryOnly: true,
                     cloudKitDatabase: .none
                 )
@@ -40,11 +40,11 @@ public enum MymeModelContainer {
         }
         let url = URL(fileURLWithPath: path)
         return try ModelContainer(
-            for: Schema(MymeSchemaV1.models),
+            for: Schema(MymeSchemaV2.models),
             migrationPlan: MymeMigrationPlan.self,
             configurations: ModelConfiguration(
                 "myme",
-                schema: Schema(MymeSchemaV1.models),
+                schema: Schema(MymeSchemaV2.models),
                 url: url,
                 allowsSave: true,
                 cloudKitDatabase: cloudKitDatabase

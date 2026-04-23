@@ -43,6 +43,11 @@ final class PendingMutationModel {
     /// Most recent error message from `recordFailure`. Optional.
     var lastError: String?
 
+    /// ISO 8601 timestamp of the last replay attempt. Nil until the first
+    /// attempt lands. Added in schema v2; lightweight migration leaves
+    /// pre-existing rows at nil.
+    var lastAttemptAt: String?
+
     init() {}
 
     // MARK: - Indexes
