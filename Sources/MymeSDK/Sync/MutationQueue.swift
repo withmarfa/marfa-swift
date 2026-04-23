@@ -191,6 +191,53 @@ public actor MutationQueue {
     private static let encoder = JSONEncoder()
     private static let decoder = JSONDecoder()
 
+    // MARK: - Enqueue event broadcast
+    //
+    // Each successful enqueue yields once to every active subscriber on the
+    // `enqueueEvents` stream. The `SyncEngine` listens to this stream and
+    // schedules a debounced proactive drain, closing the gap where writes
+    // sat in the queue until an SSE stream happened to close. The continuation
+    // set mirrors `ConnectionStateManager.continuations` — UUID-keyed
+    // dictionary, hopped into from the nonisolated factory via a `Task`.
+
+    private var enqueueContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
+
+    /// Stream that yields once after every successful enqueue (including
+    /// `enqueueBlobUpload`). Yields `Void` — subscribers treat it as a
+    /// "something happened" pulse and query the queue for detail.
+    ///
+    /// `nonisolated` so callers subscribe without an actor hop; registration
+    /// and any per-continuation cleanup happen inside internal actor-isolated
+    /// tasks. Shape matches `ConnectionStateManager.stateUpdates`.
+    public nonisolated var enqueueEvents: AsyncStream<Void> {
+        AsyncStream { continuation in
+            let id = UUID()
+            Task { await self.subscribeEnqueue(id: id, continuation: continuation) }
+            continuation.onTermination = { [weak self] _ in
+                Task { [weak self] in
+                    await self?.removeEnqueueContinuation(id: id)
+                }
+            }
+        }
+    }
+
+    private func subscribeEnqueue(
+        id: UUID,
+        continuation: AsyncStream<Void>.Continuation
+    ) {
+        enqueueContinuations[id] = continuation
+    }
+
+    private func removeEnqueueContinuation(id: UUID) {
+        enqueueContinuations.removeValue(forKey: id)
+    }
+
+    private func notifyEnqueued() {
+        for continuation in enqueueContinuations.values {
+            continuation.yield(())
+        }
+    }
+
     // MARK: - Enqueue helpers
 
     private func enqueue(
@@ -216,8 +263,10 @@ public actor MutationQueue {
         model.createdAt = now
         model.attemptCount = 0
         model.lastError = nil
+        model.lastAttemptAt = nil
         modelContext.insert(model)
         try modelContext.save()
+        notifyEnqueued()
     }
 
     // MARK: - Enqueue public API
@@ -367,10 +416,12 @@ public actor MutationQueue {
         model.createdAt = now
         model.attemptCount = 0
         model.lastError = nil
+        model.lastAttemptAt = nil
         modelContext.insert(model)
 
         // One save commits both rows as a single SQLite transaction.
         try modelContext.save()
+        notifyEnqueued()
     }
 
     // MARK: - Pending blob access

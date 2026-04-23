@@ -95,6 +95,40 @@ public actor SyncEngine {
     private let cursorKey = "last_event_id"
     private let fullSyncKey = "last_full_sync_at"
 
+    // MARK: - Proactive drain
+
+    /// Observer task that subscribes to ``MutationQueue/enqueueEvents`` and
+    /// schedules a debounced proactive drain on each pulse. Spawned from
+    /// ``start()``, cancelled from ``stop()``.
+    private var enqueueObserverTask: Task<Void, Never>?
+
+    /// Pending debounce task for the proactive drain. Cancelled and replaced
+    /// on every new enqueue pulse, so a burst of writes (bulk-tag, multi-item
+    /// paste) coalesces into a single drain round-trip.
+    private var proactiveDebounceTask: Task<Void, Never>?
+
+    /// `true` while a drain cycle is executing. Set at the top of
+    /// ``replayMutations()`` and cleared in the `defer`. Gates re-entry so
+    /// the proactive path and the SSE-close path can't overlap.
+    private var drainInFlight = false
+
+    /// Flag set when a drain trigger arrives while another drain is already
+    /// running. The in-flight drain's `defer` checks this flag and schedules
+    /// a follow-up drain so late enqueues aren't stranded.
+    private var drainRerunRequested = false
+
+    /// Debounce window for the proactive drain. 200 ms captures realistic
+    /// burst windows (bulk tag operations, multi-item paste) without
+    /// user-perceived lag. Internal so tests can compress it.
+    internal var proactiveDrainDebounceMillis: Int = 200
+
+    /// Actor-isolated test seam — tests compress the proactive drain debounce
+    /// to sub-100-ms so the suite stays snappy without sleeping 200 ms per
+    /// enqueue scenario.
+    internal func setProactiveDrainDebounceForTesting(millis: Int) {
+        self.proactiveDrainDebounceMillis = millis
+    }
+
     // MARK: - Event stream
 
     /// Reactive stream of typed sync events for app subscribers (e.g. a
@@ -199,6 +233,9 @@ public actor SyncEngine {
         streamTask = Task { [weak self] in
             await self?.runLoop()
         }
+        enqueueObserverTask = Task { [weak self] in
+            await self?.observeEnqueues()
+        }
     }
 
     /// Stops the sync engine and cancels the active SSE connection. Also stops
@@ -210,6 +247,10 @@ public actor SyncEngine {
         streamTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
+        enqueueObserverTask?.cancel()
+        enqueueObserverTask = nil
+        proactiveDebounceTask?.cancel()
+        proactiveDebounceTask = nil
         await connectionManager.stop()
     }
 
@@ -312,11 +353,9 @@ public actor SyncEngine {
             errored = true
         }
 
-        // Stream ended or errored — drain the mutation queue and go online.
+        // Stream ended or errored — drain the mutation queue. `replayMutations`
+        // owns the terminal `markOnline` transition so we don't have to.
         await replayMutations()
-        if running {
-            await connectionManager.markOnline()
-        }
 
         // Reconnect nudge. Without this, a closed-but-not-errored SSE stream
         // (server-side idle timeout, catchup_too_old finalise, transport
@@ -491,12 +530,70 @@ public actor SyncEngine {
         }
     }
 
+    // MARK: - Proactive drain (observer + debounce)
+
+    private func observeEnqueues() async {
+        for await _ in mutationQueue.enqueueEvents {
+            guard running else { break }
+            scheduleProactiveDrain()
+        }
+    }
+
+    private func scheduleProactiveDrain() {
+        proactiveDebounceTask?.cancel()
+        let ms = proactiveDrainDebounceMillis
+        proactiveDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(ms))
+            if Task.isCancelled { return }
+            await self?.runProactiveDrain()
+        }
+    }
+
+    private func runProactiveDrain() async {
+        guard running else { return }
+        let state = await connectionManager.state
+        // `.offline` — no point attempting; enqueue stays in the queue.
+        // `.syncing` — a drain is already in flight; the in-flight drain's
+        // `drainRerunRequested` hook re-schedules on exit.
+        // `.connecting` / `.online` — attempt the drain; `replayMutations`
+        // is reentrant via `drainInFlight`.
+        switch state {
+        case .offline, .syncing:
+            return
+        case .connecting, .online:
+            break
+        }
+        await replayMutations()
+    }
+
     // MARK: - Mutation replay
 
     private func replayMutations() async {
+        // Re-entry guard. The proactive path, the SSE-close path, and a
+        // ``catchup_too_old`` finalise can all call this; without the guard
+        // two drains could race and touch the same mutation row. If another
+        // drain is already running, flag a follow-up drain so late enqueues
+        // aren't stranded at the end of the current cycle.
+        if drainInFlight {
+            drainRerunRequested = true
+            return
+        }
+        drainInFlight = true
+        defer {
+            drainInFlight = false
+            if drainRerunRequested {
+                drainRerunRequested = false
+                scheduleProactiveDrain()
+            }
+        }
+
         guard let pending = try? await mutationQueue.fetchAll(), !pending.isEmpty else {
-            // Nothing to replay; signal a clean sync if the engine is up.
+            // Nothing to replay; signal a clean sync and settle to online
+            // if the engine is up. The terminal markOnline mirrors the
+            // non-empty path so the state machine always lands on `.online`
+            // after a drain, regardless of queue size.
             if running { emit(.synced(at: Date())) }
+            if running { await connectionManager.markOnline() }
             return
         }
 
@@ -599,6 +696,15 @@ public actor SyncEngine {
                     pendingCreateIds.insert(localId)
                 }
             }
+        }
+
+        // Terminal state flip. Moved inside `replayMutations` so every call
+        // site — SSE-close, proactive drain, `catchup_too_old` finalise —
+        // lands in the same `.online` steady state without each caller
+        // having to remember to flip. `markOnline` is idempotent so the
+        // empty-queue early return above calls it safely too.
+        if running {
+            await connectionManager.markOnline()
         }
 
         if let transientError {
