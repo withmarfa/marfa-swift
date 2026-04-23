@@ -1,15 +1,16 @@
 // CloudKit readiness smoke test for the v1 SwiftData schema.
 //
-// Builds a `ModelContainer` against a developer's CloudKit container.
+// Builds a `ModelContainer` against a developer's CloudKit container via
+// the SDK's public `MymeModelContainer.make(path:cloudKitDatabase:)`.
 // SwiftData validates the schema against CloudKit constraints at init
 // time — `#Unique`, missing inverses, `.deny` rules, missing defaults,
 // `description` collisions all surface here.
 //
 // The smoke test does NOT insert rows. Inserting requires the model
-// types to be public (they're internal — only `MymeModelContainer` is
-// SPI-exposed). Schema validation catches the bulk of CloudKit
-// incompatibilities; for end-to-end "actually save under CloudKit
-// mirroring" coverage, run the consumer app's Phase-2 integration
+// types to be public (they're internal — consumers interact with the
+// store through ``MymeClient``). Schema validation catches the bulk of
+// CloudKit incompatibilities; for end-to-end "actually save under
+// CloudKit mirroring" coverage, run the consumer app's integration
 // tests against the same container.
 //
 // Not in CI — GitHub runners don't carry CloudKit entitlements. Run
@@ -20,7 +21,7 @@
 
 import Foundation
 import SwiftData
-@_spi(MymeSDKTestSupport) import MymeSDK
+import MymeSDK
 
 @main
 struct CloudKitSmoke {
@@ -38,16 +39,9 @@ struct CloudKitSmoke {
                 .temporaryDirectory
                 .appendingPathComponent("cloudkit-smoke-\(UUID().uuidString).sqlite")
 
-            let cfg = ModelConfiguration(
-                "myme",
-                schema: Schema(MymeSchemaV1.models),
-                url: url,
+            _ = try MymeModelContainer.make(
+                path: url.path,
                 cloudKitDatabase: .private(containerID)
-            )
-            _ = try ModelContainer(
-                for: Schema(MymeSchemaV1.models),
-                migrationPlan: MymeMigrationPlan.self,
-                configurations: cfg
             )
 
             print("OK — schema validated against CloudKit container \(containerID)")

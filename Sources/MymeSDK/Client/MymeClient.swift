@@ -1,10 +1,6 @@
 import Foundation
 import SwiftData
 
-// `MymeModelContainer` is `@_spi(MymeSDKTestSupport) public` so external
-// test targets can construct in-memory containers; inside the SDK module
-// it's freely accessible.
-
 /// Client for the Myme API.
 ///
 /// Provides namespaced access to all API endpoints:
@@ -144,6 +140,13 @@ public final class MymeClient: Sendable {
     /// resolve against the local store. Pass `":memory:"` for an
     /// ephemeral store (useful in tests).
     ///
+    /// This is a convenience over ``MymeClient/local(container:)`` for
+    /// callers who want the SDK to build the container for them.
+    /// Consumers that need to configure the container directly — for
+    /// example to enable CloudKit mirroring via
+    /// `MymeModelContainer.make(path:cloudKitDatabase:)` — should build
+    /// the container themselves and call ``MymeClient/local(container:)``.
+    ///
     /// `async` because the underlying `LocalStore` is constructed off
     /// the main actor via `Task.detached` — `@ModelActor`'s synthesised
     /// init binds the actor's executor to whatever actor calls it, so
@@ -154,6 +157,33 @@ public final class MymeClient: Sendable {
     ///   migrated.
     public static func local(path: String) async throws -> MymeClient {
         let container = try MymeModelContainer.make(path: path)
+        return try await local(container: container)
+    }
+
+    /// Creates a pure-local client backed by a caller-supplied
+    /// ``ModelContainer``.
+    ///
+    /// Use this when you need to control how the container is built —
+    /// for example, to enable CloudKit mirroring by passing
+    /// `cloudKitDatabase: .automatic(containerIdentifier: "iCloud.…")` to
+    /// ``MymeModelContainer/make(path:cloudKitDatabase:)``:
+    ///
+    ///     let container = try MymeModelContainer.make(
+    ///         path: path,
+    ///         cloudKitDatabase: .automatic(containerIdentifier: "iCloud.example.app")
+    ///     )
+    ///     let client = try await MymeClient.local(container: container)
+    ///
+    /// All namespace calls resolve against the local store; no server URL
+    /// or API key is required. The transport is never invoked in
+    /// pure-local mode.
+    ///
+    /// `async` because the underlying `LocalStore` is constructed off
+    /// the main actor via `Task.detached` — `@ModelActor`'s synthesised
+    /// init binds the actor's executor to whatever actor calls it, so
+    /// calling from `@MainActor` would silently route every method onto
+    /// the main thread.
+    public static func local(container: ModelContainer) async throws -> MymeClient {
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
         // The transport is never invoked in pure-local mode: every
         // namespace method checks `localStore` first before touching the

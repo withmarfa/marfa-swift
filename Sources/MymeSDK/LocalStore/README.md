@@ -3,7 +3,9 @@
 Persistent on-device store for the SDK. Backed by SwiftData with a
 CloudKit-compatible v1 schema (`MymeSchemaV1`). Two `@ModelActor`s
 (`LocalStore` and `MutationQueue`) share a single `ModelContainer`
-constructed via `MymeModelContainer.make(path:)`.
+constructed via `MymeModelContainer.make(path:cloudKitDatabase:)`.
+Pass `cloudKitDatabase: .automatic(containerIdentifier: "iCloud.…")`
+to mirror through CloudKit; omit it for pure-local (default `.none`).
 
 ## Schema
 
