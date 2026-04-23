@@ -85,17 +85,6 @@ fileprivate actor BlockingTransport: Transport {
 @Suite("SyncEngine")
 struct SyncEngineTests {
 
-    // MARK: - Helpers
-
-    private func makeStoreAndQueue() async throws -> (LocalStore, MutationQueue) {
-        let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
-        return (store, queue)
-    }
-
-    private func noteInput(body: String = "Hello") -> CreateItemInput {
-        CreateItemInput(type: "core.note", properties: ["body": .string(body)])
-    }
-
     // MARK: - MutationQueue unit tests
 
     @Suite("MutationQueue")
