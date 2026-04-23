@@ -9,10 +9,10 @@ import SwiftData
 /// Version `1.0.0` per Apple's `Schema.Version` semantics (major.minor.patch).
 /// `models` is the canonical list of `@Model` types in this version — the
 /// `ModelContainer` constructor reflects on these for validation.
-enum MymeSchemaV1: VersionedSchema {
-    static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
+@_spi(MymeSDKTestSupport) public enum MymeSchemaV1: VersionedSchema {
+    public static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
-    static var models: [any PersistentModel.Type] {
+    public static var models: [any PersistentModel.Type] {
         [
             MymeItemModel.self,
             MymeEdgeModel.self,

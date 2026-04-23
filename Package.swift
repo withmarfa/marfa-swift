@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "MymeSDKTestSupport", targets: ["MymeSDKTestSupport"]),
         .executable(name: "codegen-custom-types", targets: ["codegen-custom-types"]),
         .executable(name: "sync-custom-types", targets: ["sync-custom-types"]),
+        .executable(name: "cloudkit-smoke", targets: ["cloudkit-smoke"]),
         .plugin(name: "GenerateMymeCustomTypes", targets: ["GenerateMymeCustomTypes"]),
     ],
     dependencies: [
@@ -44,6 +45,7 @@ let package = Package(
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
                 "sync-types.sh", "codegen-domain.swift",
                 "MymeCodegenCore", "codegen-custom-types", "sync-custom-types",
+                "cloudkit-smoke",
             ],
             sources: ["codegen-wire.swift"]
         ),
@@ -54,6 +56,7 @@ let package = Package(
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
                 "sync-types.sh", "codegen-wire.swift",
                 "MymeCodegenCore", "codegen-custom-types", "sync-custom-types",
+                "cloudkit-smoke",
             ],
             sources: ["codegen-domain.swift"]
         ),
@@ -106,6 +109,14 @@ let package = Package(
             name: "CodegenCompileCheckTests",
             dependencies: ["MymeSDK"],
             path: "Tests/CodegenCustomTypesTests/CompileCheck"
+        ),
+
+        // MARK: - CloudKit readiness smoke (manual)
+
+        .executableTarget(
+            name: "cloudkit-smoke",
+            dependencies: ["MymeSDK"],
+            path: "scripts/cloudkit-smoke"
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -12,12 +12,12 @@ import SwiftData
 /// append `MymeSchemaV2.self` to `schemas`, and add a `MigrationStage`
 /// (lightweight or custom) to `stages`. The plan must list every prior
 /// version it knows how to migrate forward from.
-enum MymeMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] {
+@_spi(MymeSDKTestSupport) public enum MymeMigrationPlan: SchemaMigrationPlan {
+    public static var schemas: [any VersionedSchema.Type] {
         [MymeSchemaV1.self]
     }
 
-    static var stages: [MigrationStage] {
+    public static var stages: [MigrationStage] {
         []
     }
 }
