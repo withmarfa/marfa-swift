@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import MymeSDK
+@_spi(MymeSDKTestSupport) import MymeSDK
 @testable import MymeSDKTestSupport
 import SwiftData
 
@@ -84,6 +85,41 @@ fileprivate actor BlockingTransport: Transport {
 /// network or on-disk state.
 @Suite("SyncEngine")
 struct SyncEngineTests {
+
+    // MARK: - Schema v2 migration shape
+
+    @Suite("Schema v2")
+    struct SchemaV2Tests {
+        @Test("V2 models list adds DroppedMutationModel over V1")
+        func v2AddsDroppedMutation() {
+            let v1Names = Set(MymeSchemaV1.models.map { String(describing: $0) })
+            let v2Names = Set(MymeSchemaV2.models.map { String(describing: $0) })
+            // V2 is V1 plus exactly one type.
+            #expect(v1Names.isSubset(of: v2Names))
+            let added = v2Names.subtracting(v1Names)
+            #expect(added == ["DroppedMutationModel"])
+        }
+
+        @Test("MigrationPlan declares lightweight V1 -> V2 stage")
+        func migrationPlanHasLightweightStage() {
+            let schemas = MymeMigrationPlan.schemas
+            #expect(schemas.count == 2)
+            let stages = MymeMigrationPlan.stages
+            #expect(stages.count == 1)
+            // MigrationStage doesn't expose its kind publicly, but the
+            // description string carries "lightweight" for lightweight
+            // stages. Belt-and-braces check.
+            #expect(String(describing: stages[0]).lowercased().contains("lightweight"))
+        }
+
+        @Test("V2 version identifier is 2.0.0")
+        func v2VersionIs2() {
+            let v = MymeSchemaV2.versionIdentifier
+            #expect(v.major == 2)
+            #expect(v.minor == 0)
+            #expect(v.patch == 0)
+        }
+    }
 
     // MARK: - MutationQueue unit tests
 
@@ -241,6 +277,207 @@ struct SyncEngineTests {
             #expect(payload.version == nil)
             #expect(payload.conflict == nil)
             #expect(payload.library == nil)
+        }
+
+        // MARK: - 4.3.0: Proactive-drain enqueue event stream
+
+        @Test("enqueueEvents yields once per successful enqueue") func enqueueEventsStream() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+
+            // Subscribe before enqueuing so the continuation is registered.
+            let stream = queue.enqueueEvents
+            let collector = Task { () -> Int in
+                var count = 0
+                for await _ in stream {
+                    count += 1
+                    if count == 3 { return count }
+                }
+                return count
+            }
+
+            // Give the subscription Task time to register on the actor.
+            try await Task.sleep(for: .milliseconds(20))
+
+            try await queue.enqueueDeleteItem(id: "a")
+            try await queue.enqueueDeleteItem(id: "b")
+            try await queue.enqueueDeleteItem(id: "c")
+
+            // Bound the wait.
+            let race = Task { () -> Int in
+                try? await Task.sleep(for: .milliseconds(200))
+                collector.cancel()
+                return -1
+            }
+            let received = await collector.value
+            race.cancel()
+            #expect(received == 3)
+        }
+
+        @Test("enqueueBlobUpload also yields on enqueueEvents") func enqueueEventsForBlob() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            let stream = queue.enqueueEvents
+            let collector = Task { () -> Bool in
+                var iter = stream.makeAsyncIterator()
+                return await iter.next() != nil
+            }
+            try await Task.sleep(for: .milliseconds(20))
+            try await queue.enqueueBlobUpload(
+                hash: "sha256:abc", data: Data("hi".utf8), mimeType: "text/plain"
+            )
+
+            let race = Task {
+                try? await Task.sleep(for: .milliseconds(200))
+                collector.cancel()
+            }
+            let received = await collector.value
+            race.cancel()
+            #expect(received == true)
+        }
+
+        // MARK: - 4.3.0: Per-mutation status
+
+        @Test("recordFailure stamps lastAttemptAt on next fetch") func recordFailureStampsLastAttempt() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            try await queue.enqueueDeleteItem(id: "item-1")
+            var records = try await queue.fetchAll()
+            #expect(records[0].lastAttemptAt == nil)
+
+            try await queue.recordFailure(id: records[0].id, error: "boom")
+            records = try await queue.fetchAll()
+            #expect(records[0].lastAttemptAt != nil)
+            // Parses as a real ISO 8601 timestamp.
+            let parsed = try? Date(records[0].lastAttemptAt!, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            #expect(parsed != nil)
+        }
+
+        @Test("snapshots reports pending/failed/inFlight correctly") func snapshotsStatusMapping() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            try await queue.enqueueDeleteItem(id: "pending-1")
+            try await queue.enqueueDeleteItem(id: "failed-1")
+            try await queue.enqueueDeleteItem(id: "in-flight-1")
+
+            let records = try await queue.fetchAll()
+            let pendingId = records.first { $0.localId == "pending-1" }!.id
+            let failedId = records.first { $0.localId == "failed-1" }!.id
+            let inFlightId = records.first { $0.localId == "in-flight-1" }!.id
+
+            try await queue.recordFailure(id: failedId, error: "server_error")
+
+            let snapshots = try await queue.snapshots(inFlight: [inFlightId])
+            let byId = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.id, $0) })
+
+            #expect(byId[pendingId]?.status == .pending)
+            if case let .failed(err, _) = byId[failedId]?.status {
+                #expect(err == "server_error")
+            } else {
+                Issue.record("expected .failed status for failed mutation")
+            }
+            #expect(byId[inFlightId]?.status == .inFlight)
+        }
+
+        @Test("snapshots ordering matches fetchAll (createdAt asc)") func snapshotsOrdering() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            try await queue.enqueueDeleteItem(id: "a")
+            try await queue.enqueueDeleteItem(id: "b")
+            try await queue.enqueueDeleteItem(id: "c")
+
+            let snaps = try await queue.snapshots(inFlight: [])
+            #expect(snaps.count == 3)
+            // Creation order must be preserved.
+            #expect(snaps[0].createdAt <= snaps[1].createdAt)
+            #expect(snaps[1].createdAt <= snaps[2].createdAt)
+        }
+
+        // MARK: - 4.3.0: Dropped mutation log
+
+        @Test("removeAndRecordDropped atomically removes and logs") func removeAndRecordDropped() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            try await queue.enqueueUpdateItem(id: "item-1", properties: ["body": .string("x")])
+            let records = try await queue.fetchAll()
+            let record = records[0]
+
+            let err = NotFoundError(message: "Item not found")
+            try await queue.removeAndRecordDropped(record: record, error: err)
+
+            // Queue is empty.
+            #expect(try await queue.isEmpty)
+            // Dropped log has our entry.
+            let dropped = try await queue.fetchAllDropped()
+            #expect(dropped.count == 1)
+            #expect(dropped[0].id == record.id)
+            #expect(dropped[0].kind == .updateItem)
+            #expect(dropped[0].itemId == "item-1")
+            #expect(dropped[0].errorCode == "not_found")
+            #expect(dropped[0].errorStatus == 404)
+            #expect(dropped[0].errorMessage == "Item not found")
+            // Payload preserved verbatim.
+            #expect(dropped[0].payloadJson == record.payloadJson)
+        }
+
+        @Test("cascade drop with error populates dropped log for each orphan") func cascadeDropPopulatesLog() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            // createItem + dependent updateItem + setMetadata, all keyed on "li".
+            let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+            try await queue.enqueueCreateItem(input, localId: "li")
+            try await queue.enqueueUpdateItem(id: "li", properties: ["body": .string("y")])
+            try await queue.enqueueSetMetadata(itemId: "li", input: MetadataInput(tags: ["t"]))
+            #expect(try await queue.fetchAll().count == 3)
+
+            // Remove the createItem (matches how SyncEngine does it), then
+            // cascade with error — the two follow-ups end up in the log.
+            let create = try await queue.fetchAll().first { $0.kind == .createItem }!
+            try await queue.remove(id: create.id)
+            let err = NotFoundError(message: "gone")
+            let cascaded = try await queue.dropMutationsReferencingLocalId("li", error: err)
+            #expect(cascaded.count == 2)
+            #expect(try await queue.isEmpty)
+
+            let logged = try await queue.fetchAllDropped()
+            #expect(logged.count == 2)
+            // Both logged entries carry the root error.
+            #expect(logged.allSatisfy { $0.errorCode == "not_found" })
+            #expect(logged.allSatisfy { $0.itemId == "li" })
+        }
+
+        @Test("fetchAllDropped returns newest first") func droppedNewestFirst() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            try await queue.enqueueDeleteItem(id: "a")
+            let recA = try await queue.fetchAll()[0]
+            try await queue.removeAndRecordDropped(record: recA, error: NotFoundError(message: "x"))
+            try await Task.sleep(for: .milliseconds(20))
+
+            try await queue.enqueueDeleteItem(id: "b")
+            let recB = try await queue.fetchAll()[0]
+            try await queue.removeAndRecordDropped(record: recB, error: NotFoundError(message: "x"))
+
+            let dropped = try await queue.fetchAllDropped()
+            #expect(dropped.count == 2)
+            // Newest (`b`) first.
+            #expect(dropped[0].itemId == "b")
+            #expect(dropped[1].itemId == "a")
+        }
+
+        @Test("removeDropped is idempotent on unknown id") func removeDroppedIdempotent() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            // No exception thrown for a non-existent id.
+            try await queue.removeDropped(id: "does-not-exist")
+            let logged = try await queue.fetchAllDropped()
+            #expect(logged.isEmpty)
+        }
+
+        @Test("purgeAllDropped returns count") func purgeAllDroppedReturnsCount() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+            for letter in ["a", "b", "c"] {
+                try await queue.enqueueDeleteItem(id: letter)
+                let rec = try await queue.fetchAll().first { $0.localId == letter }!
+                try await queue.removeAndRecordDropped(record: rec, error: NotFoundError(message: "x"))
+            }
+            let count = try await queue.purgeAllDropped()
+            #expect(count == 3)
+            #expect(try await queue.fetchAllDropped().isEmpty)
+            // Purge on empty log returns 0.
+            let second = try await queue.purgeAllDropped()
+            #expect(second == 0)
         }
     }
 
@@ -1325,6 +1562,208 @@ struct SyncEngineTests {
             )
             let second = await engine2.lastFullSyncAt
             #expect(second == first)
+        }
+
+        // MARK: - 4.3.0: Proactive drain
+
+        @Test("proactive drain fires when enqueue arrives while online")
+        func proactiveDrainFiresWhenOnline() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
+
+            // Compress the debounce so the test isn't held by the 200 ms default.
+            await engine.setProactiveDrainDebounceForTesting(millis: 10)
+
+            // Start the engine and put connection state at `.online` so the
+            // proactive path's state guard passes. Skip `.connecting` so no
+            // SSE stream opens — keeps the test hermetic.
+            await engine.start()
+            // Give observeEnqueues a moment to subscribe.
+            try await Task.sleep(for: .milliseconds(50))
+            await connManager.applyStateForTesting(.online)
+
+            // Enqueue a DELETE for a server item; the server responds OK.
+            struct Empty: Encodable {}
+            transport.enqueue(Empty())
+            try await queue.enqueueDeleteItem(id: "server-x")
+
+            // The proactive drain should remove the row without us touching
+            // the SSE stream.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+            await engine.stop()
+        }
+
+        @Test("proactive drain is skipped when offline")
+        func proactiveDrainSkippedWhenOffline() async throws {
+            let (_, queue, _, connManager, engine) = try await makeFixture()
+            await engine.setProactiveDrainDebounceForTesting(millis: 10)
+
+            await engine.start()
+            try await Task.sleep(for: .milliseconds(50))
+            // Leave state at `.offline` (the engine's default initial).
+            await connManager.applyStateForTesting(.offline)
+
+            try await queue.enqueueDeleteItem(id: "ghost")
+
+            // Wait long enough that a drain WOULD have happened if the
+            // guard were missing.
+            try await Task.sleep(for: .milliseconds(150))
+
+            // Mutation still queued — no replay happened.
+            #expect(try await queue.fetchAll().count == 1)
+            await engine.stop()
+        }
+
+        @Test("proactive drain debounce coalesces a burst into one round-trip")
+        func proactiveDrainDebouncesBurst() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
+            await engine.setProactiveDrainDebounceForTesting(millis: 50)
+
+            await engine.start()
+            try await Task.sleep(for: .milliseconds(50))
+            await connManager.applyStateForTesting(.online)
+
+            // 5 mutations arrive in a tight burst — each DELETE needs a
+            // response queued.
+            struct Empty: Encodable {}
+            for _ in 0..<5 { transport.enqueue(Empty()) }
+            for letter in ["a", "b", "c", "d", "e"] {
+                try await queue.enqueueDeleteItem(id: letter)
+            }
+
+            // The drain should process all 5 in one debounced cycle.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+            await engine.stop()
+        }
+
+        // MARK: - 4.3.0: lastFullSync structured snapshot
+
+        @Test("lastFullSync nil before any drain")
+        func lastFullSyncNilBeforeAnyDrain() async throws {
+            let (_, _, _, _, engine) = try await makeFixture()
+            let snapshot = await engine.lastFullSync
+            #expect(snapshot == nil)
+        }
+
+        @Test("lastFullSync populated with cursor after clean drain")
+        func lastFullSyncAfterCleanDrain() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
+
+            // Pre-seed the SSE cursor — the checkpoint snapshots it.
+            try await queue.saveSyncState(key: "last_event_id", value: "evt-42")
+
+            // Empty SSE stream followed by a drain — clean close, no errors.
+            transport.enqueueEvents([])
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await engine.lastFullSync != nil
+            }
+            let snap = await engine.lastFullSync
+            #expect(snap?.cursor == "evt-42")
+            #expect(snap?.completedAt != nil)
+            await engine.stop()
+        }
+
+        // MARK: - 4.3.0: Per-mutation status via SyncEngine
+
+        @Test("pendingMutations returns snapshots matching the queue")
+        func pendingMutationsReturnsSnapshots() async throws {
+            let (_, queue, _, _, engine) = try await makeFixture()
+
+            try await queue.enqueueDeleteItem(id: "a")
+            try await queue.enqueueDeleteItem(id: "b")
+
+            let snapshots = try await engine.pendingMutations()
+            #expect(snapshots.count == 2)
+            #expect(snapshots.allSatisfy { $0.status == .pending })
+        }
+
+        // MARK: - 4.3.0: Dropped mutation log via SyncEngine
+
+        @Test("dropped mutation persists through SyncEngine API")
+        func droppedMutationPersistsViaSyncEngine() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
+
+            try await queue.enqueueUpdateItem(
+                id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+                properties: ["body": .string("stale")]
+            )
+
+            transport.enqueueEvents([])
+            transport.enqueueError(NotFoundError(message: "Item not found"))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                let count = try? await engine.droppedMutations().count
+                return (count ?? 0) >= 1
+            }
+
+            let dropped = try await engine.droppedMutations()
+            #expect(dropped.count == 1)
+            #expect(dropped[0].kind == .updateItem)
+            #expect(dropped[0].errorCode == "not_found")
+            #expect(dropped[0].errorStatus == 404)
+
+            // Purge one by id.
+            try await engine.purgeDroppedMutation(id: dropped[0].id)
+            #expect(try await engine.droppedMutations().isEmpty)
+            await engine.stop()
+        }
+
+        @Test("purgeAllDroppedMutations returns count")
+        func purgeAllDroppedReturnsCount() async throws {
+            let (_, queue, _, _, engine) = try await makeFixture()
+
+            // Seed two dropped entries via the queue directly.
+            for letter in ["a", "b"] {
+                try await queue.enqueueDeleteItem(id: letter)
+                let rec = try await queue.fetchAll().first { $0.localId == letter }!
+                try await queue.removeAndRecordDropped(record: rec, error: NotFoundError(message: "x"))
+            }
+
+            let purged = try await engine.purgeAllDroppedMutations()
+            #expect(purged == 2)
+            #expect(try await engine.droppedMutations().isEmpty)
+        }
+
+        @Test("cascade drop logs every orphan in the dropped list")
+        func cascadeDropLogsOrphans() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
+
+            // createItem + two follow-ups keyed on the same local id.
+            let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+            try await queue.enqueueCreateItem(input, localId: "li")
+            try await queue.enqueueUpdateItem(id: "li", properties: ["body": .string("y")])
+            try await queue.enqueueSetMetadata(itemId: "li", input: MetadataInput(tags: ["t"]))
+
+            transport.enqueueEvents([])
+            // createItem fails permanently — everything keyed on `li` cascades.
+            transport.enqueueError(ValidationError(message: "invalid"))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await engine.droppedMutations().count) ?? 0 >= 3
+            }
+
+            let dropped = try await engine.droppedMutations()
+            // All 3 mutations (createItem root + 2 cascade orphans) logged.
+            #expect(dropped.count == 3)
+            let kinds = Set(dropped.map { $0.kind })
+            #expect(kinds == Set([.createItem, .updateItem, .setMetadata]))
+            #expect(dropped.allSatisfy { $0.errorCode == "validation_error" })
+            await engine.stop()
         }
     }
 

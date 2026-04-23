@@ -1,6 +1,8 @@
 import Testing
 import Foundation
 @testable import MymeSDK
+@testable import MymeSDKTestSupport
+import SwiftData
 
 /// Tests for ``MymeStore``, ``ItemQuery``, ``TypedItemQuery``, ``SingleItemQuery``,
 /// and ``EdgesQuery``.
@@ -564,6 +566,103 @@ struct MymeStoreTests {
         try await waitForCondition(timeout: .seconds(2)) { query.items.isEmpty }
 
         #expect(query.items.isEmpty)
+        query.stop()
+    }
+
+    // MARK: - PendingMutationsQuery (4.3.0)
+    //
+    // PendingMutationsQuery needs a real SyncEngine — in pure-local mode
+    // it publishes empty. These tests construct a synced-shaped fixture
+    // directly (LocalStore + MutationQueue + SyncEngine sharing one
+    // container) and pass it through `MymeStore`.
+
+    private func makeSyncedStoreAndQueue() async throws -> (MymeStore, MutationQueue, SyncEngine, ConnectionStateManager, MockTransport) {
+        let (ls, queue, container) = try await MymeSDKTest.makeInMemoryStorePair()
+        let transport = MockTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: ls,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        let store = MymeStore(container: container, syncEngine: engine)
+        return (store, queue, engine, connManager, transport)
+    }
+
+    @Test("queryPendingMutations is empty in pure-local mode") func pendingMutationsEmptyLocal() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+        let query = store.queryPendingMutations()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.mutations.isEmpty)
+        query.stop()
+    }
+
+    @Test("queryPendingMutations live-updates when queue changes") func pendingMutationsLive() async throws {
+        let (store, queue, _, _, _) = try await makeSyncedStoreAndQueue()
+
+        let query = store.queryPendingMutations()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.mutations.isEmpty)
+
+        try await queue.enqueueDeleteItem(id: "item-1")
+        try await waitForCondition(timeout: .seconds(2)) { query.mutations.count == 1 }
+        #expect(query.mutations[0].kind == .deleteItem)
+        #expect(query.mutations[0].status == .pending)
+        query.stop()
+    }
+
+    @Test("queryPendingMutations reflects recordFailure as .failed") func pendingMutationsFailed() async throws {
+        let (store, queue, _, _, _) = try await makeSyncedStoreAndQueue()
+
+        try await queue.enqueueDeleteItem(id: "item-1")
+        let query = store.queryPendingMutations()
+        try await waitForCondition(timeout: .seconds(2)) { query.mutations.count == 1 }
+
+        let id = query.mutations[0].id
+        try await queue.recordFailure(id: id, error: "network")
+        try await waitForCondition(timeout: .seconds(2)) {
+            if case .failed = query.mutations.first?.status { return true }
+            return false
+        }
+        if case let .failed(err, _) = query.mutations[0].status {
+            #expect(err == "network")
+        } else {
+            Issue.record("expected .failed")
+        }
+        query.stop()
+    }
+
+    // MARK: - DroppedMutationsQuery (4.3.0)
+
+    @Test("queryDroppedMutations is empty in pure-local mode") func droppedMutationsEmptyLocal() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+        let query = store.queryDroppedMutations()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.dropped.isEmpty)
+        query.stop()
+    }
+
+    @Test("queryDroppedMutations live-updates when a mutation is dropped") func droppedMutationsLive() async throws {
+        let (store, queue, _, _, _) = try await makeSyncedStoreAndQueue()
+
+        let query = store.queryDroppedMutations()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.dropped.isEmpty)
+
+        try await queue.enqueueDeleteItem(id: "item-1")
+        let rec = try await queue.fetchAll()[0]
+        try await queue.removeAndRecordDropped(record: rec, error: NotFoundError(message: "gone"))
+
+        try await waitForCondition(timeout: .seconds(2)) { query.dropped.count == 1 }
+        #expect(query.dropped[0].kind == .deleteItem)
+        #expect(query.dropped[0].errorStatus == 404)
         query.stop()
     }
 }
