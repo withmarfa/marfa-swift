@@ -474,6 +474,92 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
+    /// Removes a mutation and persists a ``DroppedMutationRecord`` for it
+    /// in a single save — the queue row and the dropped-log row commit
+    /// atomically so we never lose the record of a drop (nor leave a
+    /// zombie queue row after inserting the log).
+    ///
+    /// The dropped row carries the original payload verbatim so a consumer
+    /// UI can decode it and offer a manual retry affordance. The error
+    /// code/status/message snapshot comes from the ``MymeError`` the
+    /// transport returned; subclass-specific fields (e.g. ``ConflictError``
+    /// conflict data) are not preserved because permanent errors are only
+    /// 400/403/404 — ``ConflictError`` is 409 and never drops.
+    func removeAndRecordDropped(record: PendingMutationRecord, error: MymeError) throws {
+        let predicate = #Predicate<PendingMutationModel> { $0.id == record.id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        if let model = try modelContext.fetch(descriptor).first {
+            modelContext.delete(model)
+        }
+
+        let dropped = DroppedMutationModel()
+        dropped.id = record.id
+        dropped.kind = record.kind
+        dropped.itemId = record.localId
+        dropped.attemptCount = record.attemptCount
+        dropped.droppedAt = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        dropped.errorCode = error.code
+        dropped.errorStatus = error.status
+        dropped.errorMessage = error.message
+        dropped.payloadJson = record.payloadJson
+        modelContext.insert(dropped)
+
+        try modelContext.save()
+    }
+
+    // MARK: - Dropped mutation log (consumer-facing)
+
+    /// Returns every persisted dropped-mutation record, newest first.
+    func fetchAllDropped() throws -> [DroppedMutationRecord] {
+        let descriptor = FetchDescriptor<DroppedMutationModel>(
+            sortBy: [SortDescriptor(\.droppedAt, order: .reverse)]
+        )
+        let strategy = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        return try modelContext.fetch(descriptor).map { model in
+            let droppedAt = (try? Date(model.droppedAt, strategy: strategy)) ?? Date()
+            return DroppedMutationRecord(
+                id: model.id,
+                kind: model.kind,
+                itemId: model.itemId,
+                attemptCount: model.attemptCount,
+                droppedAt: droppedAt,
+                errorCode: model.errorCode,
+                errorStatus: model.errorStatus,
+                errorMessage: model.errorMessage,
+                payloadJson: model.payloadJson
+            )
+        }
+    }
+
+    /// Removes a single dropped-mutation record. Idempotent — a request
+    /// for an id that doesn't exist is a no-op rather than an error, so
+    /// consumer UIs don't have to race the purge against queue state.
+    func removeDropped(id: String) throws {
+        let predicate = #Predicate<DroppedMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<DroppedMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        modelContext.delete(model)
+        try modelContext.save()
+    }
+
+    /// Purges every dropped-mutation record. Returns the number purged so
+    /// consumers can surface a "cleared N dropped mutations" toast.
+    @discardableResult
+    func purgeAllDropped() throws -> Int {
+        let descriptor = FetchDescriptor<DroppedMutationModel>()
+        let all = try modelContext.fetch(descriptor)
+        let count = all.count
+        for model in all {
+            modelContext.delete(model)
+        }
+        if count > 0 {
+            try modelContext.save()
+        }
+        return count
+    }
+
     /// Records a failed replay attempt. Bumps `attemptCount`, stores the
     /// error message, and stamps `lastAttemptAt` with the current time so
     /// consumers can surface "last tried X ago" affordances.
@@ -655,8 +741,16 @@ public actor MutationQueue {
     /// cascade-deleted records (excluding the already-removed
     /// `createItem` root) so the caller can emit one
     /// ``SyncEvent/mutationDropped`` per orphan.
+    ///
+    /// When `error` is provided, each cascade-deleted row is ALSO
+    /// persisted as a ``DroppedMutationRecord`` inside the same save —
+    /// so the dropped-log and the queue stay consistent even if the
+    /// process crashes mid-call.
     @discardableResult
-    func dropMutationsReferencingLocalId(_ localId: String) throws -> [PendingMutationRecord] {
+    func dropMutationsReferencingLocalId(
+        _ localId: String,
+        error: MymeError? = nil
+    ) throws -> [PendingMutationRecord] {
         // Pass 1 — item-scope direct matches (`localId` column).
         let directPredicate = #Predicate<PendingMutationModel> { $0.localId == localId }
         let directDescriptor = FetchDescriptor<PendingMutationModel>(predicate: directPredicate)
@@ -708,6 +802,27 @@ public actor MutationQueue {
         for model in allDeletes {
             modelContext.delete(model)
         }
+
+        // When the caller provides the error, append a DroppedMutationModel
+        // row for each cascade victim in the same save cycle. Atomic — the
+        // queue row delete and the dropped-log insert commit together.
+        if let error {
+            let droppedAt = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            for record in snapshot {
+                let dropped = DroppedMutationModel()
+                dropped.id = record.id
+                dropped.kind = record.kind
+                dropped.itemId = record.localId
+                dropped.attemptCount = record.attemptCount
+                dropped.droppedAt = droppedAt
+                dropped.errorCode = error.code
+                dropped.errorStatus = error.status
+                dropped.errorMessage = error.message
+                dropped.payloadJson = record.payloadJson
+                modelContext.insert(dropped)
+            }
+        }
+
         try modelContext.save()
         return snapshot
     }

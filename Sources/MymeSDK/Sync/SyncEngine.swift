@@ -261,6 +261,34 @@ public actor SyncEngine {
         return try await mutationQueue.snapshots(inFlight: inFlight)
     }
 
+    /// Returns every mutation the engine has dropped permanently,
+    /// newest first. Entries persist across launches so a consumer UI
+    /// can surface them whenever the user next opens the app.
+    ///
+    /// Sources: the primary permanent-error drop (400/403/404 from the
+    /// server on replay) and cascade drops (every queued follow-up to a
+    /// ``MutationKind/createItem`` that was dropped permanently). Both
+    /// paths write atomically with the queue-row delete.
+    ///
+    /// For reactive access, use ``MymeStore/queryDroppedMutations()``.
+    public func droppedMutations() async throws -> [DroppedMutationRecord] {
+        try await mutationQueue.fetchAllDropped()
+    }
+
+    /// Removes a single dropped-mutation entry. Use this after the user
+    /// dismisses a "this sync didn't go through" affordance, or after a
+    /// manual retry succeeds. Idempotent — an unknown id is a no-op.
+    public func purgeDroppedMutation(id: String) async throws {
+        try await mutationQueue.removeDropped(id: id)
+    }
+
+    /// Removes every dropped-mutation entry. Returns the number of entries
+    /// purged so consumers can surface a "cleared N entries" toast.
+    @discardableResult
+    public func purgeAllDroppedMutations() async throws -> Int {
+        try await mutationQueue.purgeAllDropped()
+    }
+
     /// Timestamp of the most recent successful ``performInitialSync(pageSize:)``
     /// completion against this local store, or `nil` if one has never run.
     /// Persisted in the `sync_state` table so the value survives app restarts
@@ -792,7 +820,14 @@ public actor SyncEngine {
                     remaining = (try? await mutationQueue.fetchAll()) ?? []
                 }
             } catch let mymeError as MymeError where mymeError.isPermanent {
-                try? await mutationQueue.remove(id: record.id)
+                // Remove the queue row AND persist a dropped-log record in
+                // one save. Before 4.3.0 this content was lost beyond the
+                // os.Logger line below; the persisted log lets consumers
+                // list, inspect, and manually retry later.
+                try? await mutationQueue.removeAndRecordDropped(
+                    record: record,
+                    error: mymeError
+                )
                 logger.log.error(
                     "sync.mutation.dropped kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) status=\(mymeError.status, privacy: .public) code=\(mymeError.code, privacy: .public)"
                 )
@@ -806,9 +841,12 @@ public actor SyncEngine {
                 // Cascade: if a createItem was dropped, every downstream
                 // mutation keyed off its local id would 404 on replay. Drop
                 // them together and purge the ghost local row so the UI
-                // stops showing an item that can never sync.
+                // stops showing an item that can never sync. Passing the
+                // error logs each cascade victim to the dropped-log too.
                 if record.kind == .createItem, let localId = record.localId {
-                    let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(localId)) ?? []
+                    let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(
+                        localId, error: mymeError
+                    )) ?? []
                     try? await localStore.purgeItem(id: localId)
                     for ghost in cascaded {
                         logger.log.error(

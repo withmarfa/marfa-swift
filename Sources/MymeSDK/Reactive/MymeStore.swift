@@ -148,6 +148,15 @@ public final class MymeStore {
     public func queryPendingMutations() -> PendingMutationsQuery {
         PendingMutationsQuery(syncEngine: syncEngine)
     }
+
+    /// Creates a live query over the dropped-mutation log. See
+    /// ``DroppedMutationsQuery``.
+    ///
+    /// Publishes an empty list when the backing client is pure-local or
+    /// remote-only — neither persists dropped mutations.
+    public func queryDroppedMutations() -> DroppedMutationsQuery {
+        DroppedMutationsQuery(syncEngine: syncEngine)
+    }
 }
 
 // MARK: - Refetch observer (shared boilerplate)
