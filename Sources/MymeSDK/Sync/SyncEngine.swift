@@ -136,8 +136,8 @@ public actor SyncEngine {
     /// affordance, or to defer a fresh pull until the local queue has drained.
     ///
     /// Thin actor-isolated wrapper over ``MutationQueue/isEmpty`` — rethrows
-    /// any GRDB read error so callers can distinguish "no pending mutations"
-    /// from "couldn't check".
+    /// any storage-layer read error so callers can distinguish "no pending
+    /// mutations" from "couldn't check".
     public var hasPendingMutations: Bool {
         get async throws {
             !(try await mutationQueue.isEmpty)

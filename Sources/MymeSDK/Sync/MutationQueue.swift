@@ -9,9 +9,6 @@ import SwiftData
 /// at the actor boundary — `@Model` instances must never cross actors,
 /// so every API surface (``fetchAll``, ``rewriteLocalId``,
 /// ``dropMutationsReferencingLocalId``) returns these.
-///
-/// The shape is byte-for-byte the legacy GRDB struct, so consumers
-/// (`SyncEngine`, the rewrite logic, the test suite) compile unchanged.
 public struct PendingMutationRecord: Sendable, Codable, Equatable {
     /// UUIDv4 of this mutation record (the server never sees it).
     public var id: String

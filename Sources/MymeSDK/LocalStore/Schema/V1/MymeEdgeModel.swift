@@ -2,10 +2,11 @@
 //
 // See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift`.
 // Edges deliberately model their endpoints as `String` ids rather than
-// `@Relationship` to `MymeItemModel`. This preserves today's GRDB
-// behaviour where edges may dangle when an item is purged or has not
-// yet arrived via SSE — and keeps every edge predicate compiled against
-// stored String columns that are CloudKit-safe.
+// `@Relationship` to `MymeItemModel`. Edges may dangle when an item is
+// purged or has not yet arrived via SSE; the SDK upserts edges from
+// the server stream without checking that their endpoints exist
+// locally. String-id columns also keep every edge predicate
+// CloudKit-safe (no relationship traversal in the predicate engine).
 
 import Foundation
 import SwiftData

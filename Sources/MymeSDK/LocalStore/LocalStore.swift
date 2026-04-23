@@ -242,9 +242,9 @@ public actor LocalStore {
         var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else {
-            // Idempotent: purging a non-existent item is not an error
-            // (matches the legacy GRDB DELETE-by-id semantics, which
-            // affected zero rows silently).
+            // Idempotent: purging a non-existent item is a no-op so the
+            // sync engine can replay a server-side delete without first
+            // checking whether the row still exists locally.
             return
         }
         modelContext.delete(model)
@@ -429,7 +429,8 @@ public actor LocalStore {
     }
 
     /// Deletes an edge by ID. Idempotent — a delete against a missing
-    /// row is a no-op (preserves the legacy GRDB DELETE semantics).
+    /// row is a no-op so the sync engine can replay an `edge.deleted`
+    /// SSE event without first checking whether the row still exists.
     func deleteEdge(id: String) throws {
         let predicate = #Predicate<MymeEdgeModel> { $0.id == id }
         var descriptor = FetchDescriptor<MymeEdgeModel>(predicate: predicate)
