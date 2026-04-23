@@ -65,3 +65,29 @@ message and exits 1 — the container id is never hard-coded.
 - After bumping a SwiftData / iOS minimum (a new SDK may tighten
   CloudKit constraints).
 - When introducing a new V<n> schema or a `MigrationStage`.
+
+## Consumer-app test setup
+
+Consumer apps whose test suites spin up per-test Myme clients should
+use the in-memory helper in `MymeSDKTestSupport` rather than a
+file-backed path:
+
+```swift
+// Before — file-backed, fresh on-disk store per test.
+let client = try await MymeClient.local(
+    path: NSTemporaryDirectory() + UUID().uuidString
+)
+
+// After — in-memory, drop-in.
+let client = try await MymeSDKTest.makeInMemoryClient()
+```
+
+The file-backed pattern can crash later tests in the same process
+with `"Failed to cast model MymeSDK.MymeItemModel… to MymeItemModel"`.
+The most plausible root cause is XCTest host-bundle linkage loading
+two distinct `MymeSDK.MymeItemModel` class pointers into the same
+process (the class resolves by name but compares by pointer identity),
+and the persistent-store code path is where that ambiguity surfaces.
+In-memory containers sidestep the persistent stack entirely. The SDK's
+own suite exercises the in-memory pattern, so the reactive-query
+behaviour you depend on is already covered there.
