@@ -975,6 +975,258 @@ struct SyncEngineTests {
             await engine.stop()
         }
 
+        // MARK: - Fix D: transient createItem skips downstream mutations
+
+        @Test("transient createItem blocks downstream deleteItem from running in the same cycle")
+        func transientCreateItemBlocksDeleteItemSameCycle() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+            // Compress back-off so cycle 2 fires automatically in tens of ms.
+            await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+            // Local state: user created a note and immediately trashed it before
+            // any sync fired. The note has never reached the server.
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let itemId = "019ea000-0000-7000-8000-000000000042"
+            let localItem = Item(
+                createdAt: now, id: itemId, library: false, origin: .user,
+                properties: ["body": .string("new note")], schemaVersion: 1, source: "sdk",
+                state: .trashed, timestamp: now, type: "core.note", updatedAt: now, version: 2
+            )
+            try await store.upsertItem(localItem)
+            let createInput = CreateItemInput(
+                type: "core.note", properties: ["body": .string("new note")], id: itemId
+            )
+            try await queue.enqueueCreateItem(createInput, localId: itemId)
+            try await queue.enqueueDeleteItem(id: itemId)
+
+            // Cycle 1: createItem POST fails transiently (500). deleteItem must
+            // NOT fire — no response for it is queued in this cycle, so if the
+            // fix is absent and deleteItem does fire it would consume the cycle-2
+            // createItem response and cause cycle 2 to fail (decoding mismatch).
+            transport.enqueueEvents([])
+            transport.enqueueError(MymeError(code: "server_error", message: "transient", status: 500))
+
+            // Cycle 2: createItem succeeds, then deleteItem succeeds.
+            transport.enqueueEvents([])
+            let serverCreated = Item(
+                createdAt: now, id: itemId, library: false, origin: .user,
+                properties: ["body": .string("new note")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            transport.enqueue(ItemResponse(item: serverCreated, metadata: nil))
+            transport.enqueue(EmptyResponse())
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            // Wait for full drain — both cycles must complete cleanly.
+            try await waitUntil(timeout: .milliseconds(800)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+
+            // createItem reached the server twice (once transient, once success).
+            let postCalls = await transport.calls.filter {
+                $0.method == .post && $0.path == "/items"
+            }
+            #expect(postCalls.count == 2)
+
+            // deleteItem reached the server exactly once (in cycle 2, not cycle 1).
+            let deleteCalls = await transport.calls.filter {
+                $0.method == .delete && $0.path == "/items/\(itemId)"
+            }
+            #expect(deleteCalls.count == 1)
+
+            // The DELETE came after the second POST (the one that succeeded).
+            let allCalls = await transport.calls
+            let secondPostIndex = allCalls.lastIndex(where: {
+                $0.method == .post && $0.path == "/items"
+            })
+            let deleteIndex = allCalls.firstIndex(where: {
+                $0.method == .delete && $0.path == "/items/\(itemId)"
+            })
+            if let pi = secondPostIndex, let di = deleteIndex {
+                #expect(pi < di, "DELETE must follow the successful POST in cycle 2")
+            } else {
+                Issue.record("Expected both POST /items and DELETE /items/\(itemId) in transport calls")
+            }
+
+            await engine.stop()
+        }
+
+        @Test("transient createItem also blocks downstream updateItem and metadata mutations")
+        func transientCreateItemBlocksAllItemScopedMutations() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+            await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let itemId = "019ea001-0000-7000-8000-000000000043"
+            let localItem = Item(
+                createdAt: now, id: itemId, library: false, origin: .user,
+                properties: ["body": .string("draft")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 3
+            )
+            try await store.upsertItem(localItem)
+
+            // createItem + update + tag — all queued before sync fires.
+            let createInput = CreateItemInput(
+                type: "core.note", properties: ["body": .string("draft")], id: itemId
+            )
+            try await queue.enqueueCreateItem(createInput, localId: itemId)
+            try await queue.enqueueUpdateItem(id: itemId, properties: ["body": .string("edited")])
+            try await queue.enqueueAddTags(itemId: itemId, tags: ["note"])
+
+            // Cycle 1: createItem fails transiently; update + tag must be skipped.
+            transport.enqueueEvents([])
+            transport.enqueueError(MymeError(code: "server_error", message: "transient", status: 500))
+
+            // Cycle 2: all three replay in order and succeed.
+            transport.enqueueEvents([])
+            let serverCreated = Item(
+                createdAt: now, id: itemId, library: false, origin: .user,
+                properties: ["body": .string("draft")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            transport.enqueue(ItemResponse(item: serverCreated, metadata: nil))
+            let serverUpdated = Item(
+                createdAt: now, id: itemId, library: false, origin: .user,
+                properties: ["body": .string("edited")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 2
+            )
+            transport.enqueue(ItemResponse(item: serverUpdated, metadata: nil))
+            transport.enqueue(MetadataResponse(metadata: Metadata(
+                extensions: [:], itemId: itemId, tags: ["note"]
+            )))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(800)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+
+            // All three operations reached the server — and only once each.
+            let postCalls = await transport.calls.filter {
+                $0.method == .post && $0.path == "/items"
+            }
+            let patchCalls = await transport.calls.filter {
+                $0.method == .patch && $0.path == "/items/\(itemId)"
+            }
+            let tagCalls = await transport.calls.filter {
+                $0.method == .post && $0.path == "/items/\(itemId)/tags"
+            }
+            // createItem ran twice (cycle 1 fail + cycle 2 success).
+            #expect(postCalls.count == 2)
+            // updateItem and addTags ran once each (cycle 2 only).
+            #expect(patchCalls.count == 1)
+            #expect(tagCalls.count == 1)
+
+            // Order within cycle 2: POST → PATCH → tag POST.
+            let allCalls = await transport.calls
+            let successPostIdx = allCalls.lastIndex(where: {
+                $0.method == .post && $0.path == "/items"
+            })
+            let patchIdx = allCalls.firstIndex(where: {
+                $0.method == .patch && $0.path == "/items/\(itemId)"
+            })
+            let tagIdx = allCalls.firstIndex(where: {
+                $0.method == .post && $0.path == "/items/\(itemId)/tags"
+            })
+            if let pi = successPostIdx, let pa = patchIdx, let ti = tagIdx {
+                #expect(pi < pa, "PATCH must come after the successful POST")
+                #expect(pa < ti, "tag POST must come after PATCH")
+            } else {
+                Issue.record("Expected POST /items, PATCH /items/:id, and POST /items/:id/tags in transport calls")
+            }
+
+            await engine.stop()
+        }
+
+        @Test("transient createItem for item A does not affect unrelated item B mutations")
+        func transientCreateItemDoesNotBlockUnrelatedMutations() async throws {
+            let (store, queue, transport, connManager, engine) = try makeFixture()
+            await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            let itemA = "019ea002-0000-7000-8000-000000000044"
+            let itemB = "019ea003-0000-7000-8000-000000000045"
+
+            // Item A: pending create (will fail transiently).
+            let itemALocal = Item(
+                createdAt: now, id: itemA, library: false, origin: .user,
+                properties: ["body": .string("A")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            try await store.upsertItem(itemALocal)
+            let createA = CreateItemInput(type: "core.note", properties: ["body": .string("A")], id: itemA)
+            try await queue.enqueueCreateItem(createA, localId: itemA)
+
+            // Item B: pre-existing update (must replay in cycle 1 despite A's failure).
+            let itemBLocal = Item(
+                createdAt: now, id: itemB, library: false, origin: .user,
+                properties: ["body": .string("B")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            try await store.upsertItem(itemBLocal)
+            try await queue.enqueueUpdateItem(id: itemB, properties: ["body": .string("B updated")])
+
+            // Cycle 1: createItem(A) fails transiently; updateItem(B) must proceed.
+            transport.enqueueEvents([])
+            transport.enqueueError(MymeError(code: "server_error", message: "transient", status: 500))
+            let updatedB = Item(
+                createdAt: now, id: itemB, library: false, origin: .user,
+                properties: ["body": .string("B updated")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 2
+            )
+            transport.enqueue(ItemResponse(item: updatedB, metadata: nil))
+
+            // Cycle 2: createItem(A) succeeds; no more mutations.
+            transport.enqueueEvents([])
+            let serverA = Item(
+                createdAt: now, id: itemA, library: false, origin: .user,
+                properties: ["body": .string("A")], schemaVersion: 1, source: "sdk",
+                state: .active, timestamp: now, type: "core.note", updatedAt: now, version: 1
+            )
+            transport.enqueue(ItemResponse(item: serverA, metadata: nil))
+
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            try await waitUntil(timeout: .milliseconds(800)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+
+            // updateItem(B) was called exactly once (in cycle 1).
+            let patchBCalls = await transport.calls.filter {
+                $0.method == .patch && $0.path == "/items/\(itemB)"
+            }
+            #expect(patchBCalls.count == 1)
+
+            // createItem(A) was called twice (transient + success).
+            let postCalls = await transport.calls.filter {
+                $0.method == .post && $0.path == "/items"
+            }
+            #expect(postCalls.count == 2)
+
+            // updateItem(B) landed in cycle 1 — before the second createItem(A).
+            let allCalls = await transport.calls
+            let patchBIdx = allCalls.firstIndex(where: {
+                $0.method == .patch && $0.path == "/items/\(itemB)"
+            })
+            let secondPostIdx = allCalls.lastIndex(where: {
+                $0.method == .post && $0.path == "/items"
+            })
+            if let bi = patchBIdx, let pi = secondPostIdx {
+                #expect(bi < pi, "B's update should run in cycle 1, before cycle 2's createItem(A)")
+            } else {
+                Issue.record("Expected PATCH /items/\(itemB) and POST /items in transport calls")
+            }
+
+            await engine.stop()
+        }
+
         // MARK: - rewriteLocalId integration
 
         @Test("createItem replay with a different server id rewrites dependents")
