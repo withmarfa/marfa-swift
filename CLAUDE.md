@@ -5,7 +5,7 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 ## Architecture
 
 - **SPM package**, zero external dependencies. Built from Foundation, Security, and `os`.
-- **Platforms:** iOS 17+, macOS 14+, visionOS 1+, watchOS 10+, tvOS 17+.
+- **Platforms:** iOS 26+, macOS 26+, visionOS 26+, watchOS 26+, tvOS 26+.
 - **Swift 6** language mode with complete strict concurrency.
 - **Two products:**
   - `MymeSDK` — the client library
