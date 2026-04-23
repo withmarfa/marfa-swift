@@ -5,6 +5,81 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] — 2026-04-23
+
+Closes four connected gaps in sync observability. All additive — no
+breaking changes to the existing surface; consumers adopt incrementally.
+Schema v2 ships alongside, with a lightweight migration that runs
+transparently on first launch.
+
+### Added
+- **Proactive mutation-queue drain.** `SyncEngine` now listens to the
+  new `MutationQueue.enqueueEvents` stream and schedules a debounced
+  drain (200 ms default, configurable via
+  `setProactiveDrainDebounceForTesting`) when a mutation arrives and
+  the connection is reachable. Before 4.3.0 the queue only drained
+  after an SSE stream closed — a device that was `.online` but hadn't
+  had an SSE cycle in a while held pending writes hostage. The
+  existing SSE-close drain is preserved as the secondary trigger.
+- **Per-mutation status snapshots.** New public
+  `PendingMutationSnapshot` (id, kind, itemId, createdAt, attemptCount,
+  status) and `PendingMutationStatus` enum (`.pending`, `.inFlight`,
+  `.failed(lastError:lastAttemptAt:)`). Exposed via
+  `SyncEngine.pendingMutations()` (async read) and
+  `MymeStore.queryPendingMutations()` (live, `@Observable @MainActor`).
+- **`SyncEngine.mutationLifecycleEvents: AsyncStream<Void>`** — pulses
+  when a replay starts/ends so the reactive query picks up in-flight
+  transitions that don't correspond to a queue write.
+- **`PendingMutationModel.lastAttemptAt: String?`** — ISO 8601 stamp
+  written by `recordFailure` on every failed attempt.
+  Schema-v2 lightweight-safe (nil default).
+- **Full-sync checkpoint exposure.** New public `FullSyncState`
+  (`completedAt`, `cursor`) and `SyncEngine.lastFullSync: FullSyncState?`
+  (async read). Written by every clean drain (zero transient errors)
+  and by `performInitialSync`. Consumers can now gate redundant
+  initial-sync pulls on recency instead of firing unconditionally on
+  every launch. The older `lastFullSyncAt: Date?` remains as a
+  convenience.
+- **Persisted dropped-mutation log.** New `DroppedMutationModel`
+  (schema v2), public `DroppedMutationRecord` DTO, and three
+  `SyncEngine` methods — `droppedMutations()`,
+  `purgeDroppedMutation(id:)`, `purgeAllDroppedMutations()` — plus the
+  reactive `MymeStore.queryDroppedMutations()`. Permanent-error drops
+  (400/403/404) and cascade drops now commit to the log atomically
+  with the queue-row delete, so the payload, error context, and
+  attempt count survive the drop and consumers can surface / retry /
+  purge later.
+- **Schema v2** (`Sources/MymeSDK/LocalStore/Schema/V2/`) with the new
+  `DroppedMutationModel`. `MymeMigrationPlan` adds a
+  `.lightweight(V1 → V2)` stage; additive column + additive table
+  migrate transparently.
+
+### Changed
+- **`MutationQueue` internals.** New `enqueueEvents` stream, new
+  `snapshots(inFlight:)` / `removeAndRecordDropped(record:error:)` /
+  `fetchAllDropped()` / `removeDropped(id:)` / `purgeAllDropped()`.
+  `dropMutationsReferencingLocalId(_:error:)` gained an optional
+  `error` parameter so the cascade path writes the dropped log in the
+  same save as the deletes.
+- **`SyncEngine.replayMutations` gains a re-entry guard.** A single
+  `drainInFlight` flag lets the SSE-close path, the new proactive
+  path, and the `catchup_too_old` finalise share one serialisation
+  point. The terminal `markOnline` also moved inside `replayMutations`
+  so every drain path (including empty-queue) settles on `.online`.
+- **`PendingMutationRecord`** gained `lastAttemptAt: String?`
+  (additive with default; existing call sites unchanged).
+- **`MymeStore`** now carries an optional `syncEngine`, plumbed through
+  from `MymeClient.makeStore()`. Pure-local and remote-only modes
+  continue to publish empty results for the new queries.
+
+### Migration notes
+- **Lightweight schema migration.** Existing stores (4.0 / 4.1 / 4.2 /
+  4.2.1) open cleanly on first 4.3.0 launch — SwiftData adds the new
+  column and the new table transparently. No consumer action required.
+- **Public API is additive.** Existing consumers continue to work
+  without changes. `hasPendingMutations` remains as a convenience;
+  adopt the new snapshot + query surface when you need richer UI.
+
 ## [4.2.1] — 2026-04-23
 
 Additive test-support release. Gives consumer-app test suites a
@@ -107,6 +182,8 @@ keep their public shape; the factories move to `async throws`.
 - **CloudKit sync is unlocked but not enabled.** `cloudKitDatabase: .none` in 4.0. Phase 2 (consumer app's iCloud sync work) flips this to `.automatic` against the app's ubiquity container. The schema is already validated for CloudKit compatibility via `cloudkit-smoke`.
 - **Every namespace API is unchanged.** Items, Metadata, Extensions, Edges, Blobs, Types, Keys, Webhooks — same methods, same parameters, same return types. Only `MymeClient.local(_:)` and `MymeClient.synced(...)` need a `try await` at the call site.
 
+[4.3.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.3.0
+[4.2.1]: https://github.com/mymehq/swift-sdk/releases/tag/4.2.1
 [4.2.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.2.0
 [4.1.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.1.0
 [4.0.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.0.0
