@@ -72,6 +72,19 @@ public final class MymeStore {
         TypedItemQuery(pool: pool, filters: filters)
     }
 
+    /// Creates a live query over items paired with their metadata. See
+    /// ``ItemsWithMetadataQuery``. Emits `[ItemWithMetadata]` matching the
+    /// one-shot ``ItemsNamespace/listWithMetadata(filters:)`` and re-fires
+    /// whenever any matching item or metadata row changes.
+    ///
+    ///     let query = store.queryItemsWithMetadata(filters: .init(type: "core.note"))
+    ///     ForEach(query.items, id: \.item.id) { pair in
+    ///         NoteCard(item: pair.item, tags: pair.metadata.tags)
+    ///     }
+    public func queryItemsWithMetadata(filters: ListFilters? = nil) -> ItemsWithMetadataQuery {
+        ItemsWithMetadataQuery(pool: pool, filters: filters)
+    }
+
     // MARK: - Edge queries
 
     /// Creates a live query over outbound edges from `sourceId`.
