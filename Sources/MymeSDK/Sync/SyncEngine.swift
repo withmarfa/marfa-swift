@@ -509,9 +509,35 @@ public actor SyncEngine {
         // "this mutation will never succeed, don't keep trying."
         var transientError: Error?
         var remaining = pending
+
+        // Item IDs whose `createItem` failed transiently in this cycle.
+        // Any downstream item-scoped mutation keyed on the same ID is skipped
+        // for the remainder of this cycle.
+        //
+        // Without this guard: `deleteItem(A)` fires immediately after
+        // `createItem(A)` fails transiently. The server returns 404 (the item
+        // never landed), which is permanent — the record is dropped. On the
+        // next cycle `createItem(A)` succeeds, leaving the server with an item
+        // the client has already deleted. `pendingCreateIds` prevents that by
+        // deferring all follow-on mutations until `createItem` actually lands.
+        var pendingCreateIds = Set<String>()
+
         while !remaining.isEmpty {
             let record = remaining.removeFirst()
             guard running else { break }
+
+            // Defer item-scoped mutations whose createItem is still pending a
+            // transient retry. Replaying them now would 404 (item absent on
+            // server) and produce a permanent drop before createItem has a
+            // chance to succeed on the next cycle.
+            if let localId = record.localId,
+               record.kind != .createItem,
+               pendingCreateIds.contains(localId) {
+                logger.log.info(
+                    "sync.mutation.deferred kind=\(record.kind.rawValue, privacy: .public) item_id=\(localId, privacy: .public) reason=pending_create"
+                )
+                continue
+            }
 
             do {
                 let didRewrite = try await replayRecord(record, decoder: decoder)
@@ -565,6 +591,13 @@ public actor SyncEngine {
                 logger.log.info(
                     "sync.mutation.failed kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
                 )
+                // A transient createItem failure means the item doesn't exist on
+                // the server yet. Mark its ID so downstream mutations are skipped
+                // for the rest of this cycle — they'd 404 and drop permanently
+                // before createItem gets a chance to succeed on the next retry.
+                if record.kind == .createItem, let localId = record.localId {
+                    pendingCreateIds.insert(localId)
+                }
             }
         }
 
@@ -731,6 +764,42 @@ public actor SyncEngine {
                 method: .delete, path: "/items/\(p.itemId)/extensions/\(encoded)",
                 body: nil, query: nil
             )
+
+        case .uploadBlob:
+            let p = try decoder.decode(UploadBlobPayload.self, from: data)
+
+            guard let blobData = try? await mutationQueue.fetchPendingBlob(hash: p.hash) else {
+                // Blob data is gone — this can happen if the database was
+                // partially corrupted or the row was manually deleted. The
+                // upload can never succeed without the original bytes, so
+                // treat it as a permanent validation failure and let the
+                // engine drop it.
+                throw ValidationError(
+                    message: "Pending blob data missing for hash \(p.hash); upload cannot be replayed"
+                )
+            }
+
+            let (responseData, response) = try await transport.rawRequest(
+                method: .post, path: "/blobs", body: blobData,
+                contentType: p.mimeType, query: nil
+            )
+
+            guard (200..<300).contains(response.statusCode) else {
+                throw parseMymeError(data: responseData, statusCode: response.statusCode)
+            }
+
+            // Upload succeeded — clean up the stored bytes. The response
+            // hash should match the locally-computed hash (same data, same
+            // SHA-256); if it doesn't, the local hash was wrong and any
+            // items/edges created against it will 404 on blob fetch. Log
+            // but don't fail — the blob IS on the server.
+            if let uploaded = try? JSONDecoder().decode(BlobUploadResponse.self, from: responseData),
+               uploaded.hash != p.hash {
+                logger.log.error(
+                    "sync.uploadBlob.hash_mismatch local=\(p.hash, privacy: .public) server=\(uploaded.hash, privacy: .public)"
+                )
+            }
+            try? await mutationQueue.deletePendingBlob(hash: p.hash)
         }
 
         // Only the `createItem` path returns `true`; every other replay is a

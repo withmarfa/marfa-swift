@@ -1,12 +1,18 @@
 import Foundation
+import CryptoKit
 
 /// Blobs API namespace. Manages binary file uploads and downloads.
 ///
-/// Blob operations always hit the transport directly — they are never queued
-/// for replay. Content-addressed uploads and large-payload retry semantics
-/// are awkward under a mutation queue, and the server deduplicates identical
-/// blobs by content hash, so the caller is expected to retry explicitly on
-/// failure.
+/// In **synced mode** (`MymeClient.synced(...)`) uploads are queued for
+/// offline-resilient replay. `upload(data:mimeType:)` computes the SHA-256
+/// content hash locally (matching the server's content-addressed store),
+/// persists the bytes in the local database, and returns a
+/// ``BlobUploadResponse`` immediately so callers can proceed to create items
+/// and edges that reference the blob before it reaches the server. The sync
+/// engine drains the queued upload when connectivity is available.
+///
+/// In **network-only mode** (`MymeClient(url:apiKey:)`) `upload` hits the
+/// transport directly, identical to the previous behaviour.
 ///
 /// A client created via ``MymeClient/local(path:)`` has no live server;
 /// calling `upload`, `download`, `exists`, or `presignedURL` throws
@@ -16,6 +22,7 @@ public struct BlobsNamespace: Sendable {
     let transport: any Transport
     let apiBaseURL: URL
     let cdnBaseURL: URL?
+    let mutationQueue: MutationQueue?
 
     /// `true` when this namespace is attached to a pure-local client. When
     /// set, every method except ``url(hash:)`` throws before touching the
@@ -29,8 +36,28 @@ public struct BlobsNamespace: Sendable {
     }
 
     /// Uploads binary data as a blob.
+    ///
+    /// In synced mode the upload is queued for offline-resilient replay:
+    /// the SHA-256 hash is computed locally and returned immediately, along
+    /// with the known MIME type and byte count. The actual upload happens
+    /// when the sync engine next drains the mutation queue. If the upload
+    /// ultimately fails permanently (e.g. the server rejects the content
+    /// type), a ``SyncEvent/mutationDropped`` event is emitted on the sync
+    /// engine's `events` stream.
+    ///
+    /// In network-only mode the upload is performed synchronously and any
+    /// error is thrown immediately, as before.
     public func upload(data: Data, mimeType: String) async throws -> BlobUploadResponse {
         try ensureRemote("blobs.upload")
+
+        if let queue = mutationQueue {
+            // Synced mode: compute hash locally, queue, return immediately.
+            let hash = sha256Hash(of: data)
+            try await queue.enqueueBlobUpload(hash: hash, data: data, mimeType: mimeType)
+            return BlobUploadResponse(hash: hash, mimeType: mimeType, size: data.count)
+        }
+
+        // Network-only mode: upload synchronously.
         let (responseData, response) = try await transport.rawRequest(
             method: .post, path: "/blobs", body: data,
             contentType: mimeType, query: nil
@@ -45,6 +72,16 @@ public struct BlobsNamespace: Sendable {
         } catch {
             throw ResponseDecodingError(error)
         }
+    }
+
+    // MARK: - Private helpers
+
+    /// Computes the SHA-256 content hash in the `"sha256:<hex>"` format the
+    /// server uses for content-addressed blob storage.
+    private func sha256Hash(of data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
+        return "sha256:\(hex)"
     }
 
     /// Downloads a blob by its content hash. Returns the raw data and MIME type.

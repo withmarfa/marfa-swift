@@ -106,10 +106,13 @@ public final class MymeClient: Sendable {
         )
         // Pure-local mode has a local store but no sync engine — blob ops
         // can't round-trip through the server and must throw early.
+        // In synced mode the mutation queue is passed so uploads are queued
+        // for offline-resilient replay rather than hitting the transport directly.
         self.blobs = BlobsNamespace(
             transport: transport,
             apiBaseURL: configuration.url,
             cdnBaseURL: configuration.cdnBaseURL,
+            mutationQueue: syncEngine != nil ? mutationQueue : nil,
             isLocalMode: localStore != nil && syncEngine == nil
         )
         self.types = TypesNamespace(transport: transport)

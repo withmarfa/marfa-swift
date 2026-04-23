@@ -12,6 +12,7 @@ struct PendingMutationRecord: Codable, FetchableRecord, PersistableRecord {
         case createEdge, updateEdge, deleteEdge
         case setMetadata, mergeMetadata, addTags, removeTag
         case setExtension, deleteExtension
+        case uploadBlob
     }
 
     var id: String  // UUID of this mutation record
@@ -112,6 +113,19 @@ struct DeleteExtensionPayload: Codable, Sendable {
     let namespace: String
 }
 
+/// Payload for `uploadBlob`.
+///
+/// The binary data itself is stored in `pending_blobs` keyed by `hash`
+/// so `payload_json` stays lean. `hash` is the SHA-256 content address
+/// (`"sha256:<hex>"`), identical to what the server returns on successful
+/// upload — callers can use it immediately after queuing to create items
+/// and edges that reference the blob before it reaches the server.
+struct UploadBlobPayload: Codable, Sendable {
+    let hash: String
+    let mimeType: String
+    let size: Int
+}
+
 // MARK: - MutationQueue actor
 
 /// Durable queue of pending server writes.
@@ -155,6 +169,25 @@ public actor MutationQueue {
             try db.create(table: "sync_state", ifNotExists: true) { t in
                 t.primaryKey("key", .text)
                 t.column("value", .text).notNull()
+            }
+        }
+
+        migrator.registerMigration("v4_pending_blobs") { db in
+            // Stores binary data for queued blob uploads. Keyed by content
+            // hash so identical blobs only occupy one row even if enqueued
+            // twice. The corresponding `pending_mutations` row (kind =
+            // `uploadBlob`) carries hash + mimeType + size in its
+            // `payload_json`; this table holds the raw bytes separately so
+            // `pending_mutations` reads stay lean.
+            //
+            // Rows are deleted by `SyncEngine` after a successful upload.
+            // An orphaned row (mutation was dropped, data row was not cleaned
+            // up) is harmless — it occupies space until the database is next
+            // vacuumed or the app is reinstalled.
+            try db.create(table: "pending_blobs", ifNotExists: true) { t in
+                t.primaryKey("hash", .text)  // "sha256:<hex>"
+                t.column("data", .blob).notNull()
+                t.column("mime_type", .text).notNull()
             }
         }
     }
@@ -286,6 +319,66 @@ public actor MutationQueue {
             payload: DeleteExtensionPayload(itemId: itemId, namespace: namespace),
             localId: itemId
         )
+    }
+
+    /// Enqueues a blob upload. Inserts the binary data into `pending_blobs`
+    /// (keyed by hash) and records an `uploadBlob` mutation. Both writes run
+    /// in a single transaction so the mutation is never left without its data.
+    ///
+    /// If a `pending_blobs` row for this hash already exists (same data
+    /// uploaded twice while offline), the existing row is preserved and a
+    /// second `pending_mutations` row is still inserted — the second drain
+    /// will find the row missing and treat the upload as already complete.
+    func enqueueBlobUpload(hash: String, data: Data, mimeType: String) throws {
+        let payload = UploadBlobPayload(hash: hash, mimeType: mimeType, size: data.count)
+        let payloadData = try MutationQueue.encoder.encode(payload)
+        guard let json = String(data: payloadData, encoding: .utf8) else {
+            throw LocalStoreError.encodingFailure("uploadBlob payload")
+        }
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let record = PendingMutationRecord(
+            id: UUID().uuidString.lowercased(),
+            kind: .uploadBlob,
+            payloadJson: json,
+            sourceId: nil,
+            localId: nil,
+            createdAt: now,
+            attemptCount: 0,
+            lastError: nil
+        )
+        try pool.write { db in
+            // INSERT OR IGNORE: a second enqueue of the same hash doesn't
+            // clobber an existing pending_blobs row.
+            try db.execute(
+                sql: "INSERT OR IGNORE INTO pending_blobs (hash, data, mime_type) VALUES (?, ?, ?)",
+                arguments: [hash, data, mimeType]
+            )
+            try record.insert(db)
+        }
+    }
+
+    // MARK: - Pending blob access
+
+    /// Returns the raw bytes stored for a pending blob upload, or `nil` if
+    /// the row has already been deleted (upload succeeded or was dropped).
+    func fetchPendingBlob(hash: String) throws -> Data? {
+        try pool.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT data FROM pending_blobs WHERE hash = ?",
+                arguments: [hash]
+            ).map { $0["data"] as Data }
+        }
+    }
+
+    /// Removes a pending blob data row after a successful upload.
+    func deletePendingBlob(hash: String) throws {
+        try pool.write { db in
+            try db.execute(
+                sql: "DELETE FROM pending_blobs WHERE hash = ?",
+                arguments: [hash]
+            )
+        }
     }
 
     // MARK: - Dequeue / drain
@@ -610,6 +703,11 @@ public actor MutationQueue {
                 p = DeleteExtensionPayload(itemId: newId, namespace: p.namespace)
             }
             encoded = try encoder.encode(p)
+
+        case .uploadBlob:
+            // Blob uploads carry a content hash, not an item ID — nothing to
+            // rewrite when a createItem's local ID changes.
+            return row.payloadJson
         }
 
         return String(data: encoded, encoding: .utf8) ?? row.payloadJson
