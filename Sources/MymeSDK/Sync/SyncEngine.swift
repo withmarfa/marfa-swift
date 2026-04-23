@@ -800,6 +800,18 @@ public actor SyncEngine {
                 )
             }
             try? await mutationQueue.deletePendingBlob(hash: p.hash)
+
+        case .bulk:
+            let p = try decoder.decode(BulkPayload.self, from: data)
+            let _: BulkResult = try await transport.request(
+                method: .post, path: "/items/bulk", body: p.input, query: nil
+            )
+
+        case .bulkAction:
+            let p = try decoder.decode(BulkActionPayload.self, from: data)
+            let _: BulkActionResult = try await transport.request(
+                method: .post, path: "/items/bulk_action", body: p.input, query: nil
+            )
         }
 
         // Only the `createItem` path returns `true`; every other replay is a

@@ -161,6 +161,18 @@ struct UploadBlobPayload: Codable, Sendable {
     let size: Int
 }
 
+/// Payload for `bulk` — `POST /items/bulk` list-in. The whole caller
+/// input travels verbatim so replay re-issues the identical call.
+struct BulkPayload: Codable, Sendable {
+    let input: BulkInput
+}
+
+/// Payload for `bulkAction` — `POST /items/bulk_action` filter-in.
+/// Same round-trip-exact semantics as `BulkPayload`.
+struct BulkActionPayload: Codable, Sendable {
+    let input: BulkActionInput
+}
+
 // MARK: - MutationQueue actor
 
 /// Durable queue of pending server writes.
@@ -304,6 +316,14 @@ public actor MutationQueue {
             payload: DeleteExtensionPayload(itemId: itemId, namespace: namespace),
             localId: itemId
         )
+    }
+
+    func enqueueBulk(_ input: BulkInput) throws {
+        try enqueue(kind: .bulk, payload: BulkPayload(input: input))
+    }
+
+    func enqueueBulkAction(_ input: BulkActionInput) throws {
+        try enqueue(kind: .bulkAction, payload: BulkActionPayload(input: input))
     }
 
     /// Enqueues a blob upload. Inserts the binary data into the
@@ -674,6 +694,13 @@ public actor MutationQueue {
         case .uploadBlob:
             // Blob uploads carry a content hash, not an item ID —
             // nothing to rewrite when a createItem's local ID changes.
+            return record.payloadJson
+
+        case .bulk, .bulkAction:
+            // Bulk payloads don't reference specific in-flight local IDs:
+            // `bulk` items are keyed by `(source, source_id)`; `bulkAction`
+            // resolves matches via a filter at replay time. Nothing to
+            // rewrite if a createItem's local ID changes.
             return record.payloadJson
         }
 

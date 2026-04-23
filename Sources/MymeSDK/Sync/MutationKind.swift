@@ -24,4 +24,6 @@ public enum MutationKind: String, Codable, Sendable, CaseIterable {
     case setExtension
     case deleteExtension
     case uploadBlob
+    case bulk
+    case bulkAction
 }
