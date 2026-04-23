@@ -1,5 +1,9 @@
 import Foundation
-import GRDB
+import SwiftData
+
+// `MymeModelContainer` is `@_spi(MymeSDKTestSupport) public` so external
+// test targets can construct in-memory containers; inside the SDK module
+// it's freely accessible.
 
 /// Client for the Myme API.
 ///
@@ -11,10 +15,10 @@ import GRDB
 ///     )
 ///     let results = try await client.search(query: "hello")
 ///
-/// For pure offline / on-device use, create a local-only client backed by
-/// a SQLite store — no API key or server URL required:
+/// For pure offline / on-device use, create a local-only client backed
+/// by a SwiftData store — no API key or server URL required:
 ///
-///     let client = try MymeClient.local(path: "/path/to/store.sqlite")
+///     let client = try await MymeClient.local(path: "/path/to/store.sqlite")
 ///     let note = try await client.items.create(
 ///         CreateItemInput(type: "core.note", properties: ["body": .string("Hello")])
 ///     )
@@ -58,11 +62,11 @@ public final class MymeClient: Sendable {
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
-    /// The underlying `DatabasePool`, non-nil when a local store is configured.
-    ///
-    /// Used by ``makeStore()`` to create ``MymeStore`` instances. The pool is
-    /// `Sendable` and safe to store on `MymeClient`.
-    private let pool: DatabasePool?
+    /// The underlying ``ModelContainer``, non-nil when a local store is
+    /// configured. Used by ``makeStore()`` to create ``MymeStore``
+    /// instances. `ModelContainer` is `Sendable` and safe to store on
+    /// `MymeClient`.
+    private let container: ModelContainer?
 
     // MARK: - Init
 
@@ -73,12 +77,12 @@ public final class MymeClient: Sendable {
         localStore: LocalStore? = nil,
         mutationQueue: MutationQueue? = nil,
         syncEngine: SyncEngine? = nil,
-        pool: DatabasePool? = nil
+        container: ModelContainer? = nil
     ) {
         self.configuration = configuration
         self.transport = transport
         self.syncEngine = syncEngine
-        self.pool = pool
+        self.container = container
 
         let items = ItemsNamespace(
             transport: transport,
@@ -104,10 +108,11 @@ public final class MymeClient: Sendable {
             localStore: localStore,
             mutationQueue: mutationQueue
         )
-        // Pure-local mode has a local store but no sync engine — blob ops
-        // can't round-trip through the server and must throw early.
-        // In synced mode the mutation queue is passed so uploads are queued
-        // for offline-resilient replay rather than hitting the transport directly.
+        // Pure-local mode has a local store but no sync engine — blob
+        // ops can't round-trip through the server and must throw early.
+        // In synced mode the mutation queue is passed so uploads are
+        // queued for offline-resilient replay rather than hitting the
+        // transport directly.
         self.blobs = BlobsNamespace(
             transport: transport,
             apiBaseURL: configuration.url,
@@ -133,18 +138,28 @@ public final class MymeClient: Sendable {
         self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
     }
 
-    /// Creates a pure-local client backed by a SQLite store at `path`.
+    /// Creates a pure-local client backed by a SwiftData store at `path`.
     ///
-    /// No server URL or API key is required. All namespace calls resolve against
-    /// the local store. Pass `":memory:"` for an ephemeral store (useful in tests).
+    /// No server URL or API key is required. All namespace calls
+    /// resolve against the local store. Pass `":memory:"` for an
+    /// ephemeral store (useful in tests).
     ///
-    /// - Throws: ``LocalStoreError`` if the database cannot be opened or migrated.
-    public static func local(path: String) throws -> MymeClient {
-        let store = try LocalStore(path: path)
-        // The transport is never invoked in pure-local mode: every namespace
-        // method checks `localStore` first before touching the transport.
-        // URL is a placeholder; the fallback guards against the synthetic
-        // `local://offline` scheme ever failing to parse in a future SDK.
+    /// `async` because the underlying `LocalStore` is constructed off
+    /// the main actor via `Task.detached` — `@ModelActor`'s synthesised
+    /// init binds the actor's executor to whatever actor calls it, so
+    /// calling from `@MainActor` would silently route every method onto
+    /// the main thread.
+    ///
+    /// - Throws: ``LocalStoreError`` if the database cannot be opened or
+    ///   migrated.
+    public static func local(path: String) async throws -> MymeClient {
+        let container = try MymeModelContainer.make(path: path)
+        let store = await Task.detached { LocalStore(modelContainer: container) }.value
+        // The transport is never invoked in pure-local mode: every
+        // namespace method checks `localStore` first before touching the
+        // transport. URL is a placeholder; the fallback guards against
+        // the synthetic `local://offline` scheme ever failing to parse
+        // in a future SDK.
         let config = ClientConfiguration(
             url: URL(string: "local://offline") ?? URL(fileURLWithPath: "/dev/null"),
             apiKey: ""
@@ -153,35 +168,41 @@ public final class MymeClient: Sendable {
             configuration: config,
             transport: URLSessionTransport(configuration: config),
             localStore: store,
-            pool: store.pool
+            container: container
         )
     }
 
-    /// Creates a synced client backed by a SQLite store and a live server connection.
+    /// Creates a synced client backed by a SwiftData store and a live
+    /// server connection.
     ///
-    /// The client writes optimistically to the local store on every mutation and
-    /// enqueues the mutation for background replay. The returned ``SyncEngine``
-    /// (via ``MymeClient/syncEngine``) must be started by the caller:
+    /// The client writes optimistically to the local store on every
+    /// mutation and enqueues the mutation for background replay. The
+    /// returned ``SyncEngine`` (via ``MymeClient/syncEngine``) must be
+    /// started by the caller:
     ///
-    ///     let client = try MymeClient.synced(url: serverURL, apiKey: key, storePath: dbPath)
+    ///     let client = try await MymeClient.synced(url: serverURL, apiKey: key, storePath: dbPath)
     ///     await client.syncEngine?.start()
     ///
     /// - Parameters:
     ///   - url: Base URL of the Myme API.
     ///   - apiKey: API key for authentication.
-    ///   - storePath: Path to the SQLite database file. Pass `":memory:"` for tests.
-    ///   - connectionManager: Optional pre-built manager; the default creates one.
-    /// - Throws: ``LocalStoreError`` if the database cannot be opened or migrated.
+    ///   - storePath: Path to the SwiftData store file. Pass `":memory:"`
+    ///     for tests.
+    ///   - connectionManager: Optional pre-built manager; the default
+    ///     creates one.
+    /// - Throws: ``LocalStoreError`` if the database cannot be opened or
+    ///   migrated.
     public static func synced(
         url: URL,
         apiKey: String,
         storePath: String,
         connectionManager: ConnectionStateManager = ConnectionStateManager()
-    ) throws -> MymeClient {
+    ) async throws -> MymeClient {
         let config = ClientConfiguration(url: url, apiKey: apiKey)
         let transport = URLSessionTransport(configuration: config)
-        let store = try LocalStore(path: storePath)
-        let queue = try MutationQueue(pool: store.pool)
+        let container = try MymeModelContainer.make(path: storePath)
+        let store = await Task.detached { LocalStore(modelContainer: container) }.value
+        let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
         let engine = SyncEngine(
             transport: transport,
             localStore: store,
@@ -194,12 +215,13 @@ public final class MymeClient: Sendable {
             localStore: store,
             mutationQueue: queue,
             syncEngine: engine,
-            pool: store.pool
+            container: container
         )
     }
 
-    /// Creates a client from environment variables (`MYME_API_URL`, `MYME_API_KEY`).
-    /// Returns `nil` if the environment variables are not set.
+    /// Creates a client from environment variables (`MYME_API_URL`,
+    /// `MYME_API_KEY`). Returns `nil` if the environment variables are
+    /// not set.
     public static func fromEnvironment() -> MymeClient? {
         guard let config = ClientConfiguration.fromEnvironment() else { return nil }
         return MymeClient(configuration: config)
@@ -252,23 +274,25 @@ public final class MymeClient: Sendable {
 
     /// Creates a ``MymeStore`` for use with SwiftUI and `@Observable`.
     ///
-    /// Returns `nil` when the client has no local store configured (i.e., it
-    /// was created with ``MymeClient/init(url:apiKey:)`` or
+    /// Returns `nil` when the client has no local store configured (i.e.
+    /// it was created with ``MymeClient/init(url:apiKey:)`` or
     /// ``MymeClient/init(configuration:)`` without a local store path).
     ///
-    /// Must be called from a `@MainActor` context. Callers typically hold the
-    /// returned store as a `@State` or environment object in a SwiftUI view:
+    /// Must be called from a `@MainActor` context. Callers typically
+    /// hold the returned store as a `@State` or environment object in a
+    /// SwiftUI view:
     ///
     ///     @State private var store = client.makeStore()
     ///     // ...
     ///     let notes = store?.query(filters: ListFilters(type: "core.note"))
     ///
-    /// Each call to `makeStore()` returns a new `MymeStore` instance backed by
-    /// the same underlying database — multiple stores observe the same data.
+    /// Each call to `makeStore()` returns a new `MymeStore` instance
+    /// backed by the same underlying ``ModelContainer`` — multiple
+    /// stores observe the same data.
     @MainActor
     public func makeStore() -> MymeStore? {
-        guard let pool else { return nil }
-        return MymeStore(pool: pool)
+        guard let container else { return nil }
+        return MymeStore(container: container)
     }
 
     // MARK: - Top-Level Methods

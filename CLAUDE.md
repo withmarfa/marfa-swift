@@ -4,12 +4,12 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 
 ## Architecture
 
-- **SPM package**, zero external dependencies. Built from Foundation, Security, and `os`.
-- **Platforms:** iOS 17+, macOS 14+, visionOS 1+, watchOS 10+, tvOS 17+.
+- **SPM package**, zero external dependencies. Built from Foundation, Security, SwiftData, and `os`.
+- **Platforms:** iOS 26+, macOS 26+, visionOS 26+, watchOS 26+, tvOS 26+.
 - **Swift 6** language mode with complete strict concurrency.
 - **Two products:**
   - `MymeSDK` — the client library
-  - `MymeSDKTestSupport` — public test scaffolding (MockTransport, InMemoryKeychain). No semver stability across SDK minor versions; for test use only.
+  - `MymeSDKTestSupport` — public test scaffolding (MockTransport, InMemoryKeychain, SwiftDataHelpers). No semver stability across SDK minor versions; for test use only.
 - **`Transport` protocol** abstracts HTTP. `URLSessionTransport` is the production impl; `MockTransport` is in test-support.
 - **Namespaced API**: `client.items.create()`, `client.metadata.get()`, etc.
 - **`JSONValue`** enum for arbitrary JSON (Codable, Sendable, Hashable).
@@ -18,24 +18,27 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 
 ### Local store & sync
 
-- **LocalStore** (`actor`) — GRDB `DatabasePool` (WAL mode) with v1 migration (items, edges, item_metadata tables + 4 indexes). Used in pure-local mode (`MymeClient.local(path:)`) and synced mode.
-- **MutationQueue** (`actor`) — shares LocalStore's `DatabasePool`; v2 migration adds `pending_mutations` and `sync_state` tables. Enqueues 13 mutation kinds; `fetchAll()`/`remove(id:)`/`recordFailure(id:error:)` drain API. Persists `last_event_id` cursor for SSE reconnection.
+- **LocalStore** (`@ModelActor`) — SwiftData `ModelContainer` constructed via `MymeModelContainer.make(path:)`. Six `@Model` classes under `LocalStore/Schema/V1/` (item, edge, metadata, pending mutation, sync state, pending blob). CloudKit-compatible from day one — no `#Unique`, all properties defaulted, all relationships optional with explicit inverse, no `.deny` rules, Codable enums via rawValue. Used in pure-local mode (`MymeClient.local(path:)`) and synced mode. **`MymeClient.local(path:)` and `MymeClient.synced(...)` are `async throws`** — `@ModelActor` actor construction must run off the main actor.
+- **MutationQueue** (`@ModelActor`) — shares LocalStore's `ModelContainer`; cross-actor saves serialise at the SQLite layer. Enqueues 16 mutation kinds (one per case in `MutationKind`); `fetchAll()`/`remove(id:)`/`recordFailure(id:error:)` drain API returning Sendable `PendingMutationRecord` DTOs. Persists `last_event_id` cursor for SSE reconnection. `enqueueBlobUpload`/`purgeItem`/`dropMutationsReferencingLocalId` each commit as one `modelContext.save()` — atomicity preserved from the GRDB era.
 - **ConnectionState** — `.offline`, `.connecting`, `.online`, `.syncing`. `isReachable` helper.
 - **ConnectionStateManager** (`actor`) — wraps `NWPathMonitor`; bridges from `DispatchQueue` to actor via `Task { await self?.handlePath(_:) }`. Multicasts to `AsyncStream<ConnectionState>` subscribers via UUID-keyed `continuations`. `markSyncing()`/`markOnline()` for engine transitions.
 - **SyncEngine** (`actor`) — observes `ConnectionStateManager.stateUpdates`; on `.connecting` opens `GET /events` SSE stream with `Last-Event-ID` cursor; applies `item.*`, `edge.*`, `metadata.changed` events to LocalStore via upsert; after stream closes, drains MutationQueue (markSyncing while replaying, markOnline when done); reconciles local-id → server-id for `createItem` replays.
-- **`MymeClient.local(path:)`** — pure-local, no mutations enqueued. `MymeClient.synced(url:apiKey:storePath:connectionManager:)` — wires all four actors together; caller calls `client.syncEngine?.start()`.
-- **Local-first reads** — `metadata.listTags()` aggregates tags from `item_metadata.tags_json` via SQLite `json_each` when a local store is present (synced + pure-local). `edges.listToTargets(targetIds:edgeType:limit:)` batches inbound-edge lookup: one SQL query locally, bounded `TaskGroup` fan-out remotely (cap via `ClientConfiguration.maxBackrefBatchConcurrency`, default 8).
+- **`MymeClient.local(path:)`** — pure-local, no mutations enqueued. `MymeClient.synced(url:apiKey:storePath:connectionManager:)` — wires all four actors together; caller calls `client.syncEngine?.start()`. Both factories are `async throws`; one-line update at every call site (`try` → `try await`).
+- **Local-first reads** — `metadata.listTags()` aggregates tags by fetching metadata rows with the parent item's `stateRaw != "trashed"` and bucketing in Swift (SwiftData predicates can't reach inside the JSON `tagsData` blob). `edges.listToTargets(targetIds:edgeType:limit:)` batches inbound-edge lookup: one fetch locally with `Set.contains(targetId)`, bounded `TaskGroup` fan-out remotely (cap via `ClientConfiguration.maxBackrefBatchConcurrency`, default 8).
+- **Predicate safety** — `LocalStore/Schema/PredicateConventions.swift` documents the SwiftData predicate-safe subset every fetch must stick to. `Tests/MymeSDKTests/PredicateSafetyTests.swift` regresses every supported shape so a future predicate that compiles cleanly but crashes at runtime fails CI loudly. Key rules: predicate against `*Raw` columns not Codable enum cases; use captured-value `&&` short-circuits not runtime `Predicate<T>` composition; use `prop != ""` for empty-string filtering (`isEmpty` and `!isEmpty` both misbehave in current SwiftData).
+- **CloudKit readiness** — schema is mirrored-ready; `cloudKitDatabase: .none` in v4.0.0. Phase 2 (Notes app) flips to `.automatic`. `swift run cloudkit-smoke` validates the schema against a developer's CloudKit container — see `Sources/MymeSDK/LocalStore/README.md`. Manual run only (no CloudKit entitlements on CI runners).
 
 ### Reactive layer (@Observable, SwiftUI)
 
-- **MymeStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (returns `nil` for network-only clients). Factory for live query objects.
-- **ItemQuery** — tracks `[Item]` for a `ListFilters`; GRDB `ValueObservation` on the items table with `.mainQueue` scheduler. Fields: `items`, `isLoading`, `error`. `stop()` cancels.
+- **MymeStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (returns `nil` for network-only clients). Factory for live query objects. Holds the shared `ModelContainer`.
+- **ItemQuery** — tracks `[Item]` for a `ListFilters`; subscribes to `ModelContext.didSave` via `NotificationCenter.notifications(named:)`, debounces 50 ms (`Reactive/RefreshDebounce.swift`), refetches on the `@MainActor`. Fields: `items`, `isLoading`, `error`. `stop()` cancels.
 - **TypedItemQuery<T: MymeItem>** — like `ItemQuery` but maps records through `T.init?(from:)`, producing `[T]`.
 - **SingleItemQuery** — tracks one item by id; `item` is `nil` when purged.
-- **EdgesQuery** — tracks outbound edges for a `sourceId`; optional `edgeType` and `limit`.
+- **EdgesQuery** — tracks outbound edges for a `sourceId`; optional `edgeType` and `limit`. Second initialiser tracks every edge of a given type tenant-wide.
 - **BackrefsQuery** — tracks inbound edges for a batch of `targetIds`; `edgesByTarget: [String: [Edge]]` keyed by every requested id (unknown ids stay present with `[]`). Factory: `store.queryBackrefs(to:edgeType:limit:)`.
-- **TagsQuery** — tracks `[TagWithCount]` sorted count desc, tag asc — same ordering as `metadata.listTags()` and the server. Factory: `store.queryTags()`.
-- All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`.
+- **TagsQuery** — tracks `[TagWithCount]` sorted count desc, tag asc — same ordering as `metadata.listTags()` and the server. Factory: `store.queryTags()`. Aggregates in Swift over a relationship-prefetched fetch (`relationshipKeyPathsForPrefetching = [\.item]`).
+- **ItemsWithMetadataQuery** — items + metadata composite. Two fetches per refresh (items, then metadata where `Set<String>.contains(itemId)`); 1:1 join in Swift.
+- All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`. The shared listener machinery lives in `RefetchObserver` (`Reactive/MymeStore.swift`).
 
 ### Transport subsystems
 

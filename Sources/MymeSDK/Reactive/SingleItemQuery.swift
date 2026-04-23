@@ -1,13 +1,18 @@
 import Foundation
-import GRDB
 import Observation
+import SwiftData
+
+// MARK: - Predicate safety
+//
+// See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift`.
+// Predicate compares against the stored String column `id`.
 
 // MARK: - SingleItemQuery
 
 /// A live, observable query over a single item by ID.
 ///
-/// The observation fires whenever the item row changes. If the item is purged,
-/// ``item`` becomes `nil`.
+/// The observation fires whenever the item row changes. If the item is
+/// purged, ``item`` becomes `nil`.
 ///
 /// ## Usage
 ///
@@ -23,45 +28,43 @@ public final class SingleItemQuery {
     /// The item, or `nil` if it has been purged or does not exist.
     public private(set) var item: Item?
 
-    /// `true` while the initial fetch is in flight.
     public private(set) var isLoading: Bool = true
-
-    /// Most recent observation error.
     public private(set) var error: Error?
 
     // MARK: - Internals
 
-    private var cancellable: AnyDatabaseCancellable?
+    private let context: ModelContext
+    private let id: String
+    private var observer: RefetchObserver?
 
     // MARK: - Init
 
-    init(pool: DatabasePool, id: String) {
-        let observation = ValueObservation.tracking { db -> ItemRecord? in
-            try ItemRecord
-                .filter(Column("id") == id)
-                .fetchOne(db)
-        }
+    init(container: ModelContainer, id: String) {
+        self.context = ModelContext(container)
+        self.id = id
+        Task { @MainActor [weak self] in self?.refetch() }
+        self.observer = RefetchObserver { [weak self] in self?.refetch() }
+    }
 
-        cancellable = observation.start(
-            in: pool,
-            scheduling: .mainActor,
-            onError: { [weak self] error in
-                self?.error = error
-                self?.isLoading = false
-            },
-            onChange: { [weak self] record in
-                self?.item = try? record?.toItem()
-                self?.isLoading = false
-                self?.error = nil
-            }
-        )
+    private func refetch() {
+        do {
+            let captured = id
+            let predicate = #Predicate<MymeItemModel> { $0.id == captured }
+            var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+            descriptor.fetchLimit = 1
+            self.item = try context.fetch(descriptor).first?.toWireItem()
+            self.isLoading = false
+            self.error = nil
+        } catch {
+            self.error = error
+            self.isLoading = false
+        }
     }
 
     // MARK: - Lifecycle
 
-    /// Stops the observation.
     public func stop() {
-        cancellable?.cancel()
-        cancellable = nil
+        observer?.cancel()
+        observer = nil
     }
 }

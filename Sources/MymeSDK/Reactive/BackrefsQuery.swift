@@ -1,16 +1,23 @@
 import Foundation
-import GRDB
 import Observation
+import SwiftData
+
+// MARK: - Predicate safety
+//
+// See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift`.
+// `Set.contains` over a captured `[String]` is supported (rule 1
+// caveat — captured collection literal contains() is allowed).
 
 // MARK: - BackrefsQuery
 
-/// A live, observable query over inbound edges for a batch of target items.
+/// A live, observable query over inbound edges for a batch of target
+/// items.
 ///
 /// `edgesByTarget` is keyed by every distinct target ID the query was
-/// created with; unknown IDs stay present with an empty array so callers can
-/// iterate the input without `??`-defaulting. Re-emits whenever any edge
-/// whose `target_id` matches one of the watched IDs changes — create,
-/// update, delete.
+/// created with; unknown IDs stay present with an empty array so
+/// callers can iterate the input without `??`-defaulting. Re-emits
+/// whenever any edge whose `targetId` matches one of the watched IDs
+/// changes — create, update, delete.
 ///
 /// ## Usage
 ///
@@ -21,95 +28,91 @@ import Observation
 ///     ForEach(items) { item in
 ///         Text("\(query.edgesByTarget[item.id]?.count ?? 0) replies")
 ///     }
-///
-/// Backs "reply count per message", "citations per article", and similar
-/// batched backref surfaces without an N+1 per-item observation.
 @Observable
 @MainActor
 public final class BackrefsQuery {
 
     // MARK: - Published state
 
-    /// Current inbound edges, keyed by target ID. Updated automatically.
     public private(set) var edgesByTarget: [String: [Edge]] = [:]
-
-    /// `true` while the initial fetch is in flight.
     public private(set) var isLoading: Bool = true
-
-    /// Most recent observation error, if any.
     public private(set) var error: Error?
 
     // MARK: - Internals
 
-    private var cancellable: AnyDatabaseCancellable?
+    private let context: ModelContext
+    private let distinctIds: [String]
+    private let initial: [String: [Edge]]
+    private let edgeType: String?
+    private let limit: Int?
+    private var observer: RefetchObserver?
 
     // MARK: - Init
 
-    /// Creates a live backrefs query.
-    ///
-    /// Duplicates in `targetIds` are collapsed to distinct. An empty
-    /// `targetIds` yields an empty dictionary and immediately marks the
-    /// query as loaded.
-    ///
-    /// - Parameters:
-    ///   - pool: Shared ``DatabasePool`` from the ``LocalStore``.
-    ///   - targetIds: Item IDs whose inbound edges should be tracked.
-    ///   - edgeType: Restrict to this edge type, or `nil` for all types.
-    ///   - limit: Optional cap per target.
     init(
-        pool: DatabasePool,
+        container: ModelContainer,
         targetIds: [String],
         edgeType: String?,
         limit: Int?
     ) {
-        let distinct = Array(Set(targetIds))
-        let initial = Dictionary(uniqueKeysWithValues: distinct.map { ($0, [Edge]()) })
+        self.context = ModelContext(container)
+        self.distinctIds = Array(Set(targetIds))
+        self.initial = Dictionary(uniqueKeysWithValues: distinctIds.map { ($0, [Edge]()) })
+        self.edgeType = edgeType
+        self.limit = limit
 
-        guard !distinct.isEmpty else {
+        // Empty input: bypass observation entirely. Callers iterating
+        // over their input ids see an empty `edgesByTarget` and the
+        // query is loaded.
+        guard !distinctIds.isEmpty else {
             self.edgesByTarget = initial
             self.isLoading = false
             return
         }
 
-        let observation = ValueObservation.tracking { db -> [String: [Edge]] in
-            var request = EdgeRecord.filter(distinct.contains(Column("target_id")))
-            if let edgeType {
-                request = request.filter(Column("edge_type") == edgeType)
+        Task { @MainActor [weak self] in self?.refetch() }
+        self.observer = RefetchObserver { [weak self] in self?.refetch() }
+    }
+
+    // MARK: - Refetch
+
+    private func refetch() {
+        do {
+            let idSet = Set(distinctIds)
+            let typeFilter = edgeType ?? ""
+            let hasTypeFilter = edgeType != nil
+            let predicate = #Predicate<MymeEdgeModel> { edge in
+                idSet.contains(edge.targetId) &&
+                (!hasTypeFilter || edge.edgeType == typeFilter)
             }
-            let records = try request.fetchAll(db)
-            var result = initial
-            for record in records {
-                let edge = try record.toEdge()
-                result[edge.targetId, default: []].append(edge)
+            let descriptor = FetchDescriptor<MymeEdgeModel>(
+                predicate: predicate,
+                sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+            )
+            let models = try context.fetch(descriptor)
+            var grouped = initial
+            for model in models {
+                let edge = model.toWireEdge()
+                grouped[edge.targetId, default: []].append(edge)
             }
             if let limit {
-                for (key, edges) in result where edges.count > limit {
-                    result[key] = Array(edges.prefix(limit))
+                for (key, edges) in grouped where edges.count > limit {
+                    grouped[key] = Array(edges.prefix(limit))
                 }
             }
-            return result
+            self.edgesByTarget = grouped
+            self.isLoading = false
+            self.error = nil
+        } catch {
+            self.error = error
+            self.isLoading = false
         }
-
-        cancellable = observation.start(
-            in: pool,
-            scheduling: .mainActor,
-            onError: { [weak self] error in
-                self?.error = error
-                self?.isLoading = false
-            },
-            onChange: { [weak self] grouped in
-                self?.edgesByTarget = grouped
-                self?.isLoading = false
-                self?.error = nil
-            }
-        )
     }
 
     // MARK: - Lifecycle
 
-    /// Stops the observation.
     public func stop() {
-        cancellable?.cancel()
-        cancellable = nil
+        observer?.cancel()
+        observer = nil
     }
 }

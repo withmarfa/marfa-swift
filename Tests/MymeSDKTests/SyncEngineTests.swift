@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import MymeSDK
 @testable import MymeSDKTestSupport
+import SwiftData
 
 // Test-only Transport used by the concurrency-guard test. Its `request` call
 // suspends on a continuation until the test calls `release(...)`, simulating
@@ -86,12 +87,9 @@ struct SyncEngineTests {
 
     // MARK: - Helpers
 
-    private func makeStore() throws -> LocalStore {
-        try LocalStore(path: ":memory:")
-    }
-
-    private func makeQueue(store: LocalStore) throws -> MutationQueue {
-        try MutationQueue(pool: store.pool)
+    private func makeStoreAndQueue() async throws -> (LocalStore, MutationQueue) {
+        let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
+        return (store, queue)
     }
 
     private func noteInput(body: String = "Hello") -> CreateItemInput {
@@ -103,20 +101,20 @@ struct SyncEngineTests {
     @Suite("MutationQueue")
     struct MutationQueueTests {
 
-        private func makeStore() throws -> LocalStore { try LocalStore(path: ":memory:") }
-        private func makeQueue(store: LocalStore) throws -> MutationQueue {
-            try MutationQueue(pool: store.pool)
+        // Pair-builder: shared `ModelContainer` so the queue and store
+        // commit to the same SQLite file (synced-mode shape).
+        private func makeStoreAndQueue() async throws -> (LocalStore, MutationQueue) {
+            let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
+            return (store, queue)
         }
 
         @Test("Queue starts empty") func startsEmpty() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             #expect(try await queue.isEmpty)
         }
 
         @Test("Enqueue createItem appears in fetchAll") func enqueueCreateItem() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             let input = CreateItemInput(type: "core.note", properties: ["body": .string("hi")])
             try await queue.enqueueCreateItem(input, localId: "local-123")
 
@@ -128,8 +126,7 @@ struct SyncEngineTests {
         }
 
         @Test("remove deletes a record") func removeRecord() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
             try await queue.enqueueCreateItem(input, localId: "l1")
 
@@ -140,8 +137,7 @@ struct SyncEngineTests {
         }
 
         @Test("recordFailure increments attempt_count") func recordFailure() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             try await queue.enqueueDeleteItem(id: "item-1")
 
             var records = try await queue.fetchAll()
@@ -155,8 +151,7 @@ struct SyncEngineTests {
         }
 
         @Test("fetchAll returns records in creation order") func fetchAllOrder() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             try await queue.enqueueDeleteItem(id: "a")
             try await queue.enqueueDeleteItem(id: "b")
             try await queue.enqueueDeleteItem(id: "c")
@@ -171,8 +166,7 @@ struct SyncEngineTests {
         }
 
         @Test("saveSyncState and loadSyncState round-trip") func syncStateCursor() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             let loaded = try await queue.loadSyncState(key: "last_event_id")
             #expect(loaded == nil)
@@ -188,8 +182,7 @@ struct SyncEngineTests {
         }
 
         @Test("enqueue all mutation kinds") func enqueueAllKinds() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
 
             try await queue.enqueueCreateItem(input, localId: "li")
@@ -225,8 +218,7 @@ struct SyncEngineTests {
         }
 
         @Test("enqueueUpdateItem captures version + conflict + library on the payload") func captureUpdateOptions() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             try await queue.enqueueUpdateItem(
                 id: "i1",
                 properties: ["body": .string("x")],
@@ -246,8 +238,7 @@ struct SyncEngineTests {
         }
 
         @Test("enqueueUpdateItem with no options leaves version/conflict/library nil") func captureNoUpdateOptions() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
             try await queue.enqueueUpdateItem(
                 id: "i1",
                 properties: ["body": .string("x")]
@@ -328,15 +319,14 @@ struct SyncEngineTests {
     struct SyncEngineIntegrationTests {
 
         // Build a full synced client fixture.
-        private func makeFixture() throws -> (
+        private func makeFixture() async throws -> (
             store: LocalStore,
             queue: MutationQueue,
             transport: MockTransport,
             connManager: ConnectionStateManager,
             engine: SyncEngine
         ) {
-            let store = try LocalStore(path: ":memory:")
-            let queue = try MutationQueue(pool: store.pool)
+            let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
             let transport = MockTransport()
             let connManager = ConnectionStateManager()
             let engine = SyncEngine(
@@ -349,7 +339,7 @@ struct SyncEngineTests {
         }
 
         @Test("mutation queue is populated on synced-mode writes") func mutationQueueIsPopulatedOnSyncedModeWrites() async throws {
-            let (store, queue, _, _, _) = try makeFixture()
+            let (store, queue, _, _, _) = try await makeFixture()
 
             // Simulate synced-mode write: local write + enqueue
             let input = CreateItemInput(type: "core.note", properties: ["body": .string("synced")])
@@ -363,7 +353,7 @@ struct SyncEngineTests {
         }
 
         @Test("SyncEngine start/stop is idempotent") func syncEngineStartStopIsIdempotent() async throws {
-            let (_, _, _, _, engine) = try makeFixture()
+            let (_, _, _, _, engine) = try await makeFixture()
             await engine.start()
             await engine.start() // second start is a no-op
             await engine.stop()
@@ -373,7 +363,7 @@ struct SyncEngineTests {
         // MARK: - SSE event application
 
         @Test("SSE item.* events apply to local store") func ssEEventsApplyToLocalStore() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
 
             // Build item.created and item.updated events that together mutate
             // the same server-side item.
@@ -422,7 +412,7 @@ struct SyncEngineTests {
         // MARK: - Mutation replay failure accounting
 
         @Test("mutation replay records failure when transport throws") func mutationReplayRecordsFailure() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // A single pending delete the engine will try to replay.
             try await queue.enqueueDeleteItem(id: "server-x")
@@ -453,7 +443,7 @@ struct SyncEngineTests {
         // MARK: - Permanent-error drop
 
         @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // Queue an update against an item the server "doesn't have"
             // (matches the `019da086-…` pattern from the bug report).
@@ -501,7 +491,7 @@ struct SyncEngineTests {
         }
 
         @Test("mutation replay drops queued record on 400 ValidationError") func mutationReplayDropsOn400() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // Matches the `6837a0e8-…` UUIDv4 pattern from the bug report —
             // server would reject the ID with INVALID_ID (400).
@@ -524,7 +514,7 @@ struct SyncEngineTests {
         }
 
         @Test("mutation replay retains queued record on transient 5xx") func mutationReplayRetainsOn5xx() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             try await queue.enqueueUpdateItem(
                 id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
@@ -552,7 +542,7 @@ struct SyncEngineTests {
         }
 
         @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // Two mutations: first fails permanently (404), second fails
             // transiently (network). First should be dropped, second should
@@ -590,7 +580,7 @@ struct SyncEngineTests {
         // MARK: - Cursor resume
 
         @Test("opens second SSE stream with Last-Event-ID after reconnect") func cursorResumeOnReconnect() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // First connection: yield one event then close. Cursor should persist.
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
@@ -653,7 +643,7 @@ struct SyncEngineTests {
 
         @Test("catchup_too_old clears cursor and triggers full resync")
         func catchupTooOldClearsCursorAndTriggersResync() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // Seed the cursor as if we'd been running for a while.
             try await queue.saveSyncState(key: "last_event_id", value: "evt-stale")
@@ -709,8 +699,7 @@ struct SyncEngineTests {
             // Instead we drive two concurrent `applyEvent` invocations via
             // the internal test seam `_applyEventForTesting` and assert only
             // one `GET /items` is issued.
-            let store = try LocalStore(path: ":memory:")
-            let queue = try MutationQueue(pool: store.pool)
+            let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
             let transport = BlockingTransport()
             let connManager = ConnectionStateManager()
             let engine = SyncEngine(
@@ -759,7 +748,7 @@ struct SyncEngineTests {
 
         @Test("ItemsNamespace.create stamps a UUIDv7 into the queued payload when input.id is nil")
         func createStampsIdIntoEnqueuedPayload() async throws {
-            let (store, queue, transport, _, _) = try makeFixture()
+            let (store, queue, transport, _, _) = try await makeFixture()
             let items = ItemsNamespace(
                 transport: transport,
                 defaultConflictStrategy: .auto,
@@ -790,7 +779,7 @@ struct SyncEngineTests {
 
         @Test("createItem replay with stamped id takes the no-op path (no rewrite, no purge)")
         func createReplayWithStampedIdIsNoOpReconcile() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
             // Compress reconnect schedule so the test doesn't hang waiting
             // on back-off sleeps after the stream closes.
             await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
@@ -833,7 +822,7 @@ struct SyncEngineTests {
 
         @Test("permanent createItem drop cascades to dependent mutations and purges the local row")
         func createItemCascadeDropsDependents() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
             await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
 
             // Seed the local store + queue as if the app had created a note,
@@ -933,7 +922,7 @@ struct SyncEngineTests {
 
         @Test("SSE reconnect nudge drains mutations queued after the first replay")
         func sseReconnectDrainsLaterMutations() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
             // Compress the back-off so the test runs in tens of ms, not seconds.
             await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
 
@@ -979,7 +968,7 @@ struct SyncEngineTests {
 
         @Test("transient createItem blocks downstream deleteItem from running in the same cycle")
         func transientCreateItemBlocksDeleteItemSameCycle() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
             // Compress back-off so cycle 2 fires automatically in tens of ms.
             await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
 
@@ -1056,7 +1045,7 @@ struct SyncEngineTests {
 
         @Test("transient createItem also blocks downstream updateItem and metadata mutations")
         func transientCreateItemBlocksAllItemScopedMutations() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
             await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
 
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
@@ -1145,7 +1134,7 @@ struct SyncEngineTests {
 
         @Test("transient createItem for item A does not affect unrelated item B mutations")
         func transientCreateItemDoesNotBlockUnrelatedMutations() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
             await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
 
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
@@ -1231,7 +1220,7 @@ struct SyncEngineTests {
 
         @Test("createItem replay with a different server id rewrites dependents")
         func replayRewritesDependentsOnDifferentServerId() async throws {
-            let (_, queue, transport, connManager, engine) = try makeFixture()
+            let (_, queue, transport, connManager, engine) = try await makeFixture()
 
             // Queue: createItem(localId = client-A), then an updateItem that
             // references client-A. Server will return a different id — the
@@ -1285,13 +1274,13 @@ struct SyncEngineTests {
 
         @Test("hasPendingMutations is false on a fresh engine")
         func hasPendingMutationsFalseWhenEmpty() async throws {
-            let (_, _, _, _, engine) = try makeFixture()
+            let (_, _, _, _, engine) = try await makeFixture()
             #expect(try await engine.hasPendingMutations == false)
         }
 
         @Test("hasPendingMutations tracks enqueue and remove")
         func hasPendingMutationsTracksQueue() async throws {
-            let (_, queue, _, _, engine) = try makeFixture()
+            let (_, queue, _, _, engine) = try await makeFixture()
 
             try await queue.enqueueDeleteItem(id: "server-1")
             #expect(try await engine.hasPendingMutations == true)
@@ -1303,14 +1292,14 @@ struct SyncEngineTests {
 
         @Test("lastFullSyncAt is nil on a fresh store")
         func lastFullSyncAtNilOnFreshStore() async throws {
-            let (_, _, _, _, engine) = try makeFixture()
+            let (_, _, _, _, engine) = try await makeFixture()
             let stamped = await engine.lastFullSyncAt
             #expect(stamped == nil)
         }
 
         @Test("performInitialSync stamps lastFullSyncAt")
         func performInitialSyncStampsLastFullSyncAt() async throws {
-            let (_, _, transport, _, engine) = try makeFixture()
+            let (_, _, transport, _, engine) = try await makeFixture()
             transport.enqueue(
                 PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
             )
@@ -1329,7 +1318,7 @@ struct SyncEngineTests {
 
         @Test("lastFullSyncAt persists across SyncEngine instances on the same store")
         func lastFullSyncAtPersistsAcrossEngines() async throws {
-            let (store, queue, transport, connManager, engine) = try makeFixture()
+            let (store, queue, transport, connManager, engine) = try await makeFixture()
             transport.enqueue(
                 PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
             )
@@ -1355,15 +1344,16 @@ struct SyncEngineTests {
     @Suite("MutationQueue.rewriteLocalId")
     struct RewriteLocalIdTests {
 
-        private func makeStore() throws -> LocalStore { try LocalStore(path: ":memory:") }
-        private func makeQueue(store: LocalStore) throws -> MutationQueue {
-            try MutationQueue(pool: store.pool)
+        // Pair-builder: shared `ModelContainer` so the queue and store
+        // commit to the same SQLite file (synced-mode shape).
+        private func makeStoreAndQueue() async throws -> (LocalStore, MutationQueue) {
+            let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
+            return (store, queue)
         }
 
         @Test("rewrites update and edge endpoint references, leaves createItem alone")
         func rewritesDependents() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
             try await queue.enqueueCreateItem(input, localId: "A")
@@ -1401,8 +1391,7 @@ struct SyncEngineTests {
 
         @Test("rewrites target endpoint when oldId was on the target side of an edge")
         func rewritesEdgeTargetEndpoint() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             try await queue.enqueueCreateEdge(
                 source: "X", target: "A", edgeType: "about", properties: nil, localEdgeId: "E1"
@@ -1422,8 +1411,7 @@ struct SyncEngineTests {
 
         @Test("rewrites metadata / tags / extension kinds keyed off item id")
         func rewritesMetadataAndExtensions() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             try await queue.enqueueSetMetadata(itemId: "A", input: MetadataInput(tags: ["a"]))
             try await queue.enqueueAddTags(itemId: "A", tags: ["b"])
@@ -1461,8 +1449,7 @@ struct SyncEngineTests {
 
         @Test("no-op when from == to")
         func noOpOnEquality() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             try await queue.enqueueUpdateItem(id: "A", properties: ["body": .string("y")])
             try await queue.rewriteLocalId(from: "A", to: "A")
@@ -1478,15 +1465,16 @@ struct SyncEngineTests {
     @Suite("MutationQueue.dropMutationsReferencingLocalId")
     struct DropMutationsReferencingLocalIdTests {
 
-        private func makeStore() throws -> LocalStore { try LocalStore(path: ":memory:") }
-        private func makeQueue(store: LocalStore) throws -> MutationQueue {
-            try MutationQueue(pool: store.pool)
+        // Pair-builder: shared `ModelContainer` so the queue and store
+        // commit to the same SQLite file (synced-mode shape).
+        private func makeStoreAndQueue() async throws -> (LocalStore, MutationQueue) {
+            let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
+            return (store, queue)
         }
 
         @Test("drops item-scope mutations keyed on local_id, leaves createItem for caller")
         func dropsItemScope() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
             try await queue.enqueueCreateItem(input, localId: "A")
@@ -1510,8 +1498,7 @@ struct SyncEngineTests {
 
         @Test("drops createEdge rows whose source or target matches the local id")
         func dropsEdgesByEndpoint() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             try await queue.enqueueCreateEdge(
                 source: "A", target: "B", edgeType: "about",
@@ -1537,8 +1524,7 @@ struct SyncEngineTests {
 
         @Test("drops updateEdge / deleteEdge follow-ups for cascade-deleted createEdge rows")
         func dropsEdgeFollowUps() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             // createEdge whose source is the dropped item; follow-up
             // updateEdge + deleteEdge reference the same edge id.
@@ -1571,8 +1557,7 @@ struct SyncEngineTests {
 
         @Test("no-op when no rows reference the local id")
         func noOpWhenUnreferenced() async throws {
-            let store = try makeStore()
-            let queue = try makeQueue(store: store)
+            let (store, queue) = try await makeStoreAndQueue()
 
             try await queue.enqueueUpdateItem(id: "B", properties: ["body": .string("y")])
             let deleted = try await queue.dropMutationsReferencingLocalId("A")

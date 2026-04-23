@@ -14,8 +14,8 @@ struct MymeStoreTests {
 
     // MARK: - Helpers
 
-    private func makeClient() throws -> MymeClient {
-        try MymeClient.local(path: ":memory:")
+    private func makeClient() async throws -> MymeClient {
+        try await MymeClient.local(path: ":memory:")
     }
 
     private func noteInput(body: String) -> CreateItemInput {
@@ -24,8 +24,8 @@ struct MymeStoreTests {
 
     // MARK: - makeStore
 
-    @Test("makeStore returns non-nil for local client") func makeStoreLocal() throws {
-        let client = try makeClient()
+    @Test("makeStore returns non-nil for local client") func makeStoreLocal() async throws {
+        let client = try await makeClient()
         let store = client.makeStore()
         #expect(store != nil)
     }
@@ -42,7 +42,7 @@ struct MymeStoreTests {
     // MARK: - ItemQuery
 
     @Test("ItemQuery starts loading then delivers items") func itemQueryBasic() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -53,7 +53,7 @@ struct MymeStoreTests {
 
         let query = store.query()
 
-        // Wait for the ValueObservation to fire.
+        // Wait for the didSave-driven refetch to land.
         try await waitForCondition(timeout: .seconds(2)) { query.items.count >= 2 }
 
         #expect(query.items.count == 2)
@@ -63,7 +63,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemQuery filters by type") func itemQueryFilterType() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -82,7 +82,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemQuery filters by state") func itemQueryFilterState() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -101,7 +101,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemQuery updates when a new item is created") func itemQueryLiveUpdate() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -120,7 +120,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemQuery updates when an item is deleted") func itemQueryLiveDelete() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -145,7 +145,7 @@ struct MymeStoreTests {
     // MARK: - SingleItemQuery
 
     @Test("SingleItemQuery returns item by ID") func singleItemQuery() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -160,7 +160,7 @@ struct MymeStoreTests {
     }
 
     @Test("SingleItemQuery returns nil for non-existent item") func singleItemQueryMissing() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -174,7 +174,7 @@ struct MymeStoreTests {
     }
 
     @Test("SingleItemQuery updates on property change") func singleItemQueryUpdate() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -198,7 +198,7 @@ struct MymeStoreTests {
     // MARK: - TypedItemQuery
 
     @Test("TypedItemQuery returns CoreNote instances") func typedItemQuery() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -217,7 +217,7 @@ struct MymeStoreTests {
     }
 
     @Test("TypedItemQuery is empty for wrong type") func typedItemQueryWrongType() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -234,7 +234,7 @@ struct MymeStoreTests {
     // MARK: - EdgesQuery
 
     @Test("EdgesQuery returns outbound edges") func edgesQueryReturnsOutboundEdges() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -254,7 +254,7 @@ struct MymeStoreTests {
     }
 
     @Test("EdgesQuery filters by edgeType") func edgesQueryFiltersByEdgeType() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -274,7 +274,7 @@ struct MymeStoreTests {
     }
 
     @Test("EdgesQuery updates when edge is deleted") func edgesQueryUpdatesWhenEdgeIsDeleted() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -296,7 +296,7 @@ struct MymeStoreTests {
     // MARK: - TagsQuery
 
     @Test("TagsQuery emits aggregated tag counts") func tagsQueryAggregates() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -317,7 +317,7 @@ struct MymeStoreTests {
     }
 
     @Test("TagsQuery updates live when a tag is added") func tagsQueryLiveAdd() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -335,7 +335,7 @@ struct MymeStoreTests {
     }
 
     @Test("TagsQuery drops trashed items live") func tagsQueryLiveTrash() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -356,7 +356,7 @@ struct MymeStoreTests {
     // MARK: - BackrefsQuery
 
     @Test("BackrefsQuery groups inbound edges by target") func backrefsQueryGroups() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -379,7 +379,7 @@ struct MymeStoreTests {
     }
 
     @Test("BackrefsQuery updates when an edge is deleted") func backrefsQueryLiveDelete() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -404,8 +404,8 @@ struct MymeStoreTests {
         query.stop()
     }
 
-    @Test("BackrefsQuery with empty targetIds loads immediately empty") func backrefsQueryEmpty() throws {
-        let client = try makeClient()
+    @Test("BackrefsQuery with empty targetIds loads immediately empty") func backrefsQueryEmpty() async throws {
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -417,7 +417,7 @@ struct MymeStoreTests {
     }
 
     @Test("BackrefsQuery keeps unknown target IDs with empty value") func backrefsQueryUnknownKeys() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -439,7 +439,7 @@ struct MymeStoreTests {
     // MARK: - ItemsWithMetadataQuery
 
     @Test("ItemsWithMetadataQuery pairs items with their metadata") func itemsWithMetadataPair() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -460,7 +460,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemsWithMetadataQuery returns empty metadata for items with no metadata row") func itemsWithMetadataEmptyDefault() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -477,7 +477,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemsWithMetadataQuery updates live on item create") func itemsWithMetadataLiveCreate() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -494,7 +494,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemsWithMetadataQuery updates live on tag add") func itemsWithMetadataLiveTagAdd() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -515,7 +515,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemsWithMetadataQuery honours type filter") func itemsWithMetadataTypeFilter() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -533,7 +533,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemsWithMetadataQuery honours limit") func itemsWithMetadataLimit() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -550,7 +550,7 @@ struct MymeStoreTests {
     }
 
     @Test("ItemsWithMetadataQuery drops item when trashed under state filter") func itemsWithMetadataStateFilter() async throws {
-        let client = try makeClient()
+        let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
         }
@@ -582,7 +582,7 @@ private func waitForCondition(
         guard ContinuousClock().now < deadline else {
             throw CancellationError()
         }
-        // Yield to let ValueObservation callbacks land on the main actor.
+        // Yield so the debounced refetch task lands on the main actor.
         await Task.yield()
         try await Task.sleep(for: .milliseconds(10))
     }

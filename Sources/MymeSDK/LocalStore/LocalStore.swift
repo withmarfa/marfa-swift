@@ -1,140 +1,60 @@
 import Foundation
-import GRDB
+import SwiftData
 
-/// Persistent local mirror of the Myme data model backed by SQLite (GRDB).
+// MARK: - Predicate safety
+//
+// See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift` for
+// the full ruleset. Every predicate in this file compares against stored
+// String / Int / Double / Bool columns — never against computed Codable
+// enum properties (`state`, `origin`) and never reaches inside the JSON
+// blobs (`propertiesData`, `tagsData`, `extensionsData`).
+
+/// Persistent local mirror of the Myme data model backed by SwiftData.
 ///
 /// Used in two modes:
 /// - **Pure-local** — `MymeClient.local(path:)`. No server; all namespace
-///   calls resolve against this store. Ideal for on-device-only apps, tests,
-///   and offline-first prototyping.
-/// - **Synced** — `MymeClient.synced(url:apiKey:storePath:)`. Writes go to
-///   the store immediately, then queue to replay against the server. Reads
-///   are served locally; the sync engine keeps the store fresh via SSE.
+///   calls resolve against this store. Ideal for on-device-only apps,
+///   tests, and offline-first prototyping.
+/// - **Synced** — `MymeClient.synced(url:apiKey:storePath:)`. Writes go
+///   to the store immediately, then queue to replay against the server.
+///   Reads are served locally; the sync engine keeps the store fresh via
+///   SSE.
 ///
-/// The actor isolates all SQLite access. `DatabasePool` is opened in WAL mode,
-/// allowing concurrent reads while a write is in flight.
+/// `@ModelActor` synthesises:
+///   - `init(modelContainer: ModelContainer)`
+///   - `nonisolated let modelContainer: ModelContainer`
+///   - `nonisolated let modelExecutor: any ModelExecutor`
+///   - actor-isolated `modelContext: ModelContext`
+///
+/// `LocalStore` and ``MutationQueue`` share a single ``ModelContainer`` —
+/// each holds its own `ModelContext`, so cross-actor saves serialise at
+/// the SQLite layer underneath.
+///
+/// `@Model` instances must never cross actor boundaries; every method
+/// returns wire types (`Item`, `Edge`, `Metadata`) constructed via the
+/// mappers in `Schema/V1/Mappers.swift`.
+@ModelActor
 public actor LocalStore {
 
-    // MARK: - Internal state
+    // MARK: - Helpers
 
-    /// Shared `DatabasePool` — nonisolated so the reactive and sync layers
-    /// (`MymeStore`, `MutationQueue`, `SyncEngine`) can construct observations
-    /// and sibling writers without crossing the actor boundary for every read.
-    /// `DatabasePool` is `Sendable` (GRDB 7+), so this is safe.
-    nonisolated let pool: DatabasePool
-
-    /// ISO 8601 timestamp with fractional seconds, matching the wire format
-    /// used by the server. `Date.ISO8601FormatStyle` is a `Sendable` value type,
-    /// so this avoids the concurrency constraints that apply to
-    /// `ISO8601DateFormatter` under Swift 6 strict mode.
+    /// ISO 8601 timestamp with fractional seconds, matching the wire
+    /// format used by the server. `Date.ISO8601FormatStyle` is a
+    /// `Sendable` value type and therefore safe under Swift 6 strict
+    /// concurrency, unlike `ISO8601DateFormatter`.
     private static func iso8601(_ date: Date) -> String {
         date.ISO8601Format(.init(includingFractionalSeconds: true))
     }
-
-    // MARK: - Init
-
-    /// Opens (or creates) the SQLite database at `path` and runs migrations.
-    ///
-    /// Pass `:memory:` for an ephemeral database — useful in tests. `DatabasePool`
-    /// requires file-backed storage for WAL mode, so `:memory:` is transparently
-    /// mapped to a unique file under the OS temporary directory. The file is
-    /// not explicitly cleaned up; the OS evicts stale temp files.
-    public init(path: String) throws {
-        let resolvedPath: String
-        if path == ":memory:" {
-            resolvedPath =
-                FileManager.default
-                .temporaryDirectory
-                .appendingPathComponent("myme-\(UUID().uuidString).sqlite")
-                .path
-        } else {
-            resolvedPath = path
-        }
-        var config = Configuration()
-        config.maximumReaderCount = 5
-        pool = try DatabasePool(path: resolvedPath, configuration: config)
-        var migrator = DatabaseMigrator()
-        LocalStore.registerMigrations(into: &migrator)
-        try migrator.migrate(pool)
-    }
-
-    // MARK: - Schema migrations
-
-    private static func registerMigrations(into migrator: inout DatabaseMigrator) {
-        migrator.registerMigration("v1_initial_schema") { db in
-            try db.create(table: "items") { t in
-                t.primaryKey("id", .text)
-                t.column("type", .text).notNull()
-                t.column("state", .text).notNull().defaults(to: "active")
-                t.column("properties_json", .text).notNull().defaults(to: "{}")
-                t.column("source", .text).notNull().defaults(to: "")
-                t.column("source_id", .text)
-                t.column("origin", .text).notNull().defaults(to: "user")
-                t.column("library", .boolean).notNull().defaults(to: false)
-                t.column("version", .integer).notNull().defaults(to: 1)
-                t.column("schema_version", .integer).notNull().defaults(to: 1)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-                t.column("timestamp", .text).notNull()
-                t.column("device", .text)
-                t.column("capture_latitude", .double)
-                t.column("capture_longitude", .double)
-            }
-
-            try db.create(table: "edges") { t in
-                t.primaryKey("id", .text)
-                t.column("source_id", .text).notNull()
-                t.column("target_id", .text).notNull()
-                t.column("edge_type", .text).notNull()
-                t.column("properties_json", .text).notNull().defaults(to: "{}")
-                t.column("tenant_id", .text)
-                t.column("created_at", .text).notNull()
-                t.column("updated_at", .text).notNull()
-            }
-
-            try db.create(table: "item_metadata") { t in
-                t.primaryKey("item_id", .text)
-                t.column("tags_json", .text).notNull().defaults(to: "[]")
-                t.column("extensions_json", .text).notNull().defaults(to: "{}")
-            }
-
-            // Indexes for common access patterns
-            try db.create(
-                index: "idx_items_type_state",
-                on: "items",
-                columns: ["type", "state"]
-            )
-            try db.create(
-                index: "idx_items_updated_at",
-                on: "items",
-                columns: ["updated_at"]
-            )
-            try db.create(
-                index: "idx_edges_source",
-                on: "edges",
-                columns: ["source_id", "edge_type"]
-            )
-            try db.create(
-                index: "idx_edges_target",
-                on: "edges",
-                columns: ["target_id", "edge_type"]
-            )
-        }
-    }
-
-    // MARK: - Helpers
 
     private func now() -> String {
         LocalStore.iso8601(Date())
     }
 
-    /// Generate a fresh ID for a new item / edge / record.
+    /// Generates a fresh ID for a new item / edge / record.
     ///
-    /// Uses **UUIDv7** — Myme's canonical ID format. Timestamp-prefixed and
-    /// globally unique, so client-generated IDs round-trip cleanly to the
-    /// server with no reconciliation race. The previous fallback returned
-    /// `UUID()` (random v4) which broke timestamp-locality on local reads
-    /// and was incompatible with the server's UUIDv7 expectation.
+    /// Uses **UUIDv7** — Myme's canonical ID format. Timestamp-prefixed
+    /// and globally unique, so client-generated IDs round-trip cleanly
+    /// to the server with no reconciliation race.
     private func newId() -> String {
         UUIDv7.generateString()
     }
@@ -148,10 +68,7 @@ public actor LocalStore {
     ///
     /// In synced mode callers go through `ItemsNamespace.create`, which
     /// stamps a UUIDv7 into `input.id` before calling in, so the queued
-    /// mutation payload carries the same id as the stored row. The
-    /// local-id → server-id reconcile path in `SyncEngine.replayRecord`
-    /// therefore never fires under normal use. Direct callers in
-    /// pure-local mode may still omit `input.id` safely.
+    /// mutation payload carries the same id as the stored row.
     func createItem(_ input: CreateItemInput) throws -> Item {
         let now = now()
         let id = input.id ?? newId()
@@ -174,222 +91,184 @@ public actor LocalStore {
             updatedAt: now,
             version: 1
         )
-        let record = try ItemRecord.from(item)
-        try pool.write { db in
-            try record.insert(db)
-        }
+        let model = MymeItemModel.make(from: item)
+        modelContext.insert(model)
+        try modelContext.save()
         return item
     }
 
     /// Fetches a single item by ID. Throws ``NotFoundError`` if absent.
     func fetchItem(id: String) throws -> Item {
-        let record = try pool.read { db in
-            try ItemRecord.filter(Column("id") == id).fetchOne(db)
-        }
-        guard let record else {
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
             throw NotFoundError(message: "Item not found: \(id)")
         }
-        return try record.toItem()
+        return model.toWireItem()
     }
 
-    /// Fetches items, applying optional filters. Returns a ``PaginatedResult``
-    /// with `hasMore: false` — local stores don't cursor-paginate.
+    /// Fetches items, applying optional filters. Returns a
+    /// ``PaginatedResult`` with `hasMore: false` — local stores don't
+    /// cursor-paginate.
     func fetchItems(filters: ListFilters?) throws -> PaginatedResult<Item> {
-        let records = try pool.read { db in
-            var request = ItemRecord.all()
-            if let type = filters?.type {
-                request = request.filter(Column("type") == type)
-            }
-            if let state = filters?.state {
-                request = request.filter(Column("state") == state.rawValue)
-            }
-            if let since = filters?.since {
-                request = request.filter(Column("updated_at") >= since)
-            }
-            if let until = filters?.until {
-                request = request.filter(Column("updated_at") <= until)
-            }
-            if let limit = filters?.limit {
-                request = request.limit(limit)
-            }
-            // Default sort: newest first
-            let direction = filters?.direction
-            let sortColumn = Column(filters?.sort?.rawValue ?? "updated_at")
-            if direction == .ascending {
-                request = request.order(sortColumn.asc)
-            } else {
-                request = request.order(sortColumn.desc)
-            }
-            return try request.fetchAll(db)
-        }
-        let items = try records.map { try $0.toItem() }
+        let descriptor = Self.makeItemsDescriptor(filters: filters)
+        let models = try modelContext.fetch(descriptor)
+        let items = models.map { $0.toWireItem() }
         return PaginatedResult(data: items, cursor: nil, hasMore: false)
     }
 
-    /// Fetches items paired with their metadata in a single observation-friendly
-    /// pair of reads. Items with no `item_metadata` row fall back to an empty
-    /// ``Metadata`` (matching ``fetchMetadata(itemId:)``), so the returned array
-    /// is 1:1 with the filtered items.
-    ///
-    /// Implementation: one `ItemRecord` query honouring `filters`, then one
-    /// `MetadataRecord` query over `item_id IN (…)`. Both tables participate in
-    /// the enclosing `ValueObservation`, so reactive callers re-fire on any
-    /// relevant row change without an N+1 per-item fan-out.
+    /// Fetches items paired with their metadata in two predicate-safe
+    /// reads (one over items, one over metadata). Items with no metadata
+    /// row fall back to an empty ``Metadata``, matching the
+    /// ``fetchMetadata(itemId:)`` contract.
     func fetchItemsWithMetadata(filters: ListFilters?) throws -> [ItemWithMetadata] {
-        try pool.read { db in
-            var request = ItemRecord.all()
-            if let type = filters?.type {
-                request = request.filter(Column("type") == type)
-            }
-            if let state = filters?.state {
-                request = request.filter(Column("state") == state.rawValue)
-            }
-            if let since = filters?.since {
-                request = request.filter(Column("updated_at") >= since)
-            }
-            if let until = filters?.until {
-                request = request.filter(Column("updated_at") <= until)
-            }
-            if let limit = filters?.limit {
-                request = request.limit(limit)
-            }
-            let direction = filters?.direction
-            let sortColumn = Column(filters?.sort?.rawValue ?? "updated_at")
-            if direction == .ascending {
-                request = request.order(sortColumn.asc)
-            } else {
-                request = request.order(sortColumn.desc)
-            }
+        let descriptor = Self.makeItemsDescriptor(filters: filters)
+        let itemModels = try modelContext.fetch(descriptor)
+        let ids = Set(itemModels.map(\.id))
+        guard !ids.isEmpty else { return [] }
 
-            let itemRecords = try request.fetchAll(db)
-            let ids = itemRecords.map(\.id)
-            let metadataRecords =
-                ids.isEmpty
-                ? []
-                : try MetadataRecord
-                    .filter(ids.contains(Column("item_id")))
-                    .fetchAll(db)
-            let metadataById = Dictionary(
-                uniqueKeysWithValues: metadataRecords.map { ($0.itemId, $0) }
-            )
+        let metaPredicate = #Predicate<MymeMetadataModel> { ids.contains($0.itemId) }
+        let metaDescriptor = FetchDescriptor<MymeMetadataModel>(predicate: metaPredicate)
+        let metaModels = try modelContext.fetch(metaDescriptor)
+        let metadataById = Dictionary(
+            uniqueKeysWithValues: metaModels.map { ($0.itemId, $0) }
+        )
 
-            return try itemRecords.map { record in
-                let item = try record.toItem()
-                let metadata =
-                    try metadataById[record.id]?.toMetadata()
-                    ?? Metadata(extensions: [:], itemId: record.id, tags: [])
-                return ItemWithMetadata(item: item, metadata: metadata)
-            }
+        return itemModels.map { model in
+            let item = model.toWireItem()
+            let metadata = metadataById[model.id]?.toWireMetadata()
+                ?? Metadata(extensions: [:], itemId: model.id, tags: [])
+            return ItemWithMetadata(item: item, metadata: metadata)
         }
     }
 
-    /// Updates an item's properties. Increments the version and sets `updated_at`.
+    /// Updates an item with **partial-merge semantics for properties**,
+    /// mirroring the server's `PATCH /items/:id` behaviour. Caller passes
+    /// only the fields it wants to change; existing keys not in the delta
+    /// are preserved. `library` is an optional metadata-axis flag — if
+    /// provided, it overrides the existing value; otherwise the existing
+    /// value is preserved.
     @discardableResult
-    /// Updates an item with **partial-merge semantics for properties**, mirroring
-    /// the server's `PATCH /items/:id` behaviour. Caller passes only the fields
-    /// it wants to change; existing keys not in the delta are preserved.
-    /// `library` is an optional metadata-axis flag — if provided, it overrides
-    /// the existing value; otherwise the existing value is preserved.
     func updateItem(
         id: String,
         properties: [String: JSONValue],
         library: Bool? = nil
     ) throws -> Item {
-        let now = now()
-        let existing = try fetchItem(id: id)
-        // Merge the delta into the existing properties dict. New keys win on
-        // collision (last-write-wins); unmentioned keys survive untouched.
-        // This is the parity fix with the server's PATCH semantics.
-        var merged = existing.properties
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Item not found: \(id)")
+        }
+        // Merge the delta into the existing properties dict. New keys win
+        // on collision; unmentioned keys survive untouched. Parity with
+        // the server's PATCH semantics.
+        var merged = model.properties
         for (key, value) in properties {
             merged[key] = value
         }
-        let updated = Item(
-            captureLatitude: existing.captureLatitude,
-            captureLongitude: existing.captureLongitude,
-            createdAt: existing.createdAt,
-            device: existing.device,
-            edges: nil,
-            id: existing.id,
-            library: library ?? existing.library,
-            origin: existing.origin,
-            properties: merged,
-            schemaVersion: existing.schemaVersion,
-            source: existing.source,
-            sourceId: existing.sourceId,
-            state: existing.state,
-            timestamp: existing.timestamp,
-            type: existing.type,
-            updatedAt: now,
-            version: existing.version + 1
-        )
-        let record = try ItemRecord.from(updated)
-        try pool.write { db in
-            try record.update(db)
+        model.properties = merged
+        if let library {
+            model.library = library
         }
-        return updated
+        model.version += 1
+        model.updatedAt = now()
+        try modelContext.save()
+        return model.toWireItem()
     }
 
     /// Sets the item's state to `trashed` (soft delete).
     func trashItem(id: String) throws {
-        try pool.write { db in
-            try db.execute(
-                sql: "UPDATE items SET state = 'trashed', updated_at = ? WHERE id = ?",
-                arguments: [now(), id]
-            )
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Item not found: \(id)")
         }
+        model.state = .trashed
+        model.updatedAt = now()
+        try modelContext.save()
     }
 
     /// Sets the item's state to `active` (restores from trash).
     func restoreItem(id: String) throws -> Item {
-        try pool.write { db in
-            try db.execute(
-                sql: "UPDATE items SET state = 'active', updated_at = ? WHERE id = ?",
-                arguments: [now(), id]
-            )
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Item not found: \(id)")
         }
-        return try fetchItem(id: id)
+        model.state = .active
+        model.updatedAt = now()
+        try modelContext.save()
+        return model.toWireItem()
     }
 
     /// Transitions the item to a new lifecycle state.
     func transitionItem(id: String, to state: String) throws -> Item {
-        try pool.write { db in
-            try db.execute(
-                sql: "UPDATE items SET state = ?, updated_at = ? WHERE id = ?",
-                arguments: [state, now(), id]
-            )
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Item not found: \(id)")
         }
-        return try fetchItem(id: id)
+        model.stateRaw = state
+        model.updatedAt = now()
+        try modelContext.save()
+        return model.toWireItem()
     }
 
     /// Returns item counts grouped by state.
     func itemStats() throws -> [String: Int] {
-        try pool.read { db in
-            let rows = try Row.fetchAll(
-                db,
-                sql: "SELECT state, COUNT(*) as count FROM items GROUP BY state"
-            )
-            return Dictionary(
-                uniqueKeysWithValues: rows.map {
-                    ($0["state"] as String, $0["count"] as Int)
-                })
+        // Predicate-safe aggregation: fetch every item's `stateRaw` (no
+        // predicate, no relationship faulting needed) and bucket in Swift.
+        // The local store is small enough that streaming through Swift is
+        // cheaper than chasing a `groupBy` SwiftData doesn't expose.
+        let descriptor = FetchDescriptor<MymeItemModel>()
+        let models = try modelContext.fetch(descriptor)
+        var counts: [String: Int] = [:]
+        for model in models {
+            counts[model.stateRaw, default: 0] += 1
         }
+        return counts
     }
 
-    /// Permanently removes the item and its metadata.
+    /// Permanently removes the item. The cascade rule on
+    /// `MymeItemModel.metadata` removes the metadata row in the same
+    /// `save()`, so this is one delete + one save end-to-end.
     func purgeItem(id: String) throws {
-        try pool.write { db in
-            try db.execute(sql: "DELETE FROM items WHERE id = ?", arguments: [id])
-            try db.execute(sql: "DELETE FROM item_metadata WHERE item_id = ?", arguments: [id])
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            // Idempotent: purging a non-existent item is not an error
+            // (matches the legacy GRDB DELETE-by-id semantics, which
+            // affected zero rows silently).
+            return
         }
+        modelContext.delete(model)
+        try modelContext.save()
     }
 
     /// Stores (insert or replace) a raw item — used by the sync engine.
+    ///
+    /// SwiftData has no native upsert; we implement it as fetch-by-id +
+    /// in-place mutation, falling through to insert when the row doesn't
+    /// exist. Cascade-owned `metadata` is preserved across upserts (we
+    /// only mutate the item's own columns).
     func upsertItem(_ item: Item) throws {
-        let record = try ItemRecord.from(item)
-        try pool.write { db in
-            try record.save(db)
+        let id = item.id
+        let predicate = #Predicate<MymeItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        if let existing = try modelContext.fetch(descriptor).first {
+            existing.apply(item)
+        } else {
+            let model = MymeItemModel.make(from: item)
+            modelContext.insert(model)
         }
+        try modelContext.save()
     }
 
     // MARK: - Edge CRUD
@@ -412,86 +291,94 @@ public actor LocalStore {
             tenantId: nil,
             updatedAt: now
         )
-        let record = try EdgeRecord.from(edge)
-        try pool.write { db in
-            try record.insert(db)
-        }
+        let model = MymeEdgeModel.make(from: edge)
+        modelContext.insert(model)
+        try modelContext.save()
         return edge
     }
 
     /// Fetches a single edge by ID. Throws ``NotFoundError`` if absent.
     func fetchEdge(id: String) throws -> Edge {
-        let record = try pool.read { db in
-            try EdgeRecord.filter(Column("id") == id).fetchOne(db)
-        }
-        guard let record else {
+        let predicate = #Predicate<MymeEdgeModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
             throw NotFoundError(message: "Edge not found: \(id)")
         }
-        return try record.toEdge()
+        return model.toWireEdge()
     }
 
-    /// Lists edges where `source_id == sourceId`, optionally filtered by type.
+    /// Lists edges where `sourceId == sourceId`, optionally filtered by
+    /// type. Sorted by `createdAt` ascending.
     func fetchEdgesFromSource(
         sourceId: String,
         edgeType: String?,
         limit: Int?
     ) throws -> PaginatedResult<Edge> {
-        let records = try pool.read { db in
-            var request = EdgeRecord.filter(Column("source_id") == sourceId)
-            if let edgeType {
-                request = request.filter(Column("edge_type") == edgeType)
-            }
-            if let limit { request = request.limit(limit) }
-            return try request.fetchAll(db)
+        let typeFilter = edgeType ?? ""
+        let hasTypeFilter = edgeType != nil
+        let predicate = #Predicate<MymeEdgeModel> { edge in
+            edge.sourceId == sourceId &&
+            (!hasTypeFilter || edge.edgeType == typeFilter)
         }
-        let edges = try records.map { try $0.toEdge() }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        if let limit { descriptor.fetchLimit = limit }
+        let models = try modelContext.fetch(descriptor)
+        let edges = models.map { $0.toWireEdge() }
         return PaginatedResult(data: edges, cursor: nil, hasMore: false)
     }
 
-    /// Global edge listing across the entire local store, optionally filtered
-    /// by type. Used by the SDK's `edges.list(edgeType:)` to satisfy
-    /// "all edges of type X" without an N+1 walk over items. Cursor pagination
-    /// not implemented here (synced-mode local store is small enough to
-    /// return in one go); the remote-mode path uses real cursors against
-    /// `GET /edges`.
+    /// Global edge listing across the entire local store, optionally
+    /// filtered by type. Backs `edges.list(edgeType:)`.
     func fetchEdges(
         edgeType: String?,
         limit: Int?
     ) throws -> PaginatedResult<Edge> {
-        let records = try pool.read { db in
-            var request: QueryInterfaceRequest<EdgeRecord> = EdgeRecord.all()
-            if let edgeType {
-                request = request.filter(Column("edge_type") == edgeType)
-            }
-            if let limit { request = request.limit(limit) }
-            return try request.fetchAll(db)
+        let typeFilter = edgeType ?? ""
+        let hasTypeFilter = edgeType != nil
+        let predicate = #Predicate<MymeEdgeModel> { edge in
+            !hasTypeFilter || edge.edgeType == typeFilter
         }
-        let edges = try records.map { try $0.toEdge() }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        if let limit { descriptor.fetchLimit = limit }
+        let models = try modelContext.fetch(descriptor)
+        let edges = models.map { $0.toWireEdge() }
         return PaginatedResult(data: edges, cursor: nil, hasMore: false)
     }
 
-    /// Lists edges where `target_id == targetId`, optionally filtered by type.
+    /// Lists edges where `targetId == targetId`, optionally filtered by
+    /// type.
     func fetchEdgesToTarget(
         targetId: String,
         edgeType: String?,
         limit: Int?
     ) throws -> PaginatedResult<Edge> {
-        let records = try pool.read { db in
-            var request = EdgeRecord.filter(Column("target_id") == targetId)
-            if let edgeType {
-                request = request.filter(Column("edge_type") == edgeType)
-            }
-            if let limit { request = request.limit(limit) }
-            return try request.fetchAll(db)
+        let typeFilter = edgeType ?? ""
+        let hasTypeFilter = edgeType != nil
+        let predicate = #Predicate<MymeEdgeModel> { edge in
+            edge.targetId == targetId &&
+            (!hasTypeFilter || edge.edgeType == typeFilter)
         }
-        let edges = try records.map { try $0.toEdge() }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        if let limit { descriptor.fetchLimit = limit }
+        let models = try modelContext.fetch(descriptor)
+        let edges = models.map { $0.toWireEdge() }
         return PaginatedResult(data: edges, cursor: nil, hasMore: false)
     }
 
     /// Batched inbound-edge lookup. Returns a dictionary keyed by every
-    /// distinct target ID in the input (unknown IDs map to an empty array),
-    /// with the `limit` applied per target. One SQL round-trip; the
-    /// `idx_edges_target (target_id, edge_type)` index backs the `IN` clause.
+    /// distinct target ID in the input (unknown IDs map to an empty
+    /// array), with the `limit` applied per target. Single fetch; the
+    /// `(targetId, edgeType)` index backs the `IN` clause.
     func fetchEdgesToTargets(
         targetIds: [String],
         edgeType: String?,
@@ -499,18 +386,24 @@ public actor LocalStore {
     ) throws -> [String: [Edge]] {
         guard !targetIds.isEmpty else { return [:] }
         let distinctIds = Array(Set(targetIds))
-        let records = try pool.read { db in
-            var request = EdgeRecord.filter(distinctIds.contains(Column("target_id")))
-            if let edgeType {
-                request = request.filter(Column("edge_type") == edgeType)
-            }
-            return try request.fetchAll(db)
+        let idSet = Set(distinctIds)
+        let typeFilter = edgeType ?? ""
+        let hasTypeFilter = edgeType != nil
+        let predicate = #Predicate<MymeEdgeModel> { edge in
+            idSet.contains(edge.targetId) &&
+            (!hasTypeFilter || edge.edgeType == typeFilter)
         }
+        let descriptor = FetchDescriptor<MymeEdgeModel>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        let models = try modelContext.fetch(descriptor)
+
         var result: [String: [Edge]] = Dictionary(
             uniqueKeysWithValues: distinctIds.map { ($0, []) }
         )
-        for record in records {
-            let edge = try record.toEdge()
+        for model in models {
+            let edge = model.toWireEdge()
             result[edge.targetId, default: []].append(edge)
         }
         if let limit {
@@ -523,50 +416,63 @@ public actor LocalStore {
 
     /// Updates an edge's properties.
     func updateEdge(id: String, properties: [String: JSONValue]) throws -> Edge {
-        let existing = try fetchEdge(id: id)
-        let updated = Edge(
-            createdAt: existing.createdAt,
-            edgeType: existing.edgeType,
-            id: existing.id,
-            properties: properties,
-            sourceId: existing.sourceId,
-            targetId: existing.targetId,
-            tenantId: existing.tenantId,
-            updatedAt: now()
-        )
-        let record = try EdgeRecord.from(updated)
-        try pool.write { db in
-            try record.update(db)
+        let predicate = #Predicate<MymeEdgeModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Edge not found: \(id)")
         }
-        return updated
+        model.properties = properties
+        model.updatedAt = now()
+        try modelContext.save()
+        return model.toWireEdge()
     }
 
-    /// Deletes an edge by ID.
+    /// Deletes an edge by ID. Idempotent — a delete against a missing
+    /// row is a no-op (preserves the legacy GRDB DELETE semantics).
     func deleteEdge(id: String) throws {
-        try pool.write { db in
-            try db.execute(sql: "DELETE FROM edges WHERE id = ?", arguments: [id])
+        let predicate = #Predicate<MymeEdgeModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            return
         }
+        modelContext.delete(model)
+        try modelContext.save()
     }
 
     /// Stores (insert or replace) a raw edge — used by the sync engine.
     func upsertEdge(_ edge: Edge) throws {
-        let record = try EdgeRecord.from(edge)
-        try pool.write { db in
-            try record.save(db)
+        let id = edge.id
+        let predicate = #Predicate<MymeEdgeModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MymeEdgeModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        if let existing = try modelContext.fetch(descriptor).first {
+            existing.apply(edge)
+        } else {
+            let model = MymeEdgeModel.make(from: edge)
+            modelContext.insert(model)
         }
+        try modelContext.save()
     }
 
     // MARK: - Metadata CRUD
 
-    /// Fetches metadata for an item. Returns empty metadata if none exists.
+    /// Fetches metadata for an item. Returns empty metadata if none
+    /// exists (matches the wire-shape `Metadata` for an item with no
+    /// row).
     func fetchMetadata(itemId: String) throws -> Metadata {
-        let record = try pool.read { db in
-            try MetadataRecord.filter(Column("item_id") == itemId).fetchOne(db)
+        let predicate = #Predicate<MymeMetadataModel> { $0.itemId == itemId }
+        var descriptor = FetchDescriptor<MymeMetadataModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            return Metadata(extensions: [:], itemId: itemId, tags: [])
         }
-        return try record?.toMetadata() ?? Metadata(extensions: [:], itemId: itemId, tags: [])
+        return model.toWireMetadata()
     }
 
-    /// Replaces all metadata for an item.
+    /// Replaces all metadata for an item (tags only — `extensions` is
+    /// reset to empty, matching the legacy `setMetadata` contract).
     @discardableResult
     func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
         let metadata = Metadata(
@@ -574,14 +480,12 @@ public actor LocalStore {
             itemId: itemId,
             tags: input.tags ?? []
         )
-        let record = try MetadataRecord.from(metadata)
-        try pool.write { db in
-            try record.save(db)
-        }
+        try writeMetadata(metadata, itemId: itemId)
         return metadata
     }
 
-    /// Merges (union) metadata with existing values.
+    /// Merges metadata with existing values (set-union for tags;
+    /// extensions are preserved).
     @discardableResult
     func mergeMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
         let existing = try fetchMetadata(itemId: itemId)
@@ -590,17 +494,14 @@ public actor LocalStore {
             itemId: itemId,
             tags: Array(Set(existing.tags + (input.tags ?? [])).sorted())
         )
-        let record = try MetadataRecord.from(merged)
-        try pool.write { db in
-            try record.save(db)
-        }
+        try writeMetadata(merged, itemId: itemId)
         return merged
     }
 
     /// Adds tags to an item (union with existing tags).
     @discardableResult
     func addTags(itemId: String, tags: [String]) throws -> Metadata {
-        return try mergeMetadata(itemId: itemId, input: MetadataInput(tags: tags))
+        try mergeMetadata(itemId: itemId, input: MetadataInput(tags: tags))
     }
 
     /// Removes a single tag from an item.
@@ -611,44 +512,54 @@ public actor LocalStore {
             itemId: itemId,
             tags: existing.tags.filter { $0 != tag }
         )
-        let record = try MetadataRecord.from(updated)
-        try pool.write { db in
-            try record.save(db)
-        }
+        try writeMetadata(updated, itemId: itemId)
     }
 
-    /// Aggregates every distinct tag in use across non-trashed items in the
-    /// local store, with usage counts. Sorted count DESC, tag ASC — matches
-    /// the server's `GET /metadata/tags` ordering.
+    /// Aggregates every distinct tag in use across non-trashed items in
+    /// the local store, with usage counts. Sorted count DESC, tag ASC —
+    /// matches the server's `GET /metadata/tags` ordering.
     ///
-    /// Implementation: SQLite `json_each` expands each item's `tags_json`
-    /// array into rows, joined with `items` so we can exclude `state = 'trashed'`.
-    /// `json_each` is part of the SQLite JSON1 extension, which Apple ships
-    /// built-in on the iOS 17 / macOS 14 floors this SDK targets.
+    /// Implementation: fetch every metadata row whose parent item is
+    /// non-trashed (single predicate over `item.stateRaw`), then bucket
+    /// in Swift over the JSON-decoded tags. Avoids the predicate-engine
+    /// blind spot on Codable struct fields (`tagsData`).
     func listTags() throws -> [TagWithCount] {
-        try pool.read { db in
-            let rows = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT je.value AS tag, COUNT(*) AS count
-                    FROM item_metadata m
-                    JOIN items i ON i.id = m.item_id
-                    JOIN json_each(m.tags_json) je
-                    WHERE i.state != 'trashed'
-                    GROUP BY je.value
-                    ORDER BY count DESC, tag ASC
-                    """
-            )
-            return rows.map {
-                TagWithCount(tag: $0["tag"] as String, count: $0["count"] as Int)
+        // Trashed items contribute no tags; this matches the legacy
+        // `WHERE state != 'trashed'` SQL filter.
+        let trashedRaw = ItemState.trashed.rawValue
+        // `item` is the inverse relationship — only metadata rows
+        // attached to a non-trashed item count. A nil `item` (orphan)
+        // contributes nothing, matching the legacy JOIN. The predicate
+        // engine requires a single expression, hence the `&&` chain
+        // rather than an `if let`.
+        let predicate = #Predicate<MymeMetadataModel> { meta in
+            meta.item != nil && meta.item?.stateRaw != trashedRaw
+        }
+        var descriptor = FetchDescriptor<MymeMetadataModel>(predicate: predicate)
+        // Fault the parent item alongside the metadata rows so we don't
+        // pay a per-row materialisation cost when the predicate engine
+        // walks the relationship.
+        descriptor.relationshipKeyPathsForPrefetching = [\.item]
+        let models = try modelContext.fetch(descriptor)
+        var counts: [String: Int] = [:]
+        for model in models {
+            for tag in model.tags {
+                counts[tag, default: 0] += 1
             }
         }
+        return counts
+            .map { TagWithCount(tag: $0.key, count: $0.value) }
+            .sorted { lhs, rhs in
+                if lhs.count != rhs.count { return lhs.count > rhs.count }
+                return lhs.tag < rhs.tag
+            }
     }
 
     // MARK: - Extension CRUD
 
-    /// Writes data to a namespaced extension on an item, merging it into any
-    /// existing extensions map. Returns the full extensions dictionary.
+    /// Writes data to a namespaced extension on an item, merging it into
+    /// any existing extensions map. Returns the full extensions
+    /// dictionary in the namespace-keyed shape callers see.
     @discardableResult
     func setExtension(
         itemId: String,
@@ -663,10 +574,7 @@ public actor LocalStore {
             itemId: itemId,
             tags: existing.tags
         )
-        let record = try MetadataRecord.from(merged)
-        try pool.write { db in
-            try record.save(db)
-        }
+        try writeMetadata(merged, itemId: itemId)
         return map
     }
 
@@ -680,10 +588,7 @@ public actor LocalStore {
             itemId: itemId,
             tags: existing.tags
         )
-        let record = try MetadataRecord.from(merged)
-        try pool.write { db in
-            try record.save(db)
-        }
+        try writeMetadata(merged, itemId: itemId)
     }
 
     /// Returns all extension namespaces for an item.
@@ -691,15 +596,92 @@ public actor LocalStore {
         Self.unwrapExtensions(try fetchMetadata(itemId: itemId).extensions)
     }
 
-    /// Returns a single extension namespace for an item, or `nil` if absent.
+    /// Returns a single extension namespace for an item, or `nil` if
+    /// absent.
     func fetchExtension(itemId: String, namespace: String) throws -> [String: JSONValue]? {
         try fetchExtensions(itemId: itemId)[namespace]
     }
 
-    // Each namespace's stored value is an object. The wire type models the
-    // extensions map as `[String: JSONValue]` (any value), but in practice
-    // every namespace holds a dictionary. These helpers unwrap/rewrap between
-    // the two shapes without losing type information.
+    // MARK: - Private helpers
+
+    /// Upsert path for the metadata row. Looks up by `itemId`, mutates
+    /// in place, or inserts a fresh row attached to the parent item if
+    /// one exists. Always one save.
+    private func writeMetadata(_ metadata: Metadata, itemId: String) throws {
+        let metaPredicate = #Predicate<MymeMetadataModel> { $0.itemId == itemId }
+        var metaDescriptor = FetchDescriptor<MymeMetadataModel>(predicate: metaPredicate)
+        metaDescriptor.fetchLimit = 1
+        if let existing = try modelContext.fetch(metaDescriptor).first {
+            existing.apply(metadata)
+            try modelContext.save()
+            return
+        }
+        let model = MymeMetadataModel.make(from: metadata)
+        modelContext.insert(model)
+        // Attach to the parent item's relationship if the item exists,
+        // so cascade-on-purge fires correctly.
+        let itemPredicate = #Predicate<MymeItemModel> { $0.id == itemId }
+        var itemDescriptor = FetchDescriptor<MymeItemModel>(predicate: itemPredicate)
+        itemDescriptor.fetchLimit = 1
+        if let parent = try modelContext.fetch(itemDescriptor).first {
+            parent.metadata = model
+        }
+        try modelContext.save()
+    }
+
+    // Items descriptor — shared by `fetchItems`, `fetchItemsWithMetadata`,
+    // and the ItemQuery / ItemsWithMetadataQuery refetch paths via the
+    // `nonisolated` static helpers.
+    nonisolated static func makeItemsDescriptor(filters: ListFilters?) -> FetchDescriptor<MymeItemModel> {
+        // Captured-value short-circuit pattern (predicate convention 8):
+        // SwiftData has no runtime `Predicate<T>` composition, so we
+        // capture booleans alongside string defaults and let the
+        // predicate engine optimise constant-true branches away.
+        let typeFilter = filters?.type ?? ""
+        let hasTypeFilter = filters?.type != nil
+        let stateFilter = filters?.state?.rawValue ?? ""
+        let hasStateFilter = filters?.state != nil
+        let since = filters?.since ?? ""
+        let hasSince = filters?.since != nil
+        let until = filters?.until ?? ""
+        let hasUntil = filters?.until != nil
+
+        let predicate = #Predicate<MymeItemModel> { item in
+            (!hasTypeFilter  || item.type == typeFilter) &&
+            (!hasStateFilter || item.stateRaw == stateFilter) &&
+            (!hasSince       || item.updatedAt >= since) &&
+            (!hasUntil       || item.updatedAt <= until)
+        }
+
+        var descriptor = FetchDescriptor<MymeItemModel>(
+            predicate: predicate,
+            sortBy: [Self.sortDescriptor(filters: filters)]
+        )
+        if let limit = filters?.limit {
+            descriptor.fetchLimit = limit
+        }
+        return descriptor
+    }
+
+    /// Shared sort descriptor honouring `filters.sort` / `filters.direction`.
+    /// Default is `updatedAt` DESC, matching the server's
+    /// `GET /items` default. Falls back to `updatedAt` for any
+    /// unsupported sort key — predicate-safe access only.
+    nonisolated static func sortDescriptor(filters: ListFilters?) -> SortDescriptor<MymeItemModel> {
+        let order: SortOrder = filters?.direction == .ascending ? .forward : .reverse
+        switch filters?.sort?.rawValue ?? "updated_at" {
+        case "created_at": return SortDescriptor(\.createdAt, order: order)
+        case "timestamp":  return SortDescriptor(\.timestamp, order: order)
+        case "type":       return SortDescriptor(\.type, order: order)
+        default:           return SortDescriptor(\.updatedAt, order: order)
+        }
+    }
+
+    // Each namespace's stored value is an object. The wire type models
+    // the extensions map as `[String: JSONValue]`, but every namespace
+    // holds a dictionary in practice. These helpers translate between
+    // the wire shape and the namespace-keyed `[String: [String: JSONValue]]`
+    // view callers of `fetchExtensions` see.
     private static func unwrapExtensions(
         _ extensions: [String: JSONValue]
     ) -> [String: [String: JSONValue]] {

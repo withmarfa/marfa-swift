@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CryptoKit
+import SwiftData
 @testable import MymeSDK
 import MymeSDKTestSupport
 
@@ -14,13 +15,12 @@ struct BlobsTests {
         return (client, mock)
     }
 
-    /// Returns a synced-mode client backed by an in-memory store, plus the
-    /// mock transport so tests can inspect calls.
-    func makeSyncedClient() throws -> (MymeClient, MockTransport) {
+    /// Returns a synced-mode client backed by an in-memory store, plus
+    /// the mock transport so tests can inspect calls.
+    func makeSyncedClient() async throws -> (MymeClient, MockTransport) {
         let mock = MockTransport()
         let config = ClientConfiguration(url: URL(string: "http://test")!, apiKey: "test-key")
-        let store = try LocalStore(path: ":memory:")
-        let queue = try MutationQueue(pool: store.pool)
+        let (store, queue, container) = try await MymeSDKTest.makeInMemoryStorePair()
         let engine = SyncEngine(
             transport: mock,
             localStore: store,
@@ -33,7 +33,7 @@ struct BlobsTests {
             localStore: store,
             mutationQueue: queue,
             syncEngine: engine,
-            pool: store.pool
+            container: container
         )
         return (client, mock)
     }
@@ -133,7 +133,7 @@ struct BlobsTests {
 
     @Test("Synced upload returns predicted hash immediately without hitting transport")
     func syncedUploadQueues() async throws {
-        let (client, mock) = try makeSyncedClient()
+        let (client, mock) = try await makeSyncedClient()
         let imageData = Data([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])  // PNG header
 
         let result = try await client.blobs.upload(data: imageData, mimeType: "image/png")
@@ -148,8 +148,7 @@ struct BlobsTests {
 
     @Test("Synced upload enqueues uploadBlob mutation with blob data in store")
     func syncedUploadPersistsData() async throws {
-        let store = try LocalStore(path: ":memory:")
-        let queue = try MutationQueue(pool: store.pool)
+        let (store, queue, container) = try await MymeSDKTest.makeInMemoryStorePair()
         let mock = MockTransport()
         let config = ClientConfiguration(url: URL(string: "http://test")!, apiKey: "k")
         let engine = SyncEngine(
@@ -158,7 +157,7 @@ struct BlobsTests {
         )
         let client = MymeClient(
             configuration: config, transport: mock,
-            localStore: store, mutationQueue: queue, syncEngine: engine, pool: store.pool
+            localStore: store, mutationQueue: queue, syncEngine: engine, container: container
         )
 
         let imageData = Data(repeating: 0xAB, count: 64)
@@ -178,8 +177,7 @@ struct BlobsTests {
 
     @Test("SyncEngine replays uploadBlob mutation and cleans up pending blob data")
     func syncEngineReplaysUploadBlob() async throws {
-        let store = try LocalStore(path: ":memory:")
-        let queue = try MutationQueue(pool: store.pool)
+        let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
         let mock = MockTransport()
         let connManager = ConnectionStateManager()
 
@@ -229,27 +227,31 @@ struct BlobsTests {
 
     @Test("SyncEngine drops uploadBlob permanently when blob data is missing")
     func syncEngineDropsMissingBlobData() async throws {
-        let store = try LocalStore(path: ":memory:")
-        let queue = try MutationQueue(pool: store.pool)
+        let (store, queue, container) = try await MymeSDKTest.makeInMemoryStorePair()
         let mock = MockTransport()
         let connManager = ConnectionStateManager()
 
         let hash = "sha256:deadbeef"
-        // Insert the mutation record directly but omit the pending_blobs row,
-        // simulating a corrupted or partially-written store. Use store.pool
-        // (the same underlying pool) since MutationQueue.pool is private.
+        // Insert the mutation record directly but omit the
+        // PendingBlobModel row, simulating a corrupted or partially-
+        // written store. We open a fresh @MainActor `ModelContext`
+        // against the shared container; the save commits to the same
+        // SQLite file that `MutationQueue.fetchPendingBlob` reads from.
         let payload = #"{"hash":"\#(hash)","mimeType":"image/png","size":4}"#
-        try await store.pool.write { db in
-            let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
-            try db.execute(
-                sql: """
-                    INSERT INTO pending_mutations
-                        (id, kind, payload_json, source_id, local_id, created_at, attempt_count)
-                    VALUES (?, ?, ?, NULL, NULL, ?, 0)
-                    """,
-                arguments: [UUID().uuidString.lowercased(), "uploadBlob", payload, now]
-            )
-        }
+        try await Task { @MainActor in
+            let context = ModelContext(container)
+            let mutation = PendingMutationModel()
+            mutation.id = UUID().uuidString.lowercased()
+            mutation.kindRaw = MutationKind.uploadBlob.rawValue
+            mutation.payloadJson = payload
+            mutation.sourceId = nil
+            mutation.localId = nil
+            mutation.createdAt = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+            mutation.attemptCount = 0
+            mutation.lastError = nil
+            context.insert(mutation)
+            try context.save()
+        }.value
 
         // SSE stream closes immediately.
         mock.enqueueEvents([])

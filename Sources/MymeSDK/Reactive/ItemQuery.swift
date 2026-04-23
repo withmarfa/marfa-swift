@@ -1,16 +1,24 @@
 import Foundation
-import GRDB
 import Observation
+import SwiftData
+
+// MARK: - Predicate safety
+//
+// See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift`.
+// Filters use the captured-value short-circuit pattern (rule 8) to
+// compose predicates without runtime `Predicate<T>` composition. State
+// is compared against `stateRaw` (rule 7), never against `.active`
+// directly.
 
 // MARK: - ItemQuery
 
-/// A live, observable query over a filtered set of items in the local store.
+/// A live, observable query over a filtered set of items in the local
+/// store.
 ///
-/// `ItemQuery` holds a GRDB `ValueObservation` against the `items` table.
-/// When any row that satisfies `filters` changes — insert, update, or delete —
-/// the observation fires and ``items`` is updated on the main actor, which
-/// propagates the change through `@Observable` to any SwiftUI view that reads
-/// `query.items`.
+/// `ItemQuery` opens its own `ModelContext` on `@MainActor`, subscribes
+/// to `ModelContext.didSave`, and refetches after a 50 ms debounce
+/// window (see ``RefreshDebounce``) — the same coalescing strategy
+/// every reactive query uses.
 ///
 /// ## Usage
 ///
@@ -18,23 +26,21 @@ import Observation
 ///     // In SwiftUI:
 ///     ForEach(query.items) { item in ... }
 ///
-/// The observation is active for as long as the `ItemQuery` instance is alive.
-/// Release the query (or call ``stop()``) to tear down the observer.
-///
-/// - Note: Reads are always served from the local SQLite cache. In synced
-///   mode, the ``SyncEngine`` keeps the cache fresh in the background.
+/// The observation is active for as long as the `ItemQuery` instance is
+/// alive. Release the query (or call ``stop()``) to tear down the
+/// observer.
 @Observable
 @MainActor
 public final class ItemQuery {
 
     // MARK: - Published state
 
-    /// The current set of items matching the query's filters.
-    /// Updated automatically whenever the underlying data changes.
+    /// The current set of items matching the query's filters. Updated
+    /// automatically whenever the underlying data changes.
     public private(set) var items: [Item] = []
 
-    /// Whether the initial fetch has completed. `false` while the first
-    /// result is still in flight from the background reader.
+    /// Whether the initial fetch has completed. `false` until the first
+    /// result lands.
     public private(set) var isLoading: Bool = true
 
     /// The most recent error thrown by the observation, if any.
@@ -42,75 +48,53 @@ public final class ItemQuery {
 
     // MARK: - Internals
 
-    // AnyDatabaseCancellable cancels the observation on dealloc — no need for deinit.
-    private var cancellable: AnyDatabaseCancellable?
+    private let context: ModelContext
+    private let filters: ListFilters?
+    private var observer: RefetchObserver?
 
     // MARK: - Init
 
-    init(pool: DatabasePool, filters: ListFilters?) {
-        let observation = ValueObservation.tracking { db -> [ItemRecord] in
-            var query = ItemRecord.all()
+    init(container: ModelContainer, filters: ListFilters?) {
+        self.context = ModelContext(container)
+        self.filters = filters
+        Task { @MainActor [weak self] in self?.refetch() }
+        self.observer = RefetchObserver { [weak self] in self?.refetch() }
+    }
 
-            if let type = filters?.type {
-                query = query.filter(Column("type") == type)
-            }
-            if let state = filters?.state {
-                query = query.filter(Column("state") == state.rawValue)
-            }
-            if let since = filters?.since {
-                query = query.filter(Column("updated_at") >= since)
-            }
-            if let until = filters?.until {
-                query = query.filter(Column("updated_at") <= until)
-            }
-            if let limit = filters?.limit {
-                query = query.limit(limit)
-            }
-            query = query.order(Self.orderExpression(for: filters))
-            return try query.fetchAll(db)
+    // MARK: - Refetch
+
+    private func refetch() {
+        do {
+            let descriptor = LocalStore.makeItemsDescriptor(filters: filters)
+            let models = try context.fetch(descriptor)
+            self.items = models.map { $0.toWireItem() }
+            self.isLoading = false
+            self.error = nil
+        } catch {
+            self.error = error
+            self.isLoading = false
         }
-
-        // .mainActor scheduler (GRDB 7) runs callbacks under @MainActor isolation,
-        // making @Observable property assignments sound in Swift 6.
-        cancellable = observation.start(
-            in: pool,
-            scheduling: .mainActor,
-            onError: { [weak self] error in
-                self?.error = error
-                self?.isLoading = false
-            },
-            onChange: { [weak self] records in
-                self?.items = records.compactMap { try? $0.toItem() }
-                self?.isLoading = false
-                self?.error = nil
-            }
-        )
     }
 
     // MARK: - Lifecycle
 
-    /// Stops the observation and releases the database watcher.
-    /// After calling `stop()`, `items` will no longer update.
+    /// Stops the observation and releases the database watcher. After
+    /// calling `stop()`, `items` will no longer update.
     public func stop() {
-        cancellable?.cancel()
-        cancellable = nil
-    }
-
-    /// Order expression honoring `filters.sort` / `filters.direction`. Default
-    /// is `updated_at DESC`, matching the server-side default for `GET /items`.
-    nonisolated static func orderExpression(for filters: ListFilters?) -> SQLOrderingTerm {
-        let column = Column(filters?.sort?.rawValue ?? "updated_at")
-        return filters?.direction == .ascending ? column.asc : column.desc
+        observer?.cancel()
+        observer = nil
     }
 }
 
 // MARK: - TypedItemQuery
 
-/// A live, observable query over a filtered set of typed domain model items.
+/// A live, observable query over a filtered set of typed domain model
+/// items.
 ///
-/// Works like ``ItemQuery`` but returns domain-model wrappers (e.g. `CoreNote`)
-/// rather than raw `Item` values. Items that fail `T.init?(from:)` are silently
-/// dropped — typically because the required fields are absent.
+/// Works like ``ItemQuery`` but returns domain-model wrappers (e.g.
+/// `CoreNote`) rather than raw `Item` values. Items that fail
+/// `T.init?(from:)` are silently dropped — typically because the
+/// required fields are absent.
 ///
 /// ## Usage
 ///
@@ -122,58 +106,47 @@ public final class TypedItemQuery<T: MymeItem> {
 
     // MARK: - Published state
 
-    /// The current set of typed items. Updated automatically on change.
     public private(set) var items: [T] = []
-
-    /// `true` while the initial fetch is in flight.
     public private(set) var isLoading: Bool = true
-
-    /// Most recent observation error.
     public private(set) var error: Error?
 
     // MARK: - Internals
 
-    private var cancellable: AnyDatabaseCancellable?
+    private let context: ModelContext
+    private let filters: ListFilters?
+    private var observer: RefetchObserver?
 
     // MARK: - Init
 
-    init(pool: DatabasePool, filters: ListFilters? = nil) {
-        let typeId = T.typeIdentifier
-        let observation = ValueObservation.tracking { db -> [ItemRecord] in
-            var query = ItemRecord.filter(Column("type") == typeId)
-            if let state = filters?.state {
-                query = query.filter(Column("state") == state.rawValue)
-            }
-            if let limit = filters?.limit {
-                query = query.limit(limit)
-            }
-            query = query.order(ItemQuery.orderExpression(for: filters))
-            return try query.fetchAll(db)
-        }
+    init(container: ModelContainer, filters: ListFilters? = nil) {
+        self.context = ModelContext(container)
+        // Force the type filter onto the descriptor so the predicate
+        // narrows by `type == T.typeIdentifier` even when the caller
+        // didn't pass one.
+        var withType = filters ?? ListFilters()
+        withType.type = T.typeIdentifier
+        self.filters = withType
+        Task { @MainActor [weak self] in self?.refetch() }
+        self.observer = RefetchObserver { [weak self] in self?.refetch() }
+    }
 
-        cancellable = observation.start(
-            in: pool,
-            scheduling: .mainActor,
-            onError: { [weak self] error in
-                self?.error = error
-                self?.isLoading = false
-            },
-            onChange: { [weak self] records in
-                self?.items = records.compactMap { record in
-                    guard let item = try? record.toItem() else { return nil }
-                    return T(from: item)
-                }
-                self?.isLoading = false
-                self?.error = nil
-            }
-        )
+    private func refetch() {
+        do {
+            let descriptor = LocalStore.makeItemsDescriptor(filters: filters)
+            let models = try context.fetch(descriptor)
+            self.items = models.compactMap { T(from: $0.toWireItem()) }
+            self.isLoading = false
+            self.error = nil
+        } catch {
+            self.error = error
+            self.isLoading = false
+        }
     }
 
     // MARK: - Lifecycle
 
-    /// Stops the observation.
     public func stop() {
-        cancellable?.cancel()
-        cancellable = nil
+        observer?.cancel()
+        observer = nil
     }
 }

@@ -1,96 +1,95 @@
 import Foundation
-import GRDB
 import Observation
+import SwiftData
 
 // MARK: - MymeStore
 
-/// A `@MainActor` facade over ``LocalStore`` that vends live, `@Observable`
-/// query objects for use in SwiftUI.
+/// A `@MainActor` facade over ``LocalStore`` that vends live,
+/// `@Observable` query objects for use in SwiftUI.
 ///
-/// Obtain an instance from ``MymeClient/store`` (available when the client was
-/// created with ``MymeClient/local(path:)`` or ``MymeClient/synced(url:apiKey:storePath:)``):
+/// Obtain an instance from ``MymeClient/makeStore()`` (available when
+/// the client was created with ``MymeClient/local(path:)`` or
+/// ``MymeClient/synced(url:apiKey:storePath:)``):
 ///
-///     guard let store = client.store else { return }
+///     guard let store = client.makeStore() else { return }
 ///     let notes = store.query(filters: ListFilters(type: "core.note"))
 ///     // `notes.items` updates whenever any `core.note` row changes.
 ///
-/// All database reads performed by the query objects are non-blocking (WAL
-/// mode allows concurrent reads). Writes still go through the ``MymeClient``
-/// namespace APIs (``ItemsNamespace``, etc.), which keep the local store in
-/// sync and, in synced mode, enqueue mutations for the server.
+/// Each query type opens its own `ModelContext` on `@MainActor`. A
+/// single `NotificationCenter` subscription on
+/// `ModelContext.didSave`, debounced by ``RefreshDebounce/interval``,
+/// drives the refetch.
 ///
-/// - Important: `MymeStore` must be created and used on the `@MainActor`.
-///   It is safe to pass the store to `@Observable @MainActor` SwiftUI views.
+/// Writes still go through the ``MymeClient`` namespace APIs
+/// (``ItemsNamespace``, etc.), which keep the local store in sync and,
+/// in synced mode, enqueue mutations for the server.
+///
+/// - Important: `MymeStore` must be created and used on the
+///   `@MainActor`. It is safe to pass the store to
+///   `@Observable @MainActor` SwiftUI views.
 @Observable
 @MainActor
 public final class MymeStore {
 
     // MARK: - Internal
 
-    private let pool: DatabasePool
+    private let container: ModelContainer
 
     // MARK: - Init
 
-    init(pool: DatabasePool) {
-        self.pool = pool
+    init(container: ModelContainer) {
+        self.container = container
     }
 
     // MARK: - Item queries
 
     /// Creates a live query over all items matching `filters`.
     ///
-    /// The returned ``ItemQuery`` starts fetching immediately. Its `items`
-    /// property is updated on the main actor whenever matching rows change.
+    /// The returned ``ItemQuery`` starts fetching immediately. Its
+    /// `items` property is updated on the main actor whenever matching
+    /// rows change.
     ///
     ///     let query = store.query()                          // all items
     ///     let notes = store.query(filters: .init(type: "core.note"))
     ///     let active = store.query(filters: .init(state: .active))
     public func query(filters: ListFilters? = nil) -> ItemQuery {
-        ItemQuery(pool: pool, filters: filters)
+        ItemQuery(container: container, filters: filters)
     }
 
     /// Creates a live query over a single item by `id`.
     ///
-    /// `query.item` is `nil` if the item doesn't exist or has been purged.
+    /// `query.item` is `nil` if the item doesn't exist or has been
+    /// purged.
     public func queryItem(id: String) -> SingleItemQuery {
-        SingleItemQuery(pool: pool, id: id)
+        SingleItemQuery(container: container, id: id)
     }
 
-    /// Creates a live, typed query for items of a specific domain-model type.
+    /// Creates a live, typed query for items of a specific domain-model
+    /// type.
     ///
     ///     let query = store.typedQuery(CoreNote.self)
     ///     // query.items is [CoreNote]
     ///
     /// - Parameters:
     ///   - type: The ``MymeItem`` conforming type (e.g. `CoreNote.self`).
-    ///   - filters: Additional filters (state, limit). The `type` filter is
-    ///     derived automatically from `T.typeIdentifier`.
+    ///   - filters: Additional filters (state, limit). The `type` filter
+    ///     is derived automatically from `T.typeIdentifier`.
     public func typedQuery<T: MymeItem>(
         _ type: T.Type,
         filters: ListFilters? = nil
     ) -> TypedItemQuery<T> {
-        TypedItemQuery(pool: pool, filters: filters)
+        TypedItemQuery(container: container, filters: filters)
     }
 
     /// Creates a live query over items paired with their metadata. See
-    /// ``ItemsWithMetadataQuery``. Emits `[ItemWithMetadata]` matching the
-    /// one-shot ``ItemsNamespace/listWithMetadata(filters:)`` and re-fires
-    /// whenever any matching item or metadata row changes.
-    ///
-    ///     let query = store.queryItemsWithMetadata(filters: .init(type: "core.note"))
-    ///     ForEach(query.items, id: \.item.id) { pair in
-    ///         NoteCard(item: pair.item, tags: pair.metadata.tags)
-    ///     }
+    /// ``ItemsWithMetadataQuery``.
     public func queryItemsWithMetadata(filters: ListFilters? = nil) -> ItemsWithMetadataQuery {
-        ItemsWithMetadataQuery(pool: pool, filters: filters)
+        ItemsWithMetadataQuery(container: container, filters: filters)
     }
 
     // MARK: - Edge queries
 
     /// Creates a live query over outbound edges from `sourceId`.
-    ///
-    ///     let outbound = store.queryEdges(from: item.id)
-    ///     let aboutEdges = store.queryEdges(from: item.id, edgeType: "about")
     ///
     /// - Parameters:
     ///   - sourceId: ID of the source item.
@@ -101,57 +100,95 @@ public final class MymeStore {
         edgeType: String? = nil,
         limit: Int? = nil
     ) -> EdgesQuery {
-        EdgesQuery(pool: pool, sourceId: sourceId, edgeType: edgeType, limit: limit)
+        EdgesQuery(container: container, sourceId: sourceId, edgeType: edgeType, limit: limit)
     }
 
-    /// Creates a live query over **all edges of a given type** across the
-    /// entire local store. Backs taxonomy-style "every reply", "every
-    /// annotation" surfaces — replaces the walk-every-item polling that
-    /// app authors were writing as a workaround.
-    ///
-    ///     let allReplies = store.queryEdges(ofType: "in-thread")
-    ///
-    /// - Parameters:
-    ///   - edgeType: Edge type to track.
-    ///   - limit: Optional row cap.
+    /// Creates a live query over **all edges of a given type** across
+    /// the entire local store.
     public func queryEdges(
         ofType edgeType: String,
         limit: Int? = nil
     ) -> EdgesQuery {
-        EdgesQuery(pool: pool, edgeType: edgeType, limit: limit)
+        EdgesQuery(container: container, edgeType: edgeType, limit: limit)
     }
 
-    /// Creates a live query over **inbound edges for a batch of targets**.
-    /// See ``BackrefsQuery``. Duplicate IDs are collapsed; unknown IDs
-    /// remain present in the result keyed to an empty array.
-    ///
-    ///     let backrefs = store.queryBackrefs(to: items.map(\.id), edgeType: "in-thread")
-    ///     Text("\(backrefs.edgesByTarget[item.id]?.count ?? 0) replies")
-    ///
-    /// - Parameters:
-    ///   - targetIds: Item IDs whose inbound edges should be tracked.
-    ///   - edgeType: Restrict to this edge type, or `nil` for all.
-    ///   - limit: Optional cap per target.
+    /// Creates a live query over **inbound edges for a batch of
+    /// targets**. See ``BackrefsQuery``.
     public func queryBackrefs(
         to targetIds: [String],
         edgeType: String? = nil,
         limit: Int? = nil
     ) -> BackrefsQuery {
-        BackrefsQuery(pool: pool, targetIds: targetIds, edgeType: edgeType, limit: limit)
+        BackrefsQuery(container: container, targetIds: targetIds, edgeType: edgeType, limit: limit)
     }
 
     // MARK: - Tag queries
 
-    /// Creates a live query over tag usage across the local store.
-    /// See ``TagsQuery``. Emits `[TagWithCount]` sorted count DESC, tag ASC
-    /// — identical to the one-shot ``MetadataNamespace/listTags()`` and
-    /// the server's `GET /metadata/tags`.
-    ///
-    ///     let tags = store.queryTags()
-    ///     ForEach(tags.tags, id: \.tag) { entry in
-    ///         TagChip(entry.tag, count: entry.count)
-    ///     }
+    /// Creates a live query over tag usage across the local store. See
+    /// ``TagsQuery``.
     public func queryTags() -> TagsQuery {
-        TagsQuery(pool: pool)
+        TagsQuery(container: container)
+    }
+}
+
+// MARK: - Refetch observer (shared boilerplate)
+
+/// Shared boilerplate for the seven reactive query types.
+///
+/// Subscribes to `ModelContext.didSave` notifications via the modern
+/// `NotificationCenter.notifications(named:)` async sequence (no
+/// observer-token leak risk — cancelling the consuming task tears
+/// down the subscription), coalesces bursts via
+/// ``RefreshDebounce/interval``, and invokes the per-query refetch
+/// closure on the `@MainActor`.
+///
+/// One instance per query. `cancel()` tears down both the listener
+/// task and any pending debounce task; safe to call multiple times.
+@MainActor
+final class RefetchObserver {
+    private var listenerTask: Task<Void, Never>?
+    private var debounceTask: Task<Void, Never>?
+
+    /// Starts the observer. The closure is retained for the lifetime of
+    /// the observer; tear it down via `cancel()` (or by releasing the
+    /// owning query) to avoid a strong-reference cycle.
+    init(refetch: @escaping @MainActor () -> Void) {
+        // `object: nil` — we want changes from any context against the
+        // same container. `LocalStore` and `MutationQueue` write from
+        // their own actor-bound contexts, not from `MymeStore`'s
+        // context.
+        listenerTask = Task { @MainActor [weak self] in
+            let stream = NotificationCenter.default.notifications(named: ModelContext.didSave)
+            for await _ in stream {
+                guard !Task.isCancelled, let self else { return }
+                self.scheduleRefetch(refetch)
+            }
+        }
+    }
+
+    private func scheduleRefetch(_ refetch: @escaping @MainActor () -> Void) {
+        debounceTask?.cancel()
+        debounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(RefreshDebounce.interval))
+            if Task.isCancelled { return }
+            refetch()
+        }
+    }
+
+    /// Cancels the listener task and any pending debounce task. Safe
+    /// to call multiple times.
+    func cancel() {
+        listenerTask?.cancel()
+        listenerTask = nil
+        debounceTask?.cancel()
+        debounceTask = nil
+    }
+
+    deinit {
+        // Cancelling tasks is safe from a nonisolated deinit; the tasks
+        // themselves are isolated to @MainActor and finish their work
+        // there.
+        listenerTask?.cancel()
+        debounceTask?.cancel()
     }
 }

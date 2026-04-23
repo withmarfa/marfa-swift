@@ -205,8 +205,7 @@ struct ItemsTests {
         // Synced mode is `localStore != nil && mutationQueue != nil`.
         // Previously this degenerated to `[currentItem]` wrapped as one
         // Version. It must hit `GET /items/:id/versions`.
-        let store = try LocalStore(path: ":memory:")
-        let queue = try MutationQueue(pool: store.pool)
+        let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
         let transport = MockTransport()
         let items = ItemsNamespace(
             transport: transport,
@@ -243,7 +242,7 @@ struct ItemsTests {
 
     @Test("versions returns single current version in pure-local mode")
     func versionsPureLocalModeSkipsNetwork() async throws {
-        let store = try LocalStore(path: ":memory:")
+        let store = try await MymeSDKTest.makeInMemoryLocalStore()
         let transport = MockTransport()
         let items = ItemsNamespace(
             transport: transport,
