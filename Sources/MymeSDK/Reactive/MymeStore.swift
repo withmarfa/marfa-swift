@@ -35,10 +35,18 @@ public final class MymeStore {
 
     private let container: ModelContainer
 
+    /// The synced client's ``SyncEngine`` when one exists, otherwise `nil`.
+    /// Passed through from ``MymeClient/makeStore()`` so the reactive
+    /// ``PendingMutationsQuery`` and ``DroppedMutationsQuery`` can read
+    /// engine state (in-flight ids, dropped log) without the store itself
+    /// depending on the queue directly.
+    private let syncEngine: SyncEngine?
+
     // MARK: - Init
 
-    init(container: ModelContainer) {
+    init(container: ModelContainer, syncEngine: SyncEngine? = nil) {
         self.container = container
+        self.syncEngine = syncEngine
     }
 
     // MARK: - Item queries
@@ -128,6 +136,17 @@ public final class MymeStore {
     /// ``TagsQuery``.
     public func queryTags() -> TagsQuery {
         TagsQuery(container: container)
+    }
+
+    // MARK: - Sync-state queries
+
+    /// Creates a live query over the mutation queue. See
+    /// ``PendingMutationsQuery``.
+    ///
+    /// Publishes an empty list when the backing client is pure-local or
+    /// remote-only — neither has a queue to observe.
+    public func queryPendingMutations() -> PendingMutationsQuery {
+        PendingMutationsQuery(syncEngine: syncEngine)
     }
 }
 

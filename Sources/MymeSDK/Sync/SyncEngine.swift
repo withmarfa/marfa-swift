@@ -162,6 +162,69 @@ public actor SyncEngine {
         }
     }
 
+    // MARK: - Mutation lifecycle stream
+    //
+    // Per-mutation in-flight transitions that don't correspond to a queue
+    // write aren't visible via `ModelContext.didSave`. The reactive
+    // `PendingMutationsQuery` subscribes to this stream so its in-flight
+    // rows update when a long-running replayRecord starts/ends. Queue
+    // mutations that change persistent state (removal on success,
+    // `recordFailure` on transient error) fire didSave naturally — the
+    // lifecycle stream is strictly for the ephemeral in-flight bracket.
+
+    private var lifecycleContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
+
+    /// Stream that pulses whenever the in-flight set of mutations changes
+    /// (a replay starts, a replay ends). Yields `Void` — subscribers treat
+    /// it as a "recheck status" signal and call ``pendingMutations()``.
+    ///
+    /// `nonisolated` so callers subscribe without an actor hop; the shape
+    /// matches ``ConnectionStateManager/stateUpdates``.
+    public nonisolated var mutationLifecycleEvents: AsyncStream<Void> {
+        AsyncStream { continuation in
+            let id = UUID()
+            Task { await self.subscribeLifecycle(id: id, continuation: continuation) }
+            continuation.onTermination = { [weak self] _ in
+                Task { [weak self] in
+                    await self?.removeLifecycleContinuation(id: id)
+                }
+            }
+        }
+    }
+
+    private func subscribeLifecycle(
+        id: UUID,
+        continuation: AsyncStream<Void>.Continuation
+    ) {
+        lifecycleContinuations[id] = continuation
+    }
+
+    private func removeLifecycleContinuation(id: UUID) {
+        lifecycleContinuations.removeValue(forKey: id)
+    }
+
+    private func emitLifecycle() {
+        for continuation in lifecycleContinuations.values {
+            continuation.yield(())
+        }
+    }
+
+    // MARK: - In-flight mutation tracking
+
+    /// Set of mutation ids currently in the middle of a `replayRecord` call
+    /// (network round-trip in flight). Consulted by ``pendingMutations()``
+    /// and by ``MutationQueue/snapshots(inFlight:)`` to surface `.inFlight`
+    /// status. Purely in-memory — a process restart clears it, matching the
+    /// semantics of "in flight" (a mid-flight mutation is treated as
+    /// pending on relaunch and retried on the next drain).
+    private var inFlightIds: Set<String> = []
+
+    /// Returns the current in-flight set. Used by tests and by the
+    /// reactive query's async hop.
+    internal func currentInFlightIds() -> Set<String> {
+        inFlightIds
+    }
+
     // MARK: - Sync status (consumer-facing signals)
 
     /// `true` when the mutation queue holds one or more pending writes that
@@ -176,6 +239,25 @@ public actor SyncEngine {
         get async throws {
             !(try await mutationQueue.isEmpty)
         }
+    }
+
+    /// Returns a snapshot of every queued mutation with its current status
+    /// (`.pending`, `.inFlight`, or `.failed(...)`). Consumers use this to
+    /// render per-mutation UI — a row for each pending write, a spinner
+    /// for in-flight, a retry affordance for failed — without having to
+    /// re-derive state from the coarse ``hasPendingMutations`` count.
+    ///
+    /// For reactive access, use ``MymeStore/queryPendingMutations()`` which
+    /// wraps this call in an `@Observable` refetch pipeline.
+    ///
+    /// Thread safety: `.inFlight` rows reflect the engine's in-memory set
+    /// at the moment of the call; a mutation may have completed by the
+    /// time the caller reads the snapshot. Consumers driving UI should
+    /// subscribe to ``mutationLifecycleEvents`` so successive calls
+    /// converge on the steady state.
+    public func pendingMutations() async throws -> [PendingMutationSnapshot] {
+        let inFlight = inFlightIds
+        return try await mutationQueue.snapshots(inFlight: inFlight)
     }
 
     /// Timestamp of the most recent successful ``performInitialSync(pageSize:)``
@@ -636,6 +718,14 @@ public actor SyncEngine {
                 continue
             }
 
+            // Bracket the replay with in-flight tracking. Both emits pulse
+            // the lifecycle stream so `PendingMutationsQuery` refetches on
+            // the start → in-flight → done transitions (queue didSave
+            // only fires on the done transition when the row is removed
+            // or `recordFailure`-updated).
+            inFlightIds.insert(record.id)
+            emitLifecycle()
+
             do {
                 let didRewrite = try await replayRecord(record, decoder: decoder)
                 try? await mutationQueue.remove(id: record.id)
@@ -696,6 +786,11 @@ public actor SyncEngine {
                     pendingCreateIds.insert(localId)
                 }
             }
+
+            // End of in-flight bracket — fires for success, permanent drop,
+            // and transient failure (all three fall through here).
+            inFlightIds.remove(record.id)
+            emitLifecycle()
         }
 
         // Terminal state flip. Moved inside `replayMutations` so every call

@@ -19,6 +19,9 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var createdAt: String
     public var attemptCount: Int
     public var lastError: String?
+    /// ISO 8601 timestamp of the last replay attempt. Nil before the first
+    /// attempt or for rows migrated from schema v1 that never retried.
+    public var lastAttemptAt: String?
 
     public init(
         id: String,
@@ -28,7 +31,8 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         localId: String? = nil,
         createdAt: String,
         attemptCount: Int = 0,
-        lastError: String? = nil
+        lastError: String? = nil,
+        lastAttemptAt: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -38,6 +42,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         self.createdAt = createdAt
         self.attemptCount = attemptCount
         self.lastError = lastError
+        self.lastAttemptAt = lastAttemptAt
     }
 }
 
@@ -52,7 +57,8 @@ extension PendingMutationModel {
             localId: localId,
             createdAt: createdAt,
             attemptCount: attemptCount,
-            lastError: lastError
+            lastError: lastError,
+            lastAttemptAt: lastAttemptAt
         )
     }
 
@@ -66,6 +72,7 @@ extension PendingMutationModel {
         createdAt = record.createdAt
         attemptCount = record.attemptCount
         lastError = record.lastError
+        lastAttemptAt = record.lastAttemptAt
     }
 }
 
@@ -467,7 +474,9 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
-    /// Records a failed replay attempt.
+    /// Records a failed replay attempt. Bumps `attemptCount`, stores the
+    /// error message, and stamps `lastAttemptAt` with the current time so
+    /// consumers can surface "last tried X ago" affordances.
     func recordFailure(id: String, error: String) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
@@ -475,7 +484,49 @@ public actor MutationQueue {
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
         model.lastError = error
+        model.lastAttemptAt = Date().ISO8601Format(.init(includingFractionalSeconds: true))
         try modelContext.save()
+    }
+
+    /// Returns consumer-facing snapshots for every queued mutation.
+    ///
+    /// Derives ``PendingMutationStatus`` from persisted columns plus the
+    /// `inFlight` set the ``SyncEngine`` provides — queue rows whose id is
+    /// in `inFlight` report `.inFlight`; rows with a `lastError` report
+    /// `.failed`; everything else reports `.pending`. Order matches
+    /// ``fetchAll`` (ascending `createdAt`, the drain order).
+    ///
+    /// Timestamps that fail to parse fall back to `Date()` rather than
+    /// crashing — the queue's writers use a single strategy so parse
+    /// failures would indicate disk corruption and shouldn't take the app
+    /// down; the UI gets a plausible value instead of a missing row.
+    func snapshots(inFlight: Set<String>) throws -> [PendingMutationSnapshot] {
+        let descriptor = FetchDescriptor<PendingMutationModel>(
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        let strategy = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        return try modelContext.fetch(descriptor).map { model in
+            let createdAt = (try? Date(model.createdAt, strategy: strategy)) ?? Date()
+            let lastAttempt: Date? = model.lastAttemptAt.flatMap {
+                try? Date($0, strategy: strategy)
+            }
+            let status: PendingMutationStatus
+            if inFlight.contains(model.id) {
+                status = .inFlight
+            } else if let err = model.lastError {
+                status = .failed(lastError: err, lastAttemptAt: lastAttempt)
+            } else {
+                status = .pending
+            }
+            return PendingMutationSnapshot(
+                id: model.id,
+                kind: model.kind,
+                itemId: model.localId,
+                createdAt: createdAt,
+                attemptCount: model.attemptCount,
+                status: status
+            )
+        }
     }
 
     /// `true` when the queue is empty.

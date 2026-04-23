@@ -322,7 +322,7 @@ public final class MymeClient: Sendable {
     @MainActor
     public func makeStore() -> MymeStore? {
         guard let container else { return nil }
-        return MymeStore(container: container)
+        return MymeStore(container: container, syncEngine: syncEngine)
     }
 
     // MARK: - Top-Level Methods
