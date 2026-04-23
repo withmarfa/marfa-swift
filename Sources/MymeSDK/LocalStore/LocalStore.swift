@@ -226,6 +226,63 @@ public actor LocalStore {
         return PaginatedResult(data: items, cursor: nil, hasMore: false)
     }
 
+    /// Fetches items paired with their metadata in a single observation-friendly
+    /// pair of reads. Items with no `item_metadata` row fall back to an empty
+    /// ``Metadata`` (matching ``fetchMetadata(itemId:)``), so the returned array
+    /// is 1:1 with the filtered items.
+    ///
+    /// Implementation: one `ItemRecord` query honouring `filters`, then one
+    /// `MetadataRecord` query over `item_id IN (…)`. Both tables participate in
+    /// the enclosing `ValueObservation`, so reactive callers re-fire on any
+    /// relevant row change without an N+1 per-item fan-out.
+    func fetchItemsWithMetadata(filters: ListFilters?) throws -> [ItemWithMetadata] {
+        try pool.read { db in
+            var request = ItemRecord.all()
+            if let type = filters?.type {
+                request = request.filter(Column("type") == type)
+            }
+            if let state = filters?.state {
+                request = request.filter(Column("state") == state.rawValue)
+            }
+            if let since = filters?.since {
+                request = request.filter(Column("updated_at") >= since)
+            }
+            if let until = filters?.until {
+                request = request.filter(Column("updated_at") <= until)
+            }
+            if let limit = filters?.limit {
+                request = request.limit(limit)
+            }
+            let direction = filters?.direction
+            let sortColumn = Column(filters?.sort?.rawValue ?? "updated_at")
+            if direction == .ascending {
+                request = request.order(sortColumn.asc)
+            } else {
+                request = request.order(sortColumn.desc)
+            }
+
+            let itemRecords = try request.fetchAll(db)
+            let ids = itemRecords.map(\.id)
+            let metadataRecords =
+                ids.isEmpty
+                ? []
+                : try MetadataRecord
+                    .filter(ids.contains(Column("item_id")))
+                    .fetchAll(db)
+            let metadataById = Dictionary(
+                uniqueKeysWithValues: metadataRecords.map { ($0.itemId, $0) }
+            )
+
+            return try itemRecords.map { record in
+                let item = try record.toItem()
+                let metadata =
+                    try metadataById[record.id]?.toMetadata()
+                    ?? Metadata(extensions: [:], itemId: record.id, tags: [])
+                return ItemWithMetadata(item: item, metadata: metadata)
+            }
+        }
+    }
+
     /// Updates an item's properties. Increments the version and sets `updated_at`.
     @discardableResult
     /// Updates an item with **partial-merge semantics for properties**, mirroring

@@ -435,6 +435,137 @@ struct MymeStoreTests {
         #expect(query.edgesByTarget["ghost-id"]?.isEmpty == true)
         query.stop()
     }
+
+    // MARK: - ItemsWithMetadataQuery
+
+    @Test("ItemsWithMetadataQuery pairs items with their metadata") func itemsWithMetadataPair() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let a = try await client.items.create(noteInput(body: "A"))
+        let b = try await client.items.create(noteInput(body: "B"))
+        _ = try await client.metadata.addTags(itemId: a.id, tags: ["work"])
+        _ = try await client.metadata.addTags(itemId: b.id, tags: ["home", "work"])
+
+        let query = store.queryItemsWithMetadata()
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 2 }
+
+        let byId = Dictionary(uniqueKeysWithValues: query.items.map { ($0.item.id, $0) })
+        #expect(Set(byId[a.id]?.metadata.tags ?? []) == ["work"])
+        #expect(Set(byId[b.id]?.metadata.tags ?? []) == ["home", "work"])
+        #expect(query.isLoading == false)
+        query.stop()
+    }
+
+    @Test("ItemsWithMetadataQuery returns empty metadata for items with no metadata row") func itemsWithMetadataEmptyDefault() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let item = try await client.items.create(noteInput(body: "no tags"))
+
+        let query = store.queryItemsWithMetadata()
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+
+        #expect(query.items.first?.item.id == item.id)
+        #expect(query.items.first?.metadata.tags.isEmpty == true)
+        #expect(query.items.first?.metadata.extensions.isEmpty == true)
+        query.stop()
+    }
+
+    @Test("ItemsWithMetadataQuery updates live on item create") func itemsWithMetadataLiveCreate() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let query = store.queryItemsWithMetadata()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+        #expect(query.items.isEmpty)
+
+        _ = try await client.items.create(noteInput(body: "fresh"))
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+
+        #expect(query.items.first?.metadata.tags.isEmpty == true)
+        query.stop()
+    }
+
+    @Test("ItemsWithMetadataQuery updates live on tag add") func itemsWithMetadataLiveTagAdd() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let item = try await client.items.create(noteInput(body: "will be tagged"))
+
+        let query = store.queryItemsWithMetadata()
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+        #expect(query.items.first?.metadata.tags.isEmpty == true)
+
+        _ = try await client.metadata.addTags(itemId: item.id, tags: ["added"])
+        try await waitForCondition(timeout: .seconds(2)) {
+            query.items.first?.metadata.tags.contains("added") == true
+        }
+
+        #expect(query.items.first?.metadata.tags == ["added"])
+        query.stop()
+    }
+
+    @Test("ItemsWithMetadataQuery honours type filter") func itemsWithMetadataTypeFilter() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "note"))
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.task", properties: ["title": .string("task")])
+        )
+
+        let query = store.queryItemsWithMetadata(filters: ListFilters(type: "core.note"))
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+
+        #expect(query.items.allSatisfy { $0.item.type == "core.note" })
+        query.stop()
+    }
+
+    @Test("ItemsWithMetadataQuery honours limit") func itemsWithMetadataLimit() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        for i in 0..<5 {
+            _ = try await client.items.create(noteInput(body: "n-\(i)"))
+        }
+
+        let query = store.queryItemsWithMetadata(filters: ListFilters(limit: 3))
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 3 }
+
+        #expect(query.items.count == 3)
+        query.stop()
+    }
+
+    @Test("ItemsWithMetadataQuery drops item when trashed under state filter") func itemsWithMetadataStateFilter() async throws {
+        let client = try makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        let item = try await client.items.create(noteInput(body: "soon-trashed"))
+
+        let query = store.queryItemsWithMetadata(filters: ListFilters(state: .active))
+        try await waitForCondition(timeout: .seconds(2)) { query.items.count == 1 }
+
+        try await client.items.delete(id: item.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.items.isEmpty }
+
+        #expect(query.items.isEmpty)
+        query.stop()
+    }
 }
 
 // MARK: - Test utilities

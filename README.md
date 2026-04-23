@@ -57,12 +57,15 @@ var body: some View {
 }
 ```
 
-Live `TagsQuery` (tag cloud / counts) and `BackrefsQuery` (inbound edges for a batch of targets) are available on the same store:
+Live `TagsQuery` (tag cloud / counts), `BackrefsQuery` (inbound edges for a batch of targets), and `ItemsWithMetadataQuery` (items paired with their metadata) are available on the same store:
 
 ```swift
 let tags = store.queryTags()                                                 // [TagWithCount]
 let backrefs = store.queryBackrefs(to: items.map(\.id), edgeType: "in-thread")
 // backrefs.edgesByTarget["msg-1"]?.count  → reply count per message
+
+let notes = store.queryItemsWithMetadata(filters: ListFilters(type: "core.note"))
+// notes.items is [ItemWithMetadata]; updates when items or metadata change
 ```
 
 Local-first batched reads:
@@ -181,6 +184,19 @@ Core schema parents (`core.note`, `core.media.book`, …) resolve automatically 
 - Myme data-model specification: [Myme Reference](https://myme.so/reference) *(once published)*
 
 ## Release notes
+
+### 3.6
+
+**New feature.** ``ItemsWithMetadataQuery`` — a live, observable query over items paired with their metadata. Complements the existing one-shot ``ItemsNamespace/listWithMetadata(filters:)`` for SwiftUI bindings; emits `[ItemWithMetadata]` and re-fires whenever any matching `items` row or associated `item_metadata` row changes.
+
+```swift
+let query = store.queryItemsWithMetadata(filters: .init(type: "core.note"))
+ForEach(query.items, id: \.item.id) { pair in
+    NoteCard(item: pair.item, tags: pair.metadata.tags)
+}
+```
+
+Apps that previously subscribed to ``SyncEngine/events`` and re-ran `listWithMetadata` on every mutation can replace that plumbing with a single factory call.
 
 ### 3.0
 
