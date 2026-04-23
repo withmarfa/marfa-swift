@@ -4,8 +4,8 @@ The Swift SDK for the [Myme](https://myme.so) API — a typed data layer for str
 
 ## Requirements
 
-- Swift 6.0+ (Xcode 16+)
-- iOS 17+, macOS 14+, visionOS 1+, watchOS 10+, tvOS 17+
+- Swift 6.2+ (Xcode 26+)
+- iOS 26+, macOS 26+, visionOS 26+, watchOS 26+, tvOS 26+
 
 ## Install
 
@@ -13,7 +13,7 @@ Add the package to your project. In `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mymehq/swift-sdk", from: "3.0.0"),
+    .package(url: "https://github.com/mymehq/swift-sdk", from: "4.0.0"),
 ]
 ```
 
@@ -34,19 +34,25 @@ let note = try await client.items.create(
 )
 print(note.id)
 
-// 2. Pure-local — backed by an on-device SQLite store. No server, no API key.
-let offline = try MymeClient.local(path: "/path/to/store.sqlite")
+// 2. Pure-local — backed by an on-device SwiftData store. No server, no API key.
+let offline = try await MymeClient.local(path: "/path/to/store.sqlite")
 _ = try await offline.items.create(CreateItemInput(type: "core.note", properties: ["body": .string("Offline")]))
 
 // 3. Synced — writes go local first, replay to the server when reachable.
-let synced = try MymeClient.synced(url: url, apiKey: key, storePath: "/path/to/store.sqlite")
+let synced = try await MymeClient.synced(url: url, apiKey: key, storePath: "/path/to/store.sqlite")
 await synced.syncEngine?.start()
 ```
 
 SwiftUI-ready reactive queries are available on the pure-local and synced clients via `client.makeStore()`:
 
 ```swift
-@State private var store = try? MymeClient.local(path: dbPath).makeStore()
+// Factories are now `async throws`; load the client before building the store.
+@State private var store: MymeStore? = nil
+
+// ...
+.task {
+    store = try? await MymeClient.local(path: dbPath).makeStore()
+}
 
 var body: some View {
     if let store, let notes = store.query(filters: ListFilters(type: "core.note")) {
@@ -184,6 +190,18 @@ Core schema parents (`core.note`, `core.media.book`, …) resolve automatically 
 - Myme data-model specification: [Myme Reference](https://myme.so/reference) *(once published)*
 
 ## Release notes
+
+### 4.0
+
+**Breaking change.** On-device storage migrated from GRDB/SQLite to SwiftData with a CloudKit-compatible schema. Three axes of breaking change:
+
+- **Factories are `async throws`.** `MymeClient.local(_:)` and `MymeClient.synced(...)` moved from `throws` to `async throws` — `@ModelActor`-isolated actor construction must run off the main actor. Every call site needs `try` → `try await`.
+- **Platform minimums bumped.** iOS 26 / macOS 26 / visionOS 26 / watchOS 26 / tvOS 26.
+- **No automatic migration from pre-4.0 stores.** Consumers with existing on-disk SQLite files must delete and recreate. Pre-release, no external users.
+
+CloudKit sync is **unlocked but not enabled** in 4.0 — the schema is CloudKit-compatible (no `#Unique`, all properties defaulted, all relationships optional with explicit inverse, no `.deny` rules). Phase 2 flips `cloudKitDatabase` from `.none` to `.automatic` in the consumer app's config.
+
+Public namespaces, reactive query types, domain models, wire types, and error hierarchy are otherwise unchanged. See [`CHANGELOG.md`](./CHANGELOG.md) for the full entry.
 
 ### 3.6
 
