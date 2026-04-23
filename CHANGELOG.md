@@ -5,6 +5,48 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] — 2026-04-23
+
+Opens the SwiftData container up for caller-controlled CloudKit
+mirroring. Consumers that want iCloud sync can now build a container
+with `cloudKitDatabase: .automatic(containerIdentifier: …)` and pass it
+straight to `MymeClient`. The pure-local convenience path is unchanged.
+
+### Added
+- **`MymeClient.local(container:)`** — new public async factory taking a
+  caller-built `ModelContainer`. This is the low-level entry point; use
+  it when you need to configure the container directly (for example,
+  to opt into CloudKit mirroring). `MymeClient.local(path:)` remains
+  and is now a convenience that delegates to it.
+- **`cloudKitDatabase:` parameter on `MymeModelContainer.make`.**
+  Defaults to `.none` so existing call sites are unaffected. Pass
+  `.automatic(containerIdentifier: "iCloud.…")` to turn on CloudKit
+  mirroring. In-memory containers ignore the argument — mirroring
+  requires a persistent store.
+
+### Changed
+- **`MymeModelContainer` is now fully public** (previously
+  `@_spi(MymeSDKTestSupport) public`). Consumers need direct access to
+  build containers with custom CloudKit configuration before handing
+  them to `MymeClient.local(container:)`.
+- **`scripts/cloudkit-smoke`** now uses the public
+  `MymeModelContainer.make(path:cloudKitDatabase:)` API instead of
+  reaching into SPI internals. One less demonstration of the old
+  pattern to remove later.
+
+## [4.1.0] — 2026-04-23
+
+### Added
+- **`ItemsNamespace.bulk(_:)`** — batched create/update/upsert via the
+  server's `/items/bulk` endpoint. Accepts `BulkInput`
+  (items + `mode: .create | .update | .upsert`, `atomic`,
+  `emitEvents`); returns `BulkResult` with per-item status.
+- **`ItemsNamespace.bulkAction(_:)`** — batched trash / restore /
+  delete / update-timestamp against multiple item IDs. `BulkActionInput`
+  (ids + `action:`, `atomic`, `emitEvents`); returns `BulkActionResult`.
+- Both methods cover pure-local, synced, and offline-queued replay
+  paths; integration tests cover each mode.
+
 ## [4.0.0] — 2026-04-23
 
 On-device storage migrated from GRDB/SQLite to SwiftData with a
@@ -41,4 +83,6 @@ keep their public shape; the factories move to `async throws`.
 - **CloudKit sync is unlocked but not enabled.** `cloudKitDatabase: .none` in 4.0. Phase 2 (consumer app's iCloud sync work) flips this to `.automatic` against the app's ubiquity container. The schema is already validated for CloudKit compatibility via `cloudkit-smoke`.
 - **Every namespace API is unchanged.** Items, Metadata, Extensions, Edges, Blobs, Types, Keys, Webhooks — same methods, same parameters, same return types. Only `MymeClient.local(_:)` and `MymeClient.synced(...)` need a `try await` at the call site.
 
+[4.2.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.2.0
+[4.1.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.1.0
 [4.0.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.0.0

@@ -6,19 +6,26 @@ import SwiftData
 /// Both `LocalStore` and `MutationQueue` are `@ModelActor`s sharing this
 /// container. Cross-actor saves serialise at the SQLite layer.
 ///
-/// Phase 1 ships with `cloudKitDatabase: .none` — CloudKit sync is unlocked
-/// (the schema is CloudKit-compatible) but not enabled. Phase 2 (the Notes
-/// app's iCloud sync work) flips this to `.automatic` against the consumer
-/// app's ubiquity container.
-///
-/// Exposed via `@_spi(MymeSDKTestSupport)` so `MymeSDKTestSupport` can
-/// build in-memory containers for unit tests without leaking the
-/// constructor into the public SDK surface.
-@_spi(MymeSDKTestSupport) public enum MymeModelContainer {
+/// The `cloudKitDatabase` parameter lets consumers opt into CloudKit sync
+/// against a ubiquity container of their choosing. The default is `.none`
+/// (pure local); pass `.automatic(containerIdentifier: "iCloud.…")` to
+/// mirror the store through `NSPersistentCloudKitContainer`. The SwiftData
+/// schema is CloudKit-compatible regardless of the mode chosen.
+public enum MymeModelContainer {
     /// Builds a container at `path`, or an in-memory container when `path`
     /// is `:memory:` (matches the legacy `LocalStore(path:)` contract used
     /// by every test that wants an ephemeral database).
-    public static func make(path: String) throws -> ModelContainer {
+    ///
+    /// - Parameters:
+    ///   - path: Filesystem path for the SQLite store, or `":memory:"` for
+    ///     an ephemeral in-memory container.
+    ///   - cloudKitDatabase: CloudKit sync mode. Defaults to `.none`.
+    ///     In-memory containers always use `.none` regardless of this
+    ///     argument — CloudKit mirroring requires a persistent store.
+    public static func make(
+        path: String,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none
+    ) throws -> ModelContainer {
         if path == ":memory:" {
             return try ModelContainer(
                 for: Schema(MymeSchemaV1.models),
@@ -40,7 +47,7 @@ import SwiftData
                 schema: Schema(MymeSchemaV1.models),
                 url: url,
                 allowsSave: true,
-                cloudKitDatabase: .none
+                cloudKitDatabase: cloudKitDatabase
             )
         )
     }

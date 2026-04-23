@@ -36,6 +36,25 @@ struct LocalStoreTests {
         _ = try await makeLocalClient()
     }
 
+    @Test("MymeClient.local(container:) creates a working client from a caller-built container") func localClientFromContainer() async throws {
+        let container = try MymeModelContainer.make(path: ":memory:")
+        let client = try await MymeClient.local(container: container)
+        let item = try await client.items.create(noteInput(body: "hello"))
+        #expect(item.properties["body"] == .string("hello"))
+        // Round-trip: fetch through a second client on the same container
+        // to prove the SDK honours the injected store (not a fresh one).
+        let second = try await MymeClient.local(container: container)
+        let fetched = try await second.items.get(id: item.id)
+        #expect(fetched.id == item.id)
+    }
+
+    @Test("MymeModelContainer.make(path:cloudKitDatabase:) defaults to .none") func containerDefaultsToNoneCloudKit() throws {
+        // Smoke-level: the in-memory branch forces `.none` regardless,
+        // but exercising the default-argument path guards against
+        // accidental signature regressions.
+        _ = try MymeModelContainer.make(path: ":memory:")
+    }
+
     // MARK: - Item CRUD (via LocalStore directly)
 
     @Test("createItem generates an ID and stores the item") func createItem() async throws {
