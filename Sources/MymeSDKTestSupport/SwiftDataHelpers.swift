@@ -22,11 +22,6 @@ public enum MymeSDKTest {
         return await Task.detached { LocalStore(modelContainer: container) }.value
     }
 
-    /// Builds an in-memory ``MutationQueue`` against an existing container.
-    public static func makeMutationQueue(in container: ModelContainer) async -> MutationQueue {
-        await Task.detached { MutationQueue(modelContainer: container) }.value
-    }
-
     /// Builds an in-memory ``LocalStore`` and a sibling ``MutationQueue``
     /// sharing one container — the same shape as `MymeClient.synced(...)`.
     /// Sequential construction (not `async let`) — the `@ModelActor`
@@ -37,15 +32,5 @@ public enum MymeSDKTest {
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
         let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
         return (store, queue, container)
-    }
-
-    /// Awaits the reactive debounce window plus headroom. Use after a
-    /// write that should propagate to a reactive query — `MymeStoreTests`
-    /// polls `query.items` after this, so the additional sleep gives
-    /// the `ModelContext.didSave` notification time to fire and the
-    /// debounce task time to schedule the refetch.
-    @MainActor
-    public static func waitForRefetch(after ms: Int = 80) async {
-        try? await Task.sleep(for: .milliseconds(ms))
     }
 }
