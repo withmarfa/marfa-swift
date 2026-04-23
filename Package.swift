@@ -18,16 +18,12 @@ let package = Package(
         .plugin(name: "GenerateMymeCustomTypes", targets: ["GenerateMymeCustomTypes"]),
     ],
     dependencies: [
-        // GRDB — SQLite wrapper for the local mirror store.
-        // Swift 6 strict concurrency support requires GRDB 7+.
-        .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
+        // No external dependencies — the SDK builds on Foundation,
+        // Security, SwiftData, and `os`.
     ],
     targets: [
         .target(
-            name: "MymeSDK",
-            dependencies: [
-                .product(name: "GRDB", package: "GRDB.swift"),
-            ]
+            name: "MymeSDK"
         ),
         .target(
             name: "MymeSDKTestSupport",
