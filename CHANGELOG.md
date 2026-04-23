@@ -5,6 +5,30 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] — 2026-04-23
+
+Additive test-support release. Gives consumer-app test suites a
+one-liner path off the file-backed `MymeClient.local(path: <uuid>)`
+pattern that was crashing later tests in the same process with
+`"Failed to cast model MymeSDK.MymeItemModel… to MymeItemModel"`.
+
+### Added
+- **`MymeSDKTest.makeInMemoryClient()`** — builds a pure-local
+  ``MymeClient`` backed by a fresh in-memory `ModelContainer`. Drop-in
+  replacement for `MymeClient.local(path: <uuid>)` in test setups.
+- **Consumer-app test-setup guidance** in
+  `Sources/MymeSDK/LocalStore/README.md`.
+
+### Notes
+- The most plausible root cause of the crash is XCTest host-bundle
+  linkage loading two distinct `MymeSDK.MymeItemModel` class pointers
+  into the same process — the persistent-store code path is where that
+  ambiguity surfaces. In-memory containers sidestep the persistent
+  stack entirely. No SDK runtime change was made; this is a
+  test-support and docs release.
+- `MymeSDKTestSupport` is explicitly non-semver-stable across SDK
+  minor versions. The helper is additive and safe to adopt immediately.
+
 ## [4.2.0] — 2026-04-23
 
 Opens the SwiftData container up for caller-controlled CloudKit

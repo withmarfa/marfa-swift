@@ -33,4 +33,31 @@ public enum MymeSDKTest {
         let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
         return (store, queue, container)
     }
+
+    /// Builds a pure-local ``MymeClient`` backed by a fresh in-memory
+    /// ``ModelContainer`` — the recommended test-setup entry point for
+    /// consumer apps.
+    ///
+    /// Drop-in replacement for `MymeClient.local(path: <uuid>)` patterns
+    /// in consumer-app test suites:
+    ///
+    ///     // Before:
+    ///     let client = try await MymeClient.local(
+    ///         path: NSTemporaryDirectory() + UUID().uuidString
+    ///     )
+    ///
+    ///     // After:
+    ///     let client = try await MymeSDKTest.makeInMemoryClient()
+    ///
+    /// Routing tests through this helper keeps the whole test process
+    /// on in-memory SwiftData stores. That matters because XCTest host
+    /// bundles can end up loading `MymeSDK.MymeItemModel` more than
+    /// once (the same class name at two distinct pointers), and the
+    /// persistent-store code path is where that ambiguity surfaces as
+    /// `"Failed to cast model MymeSDK.MymeItemModel… to MymeItemModel"`.
+    /// In-memory containers sidestep the persistent stack entirely.
+    public static func makeInMemoryClient() async throws -> MymeClient {
+        let container = try makeInMemoryContainer()
+        return try await MymeClient.local(container: container)
+    }
 }
