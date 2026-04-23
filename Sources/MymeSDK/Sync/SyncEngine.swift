@@ -94,6 +94,7 @@ public actor SyncEngine {
     // Sync-state keys stored in the mutation-queue's sync_state table.
     private let cursorKey = "last_event_id"
     private let fullSyncKey = "last_full_sync_at"
+    private let fullSyncCursorKey = "last_full_sync_cursor"
 
     // MARK: - Proactive drain
 
@@ -287,6 +288,52 @@ public actor SyncEngine {
         }
     }
 
+    /// Structured view of the last full-sync checkpoint, combining the
+    /// timestamp and the SSE cursor that was current at that moment.
+    ///
+    /// Consumers typically read this on launch to decide whether to run
+    /// ``performInitialSync(pageSize:)`` — a nil value means this store
+    /// has never completed a full sync; a stale timestamp means it's been
+    /// a while since the store was caught up and a fresh pull is worth
+    /// the round-trip.
+    ///
+    /// Returns nil when neither key has been written. If only the
+    /// timestamp is present (e.g. an older store written before this API
+    /// tracked cursors), `cursor` comes back nil but `completedAt` is
+    /// still valid.
+    public var lastFullSync: FullSyncState? {
+        get async {
+            guard
+                let raw = try? await mutationQueue.loadSyncState(key: fullSyncKey),
+                let parsed = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            else {
+                return nil
+            }
+            let cursor = try? await mutationQueue.loadSyncState(key: fullSyncCursorKey)
+            return FullSyncState(completedAt: parsed, cursor: cursor)
+        }
+    }
+
+    /// Writes the full-sync checkpoint (`last_full_sync_at` +
+    /// `last_full_sync_cursor`) to the sync-state table. The cursor is
+    /// whatever is currently stored under `last_event_id` — snapshotted
+    /// at the moment the drain landed, so the pair is internally
+    /// consistent even if another event arrives right after the write.
+    ///
+    /// Called from the drain success path (zero transient errors) and
+    /// from the end of ``performInitialSync(pageSize:)``. `try?` on every
+    /// storage call — a sync-state write failure here shouldn't propagate
+    /// to the caller since the drain itself succeeded.
+    private func persistFullSyncCheckpoint() async {
+        let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        try? await mutationQueue.saveSyncState(key: fullSyncKey, value: stamp)
+        if let cursor = try? await mutationQueue.loadSyncState(key: cursorKey) {
+            try? await mutationQueue.saveSyncState(key: fullSyncCursorKey, value: cursor)
+        } else {
+            try? await mutationQueue.clearSyncState(key: fullSyncCursorKey)
+        }
+    }
+
     // MARK: - Init
 
     public init(
@@ -380,11 +427,10 @@ public actor SyncEngine {
         } while cursor != nil
 
         // Stamp the completion so consumers can gate fresh pulls on recency
-        // rather than "is the local store empty?". Uses the same ISO 8601
-        // with fractional seconds as the mutation queue's created_at for
-        // consistency and to stay off the non-Sendable `ISO8601DateFormatter`.
-        let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
-        try? await mutationQueue.saveSyncState(key: fullSyncKey, value: stamp)
+        // rather than "is the local store empty?". Also records the SSE
+        // cursor as part of the checkpoint so ``lastFullSync`` returns a
+        // complete view.
+        await persistFullSyncCheckpoint()
 
         return imported
     }
@@ -674,8 +720,15 @@ public actor SyncEngine {
             // if the engine is up. The terminal markOnline mirrors the
             // non-empty path so the state machine always lands on `.online`
             // after a drain, regardless of queue size.
-            if running { emit(.synced(at: Date())) }
-            if running { await connectionManager.markOnline() }
+            //
+            // Empty queue + engine running = "fully caught up" — stamp the
+            // full-sync checkpoint so consumers can gate initial-sync
+            // pulls on recency.
+            if running {
+                await persistFullSyncCheckpoint()
+                emit(.synced(at: Date()))
+                await connectionManager.markOnline()
+            }
             return
         }
 
@@ -805,6 +858,10 @@ public actor SyncEngine {
         if let transientError {
             emit(.failed(error: transientError))
         } else if running {
+            // Drain completed with zero transient errors — the engine is
+            // fully caught up. Stamp the full-sync checkpoint so consumers
+            // can skip redundant initial-sync pulls on the next launch.
+            await persistFullSyncCheckpoint()
             emit(.synced(at: Date()))
         }
     }
