@@ -5,6 +5,24 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.2] — 2026-04-24
+
+Defensive bug fix. `TypesNamespace`, `KeysNamespace`, and
+`WebhooksNamespace` previously hit the transport unconditionally. On a
+pure-local client (`MymeClient.local(path:)` or the iCloud-mode
+`local(container:)`) the transport is bound to a placeholder
+`local://offline` URL, so every call exploded with an opaque
+`URLError` instead of a typed SDK error. Only `types.get(id:)` was
+biting in production today — Notes-style consumers that look up custom
+type schemas in local mode — but `keys` and `webhooks` had the same
+shape and would have failed the moment a consumer touched them.
+
+### Fixed
+- **`types`, `keys`, `webhooks` now throw `LocalModeUnsupportedError`
+  on pure-local clients** instead of leaking a `URLError` from the
+  underlying `URLSession`. Matches the existing `BlobsNamespace`
+  guard. Network and synced clients are unchanged.
+
 ## [4.2.1] — 2026-04-23
 
 Additive test-support release. Gives consumer-app test suites a

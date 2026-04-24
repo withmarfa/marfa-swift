@@ -109,16 +109,17 @@ public final class MymeClient: Sendable {
         // In synced mode the mutation queue is passed so uploads are
         // queued for offline-resilient replay rather than hitting the
         // transport directly.
+        let isLocalMode = localStore != nil && syncEngine == nil
         self.blobs = BlobsNamespace(
             transport: transport,
             apiBaseURL: configuration.url,
             cdnBaseURL: configuration.cdnBaseURL,
             mutationQueue: syncEngine != nil ? mutationQueue : nil,
-            isLocalMode: localStore != nil && syncEngine == nil
+            isLocalMode: isLocalMode
         )
-        self.types = TypesNamespace(transport: transport)
-        self.keys = KeysNamespace(transport: transport)
-        self.webhooks = WebhooksNamespace(transport: transport)
+        self.types = TypesNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.keys = KeysNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.webhooks = WebhooksNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
     /// Creates a client with the given configuration.
