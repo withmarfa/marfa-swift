@@ -82,6 +82,80 @@ public struct EdgesNamespace: Sendable {
         )
     }
 
+    // MARK: - Bulk
+
+    /// Creates or upserts many edges in one call (admin-only). Up to 5000
+    /// edges per call server-side; use ``bulkAll(_:batchSize:progressHandler:)``
+    /// to iterate larger sets.
+    ///
+    /// Modes (reuses ``BulkMode``):
+    /// - ``BulkMode/upsert`` (default) — duplicate
+    ///   `(source_id, target_id, edge_type)` triples replace properties in
+    ///   place.
+    /// - ``BulkMode/createOnly`` — duplicate triples surface as
+    ///   ``BulkOutcome/skipped`` with reason `"duplicate_edge"`.
+    ///
+    /// Dispatches per client mode:
+    /// - **Pure-local** — iterates edges through ``LocalStore/createEdge``
+    ///   and returns best-effort per-edge outcomes. Duplicate-edge
+    ///   detection is left to the local store; anything the store rejects
+    ///   surfaces as ``BulkOutcome/errored``. No upsert path locally —
+    ///   local edges have no cross-client properties contract to replace.
+    /// - **Synced** — iterates locally for immediate feedback AND enqueues
+    ///   the full input as a single ``MutationKind/bulkEdges`` record so
+    ///   replay POSTs the identical call when the client reconnects.
+    /// - **Network-only** — round-trips the server response straight
+    ///   through.
+    ///
+    /// This is the companion to ``ItemsNamespace/bulk(_:)`` for the
+    /// edges half of mode-transition migrations, where cross-item edges
+    /// can't reliably ride along as inline-edge payloads on the item
+    /// writes (source and target may land in different batches).
+    public func bulk(_ input: BulkEdgeInput) async throws -> BulkEdgeResult {
+        if let store = localStore {
+            var created = 0
+            var errored = 0
+            var results: [BulkEdgeResultEntry] = []
+            results.reserveCapacity(input.edges.count)
+
+            for (index, raw) in input.edges.enumerated() {
+                do {
+                    let edge = try await store.createEdge(
+                        source: raw.sourceId,
+                        target: raw.targetId,
+                        edgeType: raw.edgeType,
+                        properties: raw.properties
+                    )
+                    results.append(BulkEdgeResultEntry(
+                        index: index, outcome: .created, id: edge.id
+                    ))
+                    created += 1
+                } catch {
+                    results.append(BulkEdgeResultEntry(
+                        index: index, outcome: .errored,
+                        error: BulkResultError(
+                            code: "local_error",
+                            message: String(describing: error)
+                        )
+                    ))
+                    errored += 1
+                }
+            }
+
+            try await mutationQueue?.enqueueBulkEdges(input)
+
+            return BulkEdgeResult(
+                counts: BulkResultCounts(
+                    created: created, updated: 0, skipped: 0, errored: errored
+                ),
+                results: results
+            )
+        }
+        return try await transport.request(
+            method: .post, path: "/edges/bulk", body: input, query: nil
+        )
+    }
+
     // MARK: - Reads
 
     /// Global tenant-scoped edge listing, optionally filtered by type.

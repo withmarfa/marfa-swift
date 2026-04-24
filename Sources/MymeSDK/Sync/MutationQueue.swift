@@ -173,6 +173,12 @@ struct BulkActionPayload: Codable, Sendable {
     let input: BulkActionInput
 }
 
+/// Payload for `bulkEdges` — `POST /edges/bulk` list-in. The whole caller
+/// input travels verbatim so replay re-issues the identical call.
+struct BulkEdgesPayload: Codable, Sendable {
+    let input: BulkEdgeInput
+}
+
 // MARK: - MutationQueue actor
 
 /// Durable queue of pending server writes.
@@ -324,6 +330,10 @@ public actor MutationQueue {
 
     func enqueueBulkAction(_ input: BulkActionInput) throws {
         try enqueue(kind: .bulkAction, payload: BulkActionPayload(input: input))
+    }
+
+    func enqueueBulkEdges(_ input: BulkEdgeInput) throws {
+        try enqueue(kind: .bulkEdges, payload: BulkEdgesPayload(input: input))
     }
 
     /// Enqueues a blob upload. Inserts the binary data into the
@@ -696,11 +706,14 @@ public actor MutationQueue {
             // nothing to rewrite when a createItem's local ID changes.
             return record.payloadJson
 
-        case .bulk, .bulkAction:
-            // Bulk payloads don't reference specific in-flight local IDs:
-            // `bulk` items are keyed by `(source, source_id)`; `bulkAction`
-            // resolves matches via a filter at replay time. Nothing to
-            // rewrite if a createItem's local ID changes.
+        case .bulk, .bulkAction, .bulkEdges:
+            // Bulk payloads don't reference specific in-flight local IDs
+            // that need rewriting: `bulk` items are keyed by
+            // `(source, source_id)`; `bulkAction` resolves matches via a
+            // filter at replay time; `bulkEdges` source/target IDs are
+            // the UUIDv7 stamps the bulk-items path persisted verbatim
+            // to the server. Nothing to rewrite if a createItem's local
+            // ID changes.
             return record.payloadJson
         }
 

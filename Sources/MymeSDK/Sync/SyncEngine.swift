@@ -812,6 +812,12 @@ public actor SyncEngine {
             let _: BulkActionResult = try await transport.request(
                 method: .post, path: "/items/bulk_action", body: p.input, query: nil
             )
+
+        case .bulkEdges:
+            let p = try decoder.decode(BulkEdgesPayload.self, from: data)
+            let _: BulkEdgeResult = try await transport.request(
+                method: .post, path: "/edges/bulk", body: p.input, query: nil
+            )
         }
 
         // Only the `createItem` path returns `true`; every other replay is a
