@@ -112,6 +112,91 @@ final class URLSessionTransport: Transport {
         }
     }
 
+    /// Per-task progress delegate used by ``rawUpload``. Forwards
+    /// `didSendBodyData` to the caller-supplied closure. One instance
+    /// per call — no shared state, no global session delegate.
+    private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+        let onBytesSent: @Sendable (Int64, Int64) -> Void
+
+        init(onBytesSent: @escaping @Sendable (Int64, Int64) -> Void) {
+            self.onBytesSent = onBytesSent
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            didSendBodyData bytesSent: Int64,
+            totalBytesSent: Int64,
+            totalBytesExpectedToSend: Int64
+        ) {
+            onBytesSent(totalBytesSent, totalBytesExpectedToSend)
+        }
+    }
+
+    func rawUpload(
+        method: HTTPMethod,
+        path: String,
+        body: Data,
+        contentType: String?,
+        query: [(String, String)]?,
+        onBytesSent: @Sendable @escaping (Int64, Int64) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        let url = try buildURL(path: path, query: query)
+        var request = URLRequest(url: url)
+        request.httpMethod = method.rawValue
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        let requestId = UUIDv7.generateString()
+        request.setValue(requestId, forHTTPHeaderField: "X-Request-ID")
+        if let contentType {
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        }
+
+        let signpostID = logger.signposter.makeSignpostID()
+        let interval = logger.signposter.beginInterval(
+            "HTTP upload",
+            id: signpostID,
+            "\(method.rawValue) \(path)"
+        )
+        defer { logger.signposter.endInterval("HTTP upload", interval) }
+
+        logger.log.info(
+            "http.upload method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) request_id=\(requestId, privacy: .public) bytes=\(body.count, privacy: .public)"
+        )
+
+        let delegate = UploadProgressDelegate(onBytesSent: onBytesSent)
+
+        do {
+            let (data, response) = try await session.upload(
+                for: request, from: body, delegate: delegate
+            )
+            guard let httpResponse = response as? HTTPURLResponse else {
+                logger.log.error(
+                    "http.error request_id=\(requestId, privacy: .public) reason=not_http"
+                )
+                throw NetworkError(URLError(.badServerResponse))
+            }
+            await rateLimitState.update(from: httpResponse.allHeaderFields)
+            logger.log.info(
+                "http.upload.response request_id=\(requestId, privacy: .public) status=\(httpResponse.statusCode, privacy: .public)"
+            )
+            return (data, httpResponse)
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        } catch let error as URLError {
+            logger.log.error(
+                "http.error request_id=\(requestId, privacy: .public) url_error=\(error.code.rawValue, privacy: .public)"
+            )
+            throw NetworkError(error)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            logger.log.error(
+                "http.error request_id=\(requestId, privacy: .public) reason=\(String(describing: error), privacy: .public)"
+            )
+            throw NetworkError(error)
+        }
+    }
+
     func rawRequest(
         method: HTTPMethod,
         path: String,

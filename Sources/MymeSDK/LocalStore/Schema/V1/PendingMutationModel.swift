@@ -43,6 +43,19 @@ final class PendingMutationModel {
     /// Most recent error message from `recordFailure`. Optional.
     var lastError: String?
 
+    /// Stored as `PendingMutationState.rawValue`. Defaults to `"pending"`.
+    /// `"inFlight"` is set by ``SyncEngine`` immediately before the
+    /// transport call; cleared back to `"pending"` on transient failure
+    /// (with `attemptCount++`). On success or permanent drop the record
+    /// is removed, so `"failed"` is never a persisted state — consumers
+    /// subscribe to ``SyncEvent/mutationDropped`` for permanent-fail UX.
+    ///
+    /// Additive SwiftData property with a default value — safe under
+    /// lightweight migration for the V1 schema. No `SchemaMigrationPlan`
+    /// stage required. Older rows read back with `stateRaw = "pending"`
+    /// (the correct starting state).
+    var stateRaw: String = PendingMutationState.pending.rawValue
+
     init() {}
 
     // MARK: - Indexes
@@ -61,4 +74,34 @@ extension PendingMutationModel {
         get { MutationKind(rawValue: kindRaw) ?? .createItem }
         set { kindRaw = newValue.rawValue }
     }
+
+    /// Typed accessor for `stateRaw`. Falls back to `.pending` for
+    /// unknown values — the conservative default, making the record
+    /// eligible for a fresh replay rather than hiding it.
+    var state: PendingMutationState {
+        get { PendingMutationState(rawValue: stateRaw) ?? .pending }
+        set { stateRaw = newValue.rawValue }
+    }
+}
+
+// MARK: - PendingMutationState
+
+/// Lifecycle state of a pending mutation as persisted in
+/// ``PendingMutationModel``.
+///
+/// - `pending` — queued, not currently being replayed. A `pending`
+///   record with `attemptCount > 0` / `lastError != nil` is awaiting a
+///   retry after a transient failure.
+/// - `inFlight` — the sync engine is mid-replay on this record. Set
+///   immediately before the transport call; cleared back to `pending`
+///   on transient failure. On success or permanent drop the row is
+///   removed from the queue, so `inFlight` is never observed for a
+///   "stuck" record — crashed or cancelled replays recover the next
+///   time the engine starts draining.
+///
+/// Round-tripped through `stateRaw` — keep new cases additive so
+/// CloudKit-mirrored stores from older clients don't fail to decode.
+public enum PendingMutationState: String, Codable, Sendable, CaseIterable {
+    case pending
+    case inFlight
 }

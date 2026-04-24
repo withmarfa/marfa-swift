@@ -74,10 +74,33 @@ public actor SyncEngine {
     private let connectionManager: ConnectionStateManager
     private let logger = MymeLogger(category: "sync")
 
+    /// Debounce window between a `MutationQueue.drainRequests` ping and
+    /// the proactive drain firing. Coalesces bursts of enqueues from a
+    /// single user action (e.g. `setMetadata` + `addTags` back-to-back)
+    /// into one replay cycle. Default 150 ms — long enough to gather a
+    /// typed burst, short enough to feel instant.
+    private let drainDebounceInterval: Duration
+
     // MARK: - Internals
 
     private var streamTask: Task<Void, Never>?
     private var running = false
+
+    /// Child task listening to `mutationQueue.drainRequests`. Feeds
+    /// `drainDebounceTask` — one schedule-and-coalesce cycle per burst.
+    /// Cancelled on `stop()`.
+    private var drainListenerTask: Task<Void, Never>?
+
+    /// Debounce task for the proactive drain. Cancelled-and-replaced on
+    /// each new `drainRequests` ping so a steady stream of enqueues
+    /// fires one replay at the end, not per-ping.
+    private var drainDebounceTask: Task<Void, Never>?
+
+    /// Guard against overlapping replays. The SSE-close path and the
+    /// proactive-drain path both call ``replayMutations``; without this
+    /// flag, a ping arriving mid-replay would kick off a second cycle
+    /// against the same records. Set on entry, released in `defer`.
+    private var draining = false
 
     /// Detached task that sleeps for the reconnect back-off and then flips
     /// ``ConnectionStateManager`` back to `.connecting`. Detached so the
@@ -126,6 +149,22 @@ public actor SyncEngine {
             default: return false
             }
         }
+    }
+
+    /// Actor-hopped shim used by the blob-upload progress delegate.
+    /// `URLSession`'s delegate callbacks fire off-actor, and forwarding
+    /// the closure through a detached `Task { await self?.emitBlobProgress }`
+    /// keeps all event emission on the engine's executor.
+    private func emitBlobProgress(
+        hash: String,
+        bytesUploaded: Int64,
+        totalBytes: Int64
+    ) {
+        emit(.blobUploadProgress(
+            hash: hash,
+            bytesUploaded: bytesUploaded,
+            totalBytes: totalBytes
+        ))
     }
 
     // MARK: - Sync status (consumer-facing signals)
@@ -177,12 +216,14 @@ public actor SyncEngine {
         transport: any Transport,
         localStore: LocalStore,
         mutationQueue: MutationQueue,
-        connectionManager: ConnectionStateManager
+        connectionManager: ConnectionStateManager,
+        drainDebounceInterval: Duration = .milliseconds(150)
     ) {
         self.transport = transport
         self.localStore = localStore
         self.mutationQueue = mutationQueue
         self.connectionManager = connectionManager
+        self.drainDebounceInterval = drainDebounceInterval
     }
 
     // MARK: - Lifecycle
@@ -199,6 +240,9 @@ public actor SyncEngine {
         streamTask = Task { [weak self] in
             await self?.runLoop()
         }
+        drainListenerTask = Task { [weak self] in
+            await self?.drainListenerLoop()
+        }
     }
 
     /// Stops the sync engine and cancels the active SSE connection. Also stops
@@ -208,6 +252,10 @@ public actor SyncEngine {
         running = false
         streamTask?.cancel()
         streamTask = nil
+        drainListenerTask?.cancel()
+        drainListenerTask = nil
+        drainDebounceTask?.cancel()
+        drainDebounceTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
         await connectionManager.stop()
@@ -282,6 +330,71 @@ public actor SyncEngine {
                 break
             }
         }
+    }
+
+    // MARK: - Proactive drain on enqueue
+
+    /// Listens to `mutationQueue.drainRequests` for the lifetime of the
+    /// engine. Each ping schedules a debounced proactive drain — bursts
+    /// of enqueues collapse into one replay cycle at the end.
+    private func drainListenerLoop() async {
+        let stream = await mutationQueue.drainRequests
+        for await _ in stream {
+            guard running else { break }
+            scheduleProactiveDrain()
+        }
+    }
+
+    /// Cancels any pending debounce task and replaces it with a fresh
+    /// one. Sleeps for ``drainDebounceInterval`` before firing. The
+    /// actor hop from the detached task back into the engine happens
+    /// inside ``fireProactiveDrain`` — scheduling is cheap and synchronous.
+    private func scheduleProactiveDrain() {
+        drainDebounceTask?.cancel()
+        let interval = drainDebounceInterval
+        drainDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: interval)
+            if Task.isCancelled { return }
+            await self?.fireProactiveDrain()
+        }
+    }
+
+    /// Fires a proactive drain iff we're running, not already draining,
+    /// and `ConnectionStateManager` reports `.online`. All other states
+    /// are no-ops:
+    ///
+    /// - `.offline` — no server to drain to; next `NWPathMonitor`
+    ///   transition picks up the queue.
+    /// - `.connecting` — SSE stream is opening and will drain the queue
+    ///   on close via the existing ``openStream`` path.
+    /// - `.syncing` — another drain is already in flight; the current
+    ///   one will pick up this record on its next iteration.
+    ///
+    /// On fire, follows the same shape as the SSE-close path: replay,
+    /// then mark online if still running.
+    private func fireProactiveDrain() async {
+        guard running, !draining else { return }
+        let state = await connectionManager.state
+        guard state == .online else { return }
+        await replayMutations()
+        if running { await connectionManager.markOnline() }
+    }
+
+    /// Test hook — drives the proactive drain's state gate deterministically
+    /// without going through the debouncer or the drain-request stream.
+    /// `NWPathMonitor` races with the test seam on networked dev machines,
+    /// so unit tests that want to exercise the `.offline` / `.syncing`
+    /// branches call here instead of relying on engine-started state. Mirrors
+    /// what ``drainListenerLoop`` does after the debounce sleep. `internal`
+    /// so `@testable import MymeSDK` can reach it; not public API.
+    internal func triggerProactiveDrainForTesting() async {
+        // Flip `running` true so the gate inside `fireProactiveDrain` does
+        // not short out on a not-started engine. The rest of the guard
+        // chain (`draining` overlap, connection-state check) still applies.
+        let wasRunning = running
+        running = true
+        await fireProactiveDrain()
+        running = wasRunning
     }
 
     // MARK: - SSE stream
@@ -494,6 +607,13 @@ public actor SyncEngine {
     // MARK: - Mutation replay
 
     private func replayMutations() async {
+        // Overlap guard — both the SSE-close path and the
+        // proactive-drain path call here. Collapse concurrent entries
+        // to a single cycle rather than racing over the same records.
+        if draining { return }
+        draining = true
+        defer { draining = false }
+
         guard let pending = try? await mutationQueue.fetchAll(), !pending.isEmpty else {
             // Nothing to replay; signal a clean sync if the engine is up.
             if running { emit(.synced(at: Date())) }
@@ -538,6 +658,13 @@ public actor SyncEngine {
                 )
                 continue
             }
+
+            // Flip the record to `.inFlight` so any `PendingMutationsQuery`
+            // subscriber sees a live transition. Best-effort — if this
+            // save fails (SQLite I/O), proceed to the transport call
+            // anyway; the state is observable-layer metadata, not
+            // required for correct replay.
+            try? await mutationQueue.markInFlight(id: record.id)
 
             do {
                 let didRewrite = try await replayRecord(record, decoder: decoder)
@@ -774,18 +901,49 @@ public actor SyncEngine {
                 // upload can never succeed without the original bytes, so
                 // treat it as a permanent validation failure and let the
                 // engine drop it.
-                throw ValidationError(
+                let err = ValidationError(
                     message: "Pending blob data missing for hash \(p.hash); upload cannot be replayed"
                 )
+                emit(.blobUploadFailed(hash: p.hash, error: err))
+                throw err
             }
 
-            let (responseData, response) = try await transport.rawRequest(
-                method: .post, path: "/blobs", body: blobData,
-                contentType: p.mimeType, query: nil
-            )
+            let total = Int64(blobData.count)
+            emit(.blobUploadStarted(hash: p.hash, totalBytes: total))
+
+            // Capture `self` weakly in the progress closure — SyncEngine is
+            // long-lived but the closure runs off `URLSession`'s delegate
+            // queue, so we hop back onto the actor to emit events safely.
+            let hashCopy = p.hash
+            let totalCopy = total
+            let (responseData, response): (Data, HTTPURLResponse)
+            do {
+                (responseData, response) = try await transport.rawUpload(
+                    method: .post, path: "/blobs", body: blobData,
+                    contentType: p.mimeType, query: nil,
+                    onBytesSent: { [weak self] sent, _ in
+                        Task { [weak self] in
+                            await self?.emitBlobProgress(
+                                hash: hashCopy,
+                                bytesUploaded: sent,
+                                totalBytes: totalCopy
+                            )
+                        }
+                    }
+                )
+            } catch let error as MymeError {
+                emit(.blobUploadFailed(hash: p.hash, error: error))
+                throw error
+            } catch {
+                let wrapped = NetworkError(error)
+                emit(.blobUploadFailed(hash: p.hash, error: wrapped))
+                throw wrapped
+            }
 
             guard (200..<300).contains(response.statusCode) else {
-                throw parseMymeError(data: responseData, statusCode: response.statusCode)
+                let err = parseMymeError(data: responseData, statusCode: response.statusCode)
+                emit(.blobUploadFailed(hash: p.hash, error: err))
+                throw err
             }
 
             // Upload succeeded — clean up the stored bytes. The response
@@ -800,6 +958,7 @@ public actor SyncEngine {
                 )
             }
             try? await mutationQueue.deletePendingBlob(hash: p.hash)
+            emit(.blobUploadCompleted(hash: p.hash))
 
         case .bulk:
             let p = try decoder.decode(BulkPayload.self, from: data)

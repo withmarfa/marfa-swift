@@ -43,11 +43,21 @@ public struct BlobsNamespace: Sendable {
     /// when the sync engine next drains the mutation queue. If the upload
     /// ultimately fails permanently (e.g. the server rejects the content
     /// type), a ``SyncEvent/mutationDropped`` event is emitted on the sync
-    /// engine's `events` stream.
+    /// engine's `events` stream. In synced mode pass `nil` for `onProgress`
+    /// — progress for queued uploads arrives via ``BlobUploadProgressQuery``
+    /// on the reactive layer, not via this callback.
     ///
     /// In network-only mode the upload is performed synchronously and any
-    /// error is thrown immediately, as before.
-    public func upload(data: Data, mimeType: String) async throws -> BlobUploadResponse {
+    /// error is thrown immediately, as before. `onProgress` (if non-nil)
+    /// is invoked one or more times during the request body's transfer
+    /// with `(bytesSent, totalBytes)` pairs. Callback runs on the
+    /// `URLSession` delegate queue — hop to the main actor yourself if
+    /// you're updating SwiftUI state from it.
+    public func upload(
+        data: Data,
+        mimeType: String,
+        onProgress: (@Sendable (Int64, Int64) -> Void)? = nil
+    ) async throws -> BlobUploadResponse {
         try ensureRemote("blobs.upload")
 
         if let queue = mutationQueue {
@@ -58,10 +68,19 @@ public struct BlobsNamespace: Sendable {
         }
 
         // Network-only mode: upload synchronously.
-        let (responseData, response) = try await transport.rawRequest(
-            method: .post, path: "/blobs", body: data,
-            contentType: mimeType, query: nil
-        )
+        let (responseData, response): (Data, HTTPURLResponse)
+        if let onProgress {
+            (responseData, response) = try await transport.rawUpload(
+                method: .post, path: "/blobs", body: data,
+                contentType: mimeType, query: nil,
+                onBytesSent: onProgress
+            )
+        } else {
+            (responseData, response) = try await transport.rawRequest(
+                method: .post, path: "/blobs", body: data,
+                contentType: mimeType, query: nil
+            )
+        }
 
         guard (200..<300).contains(response.statusCode) else {
             throw parseMymeError(data: responseData, statusCode: response.statusCode)

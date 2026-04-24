@@ -5,6 +5,91 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] — 2026-04-24
+
+Sync-maturity release. Three post-Phase-2 investments from the
+swift-platform review — proactive drain on enqueue, per-mutation
+status observable, per-blob upload progress observable. Additive only,
+no breaking changes. Closes out the review's two Tier-2 backlog items
+for the SDK plus one new recommendation.
+
+### Added
+
+- **Proactive mutation drain on enqueue.** `SyncEngine` now triggers
+  `replayMutations()` within 150 ms of an enqueue when the engine is
+  `.online`, coalescing bursts via a debounced listener on
+  `MutationQueue.drainRequests`. Previously replay only fired on SSE
+  stream close — a device that's online but idle would hold pending
+  writes until the next stream reconnect. `.offline`, `.connecting`,
+  and `.syncing` gates short out (queue sits silently / SSE-close
+  path picks up / drain already in flight respectively). Configurable
+  via new `SyncEngine.init(drainDebounceInterval:)` parameter
+  (default `.milliseconds(150)`).
+- **`PendingMutationsQuery` reactive surface.** Vended via
+  `store.queryPendingMutations()`. Observable `mutations:
+  [PendingMutationSummary]` with per-mutation `status: PendingMutationStatus`
+  (`.pending` / `.inFlight` / `.retrying(attemptCount:lastError:)`).
+  Refreshes on the same `ModelContext.didSave` + 50 ms debounce as
+  every other reactive query. Lets consumer apps render richer
+  offline UX than the coarse `hasPendingMutations: Bool` allowed —
+  per-item badges, queue visualisations, retry banners.
+  `hasPendingMutations` is unchanged for consumer-app compatibility.
+- **`BlobUploadProgressQuery` reactive surface.** Vended via
+  `store.queryBlobUploadProgress()` (returns `nil` for network-only
+  clients). Tracks per-hash `BlobUploadProgress` entries with `state:
+  BlobUploadState` (`.pending` / `.uploading(bytesUploaded:totalBytes:)`
+  / `.completed` / `.failed(MymeError)`). Entries are evicted from
+  the `uploads` dict on `blobUploadCompleted` — apps wanting a
+  "recently completed" fade layer it on top. Replaces the hand-rolled
+  `AttachmentUploadTracker` pattern in consumer apps.
+- **Four new `SyncEvent` cases.** `blobUploadStarted`,
+  `blobUploadProgress`, `blobUploadCompleted`, `blobUploadFailed`.
+  Emitted by the `.uploadBlob` mutation-replay branch.
+  `BlobUploadProgressQuery` subscribes to the shared `SyncEngine.events`
+  stream — no parallel event surface.
+- **`Transport.rawUpload(method:path:body:contentType:query:onBytesSent:)`.**
+  Per-request `URLSessionTaskDelegate` forwards `didSendBodyData`
+  to the caller. `URLSessionTransport` and the test-support
+  `MockTransport` both implement; third-party transports get a
+  default that routes through `rawRequest` and drops progress.
+- **`BlobsNamespace.upload(data:mimeType:onProgress:)` optional
+  callback.** Direct-mode callers (network-only `MymeClient`) can
+  observe progress without subscribing to the reactive layer. Synced
+  mode ignores the callback (uploads are queued; use the reactive
+  query for progress). Unchanged default call signature.
+
+### Schema
+
+- **`stateRaw: String` added to `PendingMutationModel`.** Additive
+  SwiftData property with a `"pending"` default. Lightweight
+  migration handles existing rows transparently — no new
+  `SchemaMigrationPlan` stage. Stored as `PendingMutationState.rawValue`
+  (`pending` / `inFlight`). CloudKit-compatible: defaulted, no
+  `#Unique`, not a relationship.
+
+### Fixed / audited
+
+- **`LocalModeUnsupportedError` guard on `TypesNamespace.get()` —
+  verified present.** Follow-up to the vault backlog suspicion that
+  4.2.2's guard covered `list()` but not `get()`. Audit confirmed all
+  five methods (`list`, `get`, `register`, `update`, `delete`) call
+  `ensureRemote` correctly. Any consumer-app retry storm in local
+  mode is app-side (the app should negative-cache
+  `LocalModeUnsupportedError` rather than re-calling on every
+  request); no SDK change shipped.
+
+### Notes
+
+- Blob progress resets to `0` on transient-retry after a failure —
+  the server has no resumable-chunk support, so each retry re-emits
+  `blobUploadStarted` for the same hash and `uploads[hash]` is
+  overwritten with a fresh `.uploading(0, total)`.
+- The drain listener uses the `ConnectionStateManager.state`
+  accessor (already public). No new public surface on
+  `ConnectionStateManager`.
+- The codegen tooling (`codegen-wire`, `codegen-domain`) was not
+  touched.
+
 ## [4.4.0] — 2026-04-24
 
 Bulk-edges end-to-end + client-side chunking convenience for both items

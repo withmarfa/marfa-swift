@@ -141,6 +141,47 @@ public final class MockTransport: Transport, @unchecked Sendable {
         }
     }
 
+    /// `rawUpload` parity — routes through the same queued `rawResponses`
+    /// / `errors` machinery as ``rawRequest(method:path:body:contentType:query:)``,
+    /// with the addition of synthetic progress ticks emitted before the
+    /// response is returned. Ticks fire at 0 %, 50 %, 100 % of the body
+    /// size, which is enough to exercise a consumer's progress observer
+    /// (started → one or more progress events → completed) without any
+    /// real network I/O.
+    public func rawUpload(
+        method: HTTPMethod,
+        path: String,
+        body: Data,
+        contentType: String?,
+        query: [(String, String)]?,
+        onBytesSent: @Sendable @escaping (Int64, Int64) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        let outcome: Dequeue<(Data, HTTPURLResponse)> = lock.withLock {
+            _calls.append(Call(method: method, path: path, body: body, query: query))
+            if !errors.isEmpty { return .error(errors.removeFirst()) }
+            if rawResponses.isEmpty { return .missing }
+            return .value(rawResponses.removeFirst())
+        }
+
+        switch outcome {
+        case .error(let e):
+            if let e { throw e }
+            fatalError("MockTransport: nil error enqueued")
+        case .missing:
+            fatalError("MockTransport: no raw response queued for \(method.rawValue) \(path)")
+        case .value(let response):
+            // Synthetic progress: 0, halfway, complete. Keeps tests
+            // deterministic while still exercising the observer path.
+            let total = Int64(body.count)
+            onBytesSent(0, total)
+            if total > 0 {
+                onBytesSent(total / 2, total)
+                onBytesSent(total, total)
+            }
+            return response
+        }
+    }
+
     public func rawRequest(
         method: HTTPMethod,
         path: String,

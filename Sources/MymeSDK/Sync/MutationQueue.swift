@@ -19,6 +19,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var createdAt: String
     public var attemptCount: Int
     public var lastError: String?
+    public var state: PendingMutationState
 
     public init(
         id: String,
@@ -28,7 +29,8 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         localId: String? = nil,
         createdAt: String,
         attemptCount: Int = 0,
-        lastError: String? = nil
+        lastError: String? = nil,
+        state: PendingMutationState = .pending
     ) {
         self.id = id
         self.kind = kind
@@ -38,6 +40,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         self.createdAt = createdAt
         self.attemptCount = attemptCount
         self.lastError = lastError
+        self.state = state
     }
 }
 
@@ -52,7 +55,8 @@ extension PendingMutationModel {
             localId: localId,
             createdAt: createdAt,
             attemptCount: attemptCount,
-            lastError: lastError
+            lastError: lastError,
+            state: state
         )
     }
 
@@ -66,6 +70,7 @@ extension PendingMutationModel {
         createdAt = record.createdAt
         attemptCount = record.attemptCount
         lastError = record.lastError
+        stateRaw = record.state.rawValue
     }
 }
 
@@ -197,6 +202,45 @@ public actor MutationQueue {
     private static let encoder = JSONEncoder()
     private static let decoder = JSONDecoder()
 
+    // MARK: - Drain-request broadcast
+
+    /// Active subscribers to ``drainRequests``. Continuations are appended
+    /// on `subscribe` and pruned on the first `.terminated` yield. Pattern
+    /// mirrors ``SyncEngine/events``.
+    private var drainContinuations: [AsyncStream<Void>.Continuation] = []
+
+    /// A broadcast stream of "a mutation was just enqueued" pings.
+    /// ``SyncEngine`` consumes this to trigger a proactive drain against
+    /// a live connection — without it, writes made while the engine is
+    /// parked on `.online` wait for the next SSE reconnect before the
+    /// queue is touched.
+    ///
+    /// Yields `()` once per successful enqueue (after the SQLite
+    /// transaction has committed). Late subscribers do not see past
+    /// pings. Multiple subscribers each receive their own continuation.
+    ///
+    /// Implemented as an `async` computed property so the continuation
+    /// registration completes before the caller receives the stream —
+    /// a plain `nonisolated var` would schedule the subscribe in a
+    /// detached `Task` that races against the first enqueue.
+    public var drainRequests: AsyncStream<Void> {
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        drainContinuations.append(continuation)
+        return stream
+    }
+
+    /// Yield to every active subscriber. Drops finished continuations.
+    /// Safe to call from any enqueue path — called after the commit
+    /// critical section so subscribers wake to a fully-visible row.
+    private func emitDrainRequest() {
+        drainContinuations.removeAll { c in
+            switch c.yield(()) {
+            case .terminated: return true
+            default: return false
+            }
+        }
+    }
+
     // MARK: - Enqueue helpers
 
     private func enqueue(
@@ -224,6 +268,7 @@ public actor MutationQueue {
         model.lastError = nil
         modelContext.insert(model)
         try modelContext.save()
+        emitDrainRequest()
     }
 
     // MARK: - Enqueue public API
@@ -381,6 +426,7 @@ public actor MutationQueue {
 
         // One save commits both rows as a single SQLite transaction.
         try modelContext.save()
+        emitDrainRequest()
     }
 
     // MARK: - Pending blob access
@@ -426,7 +472,9 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
-    /// Records a failed replay attempt.
+    /// Records a failed replay attempt. Also resets `state` to `.pending`
+    /// so a `.inFlight` row doesn't appear stuck in the consumer-facing
+    /// observable after a transient failure.
     func recordFailure(id: String, error: String) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
@@ -434,6 +482,23 @@ public actor MutationQueue {
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
         model.lastError = error
+        model.state = .pending
+        try modelContext.save()
+    }
+
+    /// Flips a pending record's `state` to `.inFlight` immediately
+    /// before the sync engine issues its transport call. The transition
+    /// is a standalone save so the change is visible to any
+    /// `PendingMutationsQuery` subscriber that's observing
+    /// `ModelContext.didSave`. Successful replay removes the row
+    /// entirely; transient failure reverts to `.pending` via
+    /// ``recordFailure(id:error:)``.
+    func markInFlight(id: String) throws {
+        let predicate = #Predicate<PendingMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        model.state = .inFlight
         try modelContext.save()
     }
 

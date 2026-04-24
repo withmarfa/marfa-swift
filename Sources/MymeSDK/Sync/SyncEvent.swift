@@ -104,4 +104,35 @@ public enum SyncEvent: Sendable {
     /// `itemId` is the target item ID (or edge ID / local ID, depending on
     /// the mutation); `nil` for records that don't carry one.
     case mutationDropped(kind: String, itemId: String?, attempt: Int, error: MymeError)
+
+    /// A blob upload has started. Fires once per upload attempt, before
+    /// any bytes hit the network. `totalBytes` comes from the queued
+    /// payload — the same value `BlobUploadResponse.size` returned when
+    /// the upload was enqueued.
+    ///
+    /// ``BlobUploadProgressQuery`` consumes this to open a progress
+    /// entry in its `uploads` dict keyed by `hash`; apps that want a
+    /// "upload started" affordance can subscribe to the events stream
+    /// directly.
+    case blobUploadStarted(hash: String, totalBytes: Int64)
+
+    /// Incremental upload progress. Fires zero or more times between
+    /// ``SyncEvent/blobUploadStarted`` and a terminal
+    /// ``SyncEvent/blobUploadCompleted`` / ``SyncEvent/blobUploadFailed``.
+    /// `bytesUploaded` is monotonically non-decreasing within a single
+    /// attempt; on retry after a transient failure the counter resets
+    /// to zero with a fresh `blobUploadStarted`.
+    case blobUploadProgress(hash: String, bytesUploaded: Int64, totalBytes: Int64)
+
+    /// A blob upload finished successfully. The pending-blob row has
+    /// been removed from the local store; subsequent reads for the
+    /// same hash go through the normal blob-download path.
+    case blobUploadCompleted(hash: String)
+
+    /// A blob upload failed. For transient failures the engine will
+    /// retry on the next replay cycle — consumers will see another
+    /// ``SyncEvent/blobUploadStarted`` for the same hash when that
+    /// happens. For permanent failures the mutation is dropped, and a
+    /// matching ``SyncEvent/mutationDropped`` follows.
+    case blobUploadFailed(hash: String, error: MymeError)
 }
