@@ -6,3 +6,9 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 Package.resolved
+
+# Claude Code local-only (do not commit)
+.claude/settings.local.json
+.claude/plans/
+.claude/scheduled_tasks.lock
+.claude/worktrees/
