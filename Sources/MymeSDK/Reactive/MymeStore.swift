@@ -35,10 +35,17 @@ public final class MymeStore {
 
     private let container: ModelContainer
 
+    /// The sync engine this store was vended against, if any. Populated
+    /// for synced-mode clients; `nil` for pure-local. Gates
+    /// ``queryBlobUploadProgress()`` — only synced clients have an
+    /// engine whose `events` stream can drive blob progress.
+    private let syncEngine: SyncEngine?
+
     // MARK: - Init
 
-    init(container: ModelContainer) {
+    init(container: ModelContainer, syncEngine: SyncEngine? = nil) {
         self.container = container
+        self.syncEngine = syncEngine
     }
 
     // MARK: - Item queries
@@ -128,6 +135,41 @@ public final class MymeStore {
     /// ``TagsQuery``.
     public func queryTags() -> TagsQuery {
         TagsQuery(container: container)
+    }
+
+    // MARK: - Sync queries
+
+    /// Creates a live query over the pending-mutation queue.
+    ///
+    /// Surfaces every queued mutation with its projected
+    /// ``PendingMutationStatus`` — `.pending`, `.inFlight`, or
+    /// `.retrying(...)`. Apps use this to render richer offline UX
+    /// than ``SyncEngine/hasPendingMutations`` allows: per-item badges,
+    /// queue visualisations, retry banners.
+    ///
+    /// Updates whenever any mutation is enqueued, transitions to
+    /// `.inFlight`, records a transient failure, or is removed after
+    /// successful replay. Shares the same `ModelContext.didSave`
+    /// observation and 50 ms debounce as every other reactive query.
+    public func queryPendingMutations() -> PendingMutationsQuery {
+        PendingMutationsQuery(container: container)
+    }
+
+    /// Creates a live query over in-flight blob uploads.
+    ///
+    /// Returns `nil` when the store has no sync engine attached
+    /// (pure-local clients) — there are no blob uploads to track
+    /// without a server round-trip.
+    ///
+    /// The query subscribes to the engine's `events` stream and
+    /// maintains a `uploads: [hash: BlobUploadProgress]` dict.
+    /// Entries appear on ``SyncEvent/blobUploadStarted``, update on
+    /// ``SyncEvent/blobUploadProgress``, and are evicted on
+    /// ``SyncEvent/blobUploadCompleted``. Failures leave a `.failed`
+    /// entry that's overwritten by a fresh start on transient retry.
+    public func queryBlobUploadProgress() -> BlobUploadProgressQuery? {
+        guard let syncEngine else { return nil }
+        return BlobUploadProgressQuery(engine: syncEngine)
     }
 }
 

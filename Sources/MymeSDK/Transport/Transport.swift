@@ -31,6 +31,24 @@ public protocol Transport: Sendable {
         query: [(String, String)]?
     ) async throws -> (Data, HTTPURLResponse)
 
+    /// Sends a raw HTTP request with an upload-progress callback.
+    ///
+    /// `onBytesSent` is invoked one or more times during the request
+    /// body's transfer, with the current bytes-sent total and the
+    /// expected grand total. Called from `URLSession`'s delegate
+    /// queue — implementations must not assume a specific executor.
+    ///
+    /// The progress callback is optional; passing a no-op closure
+    /// preserves the semantics of ``rawRequest(method:path:body:contentType:query:)``.
+    func rawUpload(
+        method: HTTPMethod,
+        path: String,
+        body: Data,
+        contentType: String?,
+        query: [(String, String)]?,
+        onBytesSent: @Sendable @escaping (Int64, Int64) -> Void
+    ) async throws -> (Data, HTTPURLResponse)
+
     /// Opens a Server-Sent Events stream and yields parsed events.
     ///
     /// Transport owns connection establishment and parsing; reconnect logic
@@ -59,5 +77,23 @@ public extension Transport {
                 status: 0
             ))
         }
+    }
+
+    /// Default `rawUpload` that routes to ``rawRequest`` and discards
+    /// progress. Third-party `Transport` implementations opt in to the
+    /// progress-delegate path by overriding; the SDK's bundled
+    /// `URLSessionTransport` and test-support `MockTransport` both do.
+    func rawUpload(
+        method: HTTPMethod,
+        path: String,
+        body: Data,
+        contentType: String?,
+        query: [(String, String)]?,
+        onBytesSent: @Sendable @escaping (Int64, Int64) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await rawRequest(
+            method: method, path: path, body: body,
+            contentType: contentType, query: query
+        )
     }
 }

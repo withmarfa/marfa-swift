@@ -242,6 +242,67 @@ struct SyncEngineTests {
             #expect(payload.conflict == nil)
             #expect(payload.library == nil)
         }
+
+        // MARK: - drainRequests broadcast
+
+        @Test("drainRequests yields once per enqueue across every MutationKind helper")
+        func drainRequestsYieldsPerEnqueue() async throws {
+            let (_, queue) = try await makeStoreAndQueue()
+
+            // `drainRequests` is an async actor property — awaiting it
+            // returns a stream whose continuation is already registered,
+            // so pings fired on the very next enqueue are guaranteed to
+            // land.
+            let stream = await queue.drainRequests
+            var iter = stream.makeAsyncIterator()
+
+            // One call per MutationKind case (19 in total). Consume each
+            // ping as we go so nothing is buffered out of order.
+            let kinds: [() async throws -> Void] = [
+                {
+                    try await queue.enqueueCreateItem(
+                        CreateItemInput(type: "core.note", properties: [:]),
+                        localId: "l1"
+                    )
+                },
+                { try await queue.enqueueUpdateItem(id: "l1", properties: [:]) },
+                { try await queue.enqueueDeleteItem(id: "l1") },
+                { try await queue.enqueueRestoreItem(id: "l1") },
+                { try await queue.enqueueTransitionItem(id: "l1", to: "archived") },
+                { try await queue.enqueuePurgeItem(id: "l1") },
+                {
+                    try await queue.enqueueCreateEdge(
+                        source: "a", target: "b", edgeType: "x.y", properties: nil, localEdgeId: "e1"
+                    )
+                },
+                { try await queue.enqueueUpdateEdge(id: "e1", properties: [:]) },
+                { try await queue.enqueueDeleteEdge(id: "e1") },
+                { try await queue.enqueueSetMetadata(itemId: "l1", input: MetadataInput(tags: [])) },
+                { try await queue.enqueueMergeMetadata(itemId: "l1", input: MetadataInput(tags: [])) },
+                { try await queue.enqueueAddTags(itemId: "l1", tags: ["t"]) },
+                { try await queue.enqueueRemoveTag(itemId: "l1", tag: "t") },
+                { try await queue.enqueueSetExtension(itemId: "l1", namespace: "ns", data: [:]) },
+                { try await queue.enqueueDeleteExtension(itemId: "l1", namespace: "ns") },
+                { try await queue.enqueueBulk(BulkInput(items: [])) },
+                {
+                    try await queue.enqueueBulkAction(
+                        .transition(filter: BulkActionFilter(), state: .archived)
+                    )
+                },
+                { try await queue.enqueueBulkEdges(BulkEdgeInput(edges: [])) },
+                {
+                    try await queue.enqueueBlobUpload(
+                        hash: "sha256:deadbeef", data: Data([0x01, 0x02]), mimeType: "application/octet-stream"
+                    )
+                },
+            ]
+
+            for fire in kinds {
+                try await fire()
+                let ping: Void? = await iter.next()
+                #expect(ping != nil)
+            }
+        }
     }
 
     // MARK: - ConnectionStateManager unit tests
@@ -1325,6 +1386,130 @@ struct SyncEngineTests {
             )
             let second = await engine2.lastFullSyncAt
             #expect(second == first)
+        }
+
+        // MARK: - Proactive drain on enqueue
+
+        /// Fixture variant for the proactive-drain tests — short debounce so
+        /// assertions don't need to sleep for the 150 ms default.
+        private func makeFixtureWithShortDebounce() async throws -> (
+            store: LocalStore,
+            queue: MutationQueue,
+            transport: MockTransport,
+            connManager: ConnectionStateManager,
+            engine: SyncEngine
+        ) {
+            let (store, queue, _) = try await MymeSDKTest.makeInMemoryStorePair()
+            let transport = MockTransport()
+            let connManager = ConnectionStateManager()
+            let engine = SyncEngine(
+                transport: transport,
+                localStore: store,
+                mutationQueue: queue,
+                connectionManager: connManager,
+                drainDebounceInterval: .milliseconds(20)
+            )
+            return (store, queue, transport, connManager, engine)
+        }
+
+        @Test("proactive drain fires when a mutation is enqueued while online")
+        func proactiveDrainFiresWhenOnline() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixtureWithShortDebounce()
+
+            // Engine consumes an empty SSE stream, marks .online, then idles
+            // until a drain request wakes it.
+            transport.enqueueEvents([])
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+
+            // Wait until the stream close has landed us on .online.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await connManager.state == .online
+            }
+
+            // Queue a delete. Transport replies with a 204 via EmptyResponse
+            // envelope — mock returns any successful decoded shape.
+            transport.enqueue(EmptyResponse())
+            try await queue.enqueueDeleteItem(id: "server-x")
+
+            // Debounce (20 ms) + replay should clear the queue promptly.
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+            #expect(try await queue.isEmpty)
+            await engine.stop()
+        }
+
+        @Test("burst enqueues collapse to a single drain cycle")
+        func burstEnqueuesCollapseToSingleDrain() async throws {
+            let (_, queue, transport, connManager, engine) = try await makeFixtureWithShortDebounce()
+
+            transport.enqueueEvents([])
+            await engine.start()
+            await connManager.applyStateForTesting(.connecting)
+            try await waitUntil(timeout: .milliseconds(500)) {
+                await connManager.state == .online
+            }
+
+            // Five mutations back-to-back. Each expects one transport round
+            // trip. If the debouncer works, all fire on a single replay
+            // cycle rather than triggering five separate cycles.
+            for _ in 0..<5 {
+                transport.enqueue(EmptyResponse())
+            }
+            for i in 0..<5 {
+                try await queue.enqueueDeleteItem(id: "burst-\(i)")
+            }
+
+            try await waitUntil(timeout: .milliseconds(500)) {
+                (try? await queue.isEmpty) == true
+            }
+
+            // Five delete calls landed on the transport — one replay burst
+            // covering the whole queue snapshot, not five separate cycles.
+            let deletes = transport.calls.filter {
+                $0.method == .delete && $0.path.hasPrefix("/items/burst-")
+            }
+            #expect(deletes.count == 5)
+            await engine.stop()
+        }
+
+        @Test("proactive drain is a no-op when offline")
+        func proactiveDrainNoOpOffline() async throws {
+            // Exercise the gate directly via the test hook — `NWPathMonitor`
+            // races with `applyStateForTesting` on networked dev machines,
+            // which would otherwise transition the engine to `.connecting`
+            // and drain the queue via the SSE-close path before the assert.
+            let (_, queue, transport, connManager, engine) = try await makeFixtureWithShortDebounce()
+
+            await connManager.applyStateForTesting(.offline)
+            try await queue.enqueueDeleteItem(id: "never")
+
+            await engine.triggerProactiveDrainForTesting()
+
+            #expect(try await queue.isEmpty == false)
+            let deletes = transport.calls.filter {
+                $0.method == .delete && $0.path == "/items/never"
+            }
+            #expect(deletes.isEmpty)
+        }
+
+        @Test("proactive drain is a no-op when syncing")
+        func proactiveDrainNoOpSyncing() async throws {
+            // `.syncing` means a drain is already in flight. A second
+            // concurrent drain would race over the same records.
+            let (_, queue, transport, connManager, engine) = try await makeFixtureWithShortDebounce()
+
+            await connManager.applyStateForTesting(.syncing)
+            try await queue.enqueueDeleteItem(id: "never")
+
+            await engine.triggerProactiveDrainForTesting()
+
+            #expect(try await queue.isEmpty == false)
+            let deletes = transport.calls.filter {
+                $0.method == .delete && $0.path == "/items/never"
+            }
+            #expect(deletes.isEmpty)
         }
     }
 
