@@ -5,6 +5,57 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] — 2026-04-24
+
+Bulk-edges end-to-end + client-side chunking convenience for both items
+and edges. The 4.3.0 tag is reserved for the parked
+`feat/sync-observability-4.3.0` branch; this release skips over it.
+
+### Added
+- **`edges.bulk(_:)`** — creates or upserts many edges in a single
+  `POST /edges/bulk` call. Mirrors ``ItemsNamespace/bulk(_:)``: shared
+  `BulkMode` / `BulkOutcome` enums, same `atomic` / `emit_events`
+  switches, 5000-edge server cap. Idempotency key is
+  `(source_id, target_id, edge_type)`; `createOnly` surfaces duplicates
+  as ``BulkOutcome/skipped`` with reason `"duplicate_edge"`; `upsert`
+  replaces properties in place.
+  - Pure-local: iterates through ``LocalStore/createEdge`` with
+    best-effort outcomes (no upsert path — local edges have no
+    cross-client properties contract). Errors land as
+    ``BulkOutcome/errored``.
+  - Synced: local iteration for immediate feedback plus an enqueued
+    ``MutationKind/bulkEdges`` record; replay re-issues the identical
+    call on reconnect.
+  - Network-only: straight round-trip.
+- **`items.bulkAll(_:batchSize:mode:atomic:emitEvents:progressHandler:)`**
+  — chunked iteration over ``ItemsNamespace/bulk(_:)``. Aggregates
+  per-item results and counts across batches, preserves absolute
+  indices. Default `batchSize: 500`, clamped to 5000. Optional
+  `progressHandler` fires once per completed batch with
+  `(itemsCompleted, itemsTotal)`. Non-atomic batches synthesize one
+  ``BulkOutcome/errored`` entry per item in a failed slice so counts
+  stay consistent with the input size; `atomic: true` throws on the
+  first failing batch.
+- **`edges.bulkAll(_:batchSize:mode:atomic:emitEvents:progressHandler:)`**
+  — same shape as `items.bulkAll`, same clamping, same non-atomic
+  per-slice synthesis. Wraps `edges.bulk`.
+
+### Wire types
+- `BulkEdgeInput`, `BulkEdgeInputItem`, `BulkEdgeResult`,
+  `BulkEdgeResultEntry` in `Inputs/BulkEdgeInputs.swift`. Reuses the
+  existing `BulkMode`, `BulkOutcome`, `BulkResultError`,
+  `BulkResultCounts` types.
+
+### Notes
+- `MutationKind.bulkEdges` appended to the enum — additive-only as
+  required for CloudKit-mirrored stores.
+- `openapi.json` snapshot resynced from the monorepo at
+  `@mymehq/sdk` 3.8.0.
+- Cross-batch atomicity does NOT hold for the `bulkAll` helpers.
+  Each batch's `atomic` guarantee stops at its own transaction —
+  callers relying on strict all-or-nothing semantics for a run larger
+  than one batch need to reconcile failures out-of-band.
+
 ## [4.2.2] — 2026-04-24
 
 Defensive bug fix. `TypesNamespace`, `KeysNamespace`, and
