@@ -14,6 +14,7 @@ on:
       - 'docs/**'
       - '.github/ISSUE_TEMPLATE/**'
       - 'LICENSE'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,9 +30,10 @@ concurrency:
 # - PR tier (`pr-check`): compile + typecheck only. Fast feedback on every
 #   push. Catches ~the same class of breakage at ~30% the cost.
 # - Main tier (`main-validate`): full build + `swift test --parallel` +
-#   both freshness checks. Runs on merge to main. Breakages are a
-#   "fix main before cutting a tag" signal, not an incident — nothing
-#   auto-deploys from main.
+#   three codegen freshness checks (wire types, domain models, custom-types
+#   fixtures). Runs on merge to main and on manual workflow_dispatch.
+#   Breakages are a "fix main before cutting a tag" signal, not an
+#   incident — nothing auto-deploys from main.
 #
 # Caching is applied to both tiers: SPM checkouts + DerivedData. Cache key
 # includes Package.resolved so a dependency bump gets a fresh build, but
@@ -91,7 +93,9 @@ jobs:
 
   main-validate:
     name: Full build + test + freshness
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -147,3 +151,58 @@ jobs:
             echo "::error::codegen-domain output is stale. Run 'swift run codegen-domain' (or './scripts/sync-types.sh' if the core-types snapshot is behind) locally and commit the delta."
             exit 1
           fi
+
+      - name: Codegen freshness (custom-types fixtures)
+        # Two-stage check.
+        #
+        # Stage 1 regenerates Tests/CodegenCustomTypesTests/Fixtures/expected/
+        # from Fixtures/schemas/ via codegen-custom-types and diffs the result
+        # against the committed expected/ files. Catches emitter drift and
+        # schema edits that weren't accompanied by a regen.
+        #
+        # Stage 2 byte-compares Fixtures/expected/ against
+        # Tests/CodegenCustomTypesTests/CompileCheck/ — a hand-maintained
+        # mirror used as a compile-time check. Catches the failure mode where
+        # someone edits one copy and forgets the other (GoldenTests only
+        # reads expected/, so divergence here ships silently otherwise).
+        #
+        # The schemas are copied to a temp dir under a folder named
+        # `MymeTypes` because the codegen embeds the source path into each
+        # file's header comment (e.g. `// Source: MymeTypes/foo.json`).
+        # Pointing source.directory at the in-repo schemas dir would change
+        # that header and produce false-positive drift on every run.
+        # GoldenTests uses the same MymeTypes-copy pattern.
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          mkdir -p "$tmpdir/MymeTypes"
+          cp Tests/CodegenCustomTypesTests/Fixtures/schemas/*.json "$tmpdir/MymeTypes/"
+          cat > "$tmpdir/myme-codegen.json" <<JSON
+          {
+            "schema": 1,
+            "source": {
+              "mode": "local",
+              "directory": "MymeTypes"
+            },
+            "output": {
+              "directory": "$GITHUB_WORKSPACE/Tests/CodegenCustomTypesTests/Fixtures/expected",
+              "accessLevel": "public"
+            }
+          }
+          JSON
+          swift run codegen-custom-types --config "$tmpdir/myme-codegen.json"
+
+          if ! git diff --exit-code -- Tests/CodegenCustomTypesTests/Fixtures/expected; then
+            echo "::error::codegen-custom-types fixtures are stale. Run the regen procedure documented in Tests/CodegenCustomTypesTests/CompileCheckTests.swift locally and commit the delta."
+            exit 1
+          fi
+
+          drift=0
+          for f in Tests/CodegenCustomTypesTests/Fixtures/expected/*.swift; do
+            base="$(basename "$f")"
+            if ! cmp -s "$f" "Tests/CodegenCustomTypesTests/CompileCheck/$base"; then
+              echo "::error::CompileCheck/$base diverges from Fixtures/expected/$base. CompileCheck is a byte-for-byte mirror of expected — refresh per Tests/CodegenCustomTypesTests/CompileCheckTests.swift and commit."
+              drift=1
+            fi
+          done
+          [[ $drift -eq 0 ]] || exit 1
