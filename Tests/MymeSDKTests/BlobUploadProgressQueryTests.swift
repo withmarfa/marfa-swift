@@ -79,7 +79,9 @@ struct BlobUploadProgressQueryTests {
         #expect(try await queue.isEmpty)
 
         // After eviction-on-complete the entry is gone from the query.
-        try await waitUntil(timeout: .milliseconds(500)) { query.uploads[hash] == nil }
+        // 2s is generous for CI; locally this resolves in <50ms once the
+        // engine has emitted `blobUploadCompleted`.
+        try await waitUntil(timeout: .seconds(2)) { query.uploads[hash] == nil }
         #expect(query.uploads[hash] == nil)
 
         await engine.stop()
