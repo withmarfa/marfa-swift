@@ -8,7 +8,7 @@ import Foundation
 public struct ApiKey: Codable, Sendable, Identifiable {
     public let createdAt: String
     public let defaultOrigin: Origin
-    public let defaultTier: ApiKeyDefaultTier
+    public let defaultTier: Tier
     public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
@@ -22,7 +22,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
     public init(
         createdAt: String,
         defaultOrigin: Origin,
-        defaultTier: ApiKeyDefaultTier,
+        defaultTier: Tier,
         edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
@@ -61,9 +61,4 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         case source
         case typePermissions = "type_permissions"
     }
-}
-
-public enum ApiKeyDefaultTier: String, Codable, Sendable, Hashable {
-    case feed
-    case library
 }

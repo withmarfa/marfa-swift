@@ -8,7 +8,7 @@ import Foundation
 public struct CreatedKey: Codable, Sendable {
     public let createdAt: String
     public let defaultOrigin: Origin
-    public let defaultTier: CreatedKeyDefaultTier
+    public let defaultTier: Tier
     public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
@@ -23,7 +23,7 @@ public struct CreatedKey: Codable, Sendable {
     public init(
         createdAt: String,
         defaultOrigin: Origin,
-        defaultTier: CreatedKeyDefaultTier,
+        defaultTier: Tier,
         edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
@@ -65,9 +65,4 @@ public struct CreatedKey: Codable, Sendable {
         case source
         case typePermissions = "type_permissions"
     }
-}
-
-public enum CreatedKeyDefaultTier: String, Codable, Sendable, Hashable {
-    case feed
-    case library
 }

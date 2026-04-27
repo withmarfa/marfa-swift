@@ -19,7 +19,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let source: String
     public let sourceId: String?
     public let state: ItemState
-    public let tier: ItemTier?
+    public let tier: Tier?
     public let timestamp: String
     public let type: String
     public let updatedAt: String
@@ -39,7 +39,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         source: String,
         sourceId: String? = nil,
         state: ItemState,
-        tier: ItemTier? = nil,
+        tier: Tier? = nil,
         timestamp: String,
         type: String,
         updatedAt: String,
@@ -85,9 +85,4 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         case updatedAt = "updated_at"
         case version
     }
-}
-
-public enum ItemTier: String, Codable, Sendable, Hashable {
-    case feed
-    case library
 }

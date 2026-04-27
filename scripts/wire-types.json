@@ -13,7 +13,7 @@
     "daily_snapshot_days",
     "weekly_snapshot_days",
     "max_versions",
-    "ambient_days"
+    "feed_days"
   ],
   "types": [
     {
@@ -26,7 +26,8 @@
       },
       "enumOverrides": {
         "state": "ItemState",
-        "origin": "Origin"
+        "origin": "Origin",
+        "tier": "Tier"
       }
     },
     {
@@ -64,7 +65,8 @@
       },
       "enumOverrides": {
         "role": "KeyRole",
-        "default_origin": "Origin"
+        "default_origin": "Origin",
+        "default_tier": "Tier"
       }
     },
     {
@@ -78,7 +80,8 @@
       },
       "enumOverrides": {
         "role": "KeyRole",
-        "default_origin": "Origin"
+        "default_origin": "Origin",
+        "default_tier": "Tier"
       }
     },
     {
