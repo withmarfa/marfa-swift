@@ -1815,7 +1815,11 @@ struct SyncEngineTests {
             try await queue.enqueueSetMetadata(itemId: "A", input: MetadataInput(tags: ["t"]))
             try await queue.enqueueDeleteItem(id: "A")
 
-            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+            let deleted = try await queue.dropMutationsReferencingLocalId(
+                "A",
+                droppedAt: Date(),
+                error: ValidationError(message: "test")
+            )
 
             // Everything keyed off "A" was scheduled for drop, except the
             // createItem root (the caller removes that separately so their
@@ -1846,7 +1850,11 @@ struct SyncEngineTests {
                 properties: nil, localEdgeId: "E-XY"
             )
 
-            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+            let deleted = try await queue.dropMutationsReferencingLocalId(
+                "A",
+                droppedAt: Date(),
+                error: ValidationError(message: "test")
+            )
 
             // Both A-touching edges cascade; the unrelated X→Y survives.
             #expect(deleted.count == 2)
@@ -1875,7 +1883,11 @@ struct SyncEngineTests {
             )
             try await queue.enqueueUpdateEdge(id: "E-XY", properties: ["note": .string("z")])
 
-            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+            let deleted = try await queue.dropMutationsReferencingLocalId(
+                "A",
+                droppedAt: Date(),
+                error: ValidationError(message: "test")
+            )
 
             // createEdge + updateEdge + deleteEdge for E-AB, but NOT the
             // sibling E-XY or its updateEdge.
@@ -1893,7 +1905,11 @@ struct SyncEngineTests {
             let (store, queue) = try await makeStoreAndQueue()
 
             try await queue.enqueueUpdateItem(id: "B", properties: ["body": .string("y")])
-            let deleted = try await queue.dropMutationsReferencingLocalId("A")
+            let deleted = try await queue.dropMutationsReferencingLocalId(
+                "A",
+                droppedAt: Date(),
+                error: ValidationError(message: "test")
+            )
             #expect(deleted.isEmpty)
             #expect(try await queue.fetchAll().count == 1)
         }

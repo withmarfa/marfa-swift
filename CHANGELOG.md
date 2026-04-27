@@ -5,6 +5,71 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.0] — 2026-04-27
+
+Dropped-mutation recovery release. Second half of the
+checkpoint+recovery rollout that began with 5.1.0. Adds the persisted
+log apps need to surface "what couldn't be saved" — closes the v3.2.0
+"toast then nothing" hole.
+
+Carries the SDK's first SwiftData schema migration: a lightweight V1 →
+V2 stage purely additive (one new `@Model`). Apps that opened a V1
+store under 5.0.x or 5.1.x land on V2 on first open after upgrading;
+existing rows survive untouched.
+
+### Added
+
+- **`DroppedMutationModel` (V2 schema, `@Model`).** Persistent record
+  of every mutation the engine drops permanently. Carries the
+  original payload, the dropping `MymeError` shape (status / code /
+  message capped at 1024 chars / details JSON), the original
+  enqueue timestamp, and the drop timestamp.
+- **`DroppedMutationRecord` Sendable DTO + `MutationQueue.fetchDropped()`.**
+  Returns every dropped row, newest first.
+- **`MymeStore.queryDroppedMutations()`** vending
+  `DroppedMutationsQuery` (`@Observable @MainActor`). Refreshes on
+  the same `ModelContext.didSave` + 50 ms debounce as every other
+  reactive query. Returns `nil` for clients without a sync engine.
+- **Dismissal APIs on `MymeStore`** (forwarding to `MutationQueue`):
+  - `store.dismissDropped(id:)` — single row.
+  - `store.dismissDroppedOlderThan(_:)` — strictly less-than the
+    cutoff. Lets long-running apps clear stale rows without the SDK
+    committing to an opinionated retention default.
+  - `store.dismissAllDropped()` — clears the table.
+- **First on-disk migration test in the repo.**
+  `SchemaMigrationTests` writes a V1 store, closes the container,
+  reopens via `MymeModelContainer.make` (which uses the V2
+  migration plan), and asserts: existing rows survive,
+  `DroppedMutationModel` queryable + empty, post-migration inserts
+  succeed.
+
+### Changed
+
+- **`SyncEngine` drop sites use `recordDropped(record:droppedAt:error:)`
+  atomically.** The dropped-row insert and the live-row remove now
+  commit in a single `modelContext.save()` rather than two separate
+  ops, eliminating the window where a crash mid-sequence could
+  leave the live row gone but the log row missing.
+- **`MutationQueue.dropMutationsReferencingLocalId(_:droppedAt:error:)`**
+  signature now takes the cascade timestamp + error. The cascade
+  also persists every orphan as a `DroppedMutationModel` row in the
+  same save.
+
+### Notes
+
+- Lightweight V1 → V2 migration shipped via
+  `MigrationStage.lightweight(fromVersion:toVersion:)`. No data
+  reshape, just a new table.
+- The drop-and-recreate fallback in `MymeModelContainer.make` is
+  unchanged. It's conservative-aggressive — any future migration
+  failure (corrupt store, broken custom stage) will also clear the
+  `DroppedMutationModel` rows. The dropped log is therefore
+  best-effort across migration boundaries; treat it as a recovery
+  aid, not a durable audit trail.
+- No retry API in this delivery. A future `retryDropped(id:)` slots
+  in cleanly later (decode the payload back into the original
+  mutation kind, re-enqueue, drop the log row).
+
 ## [5.1.0] — 2026-04-27
 
 Full-sync-state checkpoint release. First half of a two-PR rollout

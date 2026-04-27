@@ -64,6 +64,12 @@ public final class MymeClient: Sendable {
     /// `MymeClient`.
     private let container: ModelContainer?
 
+    /// The mutation queue, non-nil when a local store is configured.
+    /// Held so ``makeStore()`` can pass it to ``MymeStore`` for the
+    /// dropped-mutation dismissal forwarders. `MutationQueue` is an
+    /// actor, so storing the reference is `Sendable`-safe.
+    private let mutationQueue: MutationQueue?
+
     // MARK: - Init
 
     /// Designated init — used by every other init path, including tests.
@@ -79,6 +85,7 @@ public final class MymeClient: Sendable {
         self.transport = transport
         self.syncEngine = syncEngine
         self.container = container
+        self.mutationQueue = mutationQueue
 
         let items = ItemsNamespace(
             transport: transport,
@@ -323,7 +330,11 @@ public final class MymeClient: Sendable {
     @MainActor
     public func makeStore() -> MymeStore? {
         guard let container else { return nil }
-        return MymeStore(container: container, syncEngine: syncEngine)
+        return MymeStore(
+            container: container,
+            syncEngine: syncEngine,
+            mutationQueue: mutationQueue
+        )
     }
 
     // MARK: - Top-Level Methods

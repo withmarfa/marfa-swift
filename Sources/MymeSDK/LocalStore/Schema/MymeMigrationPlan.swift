@@ -3,18 +3,29 @@ import SwiftData
 
 /// Schema migration plan for the SDK's on-device store.
 ///
-/// V1 is the only schema version, so `stages` is empty.
+/// Versions:
+/// - V1 (5.0.x): post-TSC42 reset baseline.
+/// - V2 (5.2.0): adds ``DroppedMutationModel``. Lightweight stage —
+///   purely additive, no existing model changed.
 ///
-/// Adding V2 later: copy `Schema/V1/` to `Schema/V2/`, mutate the models,
-/// append `MymeSchemaV2.self` to `schemas`, and add a `MigrationStage`
-/// (lightweight or custom) to `stages`. The plan must list every prior
-/// version it knows how to migrate forward from.
+/// Adding V3 later: if existing models change shape, copy
+/// `Schema/V2/` (and any unchanged-from-V1 models referenced by V2)
+/// into `Schema/V3/` so the V3 namespace owns its own copies, mutate
+/// those copies, append `MymeSchemaV3.self` to `schemas`, and add a
+/// `MigrationStage` describing the V2 → V3 transition. Pure-additive
+/// V3 changes can keep referencing V2 models the same way V2
+/// references V1 models — see ``MymeSchemaV2/models``.
 @_spi(MymeSDKTestSupport) public enum MymeMigrationPlan: SchemaMigrationPlan {
     public static var schemas: [any VersionedSchema.Type] {
-        [MymeSchemaV1.self]
+        [MymeSchemaV1.self, MymeSchemaV2.self]
     }
 
     public static var stages: [MigrationStage] {
-        []
+        [
+            .lightweight(
+                fromVersion: MymeSchemaV1.self,
+                toVersion: MymeSchemaV2.self
+            )
+        ]
     }
 }

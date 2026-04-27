@@ -743,7 +743,17 @@ public actor SyncEngine {
                     remaining = (try? await mutationQueue.fetchAll()) ?? []
                 }
             } catch let mymeError as MymeError where mymeError.isPermanent {
-                try? await mutationQueue.remove(id: record.id)
+                // Persist the dropped row + remove the live row in one
+                // SQLite transaction. The dropped log is the
+                // ``DroppedMutationsQuery`` source of truth; cascade
+                // orphans land in the same log via
+                // ``MutationQueue/dropMutationsReferencingLocalId(_:droppedAt:error:)``.
+                let droppedAt = Date()
+                try? await mutationQueue.recordDropped(
+                    record: record,
+                    droppedAt: droppedAt,
+                    error: mymeError
+                )
                 logger.log.error(
                     "sync.mutation.dropped kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) status=\(mymeError.status, privacy: .public) code=\(mymeError.code, privacy: .public)"
                 )
@@ -757,9 +767,16 @@ public actor SyncEngine {
                 // Cascade: if a createItem was dropped, every downstream
                 // mutation keyed off its local id would 404 on replay. Drop
                 // them together and purge the ghost local row so the UI
-                // stops showing an item that can never sync.
+                // stops showing an item that can never sync. The cascade
+                // call also persists each orphan as a
+                // ``DroppedMutationModel`` row (one save) — the engine
+                // emits the per-orphan event from the returned snapshot.
                 if record.kind == .createItem, let localId = record.localId {
-                    let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(localId)) ?? []
+                    let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(
+                        localId,
+                        droppedAt: droppedAt,
+                        error: mymeError
+                    )) ?? []
                     try? await localStore.purgeItem(id: localId)
                     for ghost in cascaded {
                         logger.log.error(
