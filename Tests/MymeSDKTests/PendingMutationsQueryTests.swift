@@ -27,8 +27,15 @@ struct PendingMutationsQueryTests {
     /// Polling helper — reactive queries refresh via
     /// `ModelContext.didSave` + a 50 ms debounce, so assertions need to
     /// poll rather than assume immediate visibility.
+    // Default timeout is generous — local runs typically resolve in
+    // <50ms because the SwiftData notification refetch is debounced
+    // 50ms and short-circuits early — but GitHub Actions macOS runners
+    // are 5-10x slower than local Apple silicon, and the previous
+    // 500ms ceiling produced flakes on CI without ever firing locally.
+    // Tests that need a tighter bound for a specific assertion can
+    // pass `timeout:` explicitly; nothing relies on the default.
     private func waitUntil(
-        timeout: Duration = .milliseconds(500),
+        timeout: Duration = .seconds(5),
         every: Duration = .milliseconds(10),
         _ condition: @MainActor () async throws -> Bool
     ) async throws {

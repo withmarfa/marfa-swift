@@ -34,8 +34,12 @@ struct BlobUploadProgressQueryTests {
         return (store, queue, transport, connManager, engine)
     }
 
+    // Default bumped to 5s for CI headroom — see PendingMutationsQueryTests
+    // for the rationale. Existing call sites that pass an explicit
+    // `timeout: .milliseconds(500)` keep their tighter bound and have
+    // not flaked on CI.
     private func waitUntil(
-        timeout: Duration = .milliseconds(500),
+        timeout: Duration = .seconds(5),
         every: Duration = .milliseconds(10),
         _ condition: @MainActor () async throws -> Bool
     ) async throws {
@@ -75,7 +79,11 @@ struct BlobUploadProgressQueryTests {
         #expect(try await queue.isEmpty)
 
         // After eviction-on-complete the entry is gone from the query.
-        try await waitUntil(timeout: .milliseconds(500)) { query.uploads[hash] == nil }
+        // The full chain — drain done, engine emits blobUploadCompleted,
+        // query observer reacts, eviction runs — resolves in <50ms locally
+        // but takes longer on the slower CI runner; 5s is the headroom
+        // ceiling.
+        try await waitUntil(timeout: .seconds(5)) { query.uploads[hash] == nil }
         #expect(query.uploads[hash] == nil)
 
         await engine.stop()

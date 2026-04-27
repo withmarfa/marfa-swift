@@ -1,5 +1,6 @@
 import Foundation
 import MymeSDK
+import os
 
 /// In-process `Transport` for unit tests. Records every call and returns
 /// canned responses enqueued by the test.
@@ -8,6 +9,28 @@ import MymeSDK
 /// and the response queues are guarded by an `NSLock` used only around
 /// synchronous critical sections. Tests typically drive a mock from a
 /// single task, which makes full actor isolation unnecessary overhead.
+///
+/// ## Missing-response handling
+///
+/// When a request arrives with no response queued, the mock throws
+/// ``MissingMockResponseError`` rather than calling `fatalError`. This
+/// matters when SyncEngine tests leak background drains: the engine's
+/// own retry / drop machinery treats the throw as a network-class failure
+/// and unwinds, instead of crashing the entire test process. Tests that
+/// genuinely require an enqueued response still detect the gap via their
+/// own assertions (`#expect(transport.calls.count == ...)` etc.). The
+/// throw also logs through `MymeLogger("transport-mock")` so the gap is
+/// visible in test transcripts.
+public struct MissingMockResponseError: Error, CustomStringConvertible {
+    public let method: String
+    public let path: String
+    public var description: String {
+        "MockTransport: no response queued for \(method) \(path)"
+    }
+}
+
+private let mockTransportLogger = Logger(subsystem: "sdk.myme", category: "transport-mock")
+
 public final class MockTransport: Transport, @unchecked Sendable {
 
     public struct Call: Sendable {
@@ -105,7 +128,9 @@ public final class MockTransport: Transport, @unchecked Sendable {
             if let e { throw e }
             fatalError("MockTransport: nil error enqueued")
         case .missing:
-            fatalError("MockTransport: no response queued for \(method.rawValue) \(path)")
+            let err = MissingMockResponseError(method: method.rawValue, path: path)
+            mockTransportLogger.error("\(err.description, privacy: .public)")
+            throw err
         case .value(let data):
             return try JSONDecoder().decode(T.self, from: data)
         }
@@ -129,7 +154,9 @@ public final class MockTransport: Transport, @unchecked Sendable {
             if let e { throw e }
             fatalError("MockTransport: nil error enqueued")
         case .missing:
-            fatalError("MockTransport: no response queued for \(method.rawValue) \(path)")
+            let err = MissingMockResponseError(method: method.rawValue, path: path)
+            mockTransportLogger.error("\(err.description, privacy: .public)")
+            throw err
         case .value(let data):
             if let result = try? JSONDecoder().decode(T.self, from: data) {
                 return .success(result)
@@ -168,7 +195,9 @@ public final class MockTransport: Transport, @unchecked Sendable {
             if let e { throw e }
             fatalError("MockTransport: nil error enqueued")
         case .missing:
-            fatalError("MockTransport: no raw response queued for \(method.rawValue) \(path)")
+            let err = MissingMockResponseError(method: method.rawValue, path: path)
+            mockTransportLogger.error("raw \(err.description, privacy: .public)")
+            throw err
         case .value(let response):
             // Synthetic progress: 0, halfway, complete. Keeps tests
             // deterministic while still exercising the observer path.
@@ -200,7 +229,9 @@ public final class MockTransport: Transport, @unchecked Sendable {
             if let e { throw e }
             fatalError("MockTransport: nil error enqueued")
         case .missing:
-            fatalError("MockTransport: no raw response queued for \(method.rawValue) \(path)")
+            let err = MissingMockResponseError(method: method.rawValue, path: path)
+            mockTransportLogger.error("raw \(err.description, privacy: .public)")
+            throw err
         case .value(let response):
             return response
         }

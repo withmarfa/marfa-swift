@@ -4,11 +4,11 @@ import PackageDescription
 let package = Package(
     name: "MymeSDK",
     platforms: [
-        .iOS(.v26),
-        .macOS(.v26),
-        .visionOS(.v26),
-        .watchOS(.v26),
-        .tvOS(.v26),
+        .iOS(.v18),
+        .macOS(.v15),
+        .visionOS(.v2),
+        .watchOS(.v11),
+        .tvOS(.v18),
     ],
     products: [
         .library(name: "MymeSDK", targets: ["MymeSDK"]),

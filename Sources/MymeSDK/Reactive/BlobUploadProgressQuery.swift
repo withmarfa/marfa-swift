@@ -130,6 +130,16 @@ public final class BlobUploadProgressQuery {
                 state: .uploading(bytesUploaded: 0, totalBytes: totalBytes)
             )
         case let .blobUploadProgress(hash, sent, total):
+            // Only update progress for entries that are still tracked.
+            // The engine spawns progress emissions as detached Tasks
+            // (the URLSession progress callback isn't actor-isolated),
+            // and on slow hardware they can race the synchronously-
+            // emitted `.blobUploadCompleted` and arrive after eviction.
+            // Without this guard a final progress tick (e.g. 100/100)
+            // resurrects the entry as `.uploading(4, 4)` and never
+            // evicts. Once `.blobUploadCompleted` fires, the upload is
+            // terminal — late progress is noise.
+            guard uploads[hash] != nil else { break }
             uploads[hash] = BlobUploadProgress(
                 hash: hash,
                 totalBytes: total,
