@@ -58,6 +58,16 @@ public enum SyncEvent: Sendable {
     /// mutation-queue replay finished without an outstanding error.
     case synced(at: Date)
 
+    /// A drain cycle just started — there's pending work in the
+    /// mutation queue and the engine has begun replaying it. Fires
+    /// once per cycle, after the engine has confirmed there is at
+    /// least one record to replay (so an empty queue does not flap
+    /// the state through `.syncing`). Consumers — including
+    /// ``FullSyncStateQuery`` — use this as the "we are now syncing"
+    /// signal without subscribing to
+    /// ``ConnectionStateManager/stateUpdates`` directly.
+    case syncing
+
     /// A sync round failed. The error is the last one observed before
     /// the engine returned to the idle / offline state.
     case failed(error: Error)

@@ -117,6 +117,14 @@ public actor SyncEngine {
     // Sync-state keys stored in the mutation-queue's sync_state table.
     private let cursorKey = "last_event_id"
     private let fullSyncKey = "last_full_sync_at"
+    private let cleanDrainKey = "last_clean_drain_at"
+
+    /// In-memory record of the most recent transient drain failure.
+    /// Cleared by the next clean drain. Not persisted — a cold start
+    /// mid-failure rolls back to whatever the persisted clean-drain
+    /// timestamp says (or ``FullSyncState/notYetSynced``).
+    private var lastFailedError: Error?
+    private var lastFailedAt: Date?
 
     // MARK: - Event stream
 
@@ -207,6 +215,59 @@ public actor SyncEngine {
                 return nil
             }
             return parsed
+        }
+    }
+
+    /// Timestamp of the most recent clean drain cycle — both the SSE
+    /// event application and the queued-mutation replay completed
+    /// without an outstanding error. Stamped from inside
+    /// ``replayMutations()`` whenever the cycle finishes cleanly (queue
+    /// drained or already empty); persisted in `sync_state` under
+    /// `last_clean_drain_at`.
+    ///
+    /// Distinct from ``lastFullSyncAt``, which only stamps on
+    /// ``performInitialSync(pageSize:)`` completion. Apps that want
+    /// "have we ever pulled from the server?" read ``lastFullSyncAt``;
+    /// apps that want "is the local store currently caught up?" read
+    /// this accessor or subscribe via ``MymeStore/queryFullSyncState()``.
+    ///
+    /// Serialised as ISO 8601 with fractional seconds; returns `nil`
+    /// when absent or unparseable.
+    public var lastCleanDrainAt: Date? {
+        get async {
+            guard
+                let raw = try? await mutationQueue.loadSyncState(key: cleanDrainKey),
+                let parsed = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            else {
+                return nil
+            }
+            return parsed
+        }
+    }
+
+    /// Point-in-time read of the engine's ``FullSyncState``.
+    ///
+    /// Order of precedence:
+    /// 1. ``FullSyncState/syncing`` if a drain cycle is currently in flight.
+    /// 2. ``FullSyncState/failed(at:error:)`` if the most recent cycle
+    ///    bailed and no later clean drain has cleared it.
+    /// 3. ``FullSyncState/synced(at:)`` if a clean drain timestamp is
+    ///    persisted.
+    /// 4. ``FullSyncState/notYetSynced`` otherwise.
+    ///
+    /// ``MymeStore/queryFullSyncState()`` returns a reactive
+    /// `@Observable` view backed by the same signals; prefer that for
+    /// SwiftUI views.
+    public var fullSyncState: FullSyncState {
+        get async {
+            if draining { return .syncing }
+            if let err = lastFailedError, let at = lastFailedAt {
+                return .failed(at: at, error: err)
+            }
+            if let stamped = await lastCleanDrainAt {
+                return .synced(at: stamped)
+            }
+            return .notYetSynced
         }
     }
 
@@ -615,12 +676,15 @@ public actor SyncEngine {
         defer { draining = false }
 
         guard let pending = try? await mutationQueue.fetchAll(), !pending.isEmpty else {
-            // Nothing to replay; signal a clean sync if the engine is up.
-            if running { emit(.synced(at: Date())) }
+            // Nothing to replay; the queue is already drained, which
+            // counts as a clean drain cycle for `last_clean_drain_at`
+            // bookkeeping.
+            await recordCleanDrain()
             return
         }
 
         await connectionManager.markSyncing()
+        emit(.syncing)
         let decoder = JSONDecoder()
 
         // Track only transient errors for the cycle-level `.failed` emit.
@@ -729,10 +793,28 @@ public actor SyncEngine {
         }
 
         if let transientError {
+            lastFailedError = transientError
+            lastFailedAt = Date()
             emit(.failed(error: transientError))
-        } else if running {
-            emit(.synced(at: Date()))
+        } else {
+            await recordCleanDrain()
         }
+    }
+
+    /// Centralises the bookkeeping for a clean drain cycle: stamps the
+    /// persisted `last_clean_drain_at` timestamp, clears the in-memory
+    /// failure record, and emits ``SyncEvent/synced(at:)`` to subscribers
+    /// (when running). Both ``replayMutations()`` clean-completion paths
+    /// — the early-return on an empty queue, and the post-loop
+    /// success — funnel through here so the persisted timestamp and
+    /// the emitted event share a single source of truth.
+    private func recordCleanDrain() async {
+        let now = Date()
+        let stamp = now.ISO8601Format(.init(includingFractionalSeconds: true))
+        try? await mutationQueue.saveSyncState(key: cleanDrainKey, value: stamp)
+        lastFailedError = nil
+        lastFailedAt = nil
+        if running { emit(.synced(at: now)) }
     }
 
     /// Returns `true` if the replay rewrote a local-id in the queue, signalling

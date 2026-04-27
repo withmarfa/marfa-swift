@@ -5,6 +5,78 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] — 2026-04-27
+
+Full-sync-state checkpoint release. First half of a two-PR rollout
+(recovery surface lands as 5.2.0); ships a discrete state apps can
+render against to answer "is the local store currently caught up?".
+Additive only — no schema bump, no wire breaks.
+
+### Added
+
+- **`FullSyncState` enum.** `.notYetSynced` / `.syncing` / `.synced(at:)` /
+  `.failed(at:error:)`. Composes the engine's drain progress and the
+  most recent cycle's outcome into a single value. Not `Equatable` —
+  the `.failed` case carries an `Error`.
+- **`SyncEngine.fullSyncState`** point-read accessor for tests and
+  headless callers; `SyncEngine.lastCleanDrainAt` exposes the persisted
+  timestamp directly. Both are `async` getters on the actor.
+- **`MymeStore.queryFullSyncState()`** vending `FullSyncStateQuery`
+  (`@Observable @MainActor`). Seeds initial state from the persisted
+  `last_clean_drain_at` timestamp, then folds `SyncEngine.events`
+  (`.syncing` / `.synced(at:)` / `.failed(error:)`) into the discrete
+  state machine. Returns `nil` for network-only / pure-local clients
+  without a sync engine.
+- **`SyncEvent.syncing` case.** Emitted from inside
+  `replayMutations()` once per cycle, after the engine has confirmed
+  there is at least one record to replay (so an empty queue does not
+  flap consumers through `.syncing`). Closes the "we are now syncing"
+  signal hole that previously required a separate
+  `ConnectionStateManager.stateUpdates` subscription.
+- **New `last_clean_drain_at` key in `SyncStateModel`.** Stamped by
+  `SyncEngine` in both clean-completion paths of `replayMutations()`
+  (early-return on empty queue, post-loop success). Distinct from
+  `last_full_sync_at` which only stamps on `performInitialSync()`
+  completion — apps that want "have we ever pulled from the server?"
+  read the existing accessor; apps that want "is the local store
+  currently caught up?" read the new one or subscribe via the
+  reactive query.
+
+### Notes
+
+- No schema migration required — the new key is just another row in
+  the existing `SyncStateModel` table.
+- The `Notes` app's `performInitialSync` gating Backlog item is now
+  unblocked.
+
+## [5.0.1] — 2026-04-26
+
+CI hygiene release.
+
+### Changed
+
+- `MockTransport` hardened against unexpected request paths during
+  full-validate runs.
+- `full-validate` workflow on `main` no longer blocks on the codegen
+  freshness check when no codegen inputs changed.
+
+## [5.0.0] — 2026-04-25
+
+TSC42 rollout. Breaking schema change on the local store; pre-5.0
+stores cannot be lightweight-migrated to this version. The SDK had
+no real users at this point and the recovery is drop-and-recreate
+(`MymeModelContainer.make` deletes and reopens on schema mismatch).
+
+### Changed
+
+- **`Item.library: Bool` → `Item.tier: String`.** Tier-axis rename
+  with a new persisted field shape (`feed` / `vault`).
+- **New `SchemaVersionMismatchError` (`MymeError` subclass).** Surfaces
+  server-side schema-mismatch responses; `isPermanent` returns `true`
+  so the engine drops mutations rejected for schema drift.
+- **Reserved-root type-id validator.** `core.*` and `sys.*` are now
+  validated server-side; client paths reject ahead-of-time.
+
 ## [4.5.0] — 2026-04-24
 
 Sync-maturity release. Three post-Phase-2 investments from the

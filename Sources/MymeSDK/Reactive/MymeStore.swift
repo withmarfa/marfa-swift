@@ -171,6 +171,24 @@ public final class MymeStore {
         guard let syncEngine else { return nil }
         return BlobUploadProgressQuery(engine: syncEngine)
     }
+
+    /// Creates a live query over the engine's ``FullSyncState``.
+    ///
+    /// Returns `nil` when the store has no sync engine attached
+    /// (pure-local clients) — those shapes never produce drain
+    /// cycles, so there's no meaningful state to render against.
+    ///
+    /// The query seeds its initial state from the persisted
+    /// `last_clean_drain_at` timestamp, then folds
+    /// ``SyncEngine/events`` (`.syncing` / `.synced(at:)` /
+    /// `.failed(error:)`) into the discrete state machine. Apps use
+    /// this to render confidence states — "waiting for first sync",
+    /// "syncing", "synced N minutes ago", "couldn't sync" — without
+    /// hand-rolling a reducer over the underlying signals.
+    public func queryFullSyncState() -> FullSyncStateQuery? {
+        guard let syncEngine else { return nil }
+        return FullSyncStateQuery(engine: syncEngine)
+    }
 }
 
 // MARK: - Refetch observer (shared boilerplate)
