@@ -436,12 +436,11 @@ struct ConflictTests {
         Item(
             createdAt: "2026-04-19T12:00:00Z",
             id: id,
-            library: false,
             origin: .user,
             properties: properties,
             schemaVersion: 1,
             source: "test",
-            state: .active,
+            state: .active, tier: .feed,
             timestamp: "2026-04-19T12:00:00Z",
             type: type,
             updatedAt: "2026-04-19T12:00:00Z",

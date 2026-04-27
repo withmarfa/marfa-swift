@@ -5,34 +5,27 @@ import Foundation
 @Suite("ListFilters query serialisation")
 struct ListFiltersTests {
 
-    // MARK: - library
+    // MARK: - tier
 
-    @Test("library filter omitted when nil")
-    func libraryNilOmitsParam() {
+    @Test("tier filter omitted when nil")
+    func tierNilOmitsParam() {
         let filters = ListFilters(type: "core.note")
         let params = filters.toQueryParams()
-        #expect(!params.contains(where: { $0.0 == "library" }))
+        #expect(!params.contains(where: { $0.0 == "tier" }))
     }
 
-    @Test("library filter serialises .library as \"true\"")
-    func libraryTrue() {
-        let filters = ListFilters(library: .library)
+    @Test("tier filter serialises .library as \"library\"")
+    func tierLibrary() {
+        let filters = ListFilters(tier: .library)
         let params = filters.toQueryParams()
-        #expect(params.contains(where: { $0.0 == "library" && $0.1 == "true" }))
+        #expect(params.contains(where: { $0.0 == "tier" && $0.1 == "library" }))
     }
 
-    @Test("library filter serialises .ambient as \"false\"")
-    func libraryFalse() {
-        let filters = ListFilters(library: .ambient)
+    @Test("tier filter serialises .feed as \"feed\"")
+    func tierFeed() {
+        let filters = ListFilters(tier: .feed)
         let params = filters.toQueryParams()
-        #expect(params.contains(where: { $0.0 == "library" && $0.1 == "false" }))
-    }
-
-    @Test("library filter serialises .all as \"all\"")
-    func libraryAll() {
-        let filters = ListFilters(library: .all)
-        let params = filters.toQueryParams()
-        #expect(params.contains(where: { $0.0 == "library" && $0.1 == "all" }))
+        #expect(params.contains(where: { $0.0 == "tier" && $0.1 == "feed" }))
     }
 
     // MARK: - edge / backref

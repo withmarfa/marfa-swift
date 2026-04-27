@@ -119,12 +119,12 @@ struct BulkTests {
         #expect(String(data: transition, encoding: .utf8)!.contains("\"action\":\"transition\""))
         #expect(String(data: transition, encoding: .utf8)!.contains("\"state\":\"trashed\""))
 
-        let updateLibrary = try encoder.encode(BulkActionInput.updateLibrary(
-            filter: BulkActionFilter(type: "core.note"), library: false
+        let updateTier = try encoder.encode(BulkActionInput.updateTier(
+            filter: BulkActionFilter(type: "core.note"), tier: .feed
         ))
-        let libJson = String(data: updateLibrary, encoding: .utf8)!
-        #expect(libJson.contains("\"action\":\"update_library\""))
-        #expect(libJson.contains("\"library\":false"))
+        let libJson = String(data: updateTier, encoding: .utf8)!
+        #expect(libJson.contains("\"action\":\"update_tier\""))
+        #expect(libJson.contains("\"tier\":\"feed\""))
 
         let updateTimestamp = try encoder.encode(BulkActionInput.updateTimestamp(
             filter: BulkActionFilter(), timestamp: "2020-01-01T00:00:00Z"
@@ -198,7 +198,7 @@ struct BulkTests {
             (.transition(filter: BulkActionFilter(type: "core.note"), state: .archived), "transition"),
             (.purge(filter: BulkActionFilter(tags: ["dead"]), options: BulkActionOptions(confirm: "PURGE")), "purge"),
             (.updateTags(filter: BulkActionFilter(), add: ["x"], remove: nil), "update_tags"),
-            (.updateLibrary(filter: BulkActionFilter(), library: true), "update_library"),
+            (.updateTier(filter: BulkActionFilter(), tier: .library), "update_tier"),
             (.updateProperties(filter: BulkActionFilter(), patch: ["k": .int(42)]), "update_properties"),
             (.updateTimestamp(filter: BulkActionFilter(), timestamp: "2024-01-01T00:00:00Z"), "update_timestamp"),
         ]
