@@ -7,11 +7,12 @@ import Foundation
 
 public struct CreatedKey: Codable, Sendable {
     public let createdAt: String
-    public let defaultLibrary: Bool
     public let defaultOrigin: Origin
+    public let defaultTier: CreatedKeyDefaultTier
     public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
+    public let isPlatform: Bool
     public let key: String
     public let label: String
     public let lastUsedAt: String?
@@ -21,11 +22,12 @@ public struct CreatedKey: Codable, Sendable {
 
     public init(
         createdAt: String,
-        defaultLibrary: Bool,
         defaultOrigin: Origin,
+        defaultTier: CreatedKeyDefaultTier,
         edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
+        isPlatform: Bool,
         key: String,
         label: String,
         lastUsedAt: String? = nil,
@@ -34,11 +36,12 @@ public struct CreatedKey: Codable, Sendable {
         typePermissions: [String: TypePermission]
     ) {
         self.createdAt = createdAt
-        self.defaultLibrary = defaultLibrary
         self.defaultOrigin = defaultOrigin
+        self.defaultTier = defaultTier
         self.edgePermissions = edgePermissions
         self.extensionPermissions = extensionPermissions
         self.id = id
+        self.isPlatform = isPlatform
         self.key = key
         self.label = label
         self.lastUsedAt = lastUsedAt
@@ -49,11 +52,12 @@ public struct CreatedKey: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case createdAt = "created_at"
-        case defaultLibrary = "default_library"
         case defaultOrigin = "default_origin"
+        case defaultTier = "default_tier"
         case edgePermissions = "edge_permissions"
         case extensionPermissions = "extension_permissions"
         case id
+        case isPlatform = "is_platform"
         case key
         case label
         case lastUsedAt = "last_used_at"
@@ -61,4 +65,9 @@ public struct CreatedKey: Codable, Sendable {
         case source
         case typePermissions = "type_permissions"
     }
+}
+
+public enum CreatedKeyDefaultTier: String, Codable, Sendable, Hashable {
+    case feed
+    case library
 }

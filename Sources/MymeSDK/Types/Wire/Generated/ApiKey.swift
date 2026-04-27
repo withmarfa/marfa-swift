@@ -7,11 +7,12 @@ import Foundation
 
 public struct ApiKey: Codable, Sendable, Identifiable {
     public let createdAt: String
-    public let defaultLibrary: Bool
     public let defaultOrigin: Origin
+    public let defaultTier: ApiKeyDefaultTier
     public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
+    public let isPlatform: Bool
     public let label: String
     public let lastUsedAt: String?
     public let role: KeyRole
@@ -20,11 +21,12 @@ public struct ApiKey: Codable, Sendable, Identifiable {
 
     public init(
         createdAt: String,
-        defaultLibrary: Bool,
         defaultOrigin: Origin,
+        defaultTier: ApiKeyDefaultTier,
         edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
+        isPlatform: Bool,
         label: String,
         lastUsedAt: String? = nil,
         role: KeyRole,
@@ -32,11 +34,12 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         typePermissions: [String: TypePermission]
     ) {
         self.createdAt = createdAt
-        self.defaultLibrary = defaultLibrary
         self.defaultOrigin = defaultOrigin
+        self.defaultTier = defaultTier
         self.edgePermissions = edgePermissions
         self.extensionPermissions = extensionPermissions
         self.id = id
+        self.isPlatform = isPlatform
         self.label = label
         self.lastUsedAt = lastUsedAt
         self.role = role
@@ -46,15 +49,21 @@ public struct ApiKey: Codable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case createdAt = "created_at"
-        case defaultLibrary = "default_library"
         case defaultOrigin = "default_origin"
+        case defaultTier = "default_tier"
         case edgePermissions = "edge_permissions"
         case extensionPermissions = "extension_permissions"
         case id
+        case isPlatform = "is_platform"
         case label
         case lastUsedAt = "last_used_at"
         case role
         case source
         case typePermissions = "type_permissions"
     }
+}
+
+public enum ApiKeyDefaultTier: String, Codable, Sendable, Hashable {
+    case feed
+    case library
 }
