@@ -100,9 +100,12 @@ extension MymeItem {
     /// The client-assigned idempotency key (UUIDv7).
     public var sourceId: String? { item.sourceId }
 
-    /// How this item entered the user's library.
+    /// Producer of this item: human (`user`), agent (`ai`), background
+    /// process (`worker`), or server-generated (`system`).
     public var origin: Origin { item.origin }
 
-    /// Whether this item is part of the user's library.
-    public var library: Bool { item.library }
+    /// The item's tier: `library` for curated content, `feed` for
+    /// high-volume capture, or `nil` for `system.*` items that have no
+    /// tier dimension.
+    public var tier: Tier? { item.tier }
 }

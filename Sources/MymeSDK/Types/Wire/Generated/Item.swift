@@ -13,13 +13,13 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let edges: [String: ItemEdgeGroup]?
     public let extensions: [String: [String: JSONValue]]?
     public let id: String
-    public let library: Bool
     public let origin: Origin
     public let properties: [String: JSONValue]
     public let schemaVersion: Int
     public let source: String
     public let sourceId: String?
     public let state: ItemState
+    public let tier: Tier?
     public let timestamp: String
     public let type: String
     public let updatedAt: String
@@ -33,13 +33,13 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         edges: [String: ItemEdgeGroup]? = nil,
         extensions: [String: [String: JSONValue]]? = nil,
         id: String,
-        library: Bool,
         origin: Origin,
         properties: [String: JSONValue],
         schemaVersion: Int,
         source: String,
         sourceId: String? = nil,
         state: ItemState,
+        tier: Tier? = nil,
         timestamp: String,
         type: String,
         updatedAt: String,
@@ -52,13 +52,13 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         self.edges = edges
         self.extensions = extensions
         self.id = id
-        self.library = library
         self.origin = origin
         self.properties = properties
         self.schemaVersion = schemaVersion
         self.source = source
         self.sourceId = sourceId
         self.state = state
+        self.tier = tier
         self.timestamp = timestamp
         self.type = type
         self.updatedAt = updatedAt
@@ -73,13 +73,13 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         case edges
         case extensions
         case id
-        case library
         case origin
         case properties
         case schemaVersion = "schema_version"
         case source
         case sourceId = "source_id"
         case state
+        case tier
         case timestamp
         case type
         case updatedAt = "updated_at"

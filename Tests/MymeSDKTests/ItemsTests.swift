@@ -18,12 +18,11 @@ struct ItemsTests {
             item: Item(
                 createdAt: "2026-01-01T00:00:00Z",
                 id: "test-id",
-                library: false,
                 origin: .user,
                 properties: ["title": .string("Test Note")],
                 schemaVersion: 1,
                 source: "sdk-test",
-                state: .active,
+                state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z",
                 type: "core.note",
                 updatedAt: "2026-01-01T00:00:00Z",
@@ -100,12 +99,11 @@ struct ItemsTests {
         response.item = Item(
             createdAt: "2026-01-01T00:00:00Z",
             id: "test-id",
-            library: false,
             origin: .user,
             properties: [:],
             schemaVersion: 1,
             source: "sdk-test",
-            state: .active,
+            state: .active, tier: .feed,
             timestamp: "2026-01-01T00:00:00Z",
             type: "core.note",
             updatedAt: "2026-01-01T00:00:00Z",
@@ -113,7 +111,7 @@ struct ItemsTests {
         )
         mock.enqueue(response)
 
-        let item = try await client.items.transition(id: "test-id", to: "active")
+        let item = try await client.items.transition(id: "test-id", to: .active)
 
         #expect(item.state == .active)
         #expect(mock.calls[0].method == .post)

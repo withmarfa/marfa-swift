@@ -132,32 +132,37 @@ struct LocalStoreTests {
         #expect(updated.properties["title"] == .string("Original title"))
     }
 
-    @Test("updateItem with no library override preserves existing flag") func updateItemPreservesLibraryWhenAbsent() async throws {
+    @Test("updateItem with no tier override preserves existing flag") func updateItemPreservesTierWhenAbsent() async throws {
         let store = try await makeStore()
         let input = CreateItemInput(
             type: "core.note",
             properties: ["body": .string("x")],
-            library: true
+            tier: .library
         )
         let item = try await store.createItem(input)
-        #expect(item.library == true)
+        #expect(item.tier == .library)
         let updated = try await store.updateItem(
             id: item.id,
             properties: ["body": .string("y")]
         )
-        #expect(updated.library == true)
+        #expect(updated.tier == .library)
     }
 
-    @Test("updateItem with library override applies the new value") func updateItemAppliesLibraryOverride() async throws {
+    @Test("updateItem with tier override applies the new value") func updateItemAppliesTierOverride() async throws {
         let store = try await makeStore()
-        let item = try await store.createItem(noteInput())
-        #expect(item.library == false)
+        let input = CreateItemInput(
+            type: "core.note",
+            properties: ["body": .string("x")],
+            tier: .feed
+        )
+        let item = try await store.createItem(input)
+        #expect(item.tier == .feed)
         let updated = try await store.updateItem(
             id: item.id,
             properties: [:],
-            library: true
+            tier: .library
         )
-        #expect(updated.library == true)
+        #expect(updated.tier == .library)
     }
 
     @Test("newId generates UUIDv7 (timestamp-prefixed)") func newIdGeneratesUUIDv7() throws {
@@ -197,7 +202,7 @@ struct LocalStoreTests {
     @Test("transitionItem sets arbitrary state") func transitionItemSetsArbitraryState() async throws {
         let store = try await makeStore()
         let item = try await store.createItem(noteInput())
-        let archived = try await store.transitionItem(id: item.id, to: "archived")
+        let archived = try await store.transitionItem(id: item.id, to: .archived)
         #expect(archived.state == .archived)
     }
 
@@ -384,7 +389,7 @@ struct LocalStoreTests {
         let store = try await makeStore()
         let item = try await store.createItem(noteInput())
         _ = try await store.setMetadata(itemId: item.id, input: MetadataInput(tags: ["keep"]))
-        _ = try await store.transitionItem(id: item.id, to: "archived")
+        _ = try await store.transitionItem(id: item.id, to: .archived)
 
         let tags = try await store.listTags()
         #expect(tags == [TagWithCount(tag: "keep", count: 1)])

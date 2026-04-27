@@ -96,14 +96,14 @@ public struct ItemsNamespace: Sendable {
             let item = try await store.updateItem(
                 id: id,
                 properties: properties,
-                library: options?.library
+                tier: options?.tier
             )
             try await mutationQueue?.enqueueUpdateItem(
                 id: id,
                 properties: properties,
                 version: options?.version,
                 conflict: options?.conflict ?? defaultConflictStrategy,
-                library: options?.library
+                tier: options?.tier
             )
             return item
         }
@@ -121,7 +121,7 @@ public struct ItemsNamespace: Sendable {
             version: resolvedVersion,
             strategy: strategy,
             resolver: options?.resolve,
-            library: options?.library
+            tier: options?.tier
         )
     }
 
@@ -156,7 +156,7 @@ public struct ItemsNamespace: Sendable {
     }
 
     /// Transitions an item to a new lifecycle state.
-    public func transition(id: String, to state: String) async throws -> Item {
+    public func transition(id: String, to state: ItemState) async throws -> Item {
         if let store = localStore {
             let item = try await store.transitionItem(id: id, to: state)
             try await mutationQueue?.enqueueTransitionItem(id: id, to: state)
@@ -299,7 +299,7 @@ public struct ItemsNamespace: Sendable {
                     sourceId: raw.sourceId,
                     origin: raw.origin,
                     device: raw.device,
-                    library: raw.library,
+                    tier: raw.tier,
                     captureLatitude: nil,
                     captureLongitude: nil,
                     tags: raw.tags,
@@ -341,7 +341,7 @@ public struct ItemsNamespace: Sendable {
     }
 
     /// Applies one action to every item matching the filter. Six actions
-    /// — `transition`, `purge`, `update_tags`, `update_library`,
+    /// — `transition`, `purge`, `update_tags`, `update_tier`,
     /// `update_properties`, `update_timestamp`.
     ///
     /// Pure-local mode resolves the filter locally via
@@ -371,9 +371,7 @@ public struct ItemsNamespace: Sendable {
         list.type = filter.type
         list.state = filter.state
         list.source = filter.source
-        if let lib = filter.library {
-            list.library = lib ? .library : .ambient
-        }
+        list.tier = filter.tier
         list.tags = filter.tags
         list.since = filter.since
         list.until = filter.until
@@ -426,8 +424,8 @@ public struct ItemsNamespace: Sendable {
             return (filter, options, "purge")
         case .updateTags(let filter, _, _, let options):
             return (filter, options, "update_tags")
-        case .updateLibrary(let filter, _, let options):
-            return (filter, options, "update_library")
+        case .updateTier(let filter, _, let options):
+            return (filter, options, "update_tier")
         case .updateProperties(let filter, _, let options):
             return (filter, options, "update_properties")
         case .updateTimestamp(let filter, _, let options):
@@ -448,8 +446,8 @@ public struct ItemsNamespace: Sendable {
             do {
                 switch input {
                 case .transition(_, let state, _):
-                    if item.state.rawValue != state.rawValue {
-                        _ = try await store.transitionItem(id: item.id, to: state.rawValue)
+                    if item.state != state {
+                        _ = try await store.transitionItem(id: item.id, to: state)
                     }
                 case .purge:
                     try await store.purgeItem(id: item.id)
@@ -462,16 +460,16 @@ public struct ItemsNamespace: Sendable {
                             try await store.removeTag(itemId: item.id, tag: tag)
                         }
                     }
-                case .updateLibrary(_, let library, _):
+                case .updateTier(_, let tier, _):
                     _ = try await store.updateItem(
-                        id: item.id, properties: item.properties, library: library
+                        id: item.id, properties: item.properties, tier: tier
                     )
                 case .updateProperties(_, let patch, _):
                     // Shallow merge locally to match server semantics.
                     var merged = item.properties
                     for (k, v) in patch { merged[k] = v }
                     _ = try await store.updateItem(
-                        id: item.id, properties: merged, library: nil
+                        id: item.id, properties: merged, tier: nil
                     )
                 case .updateTimestamp:
                     // LocalStore doesn't expose a timestamp-only setter

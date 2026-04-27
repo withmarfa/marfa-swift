@@ -86,14 +86,14 @@ struct CreateItemPayload: Codable, Sendable {
 /// `version` and `conflict` capture the per-call conflict context so a
 /// replay can apply the same strategy the caller chose. The `.callback`
 /// resolver closure is not serialisable — on replay, `.callback` degrades
-/// to `.auto`. `library` mirrors the server's separate library-axis flip
-/// on `PATCH /items/:id`.
+/// to `.auto`. `tier` mirrors the server's separate tier-axis flip on
+/// `PATCH /items/:id`.
 struct UpdateItemPayload: Codable, Sendable {
     let id: String
     let properties: [String: JSONValue]
     var version: Int?
     var conflict: ConflictStrategy?
-    var library: Bool?
+    var tier: Tier?
 }
 
 /// Payload for mutations that just need an item/edge ID.
@@ -104,7 +104,7 @@ struct IDPayload: Codable, Sendable {
 /// Payload for `transitionItem`.
 struct TransitionPayload: Codable, Sendable {
     let id: String
-    let state: String
+    let state: ItemState
 }
 
 /// Payload for `createEdge`.
@@ -288,7 +288,7 @@ public actor MutationQueue {
         properties: [String: JSONValue],
         version: Int? = nil,
         conflict: ConflictStrategy? = nil,
-        library: Bool? = nil
+        tier: Tier? = nil
     ) throws {
         try enqueue(
             kind: .updateItem,
@@ -297,7 +297,7 @@ public actor MutationQueue {
                 properties: properties,
                 version: version,
                 conflict: conflict,
-                library: library
+                tier: tier
             ),
             localId: id
         )
@@ -311,7 +311,7 @@ public actor MutationQueue {
         try enqueue(kind: .restoreItem, payload: IDPayload(id: id), localId: id)
     }
 
-    func enqueueTransitionItem(id: String, to state: String) throws {
+    func enqueueTransitionItem(id: String, to state: ItemState) throws {
         try enqueue(kind: .transitionItem, payload: TransitionPayload(id: id, state: state), localId: id)
     }
 
@@ -707,7 +707,7 @@ public actor MutationQueue {
                     properties: p.properties,
                     version: p.version,
                     conflict: p.conflict,
-                    library: p.library
+                    tier: p.tier
                 )
             }
             encoded = try encoder.encode(p)
