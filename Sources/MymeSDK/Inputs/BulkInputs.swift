@@ -14,7 +14,7 @@ public struct BulkItemInput: Codable, Sendable {
     public var type: String
     public var properties: [String: JSONValue]?
     public var state: ItemState?
-    public var library: Bool?
+    public var tier: Tier?
     public var timestamp: String?
     /// Client-supplied `source` is ignored by the server — `source` is
     /// always stamped from the credential. Kept here because the server
@@ -36,7 +36,7 @@ public struct BulkItemInput: Codable, Sendable {
         type: String,
         properties: [String: JSONValue]? = nil,
         state: ItemState? = nil,
-        library: Bool? = nil,
+        tier: Tier? = nil,
         timestamp: String? = nil,
         source: String? = nil,
         sourceId: String? = nil,
@@ -49,7 +49,7 @@ public struct BulkItemInput: Codable, Sendable {
         self.type = type
         self.properties = properties
         self.state = state
-        self.library = library
+        self.tier = tier
         self.timestamp = timestamp
         self.source = source
         self.sourceId = sourceId
@@ -60,7 +60,7 @@ public struct BulkItemInput: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, type, properties, state, library, timestamp, source, origin, device, tags, edges
+        case id, type, properties, state, tier, timestamp, source, origin, device, tags, edges
         case sourceId = "source_id"
     }
 }
@@ -146,7 +146,7 @@ public struct BulkActionFilter: Codable, Sendable {
     public var type: String?
     public var state: ItemState?
     public var source: String?
-    public var library: Bool?
+    public var tier: TierFilter?
     public var tags: [String]?
     public var since: String?
     public var until: String?
@@ -159,7 +159,7 @@ public struct BulkActionFilter: Codable, Sendable {
         type: String? = nil,
         state: ItemState? = nil,
         source: String? = nil,
-        library: Bool? = nil,
+        tier: TierFilter? = nil,
         tags: [String]? = nil,
         since: String? = nil,
         until: String? = nil,
@@ -168,7 +168,7 @@ public struct BulkActionFilter: Codable, Sendable {
         self.type = type
         self.source = source
         self.state = state
-        self.library = library
+        self.tier = tier
         self.tags = tags
         self.since = since
         self.until = until
@@ -205,7 +205,7 @@ public enum BulkActionInput: Codable, Sendable {
     case transition(filter: BulkActionFilter, state: ItemState, options: BulkActionOptions = .init())
     case purge(filter: BulkActionFilter, options: BulkActionOptions)
     case updateTags(filter: BulkActionFilter, add: [String]? = nil, remove: [String]? = nil, options: BulkActionOptions = .init())
-    case updateLibrary(filter: BulkActionFilter, library: Bool, options: BulkActionOptions = .init())
+    case updateTier(filter: BulkActionFilter, tier: Tier, options: BulkActionOptions = .init())
     case updateProperties(filter: BulkActionFilter, patch: [String: JSONValue], options: BulkActionOptions = .init())
     case updateTimestamp(filter: BulkActionFilter, timestamp: String, options: BulkActionOptions = .init())
 
@@ -216,7 +216,7 @@ public enum BulkActionInput: Codable, Sendable {
         case confirm
         case add
         case remove
-        case library
+        case tier
         case patch
         case timestamp
         case dryRun = "dry_run"
@@ -256,10 +256,10 @@ public enum BulkActionInput: Codable, Sendable {
             try c.encodeIfPresent(remove, forKey: .remove)
             try encodeOptions(options, into: &c)
 
-        case .updateLibrary(let filter, let library, let options):
-            try c.encode("update_library", forKey: .action)
+        case .updateTier(let filter, let tier, let options):
+            try c.encode("update_tier", forKey: .action)
             try c.encode(filter, forKey: .filter)
-            try c.encode(library, forKey: .library)
+            try c.encode(tier, forKey: .tier)
             try encodeOptions(options, into: &c)
 
         case .updateProperties(let filter, let patch, let options):
@@ -299,9 +299,9 @@ public enum BulkActionInput: Codable, Sendable {
             let add = try c.decodeIfPresent([String].self, forKey: .add)
             let remove = try c.decodeIfPresent([String].self, forKey: .remove)
             self = .updateTags(filter: filter, add: add, remove: remove, options: options)
-        case "update_library":
-            let library = try c.decode(Bool.self, forKey: .library)
-            self = .updateLibrary(filter: filter, library: library, options: options)
+        case "update_tier":
+            let tier = try c.decode(Tier.self, forKey: .tier)
+            self = .updateTier(filter: filter, tier: tier, options: options)
         case "update_properties":
             let patch = try c.decode([String: JSONValue].self, forKey: .patch)
             self = .updateProperties(filter: filter, patch: patch, options: options)

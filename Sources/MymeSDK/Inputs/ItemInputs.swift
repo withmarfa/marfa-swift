@@ -16,7 +16,7 @@ public struct CreateItemInput: Codable, Sendable {
     public var sourceId: String?
     public var origin: Origin?
     public var device: String?
-    public var library: Bool?
+    public var tier: Tier?
     public var captureLatitude: Double?
     public var captureLongitude: Double?
     public var tags: [String]?
@@ -32,7 +32,7 @@ public struct CreateItemInput: Codable, Sendable {
         sourceId: String? = nil,
         origin: Origin? = nil,
         device: String? = nil,
-        library: Bool? = nil,
+        tier: Tier? = nil,
         captureLatitude: Double? = nil,
         captureLongitude: Double? = nil,
         tags: [String]? = nil,
@@ -47,7 +47,7 @@ public struct CreateItemInput: Codable, Sendable {
         self.sourceId = sourceId
         self.origin = origin
         self.device = device
-        self.library = library
+        self.tier = tier
         self.captureLatitude = captureLatitude
         self.captureLongitude = captureLongitude
         self.tags = tags
@@ -55,7 +55,7 @@ public struct CreateItemInput: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, properties, id, state, timestamp, source, origin, device, library, tags, edges
+        case type, properties, id, state, timestamp, source, origin, device, tier, tags, edges
         case sourceId = "source_id"
         case captureLatitude = "capture_latitude"
         case captureLongitude = "capture_longitude"
@@ -104,7 +104,7 @@ struct UpdateItemBody: Codable, Sendable {
     var properties: [String: JSONValue]?
     var version: Int?
     var snapshot: Bool?
-    var library: Bool?
+    var tier: Tier?
 }
 
 /// Options for item update operations.
@@ -112,24 +112,24 @@ public struct UpdateOptions: Sendable {
     public var version: Int?
     public var conflict: ConflictStrategy?
     public var resolve: ConflictResolver?
-    /// Toggle the item's library / ambient flag as part of this update.
-    /// Independent of the version-merge path; never conflicts.
-    public var library: Bool?
+    /// Move the item to the given tier as part of this update. Independent
+    /// of the version-merge path; never conflicts.
+    public var tier: Tier?
 
     public init(
         version: Int? = nil,
         conflict: ConflictStrategy? = nil,
         resolve: ConflictResolver? = nil,
-        library: Bool? = nil
+        tier: Tier? = nil
     ) {
         self.version = version
         self.conflict = conflict
         self.resolve = resolve
-        self.library = library
+        self.tier = tier
     }
 }
 
 /// Body for POST /items/:id/transition.
 struct TransitionBody: Codable, Sendable {
-    let state: String
+    let state: ItemState
 }

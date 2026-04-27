@@ -10,7 +10,7 @@ public struct ListFilters: Sendable {
     public var type: String?
     public var state: ItemState?
     public var source: String?
-    public var library: LibraryFilter?
+    public var tier: TierFilter?
     public var tags: [String]?
     public var filter: String?
     public var sort: SortField?
@@ -32,7 +32,7 @@ public struct ListFilters: Sendable {
         type: String? = nil,
         state: ItemState? = nil,
         source: String? = nil,
-        library: LibraryFilter? = nil,
+        tier: TierFilter? = nil,
         tags: [String]? = nil,
         filter: String? = nil,
         sort: SortField? = nil,
@@ -47,7 +47,7 @@ public struct ListFilters: Sendable {
         self.type = type
         self.state = state
         self.source = source
-        self.library = library
+        self.tier = tier
         self.tags = tags
         self.filter = filter
         self.sort = sort
@@ -66,7 +66,7 @@ public struct ListFilters: Sendable {
         if let type { params.append(("type", type)) }
         if let state { params.append(("state", state.rawValue)) }
         if let source { params.append(("source", source)) }
-        if let library { params.append(("library", library.rawValue)) }
+        if let tier { params.append(("tier", tier.rawValue)) }
         if let tags, !tags.isEmpty { params.append(("tags", tags.joined(separator: ","))) }
         if let filter { params.append(("filter", filter)) }
         if let sort { params.append(("sort", sort.rawValue)) }
@@ -90,19 +90,15 @@ public struct ListFilters: Sendable {
     }
 }
 
-/// Tri-value filter for `GET /items?library=...` and `GET /search?library=...`.
+/// Filter for `GET /items?tier=...` and `GET /search?tier=...`.
 ///
-/// Omitting the filter matches the server-side default of no filter — both
-/// library and ambient items are returned. Use `.library` to narrow to
-/// curated items, `.ambient` to narrow to the expiring tier, or `.all` as an
-/// explicit synonym for the default.
-public enum LibraryFilter: String, Sendable, Hashable, Codable {
-    /// Library items only.
-    case library = "true"
-    /// Ambient items only.
-    case ambient = "false"
-    /// Both library and ambient items (same as omitting the filter).
-    case all
+/// Omitting the filter (`tier: nil`) returns items of any tier. Use
+/// `.library` to narrow to curated items or `.feed` to narrow to
+/// high-volume capture. There is no `.all` synonym — `nil` already
+/// expresses that.
+public enum TierFilter: String, Sendable, Hashable, Codable {
+    case library
+    case feed
 }
 
 /// Fields available for sorting.
@@ -119,10 +115,14 @@ public enum SortDirection: String, Sendable {
 }
 
 /// Filters for search queries.
+///
+/// `system.*` items are excluded from search by the server's default
+/// rules — to surface them, request the type explicitly via
+/// `type: "system.device"` (etc.).
 public struct SearchFilters: Sendable {
     public var type: String?
     public var state: ItemState?
-    public var library: LibraryFilter?
+    public var tier: TierFilter?
     /// Items must have ALL specified tags. Mirrors `ListFilters.tags` and
     /// `/items?tags=`. Comma-joined when serialised.
     public var tags: [String]?
@@ -132,14 +132,14 @@ public struct SearchFilters: Sendable {
     public init(
         type: String? = nil,
         state: ItemState? = nil,
-        library: LibraryFilter? = nil,
+        tier: TierFilter? = nil,
         tags: [String]? = nil,
         filter: String? = nil,
         limit: Int? = nil
     ) {
         self.type = type
         self.state = state
-        self.library = library
+        self.tier = tier
         self.tags = tags
         self.filter = filter
         self.limit = limit
@@ -149,7 +149,7 @@ public struct SearchFilters: Sendable {
         var params: [(String, String)] = [("q", query)]
         if let type { params.append(("type", type)) }
         if let state { params.append(("state", state.rawValue)) }
-        if let library { params.append(("library", library.rawValue)) }
+        if let tier { params.append(("tier", tier.rawValue)) }
         if let tags, !tags.isEmpty {
             params.append(("tags", tags.joined(separator: ",")))
         }
