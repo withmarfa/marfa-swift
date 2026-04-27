@@ -74,6 +74,85 @@ extension PendingMutationModel {
     }
 }
 
+// MARK: - Dropped mutation record (Sendable DTO)
+
+/// Sendable value snapshot of a dropped mutation row.
+///
+/// ``MutationQueue`` translates between this DTO and
+/// ``DroppedMutationModel`` at the actor boundary — `@Model`
+/// instances must never cross actors, so ``MutationQueue/fetchDropped``
+/// returns these.
+public struct DroppedMutationRecord: Sendable, Codable, Equatable, Identifiable {
+    /// UUIDv4 — preserved from the original ``PendingMutationRecord/id``
+    /// of the live row that was dropped.
+    public var id: String
+    public var kind: MutationKind
+    public var payloadJson: String
+    public var localId: String?
+    /// ISO 8601 with fractional seconds — original
+    /// ``PendingMutationRecord/createdAt`` from the live row.
+    public var enqueuedAt: String
+    /// ISO 8601 with fractional seconds — when the engine observed
+    /// the permanent error.
+    public var droppedAt: String
+    public var attemptCount: Int
+    /// HTTP status from the dropping error (typically 400/403/404);
+    /// `0` for non-HTTP permanent failures.
+    public var errorStatus: Int
+    /// ``MymeError/code`` — e.g. `"validation_error"`, `"not_found"`.
+    public var errorCode: String
+    /// ``MymeError/message`` — capped at 1024 characters at write time.
+    public var errorMessage: String
+    /// JSON-encoded ``MymeError/details``, or `nil` when the server
+    /// response carried no `details` payload.
+    public var errorDetailsJson: String?
+
+    public init(
+        id: String,
+        kind: MutationKind,
+        payloadJson: String,
+        localId: String?,
+        enqueuedAt: String,
+        droppedAt: String,
+        attemptCount: Int,
+        errorStatus: Int,
+        errorCode: String,
+        errorMessage: String,
+        errorDetailsJson: String?
+    ) {
+        self.id = id
+        self.kind = kind
+        self.payloadJson = payloadJson
+        self.localId = localId
+        self.enqueuedAt = enqueuedAt
+        self.droppedAt = droppedAt
+        self.attemptCount = attemptCount
+        self.errorStatus = errorStatus
+        self.errorCode = errorCode
+        self.errorMessage = errorMessage
+        self.errorDetailsJson = errorDetailsJson
+    }
+}
+
+extension DroppedMutationModel {
+    /// Snapshots this `@Model` row into a Sendable wire DTO.
+    func toRecord() -> DroppedMutationRecord {
+        DroppedMutationRecord(
+            id: id,
+            kind: kind,
+            payloadJson: payloadJson,
+            localId: localId,
+            enqueuedAt: enqueuedAt,
+            droppedAt: droppedAt,
+            attemptCount: attemptCount,
+            errorStatus: errorStatus,
+            errorCode: errorCode,
+            errorMessage: errorMessage,
+            errorDetailsJson: errorDetailsJson
+        )
+    }
+}
+
 // MARK: - Typed payloads
 
 /// Payload stored for a `createItem` mutation.
@@ -621,15 +700,23 @@ public actor MutationQueue {
     ///   follow-ups are guaranteed orphans.
     ///
     /// The `createItem` record itself is *not* removed by this call —
-    /// ``SyncEngine`` removes it first via ``remove(id:)`` so attempt
-    /// bookkeeping fires once for the root failure.
+    /// ``SyncEngine`` removes it first via ``recordDropped(record:droppedAt:error:)``
+    /// so attempt bookkeeping (and dropped-row persistence) fires once
+    /// for the root failure.
     ///
-    /// All deletes run in a single `modelContext.save()`. Returns the
-    /// cascade-deleted records (excluding the already-removed
-    /// `createItem` root) so the caller can emit one
-    /// ``SyncEvent/mutationDropped`` per orphan.
+    /// Persistence: every orphan is also captured as a
+    /// ``DroppedMutationModel`` row before deletion, so the cascade
+    /// surfaces in ``DroppedMutationsQuery`` alongside the root drop.
+    /// All inserts and deletes run in a single
+    /// `modelContext.save()`. Returns the cascade-deleted records
+    /// (excluding the already-removed `createItem` root) so the
+    /// caller can emit one ``SyncEvent/mutationDropped`` per orphan.
     @discardableResult
-    func dropMutationsReferencingLocalId(_ localId: String) throws -> [PendingMutationRecord] {
+    func dropMutationsReferencingLocalId(
+        _ localId: String,
+        droppedAt: Date,
+        error: MymeError
+    ) throws -> [PendingMutationRecord] {
         // Pass 1 — item-scope direct matches (`localId` column).
         let directPredicate = #Predicate<PendingMutationModel> { $0.localId == localId }
         let directDescriptor = FetchDescriptor<PendingMutationModel>(predicate: directPredicate)
@@ -678,11 +765,135 @@ public actor MutationQueue {
 
         let allDeletes = itemScopeDeletes + edgeCreateDeletes + edgeFollowUpDeletes
         let snapshot = allDeletes.map { $0.toRecord() }
+        let droppedAtStr = Self.iso8601(droppedAt)
         for model in allDeletes {
+            insertDroppedRow(
+                from: model.toRecord(),
+                droppedAt: droppedAtStr,
+                error: error
+            )
             modelContext.delete(model)
         }
         try modelContext.save()
         return snapshot
+    }
+
+    // MARK: - Dropped mutation log
+
+    /// Records a permanent drop atomically: inserts a
+    /// ``DroppedMutationModel`` row carrying the live record's payload
+    /// and the dropping ``MymeError``, then removes the live
+    /// ``PendingMutationModel`` by id, all in one
+    /// `modelContext.save()`.
+    ///
+    /// Called from ``SyncEngine`` at the two permanent-error sites
+    /// (root and any direct caller; cascade orphans go through
+    /// ``dropMutationsReferencingLocalId(_:droppedAt:error:)``). Apps
+    /// observe the persisted rows via ``DroppedMutationsQuery``.
+    func recordDropped(
+        record: PendingMutationRecord,
+        droppedAt: Date,
+        error: MymeError
+    ) throws {
+        let droppedAtStr = Self.iso8601(droppedAt)
+        insertDroppedRow(from: record, droppedAt: droppedAtStr, error: error)
+
+        // Remove the live row, if it's still present. The cascade
+        // path can race here when SyncEngine calls `recordDropped`
+        // after `dropMutationsReferencingLocalId` has already cleared
+        // the row; tolerating the missing row keeps both call sites
+        // simple.
+        let liveId = record.id
+        let predicate = #Predicate<PendingMutationModel> { $0.id == liveId }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        if let live = try modelContext.fetch(descriptor).first {
+            modelContext.delete(live)
+        }
+        try modelContext.save()
+    }
+
+    /// Returns every dropped mutation row, sorted by ``droppedAt``
+    /// descending (newest first).
+    public func fetchDropped() throws -> [DroppedMutationRecord] {
+        let descriptor = FetchDescriptor<DroppedMutationModel>(
+            sortBy: [SortDescriptor(\.droppedAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor).map { $0.toRecord() }
+    }
+
+    /// Removes a single dropped mutation row by id. No-op if the row
+    /// has already been dismissed.
+    public func dismissDropped(id: String) throws {
+        let predicate = #Predicate<DroppedMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<DroppedMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        modelContext.delete(model)
+        try modelContext.save()
+    }
+
+    /// Removes every dropped mutation row whose ``droppedAt``
+    /// timestamp is **strictly** earlier than `cutoff`. Rows whose
+    /// `droppedAt` exactly matches the cutoff are preserved.
+    ///
+    /// Comparison runs against the persisted ISO 8601 string with
+    /// fractional seconds — fixed-width segments under
+    /// ``Date/ISO8601FormatStyle`` give correct lexicographic
+    /// ordering for the comparison.
+    public func dismissDroppedOlderThan(_ cutoff: Date) throws {
+        let cutoffStr = Self.iso8601(cutoff)
+        let predicate = #Predicate<DroppedMutationModel> { $0.droppedAt < cutoffStr }
+        let descriptor = FetchDescriptor<DroppedMutationModel>(predicate: predicate)
+        let rows = try modelContext.fetch(descriptor)
+        guard !rows.isEmpty else { return }
+        for row in rows { modelContext.delete(row) }
+        try modelContext.save()
+    }
+
+    /// Removes every dropped mutation row.
+    public func dismissAllDropped() throws {
+        let descriptor = FetchDescriptor<DroppedMutationModel>()
+        let rows = try modelContext.fetch(descriptor)
+        guard !rows.isEmpty else { return }
+        for row in rows { modelContext.delete(row) }
+        try modelContext.save()
+    }
+
+    /// Inserts a single ``DroppedMutationModel`` from a Sendable
+    /// record snapshot and a dropping ``MymeError``. Caller is
+    /// responsible for the `modelContext.save()` so multiple inserts
+    /// can batch into a single SQLite transaction.
+    private func insertDroppedRow(
+        from record: PendingMutationRecord,
+        droppedAt: String,
+        error: MymeError
+    ) {
+        let model = DroppedMutationModel()
+        model.id = record.id
+        model.kindRaw = record.kind.rawValue
+        model.payloadJson = record.payloadJson
+        model.localId = record.localId
+        model.enqueuedAt = record.createdAt
+        model.droppedAt = droppedAt
+        model.attemptCount = record.attemptCount + 1
+        model.errorStatus = error.status
+        model.errorCode = error.code
+        // Cap the message at 1KB so a pathological server response
+        // can't blow up CloudKit row sizes.
+        model.errorMessage = String(error.message.prefix(1024))
+        if let details = error.details,
+           let data = try? Self.encoder.encode(details),
+           let json = String(data: data, encoding: .utf8) {
+            model.errorDetailsJson = json
+        } else {
+            model.errorDetailsJson = nil
+        }
+        modelContext.insert(model)
+    }
+
+    private static func iso8601(_ date: Date) -> String {
+        date.ISO8601Format(.init(includingFractionalSeconds: true))
     }
 
     // Rewrite the id fields inside a payload JSON for non-edge

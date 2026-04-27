@@ -41,11 +41,24 @@ public final class MymeStore {
     /// engine whose `events` stream can drive blob progress.
     private let syncEngine: SyncEngine?
 
+    /// The mutation queue this store was vended against, if any.
+    /// Used by ``queryDroppedMutations()`` and the dismissal
+    /// forwarders (``dismissDropped(id:)``, ``dismissDroppedOlderThan(_:)``,
+    /// ``dismissAllDropped()``). `nil` for clients without a local
+    /// store; pure-local clients do have one (so `dismissDropped` can
+    /// be called even if the engine never populated the log).
+    private let mutationQueue: MutationQueue?
+
     // MARK: - Init
 
-    init(container: ModelContainer, syncEngine: SyncEngine? = nil) {
+    init(
+        container: ModelContainer,
+        syncEngine: SyncEngine? = nil,
+        mutationQueue: MutationQueue? = nil
+    ) {
         self.container = container
         self.syncEngine = syncEngine
+        self.mutationQueue = mutationQueue
     }
 
     // MARK: - Item queries
@@ -188,6 +201,54 @@ public final class MymeStore {
     public func queryFullSyncState() -> FullSyncStateQuery? {
         guard let syncEngine else { return nil }
         return FullSyncStateQuery(engine: syncEngine)
+    }
+
+    /// Creates a live query over the dropped-mutation log.
+    ///
+    /// Returns `nil` when the store has no sync engine attached
+    /// (pure-local clients) — those shapes never drop mutations,
+    /// so the log would never grow.
+    ///
+    /// The query refreshes whenever any `ModelContext.save()` fires;
+    /// `recordDropped`, the cascade insert path, and every dismissal
+    /// API share the same notification observer the other reactive
+    /// queries use.
+    public func queryDroppedMutations() -> DroppedMutationsQuery? {
+        guard syncEngine != nil else { return nil }
+        return DroppedMutationsQuery(container: container)
+    }
+
+    // MARK: - Dropped mutation dismissal
+
+    /// Removes a single dropped mutation row by id. No-op when the
+    /// store has no mutation queue (network-only clients) or the
+    /// row has already been dismissed.
+    ///
+    /// Forwards to ``MutationQueue/dismissDropped(id:)``. The reactive
+    /// ``DroppedMutationsQuery`` picks up the change on the next
+    /// `ModelContext.didSave` notification.
+    public func dismissDropped(id: String) async throws {
+        guard let mutationQueue else { return }
+        try await mutationQueue.dismissDropped(id: id)
+    }
+
+    /// Removes every dropped mutation row whose `droppedAt` timestamp
+    /// is **strictly** earlier than `cutoff`. Rows whose `droppedAt`
+    /// exactly matches the cutoff are preserved.
+    ///
+    /// Useful for retention policies — e.g. "drop everything older
+    /// than 30 days" — without committing the SDK to an opinionated
+    /// default. No-op when the store has no mutation queue.
+    public func dismissDroppedOlderThan(_ cutoff: Date) async throws {
+        guard let mutationQueue else { return }
+        try await mutationQueue.dismissDroppedOlderThan(cutoff)
+    }
+
+    /// Removes every dropped mutation row. No-op when the store has
+    /// no mutation queue.
+    public func dismissAllDropped() async throws {
+        guard let mutationQueue else { return }
+        try await mutationQueue.dismissAllDropped()
     }
 }
 

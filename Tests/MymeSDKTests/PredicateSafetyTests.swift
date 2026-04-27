@@ -222,4 +222,71 @@ struct PredicateSafetyTests {
         #expect(results.count == 3)
         #expect(!results.contains(where: { $0.id == "d" }))
     }
+
+    // MARK: - DroppedMutationModel (5.2.0)
+
+    /// Seeds three `DroppedMutationModel` rows with deliberately-spaced
+    /// `droppedAt` strings, returning the `(context, ids)` so tests can
+    /// assert against known identifiers.
+    private func seededDroppedRows() async throws -> (ModelContext, [String]) {
+        let container = try MymeSDKTest.makeInMemoryContainer()
+        let context = ModelContext(container)
+        var ids: [String] = []
+        let timestamps = [
+            "2026-01-01T00:00:00.000Z",
+            "2026-01-02T00:00:00.000Z",
+            "2026-01-03T00:00:00.000Z",
+        ]
+        for stamp in timestamps {
+            let row = DroppedMutationModel()
+            row.id = UUID().uuidString
+            row.kindRaw = MutationKind.deleteItem.rawValue
+            row.payloadJson = "{}"
+            row.localId = "item-\(stamp.prefix(10))"
+            row.enqueuedAt = stamp
+            row.droppedAt = stamp
+            row.attemptCount = 1
+            row.errorStatus = 400
+            row.errorCode = "validation_error"
+            row.errorMessage = "test"
+            ids.append(row.id)
+            context.insert(row)
+        }
+        try context.save()
+        return (context, ids)
+    }
+
+    @Test("DroppedMutationModel sort by droppedAt descending returns newest first")
+    func droppedSortDescending() async throws {
+        let (context, _) = try await seededDroppedRows()
+        let descriptor = FetchDescriptor<DroppedMutationModel>(
+            sortBy: [SortDescriptor(\.droppedAt, order: .reverse)]
+        )
+        let rows = try context.fetch(descriptor)
+        #expect(rows.count == 3)
+        #expect(rows[0].droppedAt > rows[1].droppedAt)
+        #expect(rows[1].droppedAt > rows[2].droppedAt)
+    }
+
+    @Test("DroppedMutationModel id-equality predicate filters correctly")
+    func droppedIdEqualityPredicate() async throws {
+        let (context, ids) = try await seededDroppedRows()
+        let target = ids[1]
+        let predicate = #Predicate<DroppedMutationModel> { $0.id == target }
+        let rows = try context.fetch(FetchDescriptor<DroppedMutationModel>(predicate: predicate))
+        #expect(rows.count == 1)
+        #expect(rows.first?.id == target)
+    }
+
+    @Test("DroppedMutationModel droppedAt < cutoff lexicographic comparison")
+    func droppedDroppedAtLexCompare() async throws {
+        let (context, _) = try await seededDroppedRows()
+        let cutoff = "2026-01-02T12:00:00.000Z" // between row 2 and row 3
+        let predicate = #Predicate<DroppedMutationModel> { $0.droppedAt < cutoff }
+        let rows = try context.fetch(FetchDescriptor<DroppedMutationModel>(predicate: predicate))
+        // Two rows are strictly older than the cutoff (Jan 1 + Jan 2);
+        // the Jan 3 row is preserved.
+        #expect(rows.count == 2)
+        #expect(rows.allSatisfy { $0.droppedAt < cutoff })
+    }
 }
