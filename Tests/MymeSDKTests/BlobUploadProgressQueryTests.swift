@@ -34,8 +34,12 @@ struct BlobUploadProgressQueryTests {
         return (store, queue, transport, connManager, engine)
     }
 
+    // Default bumped to 5s for CI headroom — see PendingMutationsQueryTests
+    // for the rationale. Existing call sites that pass an explicit
+    // `timeout: .milliseconds(500)` keep their tighter bound and have
+    // not flaked on CI.
     private func waitUntil(
-        timeout: Duration = .milliseconds(500),
+        timeout: Duration = .seconds(5),
         every: Duration = .milliseconds(10),
         _ condition: @MainActor () async throws -> Bool
     ) async throws {
