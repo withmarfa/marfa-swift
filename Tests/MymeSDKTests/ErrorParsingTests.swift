@@ -46,6 +46,17 @@ struct ErrorParsingTests {
         #expect(error.message == "Item missing")
     }
 
+    @Test("422 with code version_bump_mismatch → SchemaVersionMismatchError")
+    func versionBumpMismatch() {
+        let body = #"{"error":{"code":"version_bump_mismatch","status":422,"message":"minor bump required for additive change"}}"#
+        let error = parseMymeError(data: Data(body.utf8), statusCode: 422)
+
+        #expect(error is SchemaVersionMismatchError)
+        #expect(error.status == 422)
+        #expect(error.code == "version_bump_mismatch")
+        #expect(error.isPermanent)
+    }
+
     @Test("5xx → base MymeError with correct status")
     func serverError() {
         let body = #"{"error":{"code":"internal","message":"Database down"}}"#

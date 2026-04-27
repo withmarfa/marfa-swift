@@ -38,11 +38,13 @@ open class MymeError: Error, @unchecked Sendable {
     /// failures, references to items the server no longer has) instead of
     /// replaying them on every sync cycle.
     ///
-    /// Permanent: `400` (validation), `403` (forbidden), `404` (not found).
-    /// Transient: everything else — network failures, `5xx`, timeouts,
-    /// `401` (credentials may be refreshed), `409` (resolvable via conflict
-    /// strategy), `429` (rate-limited, caller should retry).
+    /// Permanent: `400` (validation), `403` (forbidden), `404` (not found),
+    /// and `version_bump_mismatch` (server-side semver-diff rejection at type
+    /// registration). Transient: everything else — network failures, `5xx`,
+    /// timeouts, `401` (credentials may be refreshed), `409` (resolvable via
+    /// conflict strategy), `429` (rate-limited, caller should retry).
     public var isPermanent: Bool {
+        if self is SchemaVersionMismatchError { return true }
         switch status {
         case 400, 403, 404: return true
         default: return false
@@ -112,6 +114,30 @@ public final class ConflictError: MymeError, @unchecked Sendable {
             code: "version_conflict",
             message: "Version conflict on fields: \(conflictingFields.joined(separator: ", "))",
             status: 409
+        )
+    }
+}
+
+// MARK: - Schema versioning
+
+/// 422 — A `POST /types` registration was rejected because the submitted
+/// schema version doesn't match the structural diff class. Per TSC42 §7,
+/// the server computes the diff between the prior and submitted schema
+/// and rejects mismatched bumps:
+/// - additive change → minor bump permitted
+/// - field removed or required-tightened → major bump required
+/// - description-only edit → patch bump permitted
+///
+/// The server emits this as `code: "version_bump_mismatch"`. Permanent —
+/// the SyncEngine drops queued type-registration mutations carrying this
+/// error rather than replaying them.
+public final class SchemaVersionMismatchError: MymeError, @unchecked Sendable {
+    public init(message: String, details: [String: JSONValue]? = nil) {
+        super.init(
+            code: "version_bump_mismatch",
+            message: message,
+            status: 422,
+            details: details
         )
     }
 }
