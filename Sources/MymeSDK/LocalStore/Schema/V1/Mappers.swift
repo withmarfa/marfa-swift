@@ -13,13 +13,13 @@ extension MymeItemModel {
             device: device,
             edges: nil,
             id: id,
-            library: library,
             origin: origin,
             properties: properties,
             schemaVersion: schemaVersion,
             source: source,
             sourceId: sourceId,
             state: state,
+            tier: tier,
             timestamp: timestamp,
             type: type,
             updatedAt: updatedAt,
@@ -46,7 +46,7 @@ extension MymeItemModel {
         source = item.source
         sourceId = item.sourceId
         origin = item.origin
-        library = item.library
+        tier = item.tier
         version = item.version
         schemaVersion = item.schemaVersion
         createdAt = item.createdAt

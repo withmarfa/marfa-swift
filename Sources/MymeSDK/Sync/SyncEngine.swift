@@ -783,20 +783,20 @@ public actor SyncEngine {
                     version: v,
                     strategy: strategy,
                     resolver: nil,
-                    library: p.library
+                    tier: p.tier
                 )
                 if let summary = result.mergeSummary {
                     emit(.conflictAutoMerged(payload: summary))
                 }
                 emit(.itemUpdated(id: p.id))
             } else {
-                // No version → fast-merge path on the server. Library still
+                // No version → fast-merge path on the server. Tier still
                 // travels if the call site set it.
                 let body = UpdateItemBody(
                     properties: p.properties,
                     version: nil,
                     snapshot: nil,
-                    library: p.library
+                    tier: p.tier
                 )
                 let _: ItemResponse = try await transport.request(
                     method: .patch, path: "/items/\(p.id)", body: body, query: nil

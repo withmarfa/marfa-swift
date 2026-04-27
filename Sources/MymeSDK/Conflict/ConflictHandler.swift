@@ -39,7 +39,7 @@ func handleConflictUpdate(
     version: Int,
     strategy: ConflictStrategy,
     resolver: ConflictResolver?,
-    library: Bool? = nil
+    tier: Tier? = nil
 ) async throws -> Item {
     let result = try await handleConflictUpdateWithStats(
         transport: transport,
@@ -48,7 +48,7 @@ func handleConflictUpdate(
         version: version,
         strategy: strategy,
         resolver: resolver,
-        library: library
+        tier: tier
     )
     return result.item
 }
@@ -65,7 +65,7 @@ func handleConflictUpdateWithStats(
     version: Int,
     strategy: ConflictStrategy,
     resolver: ConflictResolver?,
-    library: Bool? = nil
+    tier: Tier? = nil
 ) async throws -> (item: Item, mergeSummary: ConflictAutoMergedPayload?) {
     var properties = clientPatch
     var currentVersion = version
@@ -83,7 +83,7 @@ func handleConflictUpdateWithStats(
         let body = UpdateItemBody(
             properties: properties,
             version: currentVersion,
-            library: library
+            tier: tier
         )
 
         let result: ConflictResult<ItemResponse> = try await transport.requestWithConflict(

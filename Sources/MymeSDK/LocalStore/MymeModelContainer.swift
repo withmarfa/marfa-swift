@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// Single source of truth for constructing the SDK's `ModelContainer`.
 ///
@@ -39,7 +40,26 @@ public enum MymeModelContainer {
             )
         }
         let url = URL(fileURLWithPath: path)
-        return try ModelContainer(
+        do {
+            return try buildContainer(url: url, cloudKitDatabase: cloudKitDatabase)
+        } catch {
+            // Schema-mismatch recovery: SDK 5.0 reshapes the local store
+            // (library Bool -> tier String). Pre-5.0 stores cannot be
+            // lightweight-migrated; the SDK has no real users yet, so the
+            // pragmatic recovery is to delete the stale store and reopen.
+            // If the second attempt fails too, surface the underlying error.
+            let logger = Logger(subsystem: MymeLogger.subsystem, category: "local")
+            logger.error("LocalStore open failed (\(error.localizedDescription, privacy: .public)); deleting store and recreating fresh under current schema.")
+            removeStoreFiles(at: url)
+            return try buildContainer(url: url, cloudKitDatabase: cloudKitDatabase)
+        }
+    }
+
+    private static func buildContainer(
+        url: URL,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase
+    ) throws -> ModelContainer {
+        try ModelContainer(
             for: Schema(MymeSchemaV1.models),
             migrationPlan: MymeMigrationPlan.self,
             configurations: ModelConfiguration(
@@ -50,5 +70,14 @@ public enum MymeModelContainer {
                 cloudKitDatabase: cloudKitDatabase
             )
         )
+    }
+
+    private static func removeStoreFiles(at url: URL) {
+        let fm = FileManager.default
+        let basePath = url.path
+        for suffix in ["", "-wal", "-shm"] {
+            let candidate = URL(fileURLWithPath: basePath + suffix)
+            try? fm.removeItem(at: candidate)
+        }
     }
 }

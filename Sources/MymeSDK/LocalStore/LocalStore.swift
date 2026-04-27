@@ -79,13 +79,13 @@ public actor LocalStore {
             device: input.device,
             edges: nil,
             id: id,
-            library: input.library ?? false,
             origin: input.origin ?? .user,
             properties: input.properties,
             schemaVersion: 1,
             source: input.source ?? "local",
             sourceId: input.sourceId,
             state: input.state ?? .active,
+            tier: input.tier ?? .library,
             timestamp: input.timestamp ?? now,
             type: input.type,
             updatedAt: now,
@@ -146,14 +146,14 @@ public actor LocalStore {
     /// Updates an item with **partial-merge semantics for properties**,
     /// mirroring the server's `PATCH /items/:id` behaviour. Caller passes
     /// only the fields it wants to change; existing keys not in the delta
-    /// are preserved. `library` is an optional metadata-axis flag — if
-    /// provided, it overrides the existing value; otherwise the existing
-    /// value is preserved.
+    /// are preserved. `tier` is an optional dimension flag — if provided,
+    /// it overrides the existing value; otherwise the existing value is
+    /// preserved.
     @discardableResult
     func updateItem(
         id: String,
         properties: [String: JSONValue],
-        library: Bool? = nil
+        tier: Tier? = nil
     ) throws -> Item {
         let predicate = #Predicate<MymeItemModel> { $0.id == id }
         var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
@@ -169,8 +169,8 @@ public actor LocalStore {
             merged[key] = value
         }
         model.properties = merged
-        if let library {
-            model.library = library
+        if let tier {
+            model.tier = tier
         }
         model.version += 1
         model.updatedAt = now()
@@ -206,14 +206,14 @@ public actor LocalStore {
     }
 
     /// Transitions the item to a new lifecycle state.
-    func transitionItem(id: String, to state: String) throws -> Item {
+    func transitionItem(id: String, to state: ItemState) throws -> Item {
         let predicate = #Predicate<MymeItemModel> { $0.id == id }
         var descriptor = FetchDescriptor<MymeItemModel>(predicate: predicate)
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else {
             throw NotFoundError(message: "Item not found: \(id)")
         }
-        model.stateRaw = state
+        model.state = state
         model.updatedAt = now()
         try modelContext.save()
         return model.toWireItem()

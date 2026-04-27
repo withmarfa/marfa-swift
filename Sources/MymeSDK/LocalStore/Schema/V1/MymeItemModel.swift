@@ -37,7 +37,9 @@ final class MymeItemModel {
     /// Stored as the `String` rawValue of `Origin`.
     var originRaw: String = Origin.user.rawValue
 
-    var library: Bool = false
+    /// Stored as the `String` rawValue of `Tier`. Empty string means
+    /// "no tier" — `system.*` items have no tier, mirroring the wire.
+    var tierRaw: String = ""
     var version: Int = 1
     var schemaVersion: Int = 1
 
@@ -77,6 +79,14 @@ extension MymeItemModel {
     var origin: Origin {
         get { Origin(rawValue: originRaw) ?? .user }
         set { originRaw = newValue.rawValue }
+    }
+
+    /// Typed accessor for `tierRaw`. Empty `tierRaw` (the default) maps
+    /// to `nil` — `system.*` items have no tier. Setting `nil` clears
+    /// the field.
+    var tier: Tier? {
+        get { Tier(rawValue: tierRaw) }
+        set { tierRaw = newValue?.rawValue ?? "" }
     }
 
     /// Typed accessor over `propertiesData`. Decodes lazily on get; re-encodes
