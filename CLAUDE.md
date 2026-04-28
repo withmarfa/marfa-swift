@@ -140,7 +140,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 Typed Swift structs per Myme core type live under `Sources/MymeSDK/DomainModels/Generated/`. Each struct wraps a generic `Item` and exposes typed property accessors, a failable `init?(from:)` that validates the type string and required fields, and `toProperties()` for round-tripping into create/update calls.
 
-All 21 active core types are generated (bookmark, entity, entity.person, entity.place, event, file, file.audio, file.image, file.video, highlight, media, media.album, media.article, media.book, media.film, media.podcast, media.series, media.song, media.tv_episode, note, task).
+A typed Swift struct is generated for every active core type — the active set is whatever the monorepo's `packages/types/core/` ships at codegen time. The CI `codegen-freshness` job catches drift between the registry and the generated Swift surface.
 
 ### Regenerate
 
