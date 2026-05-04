@@ -55,7 +55,7 @@ swift build
 swift test
 ```
 
-Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at the V0 staging server via `MYME_API_URL` and `MYME_API_KEY`. Never run conformance or integration tests against production.
+Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at the staging server via `MYME_API_URL` and `MYME_API_KEY`. Never run conformance or integration tests against production.
 
 ## CI — tiered validation
 

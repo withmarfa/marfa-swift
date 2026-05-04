@@ -161,7 +161,7 @@ public struct SearchFilters: Sendable {
 
 /// Input for metadata set/merge operations.
 ///
-/// V0 metadata is tags-only — the `about` references field moved to first-class
+/// Metadata is tags-only — the `about` references field moved to first-class
 /// `about` edges. Create an `about` edge via `client.edges.create(...)`.
 public struct MetadataInput: Codable, Sendable {
     public var tags: [String]?

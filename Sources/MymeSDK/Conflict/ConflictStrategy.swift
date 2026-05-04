@@ -35,8 +35,8 @@ public struct ConflictData: Sendable {
     public let clientPatch: [String: JSONValue]
 
     /// The type's resolved merge policy, as emitted by the server in the 409
-    /// response. Always present for V0 servers; the SDK falls back to
-    /// last-writer-wins per field if absent (legacy / future-proof).
+    /// response. Present in conformant server responses; the SDK falls back
+    /// to last-writer-wins per field if absent (legacy / future-proof).
     public let mergePolicy: MergePolicy?
 }
 
