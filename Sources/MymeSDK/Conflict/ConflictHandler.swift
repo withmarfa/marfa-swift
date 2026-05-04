@@ -251,7 +251,7 @@ func strategyForField(
 /// Spawns a sibling item carrying the client's in-flight values for the
 /// keep-both fields, server values for the rest. The new item is tagged
 /// `conflicted-copy` inline on the create call (no two-step `metadata.addTags`
-/// dance — `CreateItemInput.tags` is supported on the wire as of V0).
+/// dance — `CreateItemInput.tags` is supported on the wire).
 ///
 /// The original item is left to the merged update in
 /// ``handleConflictUpdateWithStats`` — it carries the server's winning
