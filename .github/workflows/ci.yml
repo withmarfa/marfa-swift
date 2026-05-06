@@ -46,7 +46,7 @@ jobs:
   pr-check:
     name: PR check (compile + typecheck)
     if: github.event_name == 'pull_request'
-    runs-on: macos-latest
+    runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -96,7 +96,7 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
+    runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v4
 
