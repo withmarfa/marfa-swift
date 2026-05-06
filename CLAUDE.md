@@ -71,6 +71,8 @@ Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries
 
 **Local before pushing.** Run `swift test` locally before opening a PR or after a main-breaking change. CI on main will catch it, but pushing a broken main wastes minutes for everyone.
 
+**Runner routing.** Both jobs read `runs-on` from the `CI_RUNNER` Actions variable, defaulting to `macos-latest`. Setting `CI_RUNNER=self-hosted` at the org or repo level routes them to a self-hosted Apple Silicon runner pool — the cost-efficient option for Swift CI during private development. Will revert to hardcoded `macos-latest` before this repo goes public.
+
 ## Conventions
 
 - American English.
