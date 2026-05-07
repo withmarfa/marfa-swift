@@ -96,4 +96,44 @@ public extension Transport {
             contentType: contentType, query: query
         )
     }
+
+    /// Sends a multipart/form-data request with a single file field.
+    ///
+    /// Used by ``ProfileNamespace/uploadAvatar(_:mimeType:)`` and any
+    /// other endpoint that requires `multipart/form-data` bodies. The
+    /// existing ``BlobsNamespace`` posts raw bytes with the MIME type as
+    /// `Content-Type`, so it doesn't go through this helper.
+    ///
+    /// Builds an RFC 7578 envelope with one part named `fieldName`
+    /// carrying `data` under the supplied `filename` and `mimeType`, then
+    /// routes through ``rawRequest(method:path:body:contentType:query:)``
+    /// so auth, retry, and rate-limit handling all apply.
+    func uploadMultipart(
+        method: HTTPMethod = .post,
+        path: String,
+        fieldName: String,
+        filename: String,
+        data: Data,
+        mimeType: String,
+        query: [(String, String)]? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        let boundary = "myme.multipart.\(UUID().uuidString)"
+        var body = Data()
+        let crlf = "\r\n"
+
+        let header = """
+        --\(boundary)\(crlf)Content-Disposition: form-data; name="\(fieldName)"; filename="\(filename)"\(crlf)Content-Type: \(mimeType)\(crlf)\(crlf)
+        """
+        body.append(Data(header.utf8))
+        body.append(data)
+        body.append(Data("\(crlf)--\(boundary)--\(crlf)".utf8))
+
+        return try await rawRequest(
+            method: method,
+            path: path,
+            body: body,
+            contentType: "multipart/form-data; boundary=\(boundary)",
+            query: query
+        )
+    }
 }

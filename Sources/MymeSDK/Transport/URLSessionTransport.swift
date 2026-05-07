@@ -5,7 +5,7 @@ import os
 final class URLSessionTransport: Transport {
 
     private let baseURL: URL
-    private let apiKey: String
+    private let tokenProvider: any TokenProvider
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
@@ -25,7 +25,7 @@ final class URLSessionTransport: Transport {
     /// so tests can route through a `URLProtocol` stub.
     init(configuration: ClientConfiguration, session: URLSession) {
         self.baseURL = configuration.url
-        self.apiKey = configuration.apiKey
+        self.tokenProvider = configuration.tokenProvider
         self.session = session
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
@@ -133,6 +133,14 @@ final class URLSessionTransport: Transport {
         }
     }
 
+    /// Applies the current bearer token to `request` by awaiting
+    /// ``tokenProvider``. Used for the three header-setting paths:
+    /// ``rawRequest``, ``rawUpload``, and the SSE stream init.
+    private func applyAuthHeader(to request: inout URLRequest) async throws {
+        let token = try await tokenProvider.currentToken()
+        request.setValue("Bearer \(token.accessToken)", forHTTPHeaderField: "Authorization")
+    }
+
     func rawUpload(
         method: HTTPMethod,
         path: String,
@@ -144,7 +152,7 @@ final class URLSessionTransport: Transport {
         let url = try buildURL(path: path, query: query)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        try await applyAuthHeader(to: &request)
         let requestId = UUIDv7.generateString()
         request.setValue(requestId, forHTTPHeaderField: "X-Request-ID")
         if let contentType {
@@ -207,7 +215,7 @@ final class URLSessionTransport: Transport {
         let url = try buildURL(path: path, query: query)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        try await applyAuthHeader(to: &request)
 
         // Stamp an `X-Request-ID` on every request so the server-side log
         // line and this client-side log line can be correlated when a
@@ -241,6 +249,7 @@ final class URLSessionTransport: Transport {
         }
 
         var lastError: Error?
+        var didRefreshOn401 = false
         for attempt in 1...retryPolicy.maxAttempts {
             try Task.checkCancellation()
 
@@ -269,6 +278,20 @@ final class URLSessionTransport: Transport {
                 }
 
                 await rateLimitState.update(from: httpResponse.allHeaderFields)
+
+                // 401-refresh-once: if the credential turned out stale,
+                // invalidate the cached token, re-mint the auth header,
+                // and retry the same request a single time. Subsequent
+                // 401s surface as ``UnauthorizedError`` to the caller.
+                if httpResponse.statusCode == 401 && !didRefreshOn401 {
+                    didRefreshOn401 = true
+                    await tokenProvider.invalidate()
+                    try await applyAuthHeader(to: &request)
+                    logger.log.info(
+                        "http.retry.refresh request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) attempt=\(attempt, privacy: .public)"
+                    )
+                    continue
+                }
 
                 let shouldRetry = attempt < retryPolicy.maxAttempts && retryPolicy.shouldRetry(
                     method: method,
@@ -343,7 +366,7 @@ final class URLSessionTransport: Transport {
                     let url = try buildURL(path: path, query: query)
                     var request = URLRequest(url: url)
                     request.httpMethod = HTTPMethod.get.rawValue
-                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                    try await self.applyAuthHeader(to: &request)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     if let lastEventID {
                         request.setValue(lastEventID, forHTTPHeaderField: "Last-Event-ID")

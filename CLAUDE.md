@@ -11,7 +11,7 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
   - `MymeSDK` — the client library
   - `MymeSDKTestSupport` — public test scaffolding (MockTransport, InMemoryKeychain, SwiftDataHelpers). No semver stability across SDK minor versions; for test use only.
 - **`Transport` protocol** abstracts HTTP. `URLSessionTransport` is the production impl; `MockTransport` is in test-support.
-- **Namespaced API**: `client.items.create()`, `client.metadata.get()`, etc.
+- **Namespaced API**: `client.items.create()`, `client.metadata.get()`, `client.profile.get()`, `client.connections.install(...)`, `client.integrations.list()`, etc. The full set: `items`, `metadata`, `extensions`, `edges`, `blobs`, `types`, `keys`, `webhooks`, `profile`, `connections` (with nested `leaseTokens` and `inboundWebhooks` sub-namespaces), `integrations`.
 - **`JSONValue`** enum for arbitrary JSON (Codable, Sendable, Hashable).
 - **Dates as ISO 8601 strings**, not `Date` — apps parse as needed.
 - **Error hierarchy:** `open class MymeError` base with `final class` subclasses (`NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ValidationError`, `ConflictError`, `NetworkError`, `ResponseDecodingError`). Pattern-match on subclasses: `catch let error as NotFoundError`.
@@ -30,14 +30,15 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 
 ### Reactive layer (@Observable, SwiftUI)
 
-- **MymeStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (returns `nil` for network-only clients). Factory for live query objects. Holds the shared `ModelContainer`.
+- **MymeStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (returns `nil` for network-only clients). Factory for live query objects. Holds the shared `ModelContainer` and the `ProfileNamespace` reference used by `profileStore`.
 - **ItemQuery** — tracks `[Item]` for a `ListFilters`; subscribes to `ModelContext.didSave` via `NotificationCenter.notifications(named:)`, debounces 50 ms (`Reactive/RefreshDebounce.swift`), refetches on the `@MainActor`. Fields: `items`, `isLoading`, `error`. `stop()` cancels.
-- **TypedItemQuery<T: MymeItem>** — like `ItemQuery` but maps records through `T.init?(from:)`, producing `[T]`.
+- **TypedItemQuery<T: MymeItem>** — like `ItemQuery` but maps records through `T.init?(from:)`, producing `[T]`. Used by the convenience factories `store.queryConnections(kind:state:)` (`TypedItemQuery<Connection>`) and `store.queryActivity(severity:limit:)` (`TypedItemQuery<Activity>`).
 - **SingleItemQuery** — tracks one item by id; `item` is `nil` when purged.
 - **EdgesQuery** — tracks outbound edges for a `sourceId`; optional `edgeType` and `limit`. Second initialiser tracks every edge of a given type tenant-wide.
 - **BackrefsQuery** — tracks inbound edges for a batch of `targetIds`; `edgesByTarget: [String: [Edge]]` keyed by every requested id (unknown ids stay present with `[]`). Factory: `store.queryBackrefs(to:edgeType:limit:)`.
 - **TagsQuery** — tracks `[TagWithCount]` sorted count desc, tag asc — same ordering as `metadata.listTags()` and the server. Factory: `store.queryTags()`. Aggregates in Swift over a relationship-prefetched fetch (`relationshipKeyPathsForPrefetching = [\.item]`).
 - **ItemsWithMetadataQuery** — items + metadata composite. Two fetches per refresh (items, then metadata where `Set<String>.contains(itemId)`); 1:1 join in Swift.
+- **ProfileStore** (`@Observable @MainActor`) — singleton view onto the calling user's `Profile`. Constructed lazily via `store.profileStore` (returns `nil` in pure-local mode — `system.profile` is server-only). Refresh on demand via `await store.profileStore?.refresh()`; mutation methods (`update`, `uploadAvatar`, `deleteAvatar`) write the returned profile back into the store on success. No SwiftData persistence — the server is the source of truth for `system.profile`, which is a virtual type joined from the `users`/`auth_user` tables and doesn't fire `item.*` SSE events.
 - All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`. The shared listener machinery lives in `RefetchObserver` (`Reactive/MymeStore.swift`).
 
 ### Transport subsystems
@@ -46,7 +47,25 @@ Swift SDK for the Myme API. Equivalent to the TypeScript `@mymehq/sdk`.
 - **Retry / rate limits / cancellation** — `RetryPolicy` struct (bounded exponential backoff with jitter, configurable per client) and `RateLimitState` actor (tracks `X-RateLimit-*` and `Retry-After`). Task cancellation via Swift's cooperative system; `URLError(.cancelled)` translates to `CancellationError`.
 - **Observability** — `MymeLogger` wraps `os.Logger` + `OSSignposter` on the stable `"sdk.myme"` subsystem with categories `transport`, `retry`, `sse`, `keychain`. `ClientConfiguration.debugLogging` flag opts in to full-body logging at `.private` privacy.
 - **SSE** — `Transport.eventStream(path:query:lastEventID:)` returns `AsyncThrowingStream<SSEEvent, Error>`. `SSEParser` is WHATWG-conformant; id is sticky across events, retry attaches to the next event that fires, blank-data blocks don't dispatch. Transport only — reconnect and cursor persistence belong to the consumer.
-- **Keychain** — `SecureStorage` protocol + `KeychainStorage` actor (generic-password items under `kSecAttrService = "myme.sdk"`, optional access group for app extensions). `MymeClient.fromKeychain(service:account:url:accessGroup:)` loads a stored key; `MymeClient.saveToKeychain(...)` writes it back. `InMemoryKeychain` in test-support substitutes during unit tests because SPM test binaries run unsigned.
+- **Keychain** — `SecureStorage` protocol + `KeychainStorage` actor live under `Auth/Storage/` (generic-password items under `kSecAttrService = "myme.sdk"`, optional access group for app extensions). `MymeClient.fromKeychain(service:account:url:accessGroup:)` loads a stored key; `MymeClient.saveToKeychain(...)` writes it back. `InMemoryKeychain` in test-support substitutes during unit tests because SPM test binaries run unsigned.
+
+### Auth surface (`Auth/`)
+
+Three sibling sub-directories:
+
+- **`Auth/Storage/`** — `SecureStorage` protocol, `KeychainStorage` actor, `KeychainError`. Same shape as before; relocated under `Auth/Storage/` to make room for the OAuth surface.
+- **`Auth/Core/`** — primitives shared by every flow: `Token` (the access/refresh-token bundle), `TokenProvider` protocol with two concrete impls (`StaticTokenProvider` wraps an API key, `StoredTokenProvider` actor caches an OAuth token and refreshes via `/auth/token`), `PKCE` (S256 verifier/challenge/state generators built on CryptoKit), `AuthError` (final-class subclasses of `MymeError`: `OAuthError`, `DeviceFlowError`, `PasskeyError`).
+- **`Auth/Flows/`** — three top-level types, mirroring the TS SDK's `MymeAuth` + `startDeviceFlow` split: `MymeAuth` (`@MainActor` class — Authorization Code + PKCE via `ASWebAuthenticationSession`; `signIn(presentationContextProvider:)` returns a `TokenProvider`); `DeviceFlow` (free-function `start(...)` returning a `DeviceFlowHandle` actor whose `awaitToken()` polls `/auth/device/token` per RFC 8628 — no UI, suitable for headless / TV / watch); `Passkey` (`@MainActor` enum wrapping `ASAuthorizationPlatformPublicKeyCredentialProvider` with `register(...)` and `authenticate(...)`; targets the Better-Auth-style `/auth/passkey/*` endpoints — `basePath` parameter overrides if a deployment mounts the auth router under `/api/auth`).
+
+**Internal auth contract is unified through `TokenProvider`.** The transport awaits `tokenProvider.currentToken()` for the `Authorization: Bearer …` header on every request. `ClientConfiguration.apiKey` is preserved for the existing static path (`MymeClient(url:apiKey:)`, `MymeClient.fromKeychain(...)`, `saveToKeychain(...)`); internally those constructors wrap the key in `StaticTokenProvider`. OAuth callers use `MymeClient(url:tokenProvider:)` or `MymeClient.synced(url:tokenProvider:storePath:)`. `URLSessionTransport` adds **refresh-on-401**: a single 401 response triggers `tokenProvider.invalidate()` and one retry with the freshly-minted token before surfacing as `UnauthorizedError`.
+
+### Multipart upload helper
+
+`Transport.uploadMultipart(method:path:fieldName:filename:data:mimeType:query:)` — RFC 7578 envelope with one file part, routed through `rawRequest` so retry, auth-refresh, and rate-limit handling all apply. Used by `ProfileNamespace.uploadAvatar(...)`. Note: `BlobsNamespace.upload(...)` POSTs raw bytes with the MIME type as Content-Type — it does not go through this helper.
+
+### System domain models (`DomainModels/System/`)
+
+Hand-written (codegen-domain currently scans only `core.*` types): `Connection` (typed wrapper for `system.connection` items, surfacing `kind: ConnectionKind`, `scopes`, `integrationRef`, `runtimeStatus`, etc.) and `Activity` (typed wrapper for `system.activity`, surfacing `severity: ActivitySeverity`, `summary`, `connectionId`). Both conform to `MymeItem` so they slot into `client.items.list({type: ...})`, `typedQuery<T>()`, and the reactive `queryConnections` / `queryActivity` factories. The closed enum types `ConnectionKind` (`app | integration | tenant`) and `ActivitySeverity` (`info | warning | error | actionRequired`) are hand-written under `Types/Wire/Hand/` so apps can pattern-match without comparing raw strings.
 
 ## Build
 
@@ -119,7 +138,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 ### What stays hand-written
 
-- `Sources/MymeSDK/Types/Wire/Hand/` — composite wrappers (`ItemWithMetadata`, `ItemEdgeGroup`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, …), and types the OpenAPI spec doesn't cover (`ItemState`, `Origin`, `FieldDefinition`, `SearchResult`).
+- `Sources/MymeSDK/Types/Wire/Hand/` — composite wrappers (`ItemWithMetadataWith`, `ItemEdgeGroup`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, `IntegrationsListResponse`, `LeaseTokensListResponse`, `InboundWebhooksListResponse`, …), and closed enum types the OpenAPI spec carries as plain strings (`ItemState`, `Origin`, `Tier`, `ConnectionKind`, `ActivitySeverity`, `FieldDefinition`, `SearchResult`).
 - `Sources/MymeSDK/Conflict/ConflictStrategy.swift` — the strategy enum, `ConflictData`, `ConflictResolver`, `ConflictResult`. The wire shapes (`ConflictResponse`, `ConflictSnapshot`, `MergePolicy`, `MergePolicyStrategy`) are generated under `Types/Wire/Generated/` from the 409 response schema and the embedded `merge_policy` block.
 - `Sources/MymeSDK/Inputs/` — all SDK input shapes (`CreateItemInput`, `UpdateOptions`, `ListFilters`, `CreateKeyInput`, etc.).
 
@@ -129,7 +148,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 - `numericIntFields` — global list of JSON field names that are spec'd as `number` but represent whole integers in the SDK (`version`, `schema_version`, `attempt`, `status_code`, …). Widen this list when a new such field lands.
 - Per-type `fieldOverrides` — raw Swift type expressions substituted verbatim (used for map-with-enum-value cases like `type_permissions: [String: TypePermission]`).
-- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `Origin`, `TypePermission`, `ExtensionPermission`, `EdgePermission`) instead of emitting fresh sibling enums per occurrence.
+- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `Origin`, `TypePermission`, `ExtensionPermission`, `EdgePermission`, `MetadataPermission`) instead of emitting fresh sibling enums per occurrence.
 
 ### Troubleshooting
 
