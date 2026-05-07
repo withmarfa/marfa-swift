@@ -7,38 +7,46 @@ import Foundation
 
 public struct AuditEntry: Codable, Sendable, Identifiable {
     public let action: String
+    public let clientIp: String?
     public let details: [String: JSONValue]
     public let id: String
     public let keyId: String?
     public let resourceId: String?
     public let resourceType: String
+    public let tenantId: String?
     public let timestamp: String
 
     public init(
         action: String,
+        clientIp: String? = nil,
         details: [String: JSONValue],
         id: String,
         keyId: String? = nil,
         resourceId: String? = nil,
         resourceType: String,
+        tenantId: String? = nil,
         timestamp: String
     ) {
         self.action = action
+        self.clientIp = clientIp
         self.details = details
         self.id = id
         self.keyId = keyId
         self.resourceId = resourceId
         self.resourceType = resourceType
+        self.tenantId = tenantId
         self.timestamp = timestamp
     }
 
     enum CodingKeys: String, CodingKey {
         case action
+        case clientIp = "client_ip"
         case details
         case id
         case keyId = "key_id"
         case resourceId = "resource_id"
         case resourceType = "resource_type"
+        case tenantId = "tenant_id"
         case timestamp
     }
 }

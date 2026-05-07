@@ -16,6 +16,7 @@ public struct CreatedKey: Codable, Sendable {
     public let key: String
     public let label: String
     public let lastUsedAt: String?
+    public let metadataPermissions: [String: MetadataPermission]?
     public let role: KeyRole
     public let source: String
     public let typePermissions: [String: TypePermission]
@@ -31,6 +32,7 @@ public struct CreatedKey: Codable, Sendable {
         key: String,
         label: String,
         lastUsedAt: String? = nil,
+        metadataPermissions: [String: MetadataPermission]? = nil,
         role: KeyRole,
         source: String,
         typePermissions: [String: TypePermission]
@@ -45,6 +47,7 @@ public struct CreatedKey: Codable, Sendable {
         self.key = key
         self.label = label
         self.lastUsedAt = lastUsedAt
+        self.metadataPermissions = metadataPermissions
         self.role = role
         self.source = source
         self.typePermissions = typePermissions
@@ -61,6 +64,7 @@ public struct CreatedKey: Codable, Sendable {
         case key
         case label
         case lastUsedAt = "last_used_at"
+        case metadataPermissions = "metadata_permissions"
         case role
         case source
         case typePermissions = "type_permissions"

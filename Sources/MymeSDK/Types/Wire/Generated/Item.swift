@@ -19,6 +19,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let source: String
     public let sourceId: String?
     public let state: ItemState
+    public let tenantId: String?
     public let tier: Tier?
     public let timestamp: String
     public let type: String
@@ -39,6 +40,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         source: String,
         sourceId: String? = nil,
         state: ItemState,
+        tenantId: String? = nil,
         tier: Tier? = nil,
         timestamp: String,
         type: String,
@@ -58,6 +60,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         self.source = source
         self.sourceId = sourceId
         self.state = state
+        self.tenantId = tenantId
         self.tier = tier
         self.timestamp = timestamp
         self.type = type
@@ -79,6 +82,7 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         case source
         case sourceId = "source_id"
         case state
+        case tenantId = "tenant_id"
         case tier
         case timestamp
         case type

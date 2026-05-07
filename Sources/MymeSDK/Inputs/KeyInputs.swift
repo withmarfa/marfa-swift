@@ -50,3 +50,9 @@ public enum EdgePermission: String, Codable, Sendable {
     case read
     case write
 }
+
+/// Permission level for metadata access on a key.
+public enum MetadataPermission: String, Codable, Sendable {
+    case read
+    case write
+}
