@@ -57,9 +57,13 @@ jobs:
             echo "::error::No Xcode found in /Applications"
             exit 1
           fi
-          echo "Selecting /Applications/$latest"
-          sudo xcode-select -s "/Applications/$latest/Contents/Developer"
-          swift --version
+          dev_dir="/Applications/$latest/Contents/Developer"
+          echo "Selecting $dev_dir"
+          # Export DEVELOPER_DIR for subsequent steps. Avoids sudo xcode-select
+          # which requires passwordless sudo on self-hosted runners; works
+          # identically on GitHub-hosted macOS runners.
+          echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$dev_dir" swift --version
 
       - name: Cache SPM checkouts
         uses: actions/cache@v4
@@ -107,9 +111,13 @@ jobs:
             echo "::error::No Xcode found in /Applications"
             exit 1
           fi
-          echo "Selecting /Applications/$latest"
-          sudo xcode-select -s "/Applications/$latest/Contents/Developer"
-          swift --version
+          dev_dir="/Applications/$latest/Contents/Developer"
+          echo "Selecting $dev_dir"
+          # Export DEVELOPER_DIR for subsequent steps. Avoids sudo xcode-select
+          # which requires passwordless sudo on self-hosted runners; works
+          # identically on GitHub-hosted macOS runners.
+          echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$dev_dir" swift --version
 
       - name: Cache SPM checkouts
         uses: actions/cache@v4
