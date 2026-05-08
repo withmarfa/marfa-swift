@@ -9,15 +9,23 @@ import Foundation
 /// short-lived; ``StoredTokenProvider`` refreshes them transparently when
 /// ``isExpired`` flips to `true`.
 ///
-/// Wire field names are snake_case (`access_token`, `refresh_token`,
-/// `expires_at`); the Swift surface uses camelCase via the Codable
-/// `CodingKeys` mapping below.
+/// Wire shape conforms to RFC 6749 §5.1: `access_token`, `token_type`,
+/// `refresh_token`, `expires_in` (seconds), `scope` (single space-separated
+/// string), and — when `openid` was granted — `id_token` (a signed JWT).
+/// The decoder normalises `expires_in` to an absolute `expiresAt` date and
+/// splits `scope` into a `[String]` for ergonomic Swift consumption.
+///
+/// The encode side emits a canonical persistence shape (`scope` string,
+/// `expires_at` ISO 8601) so a Token round-trips through Keychain
+/// storage without losing state. The decoder accepts both wire forms
+/// (`expires_in` + `scope` from the server) and persistence forms
+/// (`expires_at` + `scope` or legacy `scopes` array from Keychain).
 public struct Token: Codable, Sendable, Hashable {
     /// The bearer string sent in the `Authorization` header.
     public let accessToken: String
 
-    /// Token type, e.g. `"Bearer"`. Servers must echo this verbatim per
-    /// RFC 6749 §5.1; preserved on the wire for round-trip fidelity.
+    /// Token type, e.g. `"bearer"`. Servers must echo this verbatim per
+    /// RFC 6749 §5.1.
     public let tokenType: String
 
     /// Refresh token, if the server issued one. Used by
@@ -25,14 +33,21 @@ public struct Token: Codable, Sendable, Hashable {
     /// re-running the user-facing flow.
     public let refreshToken: String?
 
-    /// Absolute expiry of the access token. The wire spec allows either
-    /// `expires_in` (seconds) or `expires_at` (ISO 8601 timestamp); the SDK
-    /// normalises to an absolute date at parse time so the renewal logic
-    /// doesn't need to track when the token was issued.
+    /// OIDC ID Token (JWT) when `openid` was in the granted scopes.
+    /// Optional — non-OIDC flows omit it. Consumers who need to verify
+    /// the JWT against the platform JWKS can fetch
+    /// `/.well-known/jwks.json` from the issuer.
+    public let idToken: String?
+
+    /// Absolute expiry of the access token. Computed at decode time from
+    /// the wire `expires_in` field; persisted as an ISO 8601 date. Nil
+    /// when the server omitted both fields.
     public let expiresAt: Date?
 
-    /// Granted scopes, space-separated when serialised to the wire per
-    /// RFC 6749 §3.3, returned as an array here for convenience.
+    /// Granted scopes. The wire spec carries them as a single
+    /// space-separated string in the `scope` field; the SDK splits to
+    /// `[String]` for ergonomic consumption. Empty when the server
+    /// omitted `scope`.
     public let scopes: [String]
 
     /// True when ``expiresAt`` is in the past. ``StoredTokenProvider``
@@ -44,14 +59,16 @@ public struct Token: Codable, Sendable, Hashable {
 
     public init(
         accessToken: String,
-        tokenType: String = "Bearer",
+        tokenType: String = "bearer",
         refreshToken: String? = nil,
+        idToken: String? = nil,
         expiresAt: Date? = nil,
         scopes: [String] = []
     ) {
         self.accessToken = accessToken
         self.tokenType = tokenType
         self.refreshToken = refreshToken
+        self.idToken = idToken
         self.expiresAt = expiresAt
         self.scopes = scopes
     }
@@ -60,7 +77,55 @@ public struct Token: Codable, Sendable, Hashable {
         case accessToken = "access_token"
         case tokenType = "token_type"
         case refreshToken = "refresh_token"
+        case idToken = "id_token"
         case expiresAt = "expires_at"
+        case expiresIn = "expires_in"
+        case scope
         case scopes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.accessToken = try c.decode(String.self, forKey: .accessToken)
+        self.tokenType = try c.decode(String.self, forKey: .tokenType)
+        self.refreshToken = try c.decodeIfPresent(String.self, forKey: .refreshToken)
+        self.idToken = try c.decodeIfPresent(String.self, forKey: .idToken)
+
+        // Wire form (`expires_in` seconds) wins when present — the server
+        // sends it on every fresh grant. Falls back to `expires_at` (the
+        // canonical persistence form). Both absent → no expiry tracked.
+        if let expiresInSeconds = try c.decodeIfPresent(Int.self, forKey: .expiresIn) {
+            self.expiresAt = Date().addingTimeInterval(TimeInterval(expiresInSeconds))
+        } else if let absolute = try c.decodeIfPresent(Date.self, forKey: .expiresAt) {
+            self.expiresAt = absolute
+        } else {
+            self.expiresAt = nil
+        }
+
+        // Wire form is `scope` (single space-separated string per
+        // RFC 6749 §3.3). Falls back to `scopes` (array) for backward
+        // compat with anything persisted under the pre-fix shape.
+        if let scopeStr = try c.decodeIfPresent(String.self, forKey: .scope) {
+            self.scopes = scopeStr
+                .split(whereSeparator: \.isWhitespace)
+                .map(String.init)
+        } else if let scopesArr = try c.decodeIfPresent([String].self, forKey: .scopes) {
+            self.scopes = scopesArr
+        } else {
+            self.scopes = []
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(accessToken, forKey: .accessToken)
+        try c.encode(tokenType, forKey: .tokenType)
+        try c.encodeIfPresent(refreshToken, forKey: .refreshToken)
+        try c.encodeIfPresent(idToken, forKey: .idToken)
+        // Persistence canon: `expires_at` (ISO 8601 absolute date) and
+        // `scope` (single space-separated string). The decoder above
+        // reads both wire and persistence forms.
+        try c.encodeIfPresent(expiresAt, forKey: .expiresAt)
+        try c.encode(scopes.joined(separator: " "), forKey: .scope)
     }
 }
