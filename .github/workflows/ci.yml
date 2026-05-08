@@ -51,10 +51,17 @@ jobs:
       - name: Cache SPM checkouts
         uses: actions/cache@v4
         with:
+          # T-092: scope by runner.name. Self-hosted runners on the same
+          # host share the cache backend, but each runner's working dir
+          # is baked into compiled PCMs; a cross-runner restore surfaces
+          # as "missing required module 'SwiftShims'". Per-runner keys
+          # keep each runner reading its own correctly-pathed cache.
+          # GitHub-hosted runners get a stable runner.name per OS, so the
+          # keys still hit cache there.
           path: .build/checkouts
-          key: ${{ runner.os }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
+          key: ${{ runner.name }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-spm-checkouts-
+            ${{ runner.name }}-spm-checkouts-
 
       - name: Cache SPM build artefacts
         uses: actions/cache@v4
@@ -63,14 +70,15 @@ jobs:
           # separately with a finer key). Keyed by Package.resolved +
           # the hash of all Swift sources, so source-only edits still
           # get an incremental-compile hit and dependency bumps miss
-          # cleanly.
+          # cleanly. Per-runner scoping (T-092) for the same reason as
+          # the checkouts cache above.
           path: |
             .build
             !.build/checkouts
-          key: ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
+          key: ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
           restore-keys: |
-            ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved') }}-
-            ${{ runner.os }}-spm-build-
+            ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved') }}-
+            ${{ runner.name }}-spm-build-
 
       - name: Compile library + tests (typecheck, no test run)
         # `swift build --build-tests` compiles test targets too, which
@@ -105,10 +113,11 @@ jobs:
       - name: Cache SPM checkouts
         uses: actions/cache@v4
         with:
+          # T-092: scope by runner.name (see pr-check job above for why).
           path: .build/checkouts
-          key: ${{ runner.os }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
+          key: ${{ runner.name }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-spm-checkouts-
+            ${{ runner.name }}-spm-checkouts-
 
       - name: Cache SPM build artefacts
         uses: actions/cache@v4
@@ -116,10 +125,10 @@ jobs:
           path: |
             .build
             !.build/checkouts
-          key: ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
+          key: ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
           restore-keys: |
-            ${{ runner.os }}-spm-build-${{ hashFiles('Package.resolved') }}-
-            ${{ runner.os }}-spm-build-
+            ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved') }}-
+            ${{ runner.name }}-spm-build-
 
       - name: Build
         run: swift build
