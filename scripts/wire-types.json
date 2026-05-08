@@ -61,7 +61,8 @@
       "fieldOverrides": {
         "type_permissions": "[String: TypePermission]",
         "extension_permissions": "[String: ExtensionPermission]",
-        "edge_permissions": "[String: EdgePermission]"
+        "edge_permissions": "[String: EdgePermission]",
+        "metadata_permissions": "[String: MetadataPermission]"
       },
       "enumOverrides": {
         "role": "KeyRole",
@@ -76,7 +77,8 @@
       "fieldOverrides": {
         "type_permissions": "[String: TypePermission]",
         "extension_permissions": "[String: ExtensionPermission]",
-        "edge_permissions": "[String: EdgePermission]"
+        "edge_permissions": "[String: EdgePermission]",
+        "metadata_permissions": "[String: MetadataPermission]"
       },
       "enumOverrides": {
         "role": "KeyRole",
@@ -143,6 +145,71 @@
         "ancestor": "ConflictSnapshot",
         "merge_policy": "MergePolicy"
       }
+    },
+    {
+      "name": "Profile",
+      "pointer": "/paths/~1profile~1me/get/responses/200/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "UpdateProfileInput",
+      "pointer": "/paths/~1profile~1me/patch/requestBody/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "Integration",
+      "pointer": "/paths/~1integrations~1{id}/get/responses/200/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "RegisterIntegrationInput",
+      "pointer": "/paths/~1integrations/post/requestBody/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable"]
+    },
+    {
+      "name": "ConnectionInstallInput",
+      "pointer": "/paths/~1connections~1install/post/requestBody/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "ConnectionInstallResult",
+      "pointer": "/paths/~1connections~1install/post/responses/201/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "ConnectionUninstallResult",
+      "pointer": "/paths/~1connections~1{id}~1uninstall/post/responses/200/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "LeaseToken",
+      "pointer": "/paths/~1connections~1{id}~1lease-tokens/get/responses/200/content/application~1json/schema/properties/leases/items",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "CreatedLeaseToken",
+      "pointer": "/paths/~1connections~1{id}~1lease-token/post/responses/201/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "LeaseTokenInput",
+      "pointer": "/paths/~1connections~1{id}~1lease-token/post/requestBody/content/application~1json/schema",
+      "conformances": ["Codable", "Sendable", "Hashable"]
+    },
+    {
+      "name": "InboundWebhookSubscription",
+      "pointer": "/paths/~1connections~1{id}~1inbound-webhooks/get/responses/200/content/application~1json/schema/properties/inbound_webhooks/items",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
+    },
+    {
+      "name": "InboundWebhookDelivery",
+      "pointer": "/paths/~1connections~1{id}~1inbound-webhooks~1{webhook_id}~1deliveries/get/responses/200/content/application~1json/schema/properties/deliveries/items",
+      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "identifiableKey": "id"
     }
   ]
 }
