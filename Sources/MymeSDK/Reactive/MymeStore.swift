@@ -49,16 +49,24 @@ public final class MymeStore {
     /// be called even if the engine never populated the log).
     private let mutationQueue: MutationQueue?
 
+    /// The namespace that backs the ``profileStore`` accessor. Constructed
+    /// lazily on first access; non-`nil` only for clients that have a
+    /// remote profile endpoint to talk to.
+    private let profileNamespace: ProfileNamespace?
+    private var _profileStore: ProfileStore?
+
     // MARK: - Init
 
     init(
         container: ModelContainer,
         syncEngine: SyncEngine? = nil,
-        mutationQueue: MutationQueue? = nil
+        mutationQueue: MutationQueue? = nil,
+        profileNamespace: ProfileNamespace? = nil
     ) {
         self.container = container
         self.syncEngine = syncEngine
         self.mutationQueue = mutationQueue
+        self.profileNamespace = profileNamespace
     }
 
     // MARK: - Item queries
@@ -148,6 +156,58 @@ public final class MymeStore {
     /// ``TagsQuery``.
     public func queryTags() -> TagsQuery {
         TagsQuery(container: container)
+    }
+
+    // MARK: - Connection-aware queries
+
+    /// Creates a live typed query over `system.connection` items.
+    ///
+    /// Filters by ``ConnectionKind`` (`app | integration | tenant`) and
+    /// ``ItemState`` (`active | revoked`). Backed by ``TypedItemQuery``
+    /// over the local store; observation rides the same
+    /// `ModelContext.didSave` debounced refresh as every other reactive
+    /// query.
+    public func queryConnections(
+        kind: ConnectionKind? = nil,
+        state: ItemState? = nil,
+        limit: Int? = nil
+    ) -> TypedItemQuery<Connection> {
+        var filters = ListFilters(state: state, limit: limit)
+        if let kind {
+            filters.filter = "kind=\"\(kind.rawValue)\""
+        }
+        return TypedItemQuery(container: container, filters: filters)
+    }
+
+    /// Creates a live typed query over `system.activity` items.
+    ///
+    /// Optional `severity` filter scopes the result (e.g.
+    /// ``ActivitySeverity/actionRequired`` for a Repairs-style inbox).
+    public func queryActivity(
+        severity: ActivitySeverity? = nil,
+        limit: Int? = nil
+    ) -> TypedItemQuery<Activity> {
+        var filters = ListFilters(limit: limit)
+        if let severity {
+            filters.filter = "severity=\"\(severity.rawValue)\""
+        }
+        return TypedItemQuery(container: container, filters: filters)
+    }
+
+    // MARK: - Profile
+
+    /// `@Observable` view onto the calling user's profile.
+    ///
+    /// Returns `nil` for clients constructed without a server (pure-local
+    /// mode) — `system.profile` is server-only. Subsequent calls return
+    /// the same store instance so SwiftUI bindings remain stable across
+    /// re-rendered parents.
+    public var profileStore: ProfileStore? {
+        if let existing = _profileStore { return existing }
+        guard let namespace = profileNamespace else { return nil }
+        let store = ProfileStore(namespace: namespace)
+        _profileStore = store
+        return store
     }
 
     // MARK: - Sync queries

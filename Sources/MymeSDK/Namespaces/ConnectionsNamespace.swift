@@ -1,0 +1,257 @@
+import Foundation
+
+/// Connection lifecycle namespace.
+///
+/// `system.connection` items are still managed via ``ItemsNamespace`` for
+/// generic CRUD; this namespace adds the orchestrated lifecycle
+/// operations (`install`, `uninstall`) plus convenience reads, lease-token
+/// management, and inbound webhook administration.
+///
+/// Available in remote and synced modes. In **pure-local mode** every
+/// method throws ``LocalModeUnsupportedError``.
+public struct ConnectionsNamespace: Sendable {
+
+    let transport: any Transport
+    let items: ItemsNamespace
+    let isLocalMode: Bool
+
+    /// Lease tokens — short-lived bearer credentials issued for a
+    /// connection. Surfaces as a sub-namespace because lease tokens have
+    /// their own resource lifecycle (create/list/revoke) distinct from
+    /// the connection itself.
+    public let leaseTokens: LeaseTokensNamespace
+
+    /// Inbound webhooks — incoming HTTP delivery subscriptions for a
+    /// connection. Sub-namespace for the same reason as
+    /// ``leaseTokens``.
+    public let inboundWebhooks: InboundWebhooksNamespace
+
+    init(transport: any Transport, items: ItemsNamespace, isLocalMode: Bool) {
+        self.transport = transport
+        self.items = items
+        self.isLocalMode = isLocalMode
+        self.leaseTokens = LeaseTokensNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.inboundWebhooks = InboundWebhooksNamespace(transport: transport, isLocalMode: isLocalMode)
+    }
+
+    private func ensureRemote(_ operation: String) throws {
+        if isLocalMode {
+            throw LocalModeUnsupportedError(operation: operation)
+        }
+    }
+
+    /// Lists connection items. Wraps `items.list({type: "system.connection"})`
+    /// and projects the result to the typed ``Connection`` domain model.
+    ///
+    /// Filter by ``ConnectionKind`` (`app | integration | tenant`) and/or
+    /// ``ItemState`` (`active | revoked`). Local-store backed in synced
+    /// mode.
+    public func list(
+        kind: ConnectionKind? = nil,
+        state: ItemState? = nil,
+        limit: Int? = nil,
+        cursor: String? = nil
+    ) async throws -> PaginatedResult<Connection> {
+        var filters = ListFilters(
+            type: Connection.typeIdentifier,
+            state: state,
+            limit: limit,
+            cursor: cursor
+        )
+        if let kind {
+            // The server supports filter on `properties.kind` via the
+            // generic filter expression syntax.
+            filters.filter = "kind=\"\(kind.rawValue)\""
+        }
+        let raw = try await items.list(filters: filters)
+        return PaginatedResult(
+            data: raw.data.compactMap { Connection(from: $0) },
+            cursor: raw.cursor,
+            hasMore: raw.hasMore
+        )
+    }
+
+    /// Reads a single connection by id. Wraps `items.get(id)`.
+    public func get(_ id: String) async throws -> Connection {
+        let item = try await items.get(id: id)
+        guard let connection = Connection(from: item) else {
+            throw ValidationError(
+                message: "item \(id) is not a system.connection (got \(item.type))",
+                details: nil
+            )
+        }
+        return connection
+    }
+
+    /// Installs an integration connection non-interactively via
+    /// `POST /connections/install`.
+    ///
+    /// Skips the HTML consent screen — operators and tooling use this
+    /// path to install connections programmatically. Admin-only; tenant
+    /// admins install into their own tenant scope.
+    ///
+    /// `integrationId` references a `system.integration` item registered
+    /// via ``IntegrationsNamespace/register(manifest:)``. `label` is
+    /// optional; the server defaults to `"<manifest_name> <manifest_version>"`
+    /// when omitted.
+    @discardableResult
+    public func install(
+        integrationId: String,
+        label: String? = nil
+    ) async throws -> ConnectionInstallResult {
+        try ensureRemote("connections.install")
+        let input = ConnectionInstallInput(integrationId: integrationId, label: label)
+        return try await transport.request(
+            method: .post, path: "/connections/install", body: input, query: nil
+        )
+    }
+
+    /// Orchestrated uninstall via `POST /connections/{id}/uninstall`.
+    ///
+    /// Server-side pipeline:
+    /// 1. Revokes runtime credentials.
+    /// 2. Deletes upstream OAuth tokens.
+    /// 3. Revokes active leased tokens.
+    /// 4. Disables inbound webhook subscriptions.
+    /// 5. Transitions the connection state to `revoked`.
+    /// 6. Emits a `system.activity` row.
+    ///
+    /// Idempotent at the artefact level — revoking already-revoked
+    /// tokens is a no-op — but rejects with `400 ValidationError` when
+    /// the connection itself is already in state `revoked`.
+    ///
+    /// Synonym: this is sometimes called "revoke" colloquially. The wire
+    /// spelling is "uninstall"; this method matches.
+    @discardableResult
+    public func uninstall(_ id: String) async throws -> ConnectionUninstallResult {
+        try ensureRemote("connections.uninstall")
+        return try await transport.request(
+            method: .post,
+            path: "/connections/\(id)/uninstall",
+            body: nil,
+            query: nil
+        )
+    }
+}
+
+/// Lease token sub-namespace under ``ConnectionsNamespace``. Manages
+/// the short-lived bearer credentials a connection mints for a specific
+/// capability.
+public struct LeaseTokensNamespace: Sendable {
+
+    let transport: any Transport
+    let isLocalMode: Bool
+
+    private func ensureRemote(_ operation: String) throws {
+        if isLocalMode {
+            throw LocalModeUnsupportedError(operation: operation)
+        }
+    }
+
+    /// Creates a lease token via `POST /connections/{id}/lease-token`.
+    ///
+    /// Returns a ``CreatedLeaseToken`` containing the actual token string
+    /// in `lease_token` — this is the **only** time the token value is
+    /// returned to the caller; subsequent `list` calls return the
+    /// metadata without the token value.
+    public func create(
+        connectionId: String,
+        capabilityId: String,
+        scopes: [String]? = nil,
+        ttlSeconds: Int? = nil
+    ) async throws -> CreatedLeaseToken {
+        try ensureRemote("connections.leaseTokens.create")
+        let input = LeaseTokenInput(
+            capabilityId: capabilityId,
+            scopes: scopes,
+            ttlSeconds: ttlSeconds
+        )
+        return try await transport.request(
+            method: .post,
+            path: "/connections/\(connectionId)/lease-token",
+            body: input,
+            query: nil
+        )
+    }
+
+    /// Lists active lease tokens for a connection. Token values are not
+    /// returned — only id, scopes, expiry, and revocation status.
+    public func list(connectionId: String) async throws -> [LeaseToken] {
+        try ensureRemote("connections.leaseTokens.list")
+        let response: LeaseTokensListResponse = try await transport.request(
+            method: .get,
+            path: "/connections/\(connectionId)/lease-tokens",
+            body: nil,
+            query: nil
+        )
+        return response.leases
+    }
+
+    /// Revokes a lease token via
+    /// `POST /connections/{id}/lease-tokens/{leaseId}/revoke`. Idempotent.
+    public func revoke(connectionId: String, leaseId: String) async throws {
+        try ensureRemote("connections.leaseTokens.revoke")
+        let _: EmptyResponse = try await transport.request(
+            method: .post,
+            path: "/connections/\(connectionId)/lease-tokens/\(leaseId)/revoke",
+            body: nil,
+            query: nil
+        )
+    }
+}
+
+/// Inbound webhook sub-namespace under ``ConnectionsNamespace``.
+public struct InboundWebhooksNamespace: Sendable {
+
+    let transport: any Transport
+    let isLocalMode: Bool
+
+    private func ensureRemote(_ operation: String) throws {
+        if isLocalMode {
+            throw LocalModeUnsupportedError(operation: operation)
+        }
+    }
+
+    /// Lists inbound webhook subscriptions for a connection.
+    public func list(connectionId: String) async throws -> [InboundWebhookSubscription] {
+        try ensureRemote("connections.inboundWebhooks.list")
+        let response: InboundWebhooksListResponse = try await transport.request(
+            method: .get,
+            path: "/connections/\(connectionId)/inbound-webhooks",
+            body: nil,
+            query: nil
+        )
+        return response.inboundWebhooks
+    }
+
+    /// Lists deliveries for a specific inbound webhook.
+    public func listDeliveries(
+        connectionId: String,
+        webhookId: String
+    ) async throws -> [InboundWebhookDelivery] {
+        try ensureRemote("connections.inboundWebhooks.listDeliveries")
+        let response: InboundWebhookDeliveriesResponse = try await transport.request(
+            method: .get,
+            path: "/connections/\(connectionId)/inbound-webhooks/\(webhookId)/deliveries",
+            body: nil,
+            query: nil
+        )
+        return response.deliveries
+    }
+
+    /// Manually retries a failed delivery via
+    /// `POST /connections/{id}/inbound-webhooks/{webhookId}/deliveries/{eventId}/retry`.
+    public func retryDelivery(
+        connectionId: String,
+        webhookId: String,
+        eventId: String
+    ) async throws {
+        try ensureRemote("connections.inboundWebhooks.retryDelivery")
+        let _: EmptyResponse = try await transport.request(
+            method: .post,
+            path: "/connections/\(connectionId)/inbound-webhooks/\(webhookId)/deliveries/\(eventId)/retry",
+            body: nil,
+            query: nil
+        )
+    }
+}

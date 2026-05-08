@@ -94,3 +94,27 @@ public struct TagWithCount: Codable, Sendable, Hashable {
 struct TagListResponse: Codable, Sendable {
     let tags: [TagWithCount]
 }
+
+/// Response from GET /integrations: `{ "data": [Integration] }`.
+struct IntegrationsListResponse: Codable, Sendable {
+    let data: [Integration]
+}
+
+/// Response from GET /connections/:id/lease-tokens: `{ "leases": [LeaseToken] }`.
+struct LeaseTokensListResponse: Codable, Sendable {
+    let leases: [LeaseToken]
+}
+
+/// Response from GET /connections/:id/inbound-webhooks: `{ "inbound_webhooks": [...] }`.
+struct InboundWebhooksListResponse: Codable, Sendable {
+    let inboundWebhooks: [InboundWebhookSubscription]
+
+    enum CodingKeys: String, CodingKey {
+        case inboundWebhooks = "inbound_webhooks"
+    }
+}
+
+/// Response from GET /connections/:id/inbound-webhooks/:webhook_id/deliveries.
+struct InboundWebhookDeliveriesResponse: Codable, Sendable {
+    let deliveries: [InboundWebhookDelivery]
+}

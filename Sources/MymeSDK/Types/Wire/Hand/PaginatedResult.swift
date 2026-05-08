@@ -7,7 +7,7 @@ import Foundation
 /// generic from the inlined occurrences. Consumers use concrete
 /// instantiations (`PaginatedResult<Item>`, `PaginatedResult<AuditEntry>`,
 /// etc.) at call sites.
-public struct PaginatedResult<T: Codable & Sendable>: Codable, Sendable {
+public struct PaginatedResult<T: Sendable>: Sendable {
     public let data: [T]
     public let cursor: String?
     public let hasMore: Bool
@@ -17,7 +17,14 @@ public struct PaginatedResult<T: Codable & Sendable>: Codable, Sendable {
         self.cursor = cursor
         self.hasMore = hasMore
     }
+}
 
+/// Codable conformance lights up only when the element is itself Codable
+/// — wire decoding (`Item`, `AuditEntry`, etc.) goes through here, while
+/// in-memory results of typed-wrapper namespaces (`Connection`,
+/// `Activity`, …) can use the same envelope without forcing a synthetic
+/// Codable conformance on every domain model.
+extension PaginatedResult: Codable where T: Codable {
     enum CodingKeys: String, CodingKey {
         case data, cursor
         case hasMore = "has_more"

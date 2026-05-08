@@ -52,6 +52,17 @@ public final class MymeClient: Sendable {
     /// Webhooks API: create, list, get, update, delete, delivery history.
     public let webhooks: WebhooksNamespace
 
+    /// Profile API: get / update the calling user's profile, manage avatar.
+    public let profile: ProfileNamespace
+
+    /// Connections API: install / uninstall lifecycle plus convenience
+    /// reads for `system.connection` items, lease tokens, and inbound
+    /// webhooks.
+    public let connections: ConnectionsNamespace
+
+    /// Integrations API: list, get, register Integration manifests.
+    public let integrations: IntegrationsNamespace
+
     /// The active sync engine, present only in synced mode (``MymeClient/synced(url:apiKey:storePath:)``).
     ///
     /// Call ``SyncEngine/start()`` to begin synchronisation and
@@ -127,6 +138,13 @@ public final class MymeClient: Sendable {
         self.types = TypesNamespace(transport: transport, isLocalMode: isLocalMode)
         self.keys = KeysNamespace(transport: transport, isLocalMode: isLocalMode)
         self.webhooks = WebhooksNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.profile = ProfileNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.connections = ConnectionsNamespace(
+            transport: transport,
+            items: items,
+            isLocalMode: isLocalMode
+        )
+        self.integrations = IntegrationsNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
     /// Creates a client with the given configuration.
@@ -140,6 +158,16 @@ public final class MymeClient: Sendable {
     /// Creates a client with a URL and API key using default settings.
     public convenience init(url: URL, apiKey: String) {
         self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
+    }
+
+    /// Creates a client with an OAuth-issued ``TokenProvider``.
+    ///
+    /// Used by callers that obtain a ``TokenProvider`` from one of the
+    /// auth flows — ``MymeAuth``, ``DeviceFlow``, or ``Passkey``. The
+    /// transport awaits ``TokenProvider/currentToken()`` on every
+    /// request and refreshes once on `401`.
+    public convenience init(url: URL, tokenProvider: any TokenProvider) {
+        self.init(configuration: ClientConfiguration(url: url, tokenProvider: tokenProvider))
     }
 
     /// Creates a pure-local client backed by a SwiftData store at `path`.
@@ -237,6 +265,51 @@ public final class MymeClient: Sendable {
         connectionManager: ConnectionStateManager = ConnectionStateManager()
     ) async throws -> MymeClient {
         let config = ClientConfiguration(url: url, apiKey: apiKey)
+        return try await synced(
+            configuration: config,
+            storePath: storePath,
+            connectionManager: connectionManager
+        )
+    }
+
+    /// Synced-mode factory for OAuth-tokened callers.
+    ///
+    /// Mirrors ``synced(url:apiKey:storePath:connectionManager:)`` but
+    /// accepts a ``TokenProvider`` directly — required for the
+    /// "Sign in with Myme + sync" flow used by Notes / Messages.
+    /// The transport awaits ``TokenProvider/currentToken()`` on every
+    /// request and refreshes once on `401`; sync replay rides the same
+    /// auth path.
+    ///
+    /// - Parameters:
+    ///   - url: Base URL of the Myme API.
+    ///   - tokenProvider: OAuth token provider returned by ``MymeAuth``,
+    ///     ``DeviceFlow``, or ``Passkey``.
+    ///   - storePath: Path to the SwiftData store file. Pass `":memory:"`
+    ///     for tests.
+    ///   - connectionManager: Optional pre-built manager; the default
+    ///     creates one.
+    public static func synced(
+        url: URL,
+        tokenProvider: any TokenProvider,
+        storePath: String,
+        connectionManager: ConnectionStateManager = ConnectionStateManager()
+    ) async throws -> MymeClient {
+        let config = ClientConfiguration(url: url, tokenProvider: tokenProvider)
+        return try await synced(
+            configuration: config,
+            storePath: storePath,
+            connectionManager: connectionManager
+        )
+    }
+
+    /// Designated synced-factory — both `synced(url:apiKey:...)` and
+    /// `synced(url:tokenProvider:...)` route through here.
+    private static func synced(
+        configuration config: ClientConfiguration,
+        storePath: String,
+        connectionManager: ConnectionStateManager
+    ) async throws -> MymeClient {
         let transport = URLSessionTransport(configuration: config)
         let container = try MymeModelContainer.make(path: storePath)
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
@@ -333,7 +406,8 @@ public final class MymeClient: Sendable {
         return MymeStore(
             container: container,
             syncEngine: syncEngine,
-            mutationQueue: mutationQueue
+            mutationQueue: mutationQueue,
+            profileNamespace: profile
         )
     }
 
