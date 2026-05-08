@@ -20,27 +20,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Tiered validation pattern.
-#
-# macOS runners are 10x Ubuntu on GitHub Actions billing. Before this split
-# the full test suite + freshness checks ran on every PR push, driving ~$5/mo
-# of the org's CI bill from this repo alone. The decision and rationale live
-# in `~/aic-vault/Projects/myme-A1ZB0/Artifacts/32-state-of-play/CI Actions Review.md`.
-#
-# - PR tier (`pr-check`): compile + typecheck only. Fast feedback on every
-#   push. Catches ~the same class of breakage at ~30% the cost.
-# - Main tier (`main-validate`): full build + `swift test --parallel` +
-#   three codegen freshness checks (wire types, domain models, custom-types
-#   fixtures). Runs on merge to main and on manual workflow_dispatch.
-#   Breakages are a "fix main before cutting a tag" signal, not an
-#   incident — nothing auto-deploys from main.
-#
-# Caching is applied to both tiers: SPM checkouts + DerivedData. Cache key
-# includes Package.resolved so a dependency bump gets a fresh build, but
-# iterative source-only changes hit cache warm.
-#
-# If this repo ever ships externally (App Store, public SDK consumers),
-# revisit: PR-time safety may need to trade back against cost.
+# Tiered validation. PR tier (`pr-check`): compile + typecheck only.
+# Main tier (`main-validate`): full build + `swift test --parallel` +
+# codegen freshness checks, run on merge to main and on workflow_dispatch.
+# Caching keyed on `Package.resolved` + source hashes for both tiers.
 
 jobs:
   pr-check:
