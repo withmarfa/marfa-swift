@@ -41,13 +41,13 @@ public enum DeviceFlow {
         let normalized = DeviceFlow.normalizeIssuer(issuer)
         var request = URLRequest(url: normalized.appendingPathComponent("auth/device"))
         request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let body = [
+        let body: [String: Any] = [
             "client_id": clientId,
             "scope": scopes.joined(separator: " "),
         ]
-        request.httpBody = formURLEncode(body).data(using: .utf8)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await urlSession.data(for: request)
         guard let http = response as? HTTPURLResponse else {
