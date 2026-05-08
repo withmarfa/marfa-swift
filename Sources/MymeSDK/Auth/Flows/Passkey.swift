@@ -47,42 +47,37 @@ public enum Passkey {
     ///   - issuer: Myme instance base URL (e.g. `https://staging.myme.so`).
     ///   - presentationContextProvider: SwiftUI/UIKit context provider for
     ///     the system browser window.
-    ///   - callbackURLScheme: Custom scheme the SDK listens for to know
-    ///     when the user is finished. The enrolment flow has no
-    ///     server-side redirect, so the scheme just has to match
-    ///     **something** (default `myme-auth-host`); the user dismissing
-    ///     the window is the completion signal.
+    ///   - callbackURLScheme: Custom scheme passed to the underlying
+    ///     `ASWebAuthenticationSession`. The enrolment flow has no
+    ///     server-side redirect to a custom scheme — the user dismissing
+    ///     the window IS the completion signal — so the scheme just has
+    ///     to be a valid identifier (default `myme-auth-host`).
     ///
-    /// - Throws: ``OAuthError`` with code `user_cancelled` if the user
-    ///   dismisses the window before completing, or any underlying
-    ///   `ASWebAuthenticationSessionError` thrown by the system.
+    /// Returns when the user dismisses the enrolment window. Whether
+    /// enrolment actually succeeded is **not observable** from this side
+    /// — `/auth/passkey/enroll` doesn't redirect to a custom scheme on
+    /// completion or failure, so any dismissal looks identical to the
+    /// SDK. Callers verify enrolment by attempting a passkey-backed
+    /// sign-in: the OAuth sign-in page surfaces a "Use a passkey" button
+    /// once a credential is stored against the account. Never throws on
+    /// user dismissal — would be misleading given we can't tell success
+    /// from cancellation.
     public static func enroll(
         issuer: URL,
         presentationContextProvider: ASWebAuthenticationPresentationContextProviding,
         callbackURLScheme: String = "myme-auth-host"
-    ) async throws {
+    ) async {
         let url = issuer.appendingPathComponent("auth/passkey/enroll")
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let session = ASWebAuthenticationSession(
                 url: url,
                 callbackURLScheme: callbackURLScheme
-            ) { _, error in
-                if let asError = error as? ASWebAuthenticationSessionError,
-                   asError.code == .canceledLogin {
-                    continuation.resume(throwing: OAuthError(
-                        rawCode: "user_cancelled",
-                        message: "passkey enrolment cancelled",
-                        status: 400
-                    ))
-                } else {
-                    // Any other error surface (real failure or natural
-                    // dismissal-after-enrol) is treated as success: the
-                    // server-side enrolment is observable later via
-                    // listing the user's passkeys, not via this callback
-                    // (which only fires on a custom-scheme redirect that
-                    // /auth/passkey/enroll never emits).
-                    continuation.resume()
-                }
+            ) { _, _ in
+                // The completion handler fires either on a custom-scheme
+                // callback URL (never happens for the enrol page) or on
+                // the user closing the window (`canceledLogin`). Both
+                // paths resume successfully — see method doc for why.
+                continuation.resume()
             }
             session.presentationContextProvider = presentationContextProvider
             session.prefersEphemeralWebBrowserSession = true
