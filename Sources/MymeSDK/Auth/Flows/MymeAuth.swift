@@ -242,7 +242,15 @@ public final class MymeAuth {
                 continuation.resume(returning: callbackURL)
             }
             session.presentationContextProvider = presentationContextProvider
-            session.prefersEphemeralWebBrowserSession = false
+            // Ephemeral browser session per Apple's OAuth-client guidance:
+            // each sign-in starts with a fresh cookie jar, so the user's
+            // IdP session ends when the OAuth flow completes. Without this
+            // the better-auth session cookie persists in Safari and
+            // `signOut(_:)` only clears the SDK-side token — the next
+            // sign-in skips the password prompt because the IdP still
+            // recognises the cookie. Ephemeral is the secure default for
+            // OAuth public clients.
+            session.prefersEphemeralWebBrowserSession = true
             session.start()
         }
     }
