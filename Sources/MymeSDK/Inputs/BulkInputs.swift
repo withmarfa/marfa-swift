@@ -22,7 +22,6 @@ public struct BulkItemInput: Codable, Sendable {
     /// non-forgeability as an explicit contract.
     public var source: String?
     public var sourceId: String?
-    public var origin: Origin?
     public var device: String?
     public var tags: [String]?
     /// Outbound edges to create atomically after the item write.
@@ -40,7 +39,6 @@ public struct BulkItemInput: Codable, Sendable {
         timestamp: String? = nil,
         source: String? = nil,
         sourceId: String? = nil,
-        origin: Origin? = nil,
         device: String? = nil,
         tags: [String]? = nil,
         edges: [String: [String]]? = nil
@@ -53,14 +51,13 @@ public struct BulkItemInput: Codable, Sendable {
         self.timestamp = timestamp
         self.source = source
         self.sourceId = sourceId
-        self.origin = origin
         self.device = device
         self.tags = tags
         self.edges = edges
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, type, properties, state, tier, timestamp, source, origin, device, tags, edges
+        case id, type, properties, state, tier, timestamp, source, device, tags, edges
         case sourceId = "source_id"
     }
 }

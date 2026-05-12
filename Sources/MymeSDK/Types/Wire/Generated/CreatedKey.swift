@@ -7,7 +7,6 @@ import Foundation
 
 public struct CreatedKey: Codable, Sendable {
     public let createdAt: String
-    public let defaultOrigin: Origin
     public let defaultTier: Tier
     public let edgePermissions: [String: EdgePermission]?
     public let extensionPermissions: [String: ExtensionPermission]?
@@ -23,7 +22,6 @@ public struct CreatedKey: Codable, Sendable {
 
     public init(
         createdAt: String,
-        defaultOrigin: Origin,
         defaultTier: Tier,
         edgePermissions: [String: EdgePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
@@ -38,7 +36,6 @@ public struct CreatedKey: Codable, Sendable {
         typePermissions: [String: TypePermission]
     ) {
         self.createdAt = createdAt
-        self.defaultOrigin = defaultOrigin
         self.defaultTier = defaultTier
         self.edgePermissions = edgePermissions
         self.extensionPermissions = extensionPermissions
@@ -55,7 +52,6 @@ public struct CreatedKey: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case createdAt = "created_at"
-        case defaultOrigin = "default_origin"
         case defaultTier = "default_tier"
         case edgePermissions = "edge_permissions"
         case extensionPermissions = "extension_permissions"

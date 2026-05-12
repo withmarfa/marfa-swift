@@ -59,14 +59,6 @@
                   "source_id": {
                     "type": "string"
                   },
-                  "origin": {
-                    "type": "string",
-                    "enum": [
-                      "user",
-                      "ai",
-                      "worker"
-                    ]
-                  },
                   "tier": {
                     "type": "string",
                     "enum": [
@@ -161,15 +153,6 @@
                         "source_id": {
                           "type": "string"
                         },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker",
-                            "system"
-                          ]
-                        },
                         "device": {
                           "type": "string"
                         },
@@ -269,7 +252,6 @@
                         "version",
                         "schema_version",
                         "source",
-                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -363,15 +345,6 @@
                         "source_id": {
                           "type": "string"
                         },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker",
-                            "system"
-                          ]
-                        },
                         "device": {
                           "type": "string"
                         },
@@ -471,7 +444,6 @@
                         "version",
                         "schema_version",
                         "source",
-                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -813,15 +785,6 @@
                               "source_id": {
                                 "type": "string"
                               },
-                              "origin": {
-                                "type": "string",
-                                "enum": [
-                                  "user",
-                                  "ai",
-                                  "worker",
-                                  "system"
-                                ]
-                              },
                               "device": {
                                 "type": "string"
                               },
@@ -921,7 +884,6 @@
                               "version",
                               "schema_version",
                               "source",
-                              "origin",
                               "timestamp",
                               "created_at",
                               "updated_at"
@@ -996,15 +958,6 @@
                                   },
                                   "source_id": {
                                     "type": "string"
-                                  },
-                                  "origin": {
-                                    "type": "string",
-                                    "enum": [
-                                      "user",
-                                      "ai",
-                                      "worker",
-                                      "system"
-                                    ]
                                   },
                                   "device": {
                                     "type": "string"
@@ -1105,7 +1058,6 @@
                                   "version",
                                   "schema_version",
                                   "source",
-                                  "origin",
                                   "timestamp",
                                   "created_at",
                                   "updated_at"
@@ -1377,15 +1329,6 @@
                         "source_id": {
                           "type": "string"
                         },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker",
-                            "system"
-                          ]
-                        },
                         "device": {
                           "type": "string"
                         },
@@ -1485,7 +1428,6 @@
                         "version",
                         "schema_version",
                         "source",
-                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -1717,15 +1659,6 @@
                         "source_id": {
                           "type": "string"
                         },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker",
-                            "system"
-                          ]
-                        },
                         "device": {
                           "type": "string"
                         },
@@ -1825,7 +1758,6 @@
                         "version",
                         "schema_version",
                         "source",
-                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -2236,15 +2168,6 @@
                         "source_id": {
                           "type": "string"
                         },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker",
-                            "system"
-                          ]
-                        },
                         "device": {
                           "type": "string"
                         },
@@ -2344,7 +2267,6 @@
                         "version",
                         "schema_version",
                         "source",
-                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -2557,15 +2479,6 @@
                         "source_id": {
                           "type": "string"
                         },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker",
-                            "system"
-                          ]
-                        },
                         "device": {
                           "type": "string"
                         },
@@ -2665,7 +2578,6 @@
                         "version",
                         "schema_version",
                         "source",
-                        "origin",
                         "timestamp",
                         "created_at",
                         "updated_at"
@@ -3992,14 +3904,6 @@
                         },
                         "source_id": {
                           "type": "string"
-                        },
-                        "origin": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "ai",
-                            "worker"
-                          ]
                         },
                         "device": {
                           "type": "string"
@@ -8525,15 +8429,6 @@
                               "source_id": {
                                 "type": "string"
                               },
-                              "origin": {
-                                "type": "string",
-                                "enum": [
-                                  "user",
-                                  "ai",
-                                  "worker",
-                                  "system"
-                                ]
-                              },
                               "device": {
                                 "type": "string"
                               },
@@ -8633,7 +8528,6 @@
                               "version",
                               "schema_version",
                               "source",
-                              "origin",
                               "timestamp",
                               "created_at",
                               "updated_at"
@@ -10254,14 +10148,6 @@
                       "member"
                     ]
                   },
-                  "default_origin": {
-                    "type": "string",
-                    "enum": [
-                      "user",
-                      "ai",
-                      "worker"
-                    ]
-                  },
                   "default_tier": {
                     "type": "string",
                     "enum": [
@@ -10350,14 +10236,6 @@
                         "member"
                       ]
                     },
-                    "default_origin": {
-                      "type": "string",
-                      "enum": [
-                        "user",
-                        "ai",
-                        "worker"
-                      ]
-                    },
                     "default_tier": {
                       "type": "string",
                       "enum": [
@@ -10423,7 +10301,6 @@
                     "label",
                     "source",
                     "role",
-                    "default_origin",
                     "default_tier",
                     "is_platform",
                     "type_permissions",
@@ -10507,14 +10384,6 @@
                           "role": {
                             "type": "string"
                           },
-                          "default_origin": {
-                            "type": "string",
-                            "enum": [
-                              "user",
-                              "ai",
-                              "worker"
-                            ]
-                          },
                           "default_tier": {
                             "type": "string",
                             "enum": [
@@ -10579,7 +10448,6 @@
                           "label",
                           "source",
                           "role",
-                          "default_origin",
                           "default_tier",
                           "is_platform",
                           "type_permissions",
@@ -10747,14 +10615,6 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "default_origin": {
-                    "type": "string",
-                    "enum": [
-                      "user",
-                      "ai",
-                      "worker"
-                    ]
-                  },
                   "default_tier": {
                     "type": "string",
                     "enum": [
@@ -10839,14 +10699,6 @@
                         "member"
                       ]
                     },
-                    "default_origin": {
-                      "type": "string",
-                      "enum": [
-                        "user",
-                        "ai",
-                        "worker"
-                      ]
-                    },
                     "default_tier": {
                       "type": "string",
                       "enum": [
@@ -10911,7 +10763,6 @@
                     "label",
                     "source",
                     "role",
-                    "default_origin",
                     "default_tier",
                     "is_platform",
                     "type_permissions",
@@ -11299,6 +11150,375 @@
           },
           "409": {
             "description": "source collision for tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/connections/{connection_id}/verify-context": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Resolve the verify-route inputs for a Connection — control-plane only (T-082)",
+        "description": "Returns the manifest `integration_name` and `tenant_id` the runtime-control verify route needs to construct a queue envelope. Validates the connection exists, is `kind: integration`, and is active. Platform-credential gated; operator-debug surface.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connection_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verify context resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "integration_name": {
+                      "type": "string"
+                    },
+                    "tenant_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "integration_name",
+                    "tenant_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Connection is not of kind `integration`, not active, or has an unresolved integration_ref.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks is_platform: true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/connections/{connection_id}/dlq-context": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Resolve the DLQ-route inputs for a Connection — control-plane only (T-084)",
+        "description": "Returns minimal connection metadata for the runtime-control DLQ peek/replay routes. Platform-credential gated; operator-debug surface. Unlike verify-context, this does NOT narrow by kind or state — operators inspect DLQs precisely when a connection is unhealthy.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connection_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DLQ context resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "integration_name": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "tenant_id": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "kind",
+                    "state",
+                    "integration_name",
+                    "tenant_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks is_platform: true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12146,10 +12366,6 @@
                     "trash_retention_days": {
                       "type": "integer",
                       "minimum": 0
-                    },
-                    "feed_retention_days": {
-                      "type": "integer",
-                      "minimum": 0
                     }
                   }
                 }
@@ -12335,10 +12551,6 @@
                   "trash_retention_days": {
                     "type": "integer",
                     "minimum": 0
-                  },
-                  "feed_retention_days": {
-                    "type": "integer",
-                    "minimum": 0
                   }
                 }
               }
@@ -12439,10 +12651,6 @@
                       "minimum": 0
                     },
                     "trash_retention_days": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "feed_retention_days": {
                       "type": "integer",
                       "minimum": 0
                     }
@@ -15040,6 +15248,332 @@
           },
           "404": {
             "description": "Integration not found in this tenant scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/preview-event": {
+      "post": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Preview the bridge envelopes a synthetic item event would produce (no dispatch)",
+        "description": "Renders the wire envelopes the reactive-run bridge would POST to Cloudflare Queues for a given item-event, without invoking any handler or producing a queue message. Operator debugging surface (T-083). Returns one entry per subscribing connection in the caller's tenant — `would_dispatch: true` with the synthesised envelope, or `would_dispatch: false` with a `dispatch_reason` so the operator can see why a subscriber would be skipped (self-event / cross-tenant / hop-budget / subscription_inactive). Defaults to all subscribers; pass `connection_id` to filter to one. Workspace-admin only.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "event_type": {
+                    "type": "string",
+                    "enum": [
+                      "created",
+                      "updated",
+                      "deleted",
+                      "restored",
+                      "state_changed",
+                      "metadata_changed"
+                    ]
+                  },
+                  "connection_id": {
+                    "type": "string"
+                  },
+                  "cycle": {
+                    "type": "object",
+                    "properties": {
+                      "originating_connection_id": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "hop_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "event_type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One entry per subscriber the operator asked about, plus the tenant's hop budget.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "envelopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connection_id": {
+                            "type": "string"
+                          },
+                          "integration_name": {
+                            "type": "string"
+                          },
+                          "would_dispatch": {
+                            "type": "boolean"
+                          },
+                          "dispatch_reason": {
+                            "type": "string",
+                            "enum": [
+                              "ok",
+                              "self_event",
+                              "cross_tenant",
+                              "hop_budget_exceeded",
+                              "subscription_inactive"
+                            ]
+                          },
+                          "envelope": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "item-event"
+                                ]
+                              },
+                              "integration_name": {
+                                "type": "string"
+                              },
+                              "connection_id": {
+                                "type": "string"
+                              },
+                              "tenant_id": {
+                                "type": "string"
+                              },
+                              "event_type": {
+                                "type": "string"
+                              },
+                              "item_id": {
+                                "type": "string"
+                              },
+                              "cycle": {
+                                "type": "object",
+                                "properties": {
+                                  "originating_connection_id": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "hop_count": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "originating_connection_id",
+                                  "hop_count"
+                                ]
+                              },
+                              "payload": {
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "integration_name",
+                              "connection_id",
+                              "event_type",
+                              "item_id",
+                              "cycle"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "connection_id",
+                          "integration_name",
+                          "would_dispatch",
+                          "dispatch_reason"
+                        ]
+                      }
+                    },
+                    "hop_budget": {
+                      "type": "object",
+                      "properties": {
+                        "max": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "used": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "max",
+                        "used"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "envelopes",
+                    "hop_budget"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a workspace admin or platform admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`item_id` does not resolve in the caller's tenant scope, or the filtered `connection_id` does not exist.",
             "content": {
               "application/json": {
                 "schema": {

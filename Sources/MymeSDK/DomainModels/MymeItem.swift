@@ -100,10 +100,6 @@ extension MymeItem {
     /// The client-assigned idempotency key (UUIDv7).
     public var sourceId: String? { item.sourceId }
 
-    /// Producer of this item: human (`user`), agent (`ai`), background
-    /// process (`worker`), or server-generated (`system`).
-    public var origin: Origin { item.origin }
-
     /// The item's tier: `library` for curated content, `feed` for
     /// high-volume capture, or `nil` for `system.*` items that have no
     /// tier dimension.

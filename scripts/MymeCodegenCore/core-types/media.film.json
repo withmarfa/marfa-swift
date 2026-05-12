@@ -5,9 +5,18 @@
   "description": "A film. Inherits all core.media fields.",
   "version": 1,
   "fields": {
-    "duration": { "type": "number", "description": "Runtime in seconds" },
-    "director": { "type": "string", "description": "Primary director" },
-    "content_rating": { "type": "string", "description": "Age or content classification" }
+    "duration": {
+      "type": "number",
+      "description": "Runtime in seconds"
+    },
+    "director": {
+      "type": "string",
+      "description": "Primary director"
+    },
+    "content_rating": {
+      "type": "string",
+      "description": "Age or content classification"
+    }
   },
   "required": []
 }

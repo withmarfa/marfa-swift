@@ -6,7 +6,7 @@ import SwiftData
 // See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift` for
 // the full ruleset. Every predicate in this file compares against stored
 // String / Int / Double / Bool columns — never against computed Codable
-// enum properties (`state`, `origin`) and never reaches inside the JSON
+// enum properties (`state`) and never reaches inside the JSON
 // blobs (`propertiesData`, `tagsData`, `extensionsData`).
 
 /// Persistent local mirror of the Myme data model backed by SwiftData.
@@ -79,7 +79,6 @@ public actor LocalStore {
             device: input.device,
             edges: nil,
             id: id,
-            origin: input.origin ?? .user,
             properties: input.properties,
             schemaVersion: 1,
             source: input.source ?? "local",

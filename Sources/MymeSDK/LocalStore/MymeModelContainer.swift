@@ -51,6 +51,14 @@ public enum MymeModelContainer {
             // hit this path — V1 stores migrate cleanly. If the second
             // attempt fails too, surface the underlying error.
             //
+            // v7.0 also reaches this path for stores written by v6.x:
+            // dropping `MymeItemModel.originRaw` mutates V2's shape in
+            // place and produces a content hash that no migration stage
+            // can bridge inside a single binary. The destructive
+            // recovery is consistent with the pre-release "no legacy
+            // carry-over" principle — see
+            // ``MymeMigrationPlan`` for the rationale.
+            //
             // Trade-off: any future migration that fails (custom stage
             // gone wrong, corrupt store) will also nuke the
             // ``DroppedMutationModel`` rows added in 5.2.0. The dropped

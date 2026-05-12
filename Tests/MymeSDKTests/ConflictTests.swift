@@ -436,7 +436,6 @@ struct ConflictTests {
         Item(
             createdAt: "2026-04-19T12:00:00Z",
             id: id,
-            origin: .user,
             properties: properties,
             schemaVersion: 1,
             source: "test",

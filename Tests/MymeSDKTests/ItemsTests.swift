@@ -18,7 +18,6 @@ struct ItemsTests {
             item: Item(
                 createdAt: "2026-01-01T00:00:00Z",
                 id: "test-id",
-                origin: .user,
                 properties: ["title": .string("Test Note")],
                 schemaVersion: 1,
                 source: "sdk-test",
@@ -99,7 +98,6 @@ struct ItemsTests {
         response.item = Item(
             createdAt: "2026-01-01T00:00:00Z",
             id: "test-id",
-            origin: .user,
             properties: [:],
             schemaVersion: 1,
             source: "sdk-test",

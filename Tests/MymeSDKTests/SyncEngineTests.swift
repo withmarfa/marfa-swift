@@ -420,13 +420,13 @@ struct SyncEngineTests {
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let v1 = Item(
                 createdAt: now, id: "server-1",
-                origin: .user, properties: ["body": .string("v1")],
+                properties: ["body": .string("v1")],
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
             let v2 = Item(
                 createdAt: now, id: "server-1",
-                origin: .user, properties: ["body": .string("v2")],
+                properties: ["body": .string("v2")],
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: now, type: "core.note", updatedAt: now, version: 2
             )
@@ -636,7 +636,7 @@ struct SyncEngineTests {
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let item = Item(
                 createdAt: now, id: "server-rc",
-                origin: .user, properties: ["body": .string("hi")],
+                properties: ["body": .string("hi")],
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -849,7 +849,7 @@ struct SyncEngineTests {
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let echoed = Item(
                 createdAt: now, id: created.id,
-                origin: .user, properties: ["body": .string("v1")],
+                properties: ["body": .string("v1")],
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -881,14 +881,14 @@ struct SyncEngineTests {
             // unrelated siblings that must survive.
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let ghost = Item(
-                createdAt: now, id: "A", origin: .user,
+                createdAt: now, id: "A",
                 properties: ["body": .string("")], schemaVersion: 1, source: "test",
                 state: .active, tier: .feed, timestamp: now, type: "core.note",
                 updatedAt: now, version: 1
             )
             try await store.upsertItem(ghost)
             let survivor = Item(
-                createdAt: now, id: "Y", origin: .user,
+                createdAt: now, id: "Y",
                 properties: ["body": .string("kept")], schemaVersion: 1, source: "test",
                 state: .active, tier: .feed, timestamp: now, type: "core.note",
                 updatedAt: now, version: 1
@@ -925,7 +925,7 @@ struct SyncEngineTests {
             // PATCH /items/Y still needs a response — the sibling survives
             // and replays successfully.
             let updatedY = Item(
-                createdAt: now, id: "Y", origin: .user,
+                createdAt: now, id: "Y",
                 properties: ["body": .string("untouched")], schemaVersion: 1, source: "test",
                 state: .active, tier: .feed, timestamp: now, type: "core.note",
                 updatedAt: now, version: 2
@@ -1027,7 +1027,7 @@ struct SyncEngineTests {
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let itemId = "019ea000-0000-7000-8000-000000000042"
             let localItem = Item(
-                createdAt: now, id: itemId, origin: .user,
+                createdAt: now, id: itemId,
                 properties: ["body": .string("new note")], schemaVersion: 1, source: "sdk",
                 state: .trashed, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 2
             )
@@ -1048,7 +1048,7 @@ struct SyncEngineTests {
             // Cycle 2: createItem succeeds, then deleteItem succeeds.
             transport.enqueueEvents([])
             let serverCreated = Item(
-                createdAt: now, id: itemId, origin: .user,
+                createdAt: now, id: itemId,
                 properties: ["body": .string("new note")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -1101,7 +1101,7 @@ struct SyncEngineTests {
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let itemId = "019ea001-0000-7000-8000-000000000043"
             let localItem = Item(
-                createdAt: now, id: itemId, origin: .user,
+                createdAt: now, id: itemId,
                 properties: ["body": .string("draft")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 3
             )
@@ -1122,13 +1122,13 @@ struct SyncEngineTests {
             // Cycle 2: all three replay in order and succeed.
             transport.enqueueEvents([])
             let serverCreated = Item(
-                createdAt: now, id: itemId, origin: .user,
+                createdAt: now, id: itemId,
                 properties: ["body": .string("draft")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
             transport.enqueue(ItemResponse(item: serverCreated, metadata: nil))
             let serverUpdated = Item(
-                createdAt: now, id: itemId, origin: .user,
+                createdAt: now, id: itemId,
                 properties: ["body": .string("edited")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 2
             )
@@ -1193,7 +1193,7 @@ struct SyncEngineTests {
 
             // Item A: pending create (will fail transiently).
             let itemALocal = Item(
-                createdAt: now, id: itemA, origin: .user,
+                createdAt: now, id: itemA,
                 properties: ["body": .string("A")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -1203,7 +1203,7 @@ struct SyncEngineTests {
 
             // Item B: pre-existing update (must replay in cycle 1 despite A's failure).
             let itemBLocal = Item(
-                createdAt: now, id: itemB, origin: .user,
+                createdAt: now, id: itemB,
                 properties: ["body": .string("B")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -1214,7 +1214,7 @@ struct SyncEngineTests {
             transport.enqueueEvents([])
             transport.enqueueError(MymeError(code: "server_error", message: "transient", status: 500))
             let updatedB = Item(
-                createdAt: now, id: itemB, origin: .user,
+                createdAt: now, id: itemB,
                 properties: ["body": .string("B updated")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 2
             )
@@ -1223,7 +1223,7 @@ struct SyncEngineTests {
             // Cycle 2: createItem(A) succeeds; no more mutations.
             transport.enqueueEvents([])
             let serverA = Item(
-                createdAt: now, id: itemA, origin: .user,
+                createdAt: now, id: itemA,
                 properties: ["body": .string("A")], schemaVersion: 1, source: "sdk",
                 state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -1286,7 +1286,7 @@ struct SyncEngineTests {
             let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
             let serverItem = Item(
                 createdAt: now, id: "server-A",
-                origin: .user, properties: ["body": .string("v1")],
+                properties: ["body": .string("v1")],
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: now, type: "core.note", updatedAt: now, version: 1
             )
@@ -1294,7 +1294,7 @@ struct SyncEngineTests {
             // PATCH /items/server-A succeeds with the updated body.
             let updated = Item(
                 createdAt: now, id: "server-A",
-                origin: .user, properties: ["body": .string("v2")],
+                properties: ["body": .string("v2")],
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: now, type: "core.note", updatedAt: now, version: 2
             )

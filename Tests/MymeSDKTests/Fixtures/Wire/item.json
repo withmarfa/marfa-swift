@@ -21,7 +21,6 @@
     }
   },
   "id": "itm_01JABCXYZ",
-  "origin": "user",
   "properties": { "title": "Hello", "count": 3, "active": true },
   "schema_version": 1,
   "source": "mobile",

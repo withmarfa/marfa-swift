@@ -267,13 +267,30 @@ struct LocalStoreTests {
         let b = try await store.createItem(noteInput())
         let c = try await store.createItem(noteInput())
         _ = try await store.createEdge(source: a.id, target: b.id, edgeType: "about", properties: nil)
-        _ = try await store.createEdge(source: a.id, target: c.id, edgeType: "annotates", properties: nil)
+        _ = try await store.createEdge(source: a.id, target: c.id, edgeType: "references", properties: nil)
 
         let aboutEdges = try await store.fetchEdgesFromSource(
             sourceId: a.id, edgeType: "about", limit: nil
         )
         #expect(aboutEdges.data.count == 1)
         #expect(aboutEdges.data[0].edgeType == "about")
+    }
+
+    @Test("attached-to edge round-trips through createEdge + fetchEdgesFromSource")
+    func attachedToEdgeRoundTrips() async throws {
+        let store = try await makeStore()
+        let attachment = try await store.createItem(noteInput())
+        let host = try await store.createItem(noteInput())
+        let edge = try await store.createEdge(
+            source: attachment.id, target: host.id,
+            edgeType: "attached-to", properties: nil
+        )
+
+        let outbound = try await store.fetchEdgesFromSource(
+            sourceId: attachment.id, edgeType: "attached-to", limit: nil
+        )
+        #expect(outbound.data.map(\.id) == [edge.id])
+        #expect(outbound.data[0].targetId == host.id)
     }
 
     @Test("updateEdge replaces properties") func updateEdgeReplacesProperties() async throws {
@@ -449,7 +466,7 @@ struct LocalStoreTests {
         let src = try await store.createItem(noteInput())
         let target = try await store.createItem(noteInput())
         _ = try await store.createEdge(source: src.id, target: target.id, edgeType: "about", properties: nil)
-        _ = try await store.createEdge(source: src.id, target: target.id, edgeType: "annotates", properties: nil)
+        _ = try await store.createEdge(source: src.id, target: target.id, edgeType: "references", properties: nil)
 
         let aboutOnly = try await store.fetchEdgesToTargets(
             targetIds: [target.id], edgeType: "about", limit: nil

@@ -13,7 +13,6 @@ struct SystemDomainModelsTests {
         Item(
             createdAt: "2026-05-01T00:00:00Z",
             id: id,
-            origin: .system,
             properties: properties,
             schemaVersion: 1,
             source: "test",
