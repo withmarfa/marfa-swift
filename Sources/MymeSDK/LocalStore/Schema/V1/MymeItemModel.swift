@@ -2,9 +2,9 @@
 //
 // See `Sources/MymeSDK/LocalStore/Schema/PredicateConventions.swift` for the
 // full ruleset. Highlights enforced here:
-//  - Codable enums (`state`, `origin`) persist as `String` rawValue properties
-//    (`stateRaw`, `originRaw`). Predicates compare against the rawValue, never
-//    against an enum case.
+//  - Codable enums (`state`) persist as `String` rawValue properties
+//    (`stateRaw`). Predicates compare against the rawValue, never against an
+//    enum case.
 //  - `propertiesData` is opaque to the predicate engine — fetch then filter
 //    in Swift if you need to reach inside.
 //  - `metadata` is the cascade-owning side of the 1:1 relationship to
@@ -33,9 +33,6 @@ final class MymeItemModel {
 
     var source: String = ""
     var sourceId: String?
-
-    /// Stored as the `String` rawValue of `Origin`.
-    var originRaw: String = Origin.user.rawValue
 
     /// Stored as the `String` rawValue of `Tier`. Empty string means
     /// "no tier" — `system.*` items have no tier, mirroring the wire.
@@ -73,12 +70,6 @@ extension MymeItemModel {
     var state: ItemState {
         get { ItemState(rawValue: stateRaw) ?? .active }
         set { stateRaw = newValue.rawValue }
-    }
-
-    /// Typed accessor for `originRaw`. Falls back to `.user`.
-    var origin: Origin {
-        get { Origin(rawValue: originRaw) ?? .user }
-        set { originRaw = newValue.rawValue }
     }
 
     /// Typed accessor for `tierRaw`. Empty `tierRaw` (the default) maps

@@ -6,7 +6,7 @@
 import Foundation
 /// ``CoreHighlight`` — typed wrapper for `core.highlight` items.
 ///
-/// A user's engagement with content — the highlighted passage plus optional annotation. The canonical relationship (what was highlighted) is carried by an annotates edge; the moment of highlighting is the system timestamp.
+/// A user's engagement with content — the highlighted passage plus optional annotation. The canonical relationship (what was highlighted) is carried by a references edge; the moment of highlighting is the system timestamp.
 ///
 /// Display hints — title: `text`, body: `note`.
 public struct CoreHighlight: MymeItem {

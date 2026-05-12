@@ -297,7 +297,6 @@ public struct ItemsNamespace: Sendable {
                     timestamp: raw.timestamp,
                     source: raw.source,
                     sourceId: raw.sourceId,
-                    origin: raw.origin,
                     device: raw.device,
                     tier: raw.tier,
                     captureLatitude: nil,

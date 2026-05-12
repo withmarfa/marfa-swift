@@ -23,7 +23,7 @@ let swiftKeywords: Set<String> = [
 let sdkReservedStructNames: Set<String> = [
     "Item", "MymeItem", "JSONValue", "MymeClient", "ClientConfiguration",
     "CreateItemInput", "UpdateOptions", "ListFilters", "SearchFilters",
-    "Origin", "ItemState", "FieldDefinition", "TypeSchema", "EdgeSchema",
+    "ItemState", "FieldDefinition", "TypeSchema", "EdgeSchema",
     "MymeError", "Transport", "HTTPMethod", "SSEEvent",
     "ConflictResponse", "ConflictResult",
 ]

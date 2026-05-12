@@ -13,7 +13,6 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
     public let edges: [String: ItemEdgeGroup]?
     public let extensions: [String: [String: JSONValue]]?
     public let id: String
-    public let origin: Origin
     public let properties: [String: JSONValue]
     public let schemaVersion: Int
     public let source: String
@@ -34,7 +33,6 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         edges: [String: ItemEdgeGroup]? = nil,
         extensions: [String: [String: JSONValue]]? = nil,
         id: String,
-        origin: Origin,
         properties: [String: JSONValue],
         schemaVersion: Int,
         source: String,
@@ -54,7 +52,6 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         self.edges = edges
         self.extensions = extensions
         self.id = id
-        self.origin = origin
         self.properties = properties
         self.schemaVersion = schemaVersion
         self.source = source
@@ -76,7 +73,6 @@ public struct Item: Codable, Sendable, Hashable, Identifiable {
         case edges
         case extensions
         case id
-        case origin
         case properties
         case schemaVersion = "schema_version"
         case source

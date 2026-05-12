@@ -21,7 +21,6 @@ struct SearchTests {
                 item: Item(
                     createdAt: "2026-01-01T00:00:00Z",
                     id: "found-1",
-                    origin: .user,
                     properties: ["title": .string("Found")],
                     schemaVersion: 1,
                     source: "sdk-test",

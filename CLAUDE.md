@@ -138,7 +138,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 ### What stays hand-written
 
-- `Sources/MymeSDK/Types/Wire/Hand/` — composite wrappers (`ItemWithMetadataWith`, `ItemEdgeGroup`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, `IntegrationsListResponse`, `LeaseTokensListResponse`, `InboundWebhooksListResponse`, …), and closed enum types the OpenAPI spec carries as plain strings (`ItemState`, `Origin`, `Tier`, `ConnectionKind`, `ActivitySeverity`, `FieldDefinition`, `SearchResult`).
+- `Sources/MymeSDK/Types/Wire/Hand/` — composite wrappers (`ItemWithMetadataWith`, `ItemEdgeGroup`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, `IntegrationsListResponse`, `LeaseTokensListResponse`, `InboundWebhooksListResponse`, …), and closed enum types the OpenAPI spec carries as plain strings (`ItemState`, `Tier`, `ConnectionKind`, `ActivitySeverity`, `FieldDefinition`, `SearchResult`).
 - `Sources/MymeSDK/Conflict/ConflictStrategy.swift` — the strategy enum, `ConflictData`, `ConflictResolver`, `ConflictResult`. The wire shapes (`ConflictResponse`, `ConflictSnapshot`, `MergePolicy`, `MergePolicyStrategy`) are generated under `Types/Wire/Generated/` from the 409 response schema and the embedded `merge_policy` block.
 - `Sources/MymeSDK/Inputs/` — all SDK input shapes (`CreateItemInput`, `UpdateOptions`, `ListFilters`, `CreateKeyInput`, etc.).
 
@@ -148,7 +148,7 @@ CI runs `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Gen
 
 - `numericIntFields` — global list of JSON field names that are spec'd as `number` but represent whole integers in the SDK (`version`, `schema_version`, `attempt`, `status_code`, …). Widen this list when a new such field lands.
 - Per-type `fieldOverrides` — raw Swift type expressions substituted verbatim (used for map-with-enum-value cases like `type_permissions: [String: TypePermission]`).
-- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `Origin`, `TypePermission`, `ExtensionPermission`, `EdgePermission`, `MetadataPermission`) instead of emitting fresh sibling enums per occurrence.
+- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `TypePermission`, `ExtensionPermission`, `EdgePermission`, `MetadataPermission`) instead of emitting fresh sibling enums per occurrence.
 
 ### Troubleshooting
 
@@ -188,7 +188,7 @@ Hand-written at `Sources/MymeSDK/DomainModels/MymeItem.swift`. Provides:
 - `item: Item` — backing generic item
 - `init?(from item: Item)` — failable init
 - `toProperties() -> [String: JSONValue]` — build properties dict for create/update
-- Default accessors for `id`, `type`, `state`, `createdAt`, `updatedAt`, `timestamp`, `version`, `source`, `sourceId`, `origin`, `library`, `isActive`, `isTrashed`, `isArchived`
+- Default accessors for `id`, `type`, `state`, `createdAt`, `updatedAt`, `timestamp`, `version`, `source`, `sourceId`, `library`, `isActive`, `isTrashed`, `isArchived`
 
 ### Field conventions
 

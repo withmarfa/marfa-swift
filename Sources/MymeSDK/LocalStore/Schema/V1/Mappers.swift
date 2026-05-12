@@ -13,7 +13,6 @@ extension MymeItemModel {
             device: device,
             edges: nil,
             id: id,
-            origin: origin,
             properties: properties,
             schemaVersion: schemaVersion,
             source: source,
@@ -45,7 +44,6 @@ extension MymeItemModel {
         properties = item.properties
         source = item.source
         sourceId = item.sourceId
-        origin = item.origin
         tier = item.tier
         version = item.version
         schemaVersion = item.schemaVersion

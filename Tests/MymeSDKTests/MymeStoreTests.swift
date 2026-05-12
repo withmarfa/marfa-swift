@@ -263,7 +263,7 @@ struct MymeStoreTests {
         let b = try await client.items.create(noteInput(body: "B"))
         let c = try await client.items.create(noteInput(body: "C"))
         _ = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
-        _ = try await client.edges.create(source: a.id, target: c.id, edgeType: "annotates")
+        _ = try await client.edges.create(source: a.id, target: c.id, edgeType: "references")
 
         let aboutQuery = store.queryEdges(from: a.id, edgeType: "about")
         try await waitForCondition(timeout: .seconds(2)) { aboutQuery.edges.count >= 1 }

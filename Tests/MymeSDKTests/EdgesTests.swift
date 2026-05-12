@@ -161,7 +161,7 @@ struct EdgesTests {
         let (client, mock) = makeClient()
         mock.enqueue(PaginatedResult<Edge>(data: [sampleEdge()], cursor: nil, hasMore: false))
 
-        _ = try await client.items.edges(id: "item-1", edgeType: "annotates", limit: 10)
+        _ = try await client.items.edges(id: "item-1", edgeType: "references", limit: 10)
 
         #expect(mock.calls[0].path == "/item-1/edges".prepending("/items"))
         #expect(mock.calls[0].query?.contains(where: { $0.0 == "edge_type" }) == true)

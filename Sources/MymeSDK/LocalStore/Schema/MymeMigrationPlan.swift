@@ -8,6 +8,17 @@ import SwiftData
 /// - V2 (5.2.0): adds ``DroppedMutationModel``. Lightweight stage —
 ///   purely additive, no existing model changed.
 ///
+/// 7.0.0 dropped `originRaw` from ``MymeItemModel`` alongside the
+/// wire-side removal of `Item.origin`. That change keeps the V2
+/// versioned schema but mutates `MymeItemModel`'s shape in place —
+/// SwiftData computes a different content hash than v6.x stores wrote.
+/// No migration stage can bridge the two within a single binary
+/// (SwiftData hashes the current class shape, not the historical one),
+/// so v6.x → v7.0 takes the schema-mismatch recovery path in
+/// ``MymeModelContainer/make(path:cloudKitDatabase:)``: the old store
+/// is deleted and a fresh one is built. Pre-release pragmatism;
+/// matches the post-TSC42 baseline reset that preceded V1.
+///
 /// Adding V3 later: if existing models change shape, copy
 /// `Schema/V2/` (and any unchanged-from-V1 models referenced by V2)
 /// into `Schema/V3/` so the V3 namespace owns its own copies, mutate

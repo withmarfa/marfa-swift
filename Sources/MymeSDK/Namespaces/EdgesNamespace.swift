@@ -4,9 +4,9 @@ import Foundation
 ///
 /// An edge is `(source, target, edge_type, properties)` where `source`/`target`
 /// are item IDs and `edge_type` is one of the registered edge types — eight
-/// core types (`in-thread`, `parent-of`, `annotates`, `about`, `authored-by`,
-/// `pinned-to`, `derived-from`, `supersedes`) plus any custom types the
-/// tenant has registered via ``edgeTypes``.
+/// core types (`parent-of`, `in-thread`, `about`, `authored-by`,
+/// `derived-from`, `supersedes`, `attached-to`, `references`) plus any custom
+/// types the tenant has registered via ``edgeTypes``.
 public struct EdgesNamespace: Sendable {
 
     let transport: any Transport

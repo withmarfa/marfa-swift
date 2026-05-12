@@ -14,7 +14,6 @@ struct DomainModelTests {
         Item(
             createdAt: "2026-01-01T00:00:00Z",
             id: "test-id",
-            origin: .user,
             properties: properties,
             schemaVersion: 1,
             source: "sdk-test",
@@ -43,7 +42,6 @@ struct DomainModelTests {
         #expect(note.version == 3)
         #expect(note.source == "sdk-test")
         #expect(note.tier == .feed)
-        #expect(note.origin == .user)
     }
 
     // MARK: - CoreNote
@@ -110,7 +108,7 @@ struct DomainModelTests {
 
         private func makeItem(type: String = "core.note", properties: [String: JSONValue]) -> Item {
             Item(
-                createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user, properties: properties,
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: type,
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
@@ -158,7 +156,7 @@ struct DomainModelTests {
 
         private func makeItem(type: String = "core.task", properties: [String: JSONValue]) -> Item {
             Item(
-                createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user, properties: properties,
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: type,
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
@@ -200,7 +198,7 @@ struct DomainModelTests {
 
         private func makeItem(type: String = "core.bookmark", properties: [String: JSONValue]) -> Item {
             Item(
-                createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user, properties: properties,
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: type,
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
@@ -242,7 +240,7 @@ struct DomainModelTests {
 
         private func makeItem(properties: [String: JSONValue]) -> Item {
             Item(
-                createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user, properties: properties,
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: "core.media.article",
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
@@ -306,7 +304,7 @@ struct DomainModelTests {
 
         private func makeItem(properties: [String: JSONValue]) -> Item {
             Item(
-                createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user, properties: properties,
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: "core.file.image",
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
@@ -346,7 +344,7 @@ struct DomainModelTests {
 
         private func makeItem(properties: [String: JSONValue]) -> Item {
             Item(
-                createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user, properties: properties,
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: "core.entity.person",
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
@@ -399,14 +397,14 @@ struct DomainModelTests {
     @Test("init?(from:) returns nil when item type mismatches for all 21 types")
     func rejectsWrongTypeAcrossAllGeneratedTypes() {
         let impostorNote = Item(
-            createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user,
+            createdAt: "2026-01-01T00:00:00Z", id: "id",
             properties: ["body": .string("irrelevant"), "title": .string("t")],
             schemaVersion: 1, source: "test", state: .active, tier: .feed,
             timestamp: "2026-01-01T00:00:00Z", type: "core.note",
             updatedAt: "2026-01-01T00:00:00Z", version: 1
         )
         let impostorTask = Item(
-            createdAt: "2026-01-01T00:00:00Z", id: "id", origin: .user,
+            createdAt: "2026-01-01T00:00:00Z", id: "id",
             properties: ["title": .string("t")],
             schemaVersion: 1, source: "test", state: .active, tier: .feed,
             timestamp: "2026-01-01T00:00:00Z", type: "core.task",
@@ -446,7 +444,7 @@ struct DomainModelTests {
     /// drift before this.
     @Test("CoreNote JSON round-trips through Item encoder") func coreNoteRoundTripsThroughJSON() throws {
         let original = Item(
-            createdAt: "2026-01-01T00:00:00Z", id: "note-1", origin: .user,
+            createdAt: "2026-01-01T00:00:00Z", id: "note-1",
             properties: ["body": .string("Hello"), "title": .string("Greeting"), "language": .string("en")],
             schemaVersion: 1, source: "test", state: .active, tier: .feed,
             timestamp: "2026-01-01T00:00:00Z", type: "core.note",
@@ -457,7 +455,6 @@ struct DomainModelTests {
         // the exact path a caller takes when updating a note.
         let rebuilt = Item(
             createdAt: original.createdAt, id: original.id,
-            origin: original.origin,
             properties: wrapped.toProperties(),
             schemaVersion: original.schemaVersion, source: original.source,
             state: original.state, tier: original.tier, timestamp: original.timestamp,

@@ -14,7 +14,6 @@ public struct CreateItemInput: Codable, Sendable {
     public var timestamp: String?
     public var source: String?
     public var sourceId: String?
-    public var origin: Origin?
     public var device: String?
     public var tier: Tier?
     public var captureLatitude: Double?
@@ -30,7 +29,6 @@ public struct CreateItemInput: Codable, Sendable {
         timestamp: String? = nil,
         source: String? = nil,
         sourceId: String? = nil,
-        origin: Origin? = nil,
         device: String? = nil,
         tier: Tier? = nil,
         captureLatitude: Double? = nil,
@@ -45,7 +43,6 @@ public struct CreateItemInput: Codable, Sendable {
         self.timestamp = timestamp
         self.source = source
         self.sourceId = sourceId
-        self.origin = origin
         self.device = device
         self.tier = tier
         self.captureLatitude = captureLatitude
@@ -55,7 +52,7 @@ public struct CreateItemInput: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, properties, id, state, timestamp, source, origin, device, tier, tags, edges
+        case type, properties, id, state, timestamp, source, device, tier, tags, edges
         case sourceId = "source_id"
         case captureLatitude = "capture_latitude"
         case captureLongitude = "capture_longitude"
