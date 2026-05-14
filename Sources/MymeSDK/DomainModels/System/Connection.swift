@@ -72,7 +72,7 @@ public struct Connection: MymeItem {
     }
 
     /// Id of the `system.device` item when the integration runs on a
-    /// specific local device (e.g. a sync-agent host).
+    /// specific local device (e.g. a sync agent host).
     public var attachedDevice: String? { item.properties["attached_device"]?.stringValue }
 
     /// Operational health, distinct from the universal lifecycle ``state``.
