@@ -63,6 +63,18 @@ public final class MymeClient: Sendable {
     /// Integrations API: list, get, register Integration manifests.
     public let integrations: IntegrationsNamespace
 
+    /// Admin API (T-117, T-124): platform-admin-only operator surface.
+    /// `client.admin.tenants.{list, get, suspend, unsuspend, metrics, keys, quotas}`
+    /// plus `client.admin.accountDeletion.purgeNow()`.
+    public let admin: AdminNamespace
+
+    /// Auth API (T-116): post-sign-in account-lifecycle endpoints.
+    /// `client.auth.account.{requestDelete, cancel, confirmDelete}`. The
+    /// OAuth / Passkey / DeviceFlow sign-in surfaces live under
+    /// ``MymeAuth``, ``Passkey``, and ``DeviceFlow`` — this namespace is
+    /// for account management after a session exists.
+    public let auth: AuthNamespace
+
     /// The active sync engine, present only in synced mode (``MymeClient/synced(url:apiKey:storePath:)``).
     ///
     /// Call ``SyncEngine/start()`` to begin synchronisation and
@@ -102,7 +114,8 @@ public final class MymeClient: Sendable {
             transport: transport,
             defaultConflictStrategy: configuration.conflictStrategy,
             localStore: localStore,
-            mutationQueue: mutationQueue
+            mutationQueue: mutationQueue,
+            apiBaseURL: configuration.url
         )
         let edges = EdgesNamespace(
             transport: transport,
@@ -145,6 +158,8 @@ public final class MymeClient: Sendable {
             isLocalMode: isLocalMode
         )
         self.integrations = IntegrationsNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.admin = AdminNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.auth = AuthNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
     /// Creates a client with the given configuration.
