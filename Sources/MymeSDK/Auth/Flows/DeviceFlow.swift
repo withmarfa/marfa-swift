@@ -31,12 +31,21 @@ public enum DeviceFlow {
     /// carries the user-facing codes and an ``DeviceFlowHandle/awaitToken()``
     /// method that polls until the user completes verification (or the
     /// code expires).
+    ///
+    /// - Parameters:
+    ///   - httpClient: HTTP transport seam — defaults to
+    ///     `URLSession.shared`. Tests inject a fake; consumer apps
+    ///     normally leave the default.
+    ///   - clock: Time seam — defaults to ``SystemDeviceFlowClock``.
+    ///     Used for the device-code expiry timestamp on the returned
+    ///     handle and the between-poll sleep inside `awaitToken()`.
     public static func start(
         issuer: URL,
         clientId: String,
         scopes: [String],
         storage: any SecureStorage,
-        urlSession: URLSession = .shared
+        httpClient: any DeviceFlowHTTPClient = URLSession.shared,
+        clock: any DeviceFlowClock = SystemDeviceFlowClock()
     ) async throws -> DeviceFlowHandle {
         let normalized = DeviceFlow.normalizeIssuer(issuer)
         var request = URLRequest(url: normalized.appendingPathComponent("auth/device"))
@@ -49,7 +58,7 @@ public enum DeviceFlow {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, response) = try await httpClient.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw OAuthError(rawCode: "invalid_response", message: "no HTTP response", status: 500)
         }
@@ -65,10 +74,11 @@ public enum DeviceFlow {
             userCode: envelope.userCode,
             verificationURI: URL(string: envelope.verificationURI)!,
             verificationURIComplete: envelope.verificationURIComplete.flatMap(URL.init(string:)),
-            expiresAt: Date().addingTimeInterval(TimeInterval(envelope.expiresIn)),
+            expiresAt: clock.now().addingTimeInterval(TimeInterval(envelope.expiresIn)),
             interval: envelope.interval ?? 5,
             storage: storage,
-            urlSession: urlSession
+            httpClient: httpClient,
+            clock: clock
         )
     }
 
@@ -97,7 +107,7 @@ public enum DeviceFlow {
     }
 }
 
-/// Live handle returned by ``DeviceFlow/start(issuer:clientId:scopes:storage:urlSession:)``.
+/// Live handle returned by ``DeviceFlow/start(issuer:clientId:scopes:storage:httpClient:clock:)``.
 ///
 /// The user-visible codes (``userCode``, ``verificationURI``,
 /// ``verificationURIComplete``) are read-only. ``awaitToken()`` performs
@@ -105,17 +115,18 @@ public enum DeviceFlow {
 /// ``TokenProvider`` once the user completes verification.
 public actor DeviceFlowHandle {
 
-    public let issuer: URL
-    public let clientId: String
-    public let userCode: String
-    public let verificationURI: URL
-    public let verificationURIComplete: URL?
-    public let expiresAt: Date
+    public nonisolated let issuer: URL
+    public nonisolated let clientId: String
+    public nonisolated let userCode: String
+    public nonisolated let verificationURI: URL
+    public nonisolated let verificationURIComplete: URL?
+    public nonisolated let expiresAt: Date
 
     private let deviceCode: String
     private var interval: Int
     private let storage: any SecureStorage
-    private let urlSession: URLSession
+    private let httpClient: any DeviceFlowHTTPClient
+    private let clock: any DeviceFlowClock
 
     init(
         issuer: URL,
@@ -127,7 +138,8 @@ public actor DeviceFlowHandle {
         expiresAt: Date,
         interval: Int,
         storage: any SecureStorage,
-        urlSession: URLSession
+        httpClient: any DeviceFlowHTTPClient,
+        clock: any DeviceFlowClock
     ) {
         self.issuer = issuer
         self.clientId = clientId
@@ -138,7 +150,8 @@ public actor DeviceFlowHandle {
         self.expiresAt = expiresAt
         self.interval = interval
         self.storage = storage
-        self.urlSession = urlSession
+        self.httpClient = httpClient
+        self.clock = clock
     }
 
     /// Polls `/auth/device/token` per RFC 8628 §3.4 until the user
@@ -152,10 +165,10 @@ public actor DeviceFlowHandle {
     ///   protocol-level failures.
     public func awaitToken() async throws -> TokenProvider {
         while true {
-            if Date() >= expiresAt {
+            if clock.now() >= expiresAt {
                 throw DeviceFlowError(rawCode: "expired_token", message: "device code expired")
             }
-            try await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000_000)
+            try await clock.sleep(for: TimeInterval(interval))
 
             let result = try await poll()
             switch result {
@@ -170,8 +183,7 @@ public actor DeviceFlowHandle {
                     storage: storage,
                     storageKey: storageKey,
                     tokenEndpoint: issuer.appendingPathComponent("auth/token"),
-                    clientId: clientId,
-                    urlSession: urlSession
+                    clientId: clientId
                 )
                 try await provider.store(token)
                 return provider
@@ -197,7 +209,7 @@ public actor DeviceFlowHandle {
         ]
         request.httpBody = formURLEncode(body).data(using: .utf8)
 
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, response) = try await httpClient.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw OAuthError(rawCode: "invalid_response", message: "no HTTP response", status: 500)
         }
