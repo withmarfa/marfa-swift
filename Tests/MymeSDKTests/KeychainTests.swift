@@ -65,7 +65,7 @@ struct InMemoryKeychainTests {
 
         let client = try await MymeClient.fromSecureStorage(
             account: "staging",
-            url: URL(string: "http://100.127.105.110:8601")!,
+            url: URL(string: "http://example.test")!,
             storage: storage
         )
         #expect(client.configuration.apiKey == "api-key-XYZ")
