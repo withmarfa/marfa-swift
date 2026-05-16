@@ -63,18 +63,3 @@ struct TestSupportHelpersTests {
         }
     }
 }
-
-@MainActor
-private func waitForCondition(
-    timeout: Duration,
-    condition: () -> Bool
-) async throws {
-    let deadline = ContinuousClock().now + timeout
-    while !condition() {
-        guard ContinuousClock().now < deadline else {
-            throw CancellationError()
-        }
-        await Task.yield()
-        try await Task.sleep(for: .milliseconds(10))
-    }
-}
