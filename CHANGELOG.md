@@ -5,6 +5,41 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] — 2026-05-17
+
+Combined major bump. Tags T-148 (`waitForCondition` promotion + SyncEngineTests split) and T-149 (DeviceFlow testability seams) which shipped to `main` after `v7.0.0` but were never released to consumers — T-149's DeviceFlow parameter rename drives the major. Also lands the post-T-131 carry-across: refreshed OpenAPI snapshot (61 → 68 paths), two new top-level namespaces (`client.admin`, `client.auth`), `source_id` on item updates, and the `createWithAttachments` helper.
+
+### Added
+
+- **`client.admin`** (T-117, T-124) — platform-admin-only operator surface backing the `my admin` CLI command tree. Throws `LocalModeUnsupportedError` in pure-local mode; non-platform credentials get a `403 forbidden`.
+  - `client.admin.tenants.list()` — every tenant + status.
+  - `client.admin.tenants.get(id:)` — single tenant + per-tenant quota overrides + recent activity.
+  - `client.admin.tenants.suspend(id:)` / `unsuspend(id:)` — flip tenant `status`. Idempotent.
+  - `client.admin.tenants.metrics(id:)` — item / blob counts + recent activity.
+  - `client.admin.tenants.keys(id:)` — active key listing for a tenant.
+  - `client.admin.tenants.quotas.get(id:)` / `set(id:_:)` — per-tenant quota read/write.
+  - `client.admin.accountDeletion.purgeNow()` — force a one-shot run of the pending-delete purger.
+- **`client.auth.account`** (T-116) — post-sign-in account-lifecycle endpoints. Distinct from `MymeAuth` / `Passkey` / `DeviceFlow` which run the sign-in ceremony.
+  - `client.auth.account.requestDelete()` — initiate deletion (mints token + dispatches confirmation email).
+  - `client.auth.account.confirmDelete(token:)` — programmatic equivalent of the confirmation-email link.
+  - `client.auth.account.cancel()` — cancel an in-flight deletion.
+- **`client.items.createWithAttachments(_:)`** (T-100) — atomic host + attachment(s) write. Uploads every attachment's blob concurrently, then issues one `items.bulk` call with `mode: .createOnly` and `atomic: true`, and hydrates the host + attachments via per-id reads. Auto-edges from each attachment back to the host (default `attached-to`; configurable via `edgeType`). Caller-supplied edges merge additively. Throws annotated `MymeError`s on per-step failure.
+- **`source_id` on item updates** (T-131, server v5.5.0) — `UpdateOptions.sourceId` and the underlying `UpdateItemBody.source_id` field. Renames the natural key under the item's `source`; server enforces `(source, source_id)` uniqueness with a fresh `source_id_conflict` 409 code (separate from the existing version-conflict path). Travels through the mutation queue + replay for synced-mode callers.
+- **SSE decode-failure logging.** Malformed SSE events now log on the `sync` category (`sync.sse.decode_failed event=... type=... reason=...`) rather than silently dropping via `try?`. Closes the "stream open, no events applied" invisible-failure mode.
+- **Structured `lastError` on dropped mutations.** `SyncEngine` formats the failing `MymeError` into `code=... status=... message=... details={...}` rather than calling `error.localizedDescription`, preserving the structured code / status / details for downstream surfaces.
+
+### Changed
+
+- **OpenAPI snapshot refreshed** to the post-T-131 monorepo spec. Only the three already-generated `ConflictResponse` / `ConflictSnapshot` / `MergePolicy` headers change (`anyOf/0` pointer redirect); all 28 wire types and 22 domain models regenerate byte-identical.
+
+### Breaking
+
+- **DeviceFlow parameter rename** (T-149) — `DeviceFlow.start(...)` and `DeviceFlowHandle` carry the testability seams (`DeviceFlowHTTPClient`, `DeviceFlowClock`) that shipped on main after v7.0.0. Callers depending on the older signature need to update; default-arg overloads cover the common case.
+
+### Internal
+
+- **T-148 / T-149 already shipped to `main`** and are tagged here so consumer-app builds can pick them up.
+
 ## [5.2.0] — 2026-04-27
 
 Dropped-mutation recovery release. Second half of the

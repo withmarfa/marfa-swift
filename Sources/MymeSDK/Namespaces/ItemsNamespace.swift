@@ -7,6 +7,28 @@ public struct ItemsNamespace: Sendable {
     let defaultConflictStrategy: ConflictStrategy
     let localStore: LocalStore?
     let mutationQueue: MutationQueue?
+    /// Base API URL — used by ``createWithAttachments(_:)`` to construct
+    /// a sibling ``BlobsNamespace`` for the upload step. Optional because
+    /// pure-local clients still build an `ItemsNamespace` and have no
+    /// server URL.
+    let apiBaseURL: URL?
+
+    /// Designated init. `apiBaseURL` is optional with a `nil` default so
+    /// existing call sites (tests, pure-local factories) don't need to
+    /// be retrofitted — only ``createWithAttachments(_:)`` needs it.
+    init(
+        transport: any Transport,
+        defaultConflictStrategy: ConflictStrategy,
+        localStore: LocalStore? = nil,
+        mutationQueue: MutationQueue? = nil,
+        apiBaseURL: URL? = nil
+    ) {
+        self.transport = transport
+        self.defaultConflictStrategy = defaultConflictStrategy
+        self.localStore = localStore
+        self.mutationQueue = mutationQueue
+        self.apiBaseURL = apiBaseURL
+    }
 
     /// Creates a new item.
     ///
@@ -103,7 +125,8 @@ public struct ItemsNamespace: Sendable {
                 properties: properties,
                 version: options?.version,
                 conflict: options?.conflict ?? defaultConflictStrategy,
-                tier: options?.tier
+                tier: options?.tier,
+                sourceId: options?.sourceId
             )
             return item
         }
@@ -121,7 +144,8 @@ public struct ItemsNamespace: Sendable {
             version: resolvedVersion,
             strategy: strategy,
             resolver: options?.resolve,
-            tier: options?.tier
+            tier: options?.tier,
+            sourceId: options?.sourceId
         )
     }
 

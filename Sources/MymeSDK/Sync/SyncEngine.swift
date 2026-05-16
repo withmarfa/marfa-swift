@@ -596,39 +596,39 @@ public actor SyncEngine {
 
         switch eventType {
         case "item.created":
-            if let payload = try? decoder.decode(ItemEventPayload.self, from: data) {
+            if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 try? await localStore.upsertItem(payload.item)
                 emit(.itemCreated(id: payload.item.id))
             }
 
         case "item.updated", "item.restored", "item.state_changed":
-            if let payload = try? decoder.decode(ItemEventPayload.self, from: data) {
+            if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 try? await localStore.upsertItem(payload.item)
                 emit(.itemUpdated(id: payload.item.id))
             }
 
         case "item.deleted":
             // Server sends the deleted item with state = trashed/purged.
-            if let payload = try? decoder.decode(ItemEventPayload.self, from: data) {
+            if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 try? await localStore.upsertItem(payload.item)
                 emit(.itemDeleted(id: payload.item.id))
             }
 
         case "edge.created":
-            if let payload = try? decoder.decode(EdgeEventPayload.self, from: data) {
+            if let payload = decodeOrLog(EdgeEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 try? await localStore.upsertEdge(payload.edge)
                 emit(.edgeCreated(id: payload.edge.id))
             }
 
         case "edge.deleted":
             // Edge deletes carry just the edge ID in the data envelope.
-            if let payload = try? decoder.decode(EdgeEventPayload.self, from: data) {
+            if let payload = decodeOrLog(EdgeEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 try? await localStore.deleteEdge(id: payload.edge.id)
                 emit(.edgeDeleted(id: payload.edge.id))
             }
 
         case "metadata.changed":
-            if let payload = try? decoder.decode(MetadataEventPayload.self, from: data) {
+            if let payload = decodeOrLog(MetadataEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 let input = MetadataInput(tags: payload.metadata.tags)
                 _ = try? await localStore.setMetadata(itemId: payload.itemId, input: input)
                 emit(.itemUpdated(id: payload.itemId))
@@ -662,6 +662,52 @@ public actor SyncEngine {
 
         default:
             break
+        }
+    }
+
+    /// Serialize a thrown error into a structured-but-string-shaped
+    /// representation for `PendingMutationRecord.lastError`. Preserves
+    /// `MymeError.code` / `status` / `details` so a downstream
+    /// inspection (CLI surface, `PendingMutationsQuery` in the app) can
+    /// recover the underlying cause without falling back to `localizedDescription`,
+    /// which strips structure. Non-`MymeError` falls through to
+    /// `String(describing:)`.
+    private func formatLastError(_ error: Error) -> String {
+        if let mymeError = error as? MymeError {
+            var parts: [String] = [
+                "code=\(mymeError.code)",
+                "status=\(mymeError.status)",
+                "message=\(mymeError.message)"
+            ]
+            if let details = mymeError.details, !details.isEmpty {
+                let encoder = JSONEncoder()
+                if let data = try? encoder.encode(details),
+                   let json = String(data: data, encoding: .utf8) {
+                    parts.append("details=\(json)")
+                }
+            }
+            return parts.joined(separator: " ")
+        }
+        return String(describing: error)
+    }
+
+    /// Decode an SSE event payload, logging on failure rather than
+    /// silently dropping. Returns `nil` on decode error after emitting a
+    /// structured log line on the `sse` category so malformed events
+    /// surface as observable signal instead of blocking sync invisibly.
+    private func decodeOrLog<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        eventType: String,
+        decoder: JSONDecoder
+    ) -> T? {
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            logger.log.error(
+                "sync.sse.decode_failed event=\(eventType, privacy: .public) type=\(String(describing: T.self), privacy: .public) reason=\(String(describing: error), privacy: .private)"
+            )
+            return nil
         }
     }
 
@@ -795,7 +841,7 @@ public actor SyncEngine {
                 }
             } catch {
                 transientError = error
-                try? await mutationQueue.recordFailure(id: record.id, error: error.localizedDescription)
+                try? await mutationQueue.recordFailure(id: record.id, error: formatLastError(error))
                 logger.log.info(
                     "sync.mutation.failed kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
                 )
@@ -882,20 +928,22 @@ public actor SyncEngine {
                     version: v,
                     strategy: strategy,
                     resolver: nil,
-                    tier: p.tier
+                    tier: p.tier,
+                    sourceId: p.sourceId
                 )
                 if let summary = result.mergeSummary {
                     emit(.conflictAutoMerged(payload: summary))
                 }
                 emit(.itemUpdated(id: p.id))
             } else {
-                // No version → fast-merge path on the server. Tier still
-                // travels if the call site set it.
+                // No version → fast-merge path on the server. Tier and
+                // source-id still travel if the call site set them.
                 let body = UpdateItemBody(
                     properties: p.properties,
                     version: nil,
                     snapshot: nil,
-                    tier: p.tier
+                    tier: p.tier,
+                    sourceId: p.sourceId
                 )
                 let _: ItemResponse = try await transport.request(
                     method: .patch, path: "/items/\(p.id)", body: body, query: nil

@@ -121,7 +121,7 @@
     },
     {
       "name": "MergePolicy",
-      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/properties/merge_policy",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/0/properties/merge_policy",
       "conformances": ["Codable", "Sendable", "Hashable"],
       "enumOverrides": {
         "default": "MergePolicyStrategy",
@@ -130,12 +130,12 @@
     },
     {
       "name": "ConflictSnapshot",
-      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/properties/current",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/0/properties/current",
       "conformances": ["Codable", "Sendable", "Hashable"]
     },
     {
       "name": "ConflictResponse",
-      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/0",
       "conformances": ["Codable", "Sendable"],
       "fieldOverrides": {
         "current": "ConflictSnapshot",

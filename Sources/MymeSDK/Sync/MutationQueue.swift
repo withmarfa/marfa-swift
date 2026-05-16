@@ -173,6 +173,10 @@ struct UpdateItemPayload: Codable, Sendable {
     var version: Int?
     var conflict: ConflictStrategy?
     var tier: Tier?
+    /// Rename the natural key under this item's `source`. Travels through
+    /// replay; the server still enforces `(source, source_id)` uniqueness
+    /// at replay time. Added v5.5.0 (T-131).
+    var sourceId: String?
 }
 
 /// Payload for mutations that just need an item/edge ID.
@@ -367,7 +371,8 @@ public actor MutationQueue {
         properties: [String: JSONValue],
         version: Int? = nil,
         conflict: ConflictStrategy? = nil,
-        tier: Tier? = nil
+        tier: Tier? = nil,
+        sourceId: String? = nil
     ) throws {
         try enqueue(
             kind: .updateItem,
@@ -376,7 +381,8 @@ public actor MutationQueue {
                 properties: properties,
                 version: version,
                 conflict: conflict,
-                tier: tier
+                tier: tier,
+                sourceId: sourceId
             ),
             localId: id
         )
@@ -918,7 +924,8 @@ public actor MutationQueue {
                     properties: p.properties,
                     version: p.version,
                     conflict: p.conflict,
-                    tier: p.tier
+                    tier: p.tier,
+                    sourceId: p.sourceId
                 )
             }
             encoded = try encoder.encode(p)
