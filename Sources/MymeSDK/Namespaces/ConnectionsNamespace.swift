@@ -132,6 +132,26 @@ public struct ConnectionsNamespace: Sendable {
             query: nil
         )
     }
+
+    /// Renders the wire envelopes the reactive-run bridge would POST to
+    /// Cloudflare Queues for a synthetic item event, without dispatching
+    /// anything. Operator debugging surface for reproducing reactive
+    /// scenarios and inspecting `dispatch_reason` skips
+    /// (`self_event`, `cross_tenant`, `hop_budget_exceeded`,
+    /// `subscription_inactive`).
+    ///
+    /// Defaults to every subscriber in the caller's tenant; pass
+    /// ``PreviewEventRequest/connectionId`` to filter to one.
+    /// Workspace-admin only.
+    public func previewEvent(_ input: PreviewEventRequest) async throws -> PreviewEventResult {
+        try ensureRemote("connections.previewEvent")
+        return try await transport.request(
+            method: .post,
+            path: "/connections/preview-event",
+            body: input,
+            query: nil
+        )
+    }
 }
 
 /// Lease token sub-namespace under ``ConnectionsNamespace``. Manages

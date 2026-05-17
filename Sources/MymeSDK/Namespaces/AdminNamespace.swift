@@ -21,9 +21,12 @@ public struct AdminNamespace: Sendable {
         }
     }
 
-    /// Per-tenant operator surface — listings, status flips, metrics, key
-    /// listings, and quota read/write. Mirrors the `/admin/tenants/...`
-    /// route family.
+    /// Per-tenant operator surface — listings, status flips, metrics,
+    /// and key listings. Mirrors the `/admin/tenants/...` route family.
+    /// Tenant quota read/write lives on ``MymeClient/tenants`` (the
+    /// `client.tenants.quotas.*` surface) rather than here; that endpoint
+    /// is already platform-admin-gated and exposing it twice would
+    /// duplicate the operator surface.
     public var tenants: AdminTenantsNamespace {
         AdminTenantsNamespace(transport: transport, isLocalMode: isLocalMode)
     }
@@ -124,55 +127,6 @@ public struct AdminTenantsNamespace: Sendable {
         return response.data
     }
 
-    /// Per-tenant quota read/write for platform admins. Routes through
-    /// `/tenants/{id}/quotas` (the platform-admin-gated endpoint) rather
-    /// than `/tenants/me/quotas` (which is workspace-admin-gated and
-    /// scoped to the caller's own tenant).
-    public var quotas: AdminTenantQuotasNamespace {
-        AdminTenantQuotasNamespace(transport: transport, isLocalMode: isLocalMode)
-    }
-}
-
-// MARK: - Tenant quotas
-
-/// Per-tenant quota ceilings. `nil` fields fall back to env defaults
-/// (`MYME_DEFAULT_QUOTA_*`).
-public struct AdminTenantQuotasNamespace: Sendable {
-
-    let transport: any Transport
-    let isLocalMode: Bool
-
-    private func ensureRemote(_ operation: String) throws {
-        if isLocalMode {
-            throw LocalModeUnsupportedError(operation: operation)
-        }
-    }
-
-    /// Read the quota row for a tenant. `nil` fields mean the env default
-    /// applies. Platform-admin only.
-    public func get(id: String) async throws -> TenantQuota {
-        try ensureRemote("admin.tenants.quotas.get")
-        return try await transport.request(
-            method: .get,
-            path: "/tenants/\(id)/quotas",
-            body: nil,
-            query: nil
-        )
-    }
-
-    /// Set per-tenant quota overrides. Each field is independent —
-    /// supplied non-`nil` values override the env default; supplied `nil`
-    /// resets to the env default for that field (server-side semantics).
-    /// Platform-admin only.
-    public func set(id: String, _ input: TenantQuotaInput) async throws -> TenantQuota {
-        try ensureRemote("admin.tenants.quotas.set")
-        return try await transport.request(
-            method: .put,
-            path: "/tenants/\(id)/quotas",
-            body: input,
-            query: nil
-        )
-    }
 }
 
 // MARK: - Account deletion
@@ -374,81 +328,6 @@ public struct TenantApiKeySummary: Codable, Sendable, Hashable, Identifiable {
         case isPlatform = "is_platform"
         case createdAt = "created_at"
         case lastUsedAt = "last_used_at"
-    }
-}
-
-/// Per-tenant quota row — `nil` fields fall back to env defaults
-/// (`MYME_DEFAULT_QUOTA_*`). `updatedAt` is non-`nil` only when an
-/// override row exists.
-public struct TenantQuota: Codable, Sendable, Hashable {
-    public let tenantId: String
-    public let itemsLimit: Int?
-    public let webhooksLimit: Int?
-    public let blobsLimit: Int?
-    public let storageBytesLimit: Int?
-    public let ratePerMinuteLimit: Int?
-    public let updatedAt: String?
-
-    public init(
-        tenantId: String,
-        itemsLimit: Int?,
-        webhooksLimit: Int?,
-        blobsLimit: Int?,
-        storageBytesLimit: Int?,
-        ratePerMinuteLimit: Int?,
-        updatedAt: String?
-    ) {
-        self.tenantId = tenantId
-        self.itemsLimit = itemsLimit
-        self.webhooksLimit = webhooksLimit
-        self.blobsLimit = blobsLimit
-        self.storageBytesLimit = storageBytesLimit
-        self.ratePerMinuteLimit = ratePerMinuteLimit
-        self.updatedAt = updatedAt
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case tenantId = "tenant_id"
-        case itemsLimit = "items_limit"
-        case webhooksLimit = "webhooks_limit"
-        case blobsLimit = "blobs_limit"
-        case storageBytesLimit = "storage_bytes_limit"
-        case ratePerMinuteLimit = "rate_per_minute_limit"
-        case updatedAt = "updated_at"
-    }
-}
-
-/// Body for `PUT /tenants/{id}/quotas`. Each field is independent: a
-/// supplied non-`nil` value overrides the env default; an explicit `nil`
-/// resets that field to the env default. Use ``omit`` (literal absence)
-/// to leave a field untouched.
-public struct TenantQuotaInput: Codable, Sendable {
-    public var itemsLimit: Int?
-    public var webhooksLimit: Int?
-    public var blobsLimit: Int?
-    public var storageBytesLimit: Int?
-    public var ratePerMinuteLimit: Int?
-
-    public init(
-        itemsLimit: Int? = nil,
-        webhooksLimit: Int? = nil,
-        blobsLimit: Int? = nil,
-        storageBytesLimit: Int? = nil,
-        ratePerMinuteLimit: Int? = nil
-    ) {
-        self.itemsLimit = itemsLimit
-        self.webhooksLimit = webhooksLimit
-        self.blobsLimit = blobsLimit
-        self.storageBytesLimit = storageBytesLimit
-        self.ratePerMinuteLimit = ratePerMinuteLimit
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case itemsLimit = "items_limit"
-        case webhooksLimit = "webhooks_limit"
-        case blobsLimit = "blobs_limit"
-        case storageBytesLimit = "storage_bytes_limit"
-        case ratePerMinuteLimit = "rate_per_minute_limit"
     }
 }
 
