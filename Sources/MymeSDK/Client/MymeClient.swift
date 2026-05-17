@@ -63,9 +63,16 @@ public final class MymeClient: Sendable {
     /// Integrations API: list, get, register Integration manifests.
     public let integrations: IntegrationsNamespace
 
+    /// Tenants API: tenant-scoped configuration plus quota read/write.
+    /// `client.tenants.{getConfig, setConfig}` are workspace-admin-gated;
+    /// `client.tenants.quotas.{getOwn, getById, set}` mixes workspace
+    /// and platform admin per method. The server enforces the role split.
+    public let tenants: TenantsNamespace
+
     /// Admin API (T-117, T-124): platform-admin-only operator surface.
-    /// `client.admin.tenants.{list, get, suspend, unsuspend, metrics, keys, quotas}`
-    /// plus `client.admin.accountDeletion.purgeNow()`.
+    /// `client.admin.tenants.{list, get, suspend, unsuspend, metrics, keys}`
+    /// plus `client.admin.accountDeletion.purgeNow()`. Tenant quota
+    /// read/write lives on ``tenants`` (`client.tenants.quotas.*`).
     public let admin: AdminNamespace
 
     /// Auth API (T-116): post-sign-in account-lifecycle endpoints.
@@ -158,6 +165,7 @@ public final class MymeClient: Sendable {
             isLocalMode: isLocalMode
         )
         self.integrations = IntegrationsNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.tenants = TenantsNamespace(transport: transport, isLocalMode: isLocalMode)
         self.admin = AdminNamespace(transport: transport, isLocalMode: isLocalMode)
         self.auth = AuthNamespace(transport: transport, isLocalMode: isLocalMode)
     }

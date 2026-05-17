@@ -47,4 +47,26 @@ struct LocalModeNamespaceGuardTests {
             #expect(e.status == 501)
         }
     }
+
+    @Test("tenants.getConfig throws LocalModeUnsupportedError on local client") func tenantsGetConfigThrowsOnLocalClient() async throws {
+        let client = try await MymeSDKTest.makeInMemoryClient()
+        do {
+            _ = try await client.tenants.getConfig()
+            Issue.record("expected LocalModeUnsupportedError")
+        } catch let e as LocalModeUnsupportedError {
+            #expect(e.operation == "tenants.getConfig")
+            #expect(e.status == 501)
+        }
+    }
+
+    @Test("tenants.quotas.getOwn throws LocalModeUnsupportedError on local client") func tenantsQuotasGetOwnThrowsOnLocalClient() async throws {
+        let client = try await MymeSDKTest.makeInMemoryClient()
+        do {
+            _ = try await client.tenants.quotas.getOwn()
+            Issue.record("expected LocalModeUnsupportedError")
+        } catch let e as LocalModeUnsupportedError {
+            #expect(e.operation == "tenants.quotas.getOwn")
+            #expect(e.status == 501)
+        }
+    }
 }

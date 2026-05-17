@@ -120,7 +120,88 @@ struct ConnectionsNamespaceTests {
         #expect(mock.calls[0].path == "/connections/conn-1/inbound-webhooks/wh-1/deliveries/evt-1/retry")
     }
 
-    @Test("Pure-local rejects install + lifecycle operations")
+    @Test("previewEvent sends POST /connections/preview-event with input body")
+    func previewEvent() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(PreviewEventResult(
+            envelopes: [
+                PreviewEventEnvelope(
+                    connectionId: "conn-1",
+                    integrationName: "demo.publisher",
+                    wouldDispatch: true,
+                    dispatchReason: .ok,
+                    envelope: PreviewEventQueueBody(
+                        kind: "item-event",
+                        integrationName: "demo.publisher",
+                        connectionId: "conn-1",
+                        tenantId: "tenant-1",
+                        eventType: "created",
+                        itemId: "item-1",
+                        cycle: PreviewEventQueueCycle(
+                            originatingConnectionId: nil,
+                            hopCount: 0
+                        ),
+                        payload: .dictionary(["title": .string("hi")])
+                    )
+                ),
+                PreviewEventEnvelope(
+                    connectionId: "conn-2",
+                    integrationName: "demo.silent",
+                    wouldDispatch: false,
+                    dispatchReason: .selfEvent,
+                    envelope: nil
+                )
+            ],
+            hopBudget: PreviewEventHopBudget(max: 3, used: 0)
+        ))
+
+        let result = try await client.connections.previewEvent(
+            PreviewEventRequest(itemId: "item-1", eventType: .created)
+        )
+
+        #expect(result.envelopes.count == 2)
+        #expect(result.envelopes[0].wouldDispatch)
+        #expect(result.envelopes[0].dispatchReason == .ok)
+        #expect(result.envelopes[0].envelope?.itemId == "item-1")
+        #expect(result.envelopes[1].dispatchReason == .selfEvent)
+        #expect(result.envelopes[1].envelope == nil)
+        #expect(result.hopBudget.max == 3)
+        #expect(mock.calls[0].method == .post)
+        #expect(mock.calls[0].path == "/connections/preview-event")
+        #expect(mock.calls[0].body != nil)
+    }
+
+    @Test("previewEvent encodes event_type and cycle in snake_case")
+    func previewEventEncoding() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(PreviewEventResult(
+            envelopes: [],
+            hopBudget: PreviewEventHopBudget(max: 3, used: 1)
+        ))
+
+        _ = try await client.connections.previewEvent(
+            PreviewEventRequest(
+                itemId: "item-1",
+                eventType: .stateChanged,
+                connectionId: "conn-target",
+                cycle: PreviewEventCycle(
+                    originatingConnectionId: "conn-orig",
+                    hopCount: 2
+                )
+            )
+        )
+
+        let body = mock.calls[0].body!
+        let json = try JSONSerialization.jsonObject(with: body) as! [String: Any]
+        #expect(json["item_id"] as? String == "item-1")
+        #expect(json["event_type"] as? String == "state_changed")
+        #expect(json["connection_id"] as? String == "conn-target")
+        let cycle = json["cycle"] as! [String: Any]
+        #expect(cycle["originating_connection_id"] as? String == "conn-orig")
+        #expect(cycle["hop_count"] as? Int == 2)
+    }
+
+    @Test("Pure-local rejects install + lifecycle operations + previewEvent")
     func localModeRejects() async throws {
         let client = try await MymeClient.local(path: ":memory:")
 
@@ -136,6 +217,11 @@ struct ConnectionsNamespaceTests {
                 capabilityId: "cap-1",
                 scopes: nil,
                 ttlSeconds: nil
+            )
+        }
+        await #expect(throws: LocalModeUnsupportedError.self) {
+            _ = try await client.connections.previewEvent(
+                PreviewEventRequest(itemId: "item-1", eventType: .created)
             )
         }
     }
