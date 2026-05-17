@@ -166,10 +166,15 @@ public final class MymeAuth {
         }
     }
 
-    // MARK: - Private
+    // MARK: - Internals
 
-    private var tokenEndpoint: URL { issuer.appendingPathComponent("auth/token") }
-    private var revokeEndpoint: URL { issuer.appendingPathComponent("auth/revoke") }
+    // The seams below are `internal` rather than `private` so the test
+    // module can exercise them via `@testable import MymeSDK` without
+    // standing up the full `ASWebAuthenticationSession` flow. They are
+    // not part of the public surface.
+
+    internal var tokenEndpoint: URL { issuer.appendingPathComponent("auth/token") }
+    internal var revokeEndpoint: URL { issuer.appendingPathComponent("auth/revoke") }
 
     private static func normalizeIssuer(_ url: URL) -> URL {
         var s = url.absoluteString
@@ -185,7 +190,7 @@ public final class MymeAuth {
         try await storage.set(json, for: pendingKey)
     }
 
-    private func buildAuthorizeURL(challenge: String, state: String) throws -> URL {
+    internal func buildAuthorizeURL(challenge: String, state: String) throws -> URL {
         var components = URLComponents(
             url: issuer.appendingPathComponent("auth/authorize"),
             resolvingAgainstBaseURL: false
@@ -255,7 +260,7 @@ public final class MymeAuth {
         }
     }
 
-    private func parseCallback(_ url: URL) throws -> (code: String, state: String) {
+    internal func parseCallback(_ url: URL) throws -> (code: String, state: String) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw OAuthError(rawCode: "invalid_callback", message: "could not parse callback URL", status: 400)
         }
@@ -273,7 +278,7 @@ public final class MymeAuth {
         return (code, state)
     }
 
-    private func exchangeCode(code: String, verifier: String) async throws -> Token {
+    internal func exchangeCode(code: String, verifier: String) async throws -> Token {
         var request = URLRequest(url: tokenEndpoint)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -299,7 +304,7 @@ public final class MymeAuth {
         return try decoder.decode(Token.self, from: data)
     }
 
-    private func revoke(token: String) async throws {
+    internal func revoke(token: String) async throws {
         var request = URLRequest(url: revokeEndpoint)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
