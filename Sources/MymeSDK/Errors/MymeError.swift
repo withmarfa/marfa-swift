@@ -116,6 +116,24 @@ public final class ConflictError: MymeError, @unchecked Sendable {
             status: 409
         )
     }
+
+    /// Convenience initialiser for 409 conflicts without version-conflict
+    /// snapshot data (e.g. `duplicate_id` from a `create_only` bulk
+    /// outcome). Snapshot fields are populated with empty placeholders;
+    /// consumers that need to distinguish should branch on `code` or use
+    /// pattern-matching on a more specific subclass.
+    public init(message: String, details: [String: JSONValue]? = nil) {
+        self.current = ConflictSnapshot(properties: [:], version: 0)
+        self.ancestor = ConflictSnapshot(properties: [:], version: 0)
+        self.conflictingFields = []
+        self.clientPatch = [:]
+        super.init(
+            code: "duplicate_id",
+            message: message,
+            status: 409,
+            details: details
+        )
+    }
 }
 
 // MARK: - Schema versioning
