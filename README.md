@@ -5,7 +5,7 @@ The Swift SDK for the [Myme](https://myme.so) API — a typed data layer for str
 ## Requirements
 
 - Swift 6.2+ (Xcode 26+)
-- iOS 26+, macOS 26+, visionOS 26+, watchOS 26+, tvOS 26+
+- iOS 18+, macOS 15+, visionOS 2+, watchOS 11+, tvOS 18+
 
 ## Install
 
@@ -15,7 +15,7 @@ Or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mymehq/swift-sdk", from: "4.0.0"),
+    .package(url: "https://github.com/mymehq/swift-sdk", from: "8.1.0"),
 ]
 ```
 

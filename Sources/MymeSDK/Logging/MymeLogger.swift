@@ -6,7 +6,8 @@ import os
 ///
 /// Subsystem is fixed to `"sdk.myme"` so consumers can filter logs and
 /// signposts to the SDK in Console.app or Instruments. Active categories:
-/// `"transport"`, `"sse"`, `"sync"`, `"keychain"`.
+/// `"transport"`, `"sse"`, `"sync"` (plus the `"disabled"` sentinel for
+/// test suites).
 ///
 /// ## Log shape
 ///

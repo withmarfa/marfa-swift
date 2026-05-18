@@ -117,15 +117,15 @@ public extension ItemsNamespace {
     /// - Blob upload failure → throws `blob_upload_failed` annotating
     ///   the failing index and type, with the underlying error chained
     ///   in the message. No items are created.
-    /// - Bulk write `errored` outcome → throws with the server's error
-    ///   code, annotating the offending index. The orphaned blobs from
+    /// - Bulk write `errored` outcome → throws ``ValidationError``
+    ///   annotating the offending index. The orphaned blobs from
     ///   the upload step remain reachable by hash; the server's blob
     ///   GC reaps them once they are unreferenced for the configured
     ///   window.
-    /// - Bulk write `skipped` outcome → throws `duplicate_id`. The
-    ///   helper guarantees a fresh create on every call, so any
-    ///   `create_only` collision means a caller-supplied
-    ///   ``BulkItemInput/id`` already exists.
+    /// - Bulk write `skipped` outcome → throws ``ConflictError`` with
+    ///   code `duplicate_id`. The helper guarantees a fresh create on
+    ///   every call, so any `create_only` collision means a
+    ///   caller-supplied ``BulkItemInput/id`` already exists.
     ///
     /// **Edge-merge semantics.** Caller-provided edges on the host item
     /// pass through unchanged. Caller-provided edges on an attachment
@@ -210,19 +210,16 @@ public extension ItemsNamespace {
         // batch back server-side; we still translate the outcome into
         // a typed throw for the caller.
         if let errored = bulkResult.results.first(where: { $0.outcome == .errored }) {
-            let code = errored.error?.code ?? "bulk_failed"
             let message = errored.error?.message ?? errored.reason ?? "unknown"
-            throw MymeError(
-                code: code,
+            throw ValidationError(
                 message: "createWithAttachments: bulk write failed at index \(errored.index): \(message)",
-                status: 400
+                details: nil
             )
         }
         if let skipped = bulkResult.results.first(where: { $0.outcome == .skipped }) {
-            throw MymeError(
-                code: "duplicate_id",
+            throw ConflictError(
                 message: "createWithAttachments: bulk write skipped at index \(skipped.index) (reason: \(skipped.reason ?? "unknown")). The helper requires fresh ids — if you passed an explicit `item.id`, it must not already exist.",
-                status: 409
+                details: nil
             )
         }
 

@@ -1,7 +1,8 @@
 # LocalStore
 
 Persistent on-device store for the SDK. Backed by SwiftData with a
-CloudKit-compatible v1 schema (`MymeSchemaV1`). Two `@ModelActor`s
+CloudKit-compatible v2 schema (`MymeSchemaV2`) with a registered
+V1 → V2 migration. Two `@ModelActor`s
 (`LocalStore` and `MutationQueue`) share a single `ModelContainer`
 constructed via `MymeModelContainer.make(path:cloudKitDatabase:)`.
 Pass `cloudKitDatabase: .automatic(containerIdentifier: "iCloud.…")`
@@ -9,7 +10,8 @@ to mirror through CloudKit; omit it for pure-local (default `.none`).
 
 ## Schema
 
-Six `@Model` classes under `Schema/V1/`:
+Seven `@Model` classes (six under `Schema/V1/`, plus
+`DroppedMutationModel` added in `Schema/V2/`):
 
 | Model | Purpose |
 | --- | --- |
@@ -19,6 +21,7 @@ Six `@Model` classes under `Schema/V1/`:
 | `PendingMutationModel` | Queued server writes awaiting replay. |
 | `SyncStateModel` | Key/value table for sync cursor + bookkeeping. |
 | `PendingBlobModel` | Binary buffer for queued blob uploads. `data` field uses `@Attribute(.externalStorage)`. |
+| `DroppedMutationModel` | Permanently-failed mutations dropped from the replay queue, retained for inspection + dismissal. |
 
 CloudKit invariants (no `#Unique`, every property defaulted, every
 relationship optional, no `.deny` rules, Codable enums via rawValue,

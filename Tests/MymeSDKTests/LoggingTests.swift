@@ -13,15 +13,13 @@ struct LoggingTests {
     @Test("Logger can be constructed per category without throwing")
     func loggerPerCategory() {
         let transport = MymeLogger(category: "transport")
-        let retry = MymeLogger(category: "retry")
         let sse = MymeLogger(category: "sse")
-        let keychain = MymeLogger(category: "keychain")
+        let sync = MymeLogger(category: "sync")
 
         // Smoke check — emits and completes cleanly.
         transport.log.info("smoke test transport")
-        retry.log.info("smoke test retry")
         sse.log.info("smoke test sse")
-        keychain.log.info("smoke test keychain")
+        sync.log.info("smoke test sync")
     }
 
     @Test("Signposter emits intervals cleanly")
