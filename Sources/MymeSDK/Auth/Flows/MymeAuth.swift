@@ -4,7 +4,9 @@ import AuthenticationServices
 import Foundation
 
 /// `MymeAuth` owns the Authorization-Code-with-PKCE flow against a Myme
-/// server's `/auth/authorize` and `/auth/token` endpoints.
+/// server's OAuth endpoints. URLs are discovered at first use via the
+/// server's `/.well-known/oauth-authorization-server` doc — see
+/// ``OAuthDiscovery``.
 ///
 /// ## Flow
 ///
@@ -34,15 +36,15 @@ import Foundation
 ///
 /// - ``signIn(presentationContextProvider:)`` opens an
 ///   `ASWebAuthenticationSession` that takes the user through the
-///   server's consent screen, then exchanges the returned code at
-///   `/auth/token` with the PKCE verifier. The token bundle is persisted
-///   via the configured ``SecureStorage``.
+///   server's consent screen, then exchanges the returned code at the
+///   discovered token endpoint with the PKCE verifier. The token bundle
+///   is persisted via the configured ``SecureStorage``.
 /// - ``restore()`` reads any persisted token from storage and returns a
 ///   ``StoredTokenProvider`` ready to use; returns `nil` if storage is
 ///   empty.
-/// - ``signOut(_:)`` POSTs to `/auth/revoke` and clears the persisted
-///   token. Surface-level "session expired" UX is the caller's
-///   responsibility.
+/// - ``signOut(_:)`` POSTs to the discovered revocation endpoint and
+///   clears the persisted token. Surface-level "session expired" UX is
+///   the caller's responsibility.
 ///
 /// Available on iOS, macOS, Mac Catalyst, and visionOS — `ASWebAuthenticationSession`
 /// is not exposed on watchOS or tvOS, where ``DeviceFlow`` is the
@@ -89,10 +91,10 @@ public final class MymeAuth {
     ///
     /// Steps:
     /// 1. Generate PKCE verifier and S256 challenge.
-    /// 2. Open `ASWebAuthenticationSession` against `/auth/authorize` with
-    ///    the challenge.
-    /// 3. On callback, validate `state`, then POST the code to
-    ///    `/auth/token` with the verifier.
+    /// 2. Discover the `authorization_endpoint` and open
+    ///    `ASWebAuthenticationSession` against it with the challenge.
+    /// 3. On callback, validate `state`, then POST the code to the
+    ///    discovered `token_endpoint` with the verifier.
     /// 4. Persist the resulting ``Token`` via ``StoredTokenProvider``.
     public func signIn(
         presentationContextProvider: ASWebAuthenticationPresentationContextProviding
@@ -108,7 +110,15 @@ public final class MymeAuth {
         )
         try await persist(pending)
 
-        let authorizeURL = try buildAuthorizeURL(challenge: challenge, state: state)
+        let endpoints = try await OAuthDiscovery.shared.endpoints(
+            for: issuer,
+            httpClient: urlSession
+        )
+        let authorizeURL = try buildAuthorizeURL(
+            authorize: endpoints.authorize,
+            challenge: challenge,
+            state: state
+        )
         let callbackURL = try await runWebAuthSession(
             authorizeURL: authorizeURL,
             presentationContextProvider: presentationContextProvider
@@ -119,11 +129,15 @@ public final class MymeAuth {
             throw OAuthError(rawCode: "invalid_state", message: "state parameter mismatch", status: 400)
         }
 
-        let token = try await exchangeCode(code: code, verifier: verifier)
+        let token = try await exchangeCode(
+            code: code,
+            verifier: verifier,
+            tokenEndpoint: endpoints.token
+        )
         let provider = StoredTokenProvider(
             storage: storage,
             storageKey: tokensKey,
-            tokenEndpoint: tokenEndpoint,
+            tokenEndpoint: endpoints.token,
             clientId: clientId,
             urlSession: urlSession
         )
@@ -136,10 +150,14 @@ public final class MymeAuth {
     /// for this `(issuer, clientId)` pair, or `nil` when storage is empty.
     public func restore() async throws -> TokenProvider? {
         guard try await storage.get(for: tokensKey) != nil else { return nil }
+        let endpoints = try await OAuthDiscovery.shared.endpoints(
+            for: issuer,
+            httpClient: urlSession
+        )
         return StoredTokenProvider(
             storage: storage,
             storageKey: tokensKey,
-            tokenEndpoint: tokenEndpoint,
+            tokenEndpoint: endpoints.token,
             clientId: clientId,
             urlSession: urlSession
         )
@@ -173,8 +191,14 @@ public final class MymeAuth {
     // standing up the full `ASWebAuthenticationSession` flow. They are
     // not part of the public surface.
 
-    internal var tokenEndpoint: URL { issuer.appendingPathComponent("auth/token") }
-    internal var revokeEndpoint: URL { issuer.appendingPathComponent("auth/revoke") }
+    /// Resolves the OAuth endpoints via discovery. Exposed for tests so
+    /// they can stub the well-known doc once and exercise the flow.
+    internal func discoveredEndpoints() async throws -> OAuthDiscovery.Endpoints {
+        try await OAuthDiscovery.shared.endpoints(
+            for: issuer,
+            httpClient: urlSession
+        )
+    }
 
     private static func normalizeIssuer(_ url: URL) -> URL {
         var s = url.absoluteString
@@ -190,11 +214,12 @@ public final class MymeAuth {
         try await storage.set(json, for: pendingKey)
     }
 
-    internal func buildAuthorizeURL(challenge: String, state: String) throws -> URL {
-        var components = URLComponents(
-            url: issuer.appendingPathComponent("auth/authorize"),
-            resolvingAgainstBaseURL: false
-        )
+    internal func buildAuthorizeURL(
+        authorize: URL,
+        challenge: String,
+        state: String
+    ) throws -> URL {
+        var components = URLComponents(url: authorize, resolvingAgainstBaseURL: false)
         guard components != nil else {
             throw OAuthError(rawCode: "invalid_issuer", message: "could not construct authorize URL", status: 400)
         }
@@ -278,7 +303,11 @@ public final class MymeAuth {
         return (code, state)
     }
 
-    internal func exchangeCode(code: String, verifier: String) async throws -> Token {
+    internal func exchangeCode(
+        code: String,
+        verifier: String,
+        tokenEndpoint: URL
+    ) async throws -> Token {
         var request = URLRequest(url: tokenEndpoint)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -305,7 +334,11 @@ public final class MymeAuth {
     }
 
     internal func revoke(token: String) async throws {
-        var request = URLRequest(url: revokeEndpoint)
+        let endpoints = try await OAuthDiscovery.shared.endpoints(
+            for: issuer,
+            httpClient: urlSession
+        )
+        var request = URLRequest(url: endpoints.revoke)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = [

@@ -91,6 +91,27 @@ private func makeStubbedSession() -> URLSession {
     return URLSession(configuration: config)
 }
 
+/// Stub well-known discovery doc — the SDK reads this on first OAuth
+/// operation. Tests queue it ahead of their scripted token/revoke
+/// responses.
+private func discoveryCanned() -> MymeAuthStubURLProtocol.Canned {
+    let body = #"""
+    {
+      "issuer": "https://staging.myme.so",
+      "authorization_endpoint": "https://staging.myme.so/auth/oauth2/authorize",
+      "token_endpoint": "https://staging.myme.so/auth/oauth2/token",
+      "revocation_endpoint": "https://staging.myme.so/auth/oauth2/revoke",
+      "device_authorization_endpoint": "https://staging.myme.so/auth/device"
+    }
+    """#
+    return .init(
+        statusCode: 200,
+        headers: ["Content-Type": "application/json"],
+        body: Data(body.utf8),
+        error: nil
+    )
+}
+
 @Suite("MymeAuth sign-in flow", .serialized)
 @MainActor
 struct MymeAuthSignInTests {
@@ -98,6 +119,10 @@ struct MymeAuthSignInTests {
     let issuer = URL(string: "https://staging.myme.so")!
     let clientId = "test-client"
     let redirectURI = URL(string: "myme-test://auth/callback")!
+
+    init() async {
+        await OAuthDiscovery.shared.reset()
+    }
     let scopes = ["openid", "profile", "email"]
 
     func makeAuth(session: URLSession, storage: InMemoryKeychain = InMemoryKeychain()) -> MymeAuth {
@@ -116,11 +141,15 @@ struct MymeAuthSignInTests {
     @Test("buildAuthorizeURL includes every required OAuth + PKCE query parameter")
     func authorizeURLParameters() throws {
         let auth = makeAuth(session: makeStubbedSession())
-        let url = try auth.buildAuthorizeURL(challenge: "challenge-abc", state: "state-xyz")
+        let url = try auth.buildAuthorizeURL(
+            authorize: URL(string: "https://staging.myme.so/auth/oauth2/authorize")!,
+            challenge: "challenge-abc",
+            state: "state-xyz"
+        )
 
         #expect(url.scheme == "https")
         #expect(url.host == "staging.myme.so")
-        #expect(url.path == "/auth/authorize")
+        #expect(url.path == "/auth/oauth2/authorize")
 
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         let params = Dictionary(uniqueKeysWithValues: components.queryItems!.map { ($0.name, $0.value ?? "") })
@@ -143,7 +172,11 @@ struct MymeAuthSignInTests {
             storage: InMemoryKeychain(),
             urlSession: makeStubbedSession()
         )
-        let url = try auth.buildAuthorizeURL(challenge: "c", state: "s")
+        let url = try auth.buildAuthorizeURL(
+            authorize: URL(string: "https://staging.myme.so/auth/oauth2/authorize")!,
+            challenge: "c",
+            state: "s"
+        )
 
         // URLComponents handles percent-encoding internally; consumer
         // can round-trip the redirect URI back to the original.
@@ -211,7 +244,7 @@ struct MymeAuthSignInTests {
 
     // MARK: - exchangeCode
 
-    @Test("exchangeCode POSTs form-encoded body to /auth/token and decodes Token")
+    @Test("exchangeCode POSTs form-encoded body to the discovered token endpoint and decodes Token")
     func exchangeCodeHappy() async throws {
         let session = makeStubbedSession()
         let auth = makeAuth(session: session)
@@ -228,7 +261,11 @@ struct MymeAuthSignInTests {
             .init(statusCode: 200, headers: ["Content-Type": "application/json"], body: Data(body.utf8), error: nil)
         ])
 
-        let token = try await auth.exchangeCode(code: "auth-code-123", verifier: "verifier-xyz")
+        let token = try await auth.exchangeCode(
+            code: "auth-code-123",
+            verifier: "verifier-xyz",
+            tokenEndpoint: URL(string: "https://staging.myme.so/auth/oauth2/token")!
+        )
 
         #expect(token.accessToken == "myme_at_aaa")
         #expect(token.refreshToken == "myme_rt_bbb")
@@ -238,7 +275,7 @@ struct MymeAuthSignInTests {
         let recorded = MymeAuthStubURLProtocol.recordedRequests()
         #expect(recorded.count == 1)
         let (req, requestBody) = recorded[0]
-        #expect(req.url?.path == "/auth/token")
+        #expect(req.url?.path == "/auth/oauth2/token")
         #expect(req.httpMethod == "POST")
         #expect(req.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
         let form = String(data: requestBody ?? Data(), encoding: .utf8)!
@@ -263,7 +300,11 @@ struct MymeAuthSignInTests {
         ])
 
         do {
-            _ = try await auth.exchangeCode(code: "c", verifier: "v")
+            _ = try await auth.exchangeCode(
+                code: "c",
+                verifier: "v",
+                tokenEndpoint: URL(string: "https://staging.myme.so/auth/oauth2/token")!
+            )
             Issue.record("expected OAuthError(invalid_grant)")
         } catch let error as OAuthError {
             #expect(error.oauthCode == .invalidGrant)
@@ -287,6 +328,9 @@ struct MymeAuthSignInTests {
         let key = "myme.auth.tokens:staging.myme.so:test-client"
         let json = #"{"access_token":"a","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         try await storage.set(json, for: key)
+
+        // restore() runs OAuth discovery to resolve the refresh endpoint.
+        MymeAuthStubURLProtocol.reset(with: [discoveryCanned()])
 
         let auth = makeAuth(session: makeStubbedSession(), storage: storage)
         let provider = try await auth.restore()

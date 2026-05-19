@@ -144,8 +144,8 @@ public actor StoredTokenProvider: TokenProvider {
         return token
     }
 
-    /// Calls `/auth/token` with `grant_type=refresh_token`, persists the
-    /// returned bundle, and returns it.
+    /// Calls the configured `tokenEndpoint` with `grant_type=refresh_token`,
+    /// persists the returned bundle, and returns it.
     private func refresh() async throws -> Token {
         guard let refreshToken = try await loadCached()?.refreshToken else {
             throw OAuthError(

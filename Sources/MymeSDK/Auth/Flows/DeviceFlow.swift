@@ -48,7 +48,11 @@ public enum DeviceFlow {
         clock: any DeviceFlowClock = SystemDeviceFlowClock()
     ) async throws -> DeviceFlowHandle {
         let normalized = DeviceFlow.normalizeIssuer(issuer)
-        var request = URLRequest(url: normalized.appendingPathComponent("auth/device"))
+        let endpoints = try await OAuthDiscovery.shared.endpoints(
+            for: normalized,
+            httpClient: httpClient
+        )
+        var request = URLRequest(url: endpoints.deviceAuthorize)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -76,6 +80,7 @@ public enum DeviceFlow {
             verificationURIComplete: envelope.verificationURIComplete.flatMap(URL.init(string:)),
             expiresAt: clock.now().addingTimeInterval(TimeInterval(envelope.expiresIn)),
             interval: envelope.interval ?? 5,
+            endpoints: endpoints,
             storage: storage,
             httpClient: httpClient,
             clock: clock
@@ -124,6 +129,7 @@ public actor DeviceFlowHandle {
 
     private let deviceCode: String
     private var interval: Int
+    private let endpoints: OAuthDiscovery.Endpoints
     private let storage: any SecureStorage
     private let httpClient: any DeviceFlowHTTPClient
     private let clock: any DeviceFlowClock
@@ -137,6 +143,7 @@ public actor DeviceFlowHandle {
         verificationURIComplete: URL?,
         expiresAt: Date,
         interval: Int,
+        endpoints: OAuthDiscovery.Endpoints,
         storage: any SecureStorage,
         httpClient: any DeviceFlowHTTPClient,
         clock: any DeviceFlowClock
@@ -149,6 +156,7 @@ public actor DeviceFlowHandle {
         self.verificationURIComplete = verificationURIComplete
         self.expiresAt = expiresAt
         self.interval = interval
+        self.endpoints = endpoints
         self.storage = storage
         self.httpClient = httpClient
         self.clock = clock
@@ -182,7 +190,7 @@ public actor DeviceFlowHandle {
                 let provider = StoredTokenProvider(
                     storage: storage,
                     storageKey: storageKey,
-                    tokenEndpoint: issuer.appendingPathComponent("auth/token"),
+                    tokenEndpoint: endpoints.token,
                     clientId: clientId
                 )
                 try await provider.store(token)
@@ -198,7 +206,12 @@ public actor DeviceFlowHandle {
     }
 
     private func poll() async throws -> PollResult {
-        var request = URLRequest(url: issuer.appendingPathComponent("auth/device/token"))
+        // RFC 8628 polling endpoint — discovery publishes the device
+        // authorize URL; the polling URL is the same path with `/token`
+        // appended per Better Auth's convention.
+        var request = URLRequest(
+            url: endpoints.deviceAuthorize.appendingPathComponent("token")
+        )
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
