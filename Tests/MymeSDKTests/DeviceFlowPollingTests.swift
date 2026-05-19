@@ -10,7 +10,7 @@ import Foundation
 /// All HTTP goes through ``FakeDeviceFlowHTTPClient`` and all time
 /// through ``ManualDeviceFlowClock``, so the suite runs in milliseconds
 /// with no real sleeps or network. Safe for parallel execution.
-@Suite("DeviceFlow polling")
+@Suite("DeviceFlow polling", .serialized)
 struct DeviceFlowPollingTests {
 
     // MARK: - Helpers
@@ -35,11 +35,33 @@ struct DeviceFlowPollingTests {
             verificationURIComplete: nil,
             expiresAt: clock.now().addingTimeInterval(expiresIn),
             interval: initialInterval,
+            endpoints: Self.stubEndpoints,
             storage: storage,
             httpClient: http,
             clock: clock
         )
         return (handle, http, clock, storage)
+    }
+
+    /// Pre-resolved endpoints injected directly into the handle so the
+    /// polling tests don't need to script discovery responses for every
+    /// case — discovery is exercised by the start() tests.
+    private static let stubEndpoints = OAuthDiscovery.Endpoints(
+        token: URL(string: "https://example.test/auth/oauth2/token")!,
+        authorize: URL(string: "https://example.test/auth/oauth2/authorize")!,
+        revoke: URL(string: "https://example.test/auth/oauth2/revoke")!,
+        deviceAuthorize: URL(string: "https://example.test/auth/device")!
+    )
+
+    /// Wire-shape discovery doc the SDK reads on first `start()` call.
+    /// Tests for `DeviceFlow.start()` enqueue this ahead of their
+    /// device-code response.
+    private struct DiscoveryDoc: Encodable {
+        let issuer = "https://example.test"
+        let authorization_endpoint = "https://example.test/auth/oauth2/authorize"
+        let token_endpoint = "https://example.test/auth/oauth2/token"
+        let revocation_endpoint = "https://example.test/auth/oauth2/revoke"
+        let device_authorization_endpoint = "https://example.test/auth/device"
     }
 
     // MARK: - Polling loop
@@ -193,6 +215,7 @@ struct DeviceFlowPollingTests {
             verificationURIComplete: nil,
             expiresAt: clock.now().addingTimeInterval(-1),
             interval: 5,
+            endpoints: Self.stubEndpoints,
             storage: storage,
             httpClient: http,
             clock: clock
@@ -250,9 +273,11 @@ struct DeviceFlowPollingTests {
 
     @Test("start() decodes the device-code response into a populated handle")
     func startSuccessParsesResponse() async throws {
+        await OAuthDiscovery.shared.reset()
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
+        try http.enqueueJSON(DiscoveryDoc())
         http.enqueueDeviceCodeResponse(
             deviceCode: "DC-1234",
             userCode: "WDJB-MJHT",
@@ -276,9 +301,10 @@ struct DeviceFlowPollingTests {
         #expect(handle.verificationURIComplete == URL(string: "https://example.test/device?user_code=WDJB-MJHT"))
         #expect(handle.expiresAt == clock.now().addingTimeInterval(1800))
 
-        // Request shape: POST /auth/device with the expected JSON body.
-        #expect(http.calls.count == 1)
-        let request = try #require(http.calls.first)
+        // Request shape: discovery first, then POST /auth/device with
+        // the expected JSON body.
+        #expect(http.calls.count == 2)
+        let request = try #require(http.calls.last)
         #expect(request.httpMethod == "POST")
         #expect(request.url == Self.issuer.appendingPathComponent("auth/device"))
         let body = try #require(request.httpBody)
@@ -289,9 +315,11 @@ struct DeviceFlowPollingTests {
 
     @Test("start() throws OAuthError on a non-2xx response")
     func startOAuthErrorIsParsed() async throws {
+        await OAuthDiscovery.shared.reset()
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
+        try http.enqueueJSON(DiscoveryDoc())
         http.enqueueOAuthError(code: "invalid_client", description: "no such client")
 
         let thrown: Error
@@ -316,10 +344,12 @@ struct DeviceFlowPollingTests {
 
     @Test("start() defaults interval to 5 when the server omits it")
     func startDefaultsIntervalWhenMissing() async throws {
+        await OAuthDiscovery.shared.reset()
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
         // RFC 8628 says `interval` is optional; SDK must default to 5s.
+        try http.enqueueJSON(DiscoveryDoc())
         http.enqueueDeviceCodeResponse(interval: nil)
 
         let handle = try await DeviceFlow.start(
@@ -341,9 +371,11 @@ struct DeviceFlowPollingTests {
 
     @Test("start() leaves verification_uri_complete nil when the server omits it")
     func startVerificationURICompleteOptional() async throws {
+        await OAuthDiscovery.shared.reset()
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
+        try http.enqueueJSON(DiscoveryDoc())
         http.enqueueDeviceCodeResponse(verificationURIComplete: nil)
 
         let handle = try await DeviceFlow.start(

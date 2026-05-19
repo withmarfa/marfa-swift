@@ -42,6 +42,19 @@ final class RevokeStubURLProtocol: URLProtocol, @unchecked Sendable {
         Self.recordedRequests.append((request, bodyData))
         Self.lock.unlock()
 
+        // Return a well-known discovery doc for the OAuth discovery
+        // probe; otherwise return an empty 200 (the revoke endpoint
+        // returns no body on success per RFC 7009 §2.2).
+        let responseBody: Data
+        if request.url?.path == "/.well-known/oauth-authorization-server" {
+            let discovery = #"""
+            {"issuer":"https://staging.myme.so","authorization_endpoint":"https://staging.myme.so/auth/oauth2/authorize","token_endpoint":"https://staging.myme.so/auth/oauth2/token","revocation_endpoint":"https://staging.myme.so/auth/oauth2/revoke","device_authorization_endpoint":"https://staging.myme.so/auth/device"}
+            """#
+            responseBody = Data(discovery.utf8)
+        } else {
+            responseBody = Data()
+        }
+
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: 200,
@@ -49,7 +62,7 @@ final class RevokeStubURLProtocol: URLProtocol, @unchecked Sendable {
             headerFields: ["Content-Type": "application/json"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data())
+        client?.urlProtocol(self, didLoad: responseBody)
         client?.urlProtocolDidFinishLoading(self)
     }
 
@@ -89,14 +102,15 @@ struct AuthRevokeTests {
         return (auth, storage, session)
     }
 
-    @Test("signOut posts the access and refresh tokens to /auth/revoke with client_id")
+    @Test("signOut posts the access and refresh tokens to the discovered revoke endpoint with client_id")
     func revokesBothTokens() async throws {
         RevokeStubURLProtocol.reset()
+        await OAuthDiscovery.shared.reset()
         let (auth, storage, session) = try await prepareAuth()
         let provider = StoredTokenProvider(
             storage: storage,
             storageKey: tokensKey,
-            tokenEndpoint: issuer.appendingPathComponent("auth/token"),
+            tokenEndpoint: URL(string: "https://staging.myme.so/auth/oauth2/token")!,
             clientId: clientId,
             urlSession: session
         )
@@ -104,17 +118,21 @@ struct AuthRevokeTests {
         try await auth.signOut(provider)
 
         let recorded = RevokeStubURLProtocol.recorded()
-        // Two POSTs to /auth/revoke: one per token.
-        #expect(recorded.count == 2)
-        let bodies = recorded.map { (req, body) -> (String, String) in
-            (req.url?.path ?? "", String(data: body, encoding: .utf8) ?? "")
+        // Two POSTs to the discovered revoke endpoint — one per token.
+        // The recorded set also includes the discovery probe(s); we
+        // only assert on the revoke calls.
+        let revokeCalls = recorded.filter { (req, _) in
+            req.url?.path == "/auth/oauth2/revoke"
         }
-        for (path, form) in bodies {
-            #expect(path == "/auth/revoke")
+        #expect(revokeCalls.count == 2)
+        let bodies = revokeCalls.map { (_, body) in
+            String(data: body, encoding: .utf8) ?? ""
+        }
+        for form in bodies {
             #expect(form.contains("client_id=test-client"))
         }
         // One form body carries the access token, the other the refresh token.
-        let combined = bodies.map(\.1).joined(separator: "|")
+        let combined = bodies.joined(separator: "|")
         #expect(combined.contains("token=myme_at_aaa"))
         #expect(combined.contains("token=myme_rt_bbb"))
 

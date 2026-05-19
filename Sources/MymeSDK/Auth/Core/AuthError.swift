@@ -1,7 +1,7 @@
 import Foundation
 
-/// OAuth 2.0 protocol error returned by `/auth/token`, `/auth/revoke`, and
-/// the token-exchange leg of every auth flow.
+/// OAuth 2.0 protocol error returned by the discovered token and
+/// revocation endpoints, and the token-exchange leg of every auth flow.
 ///
 /// Mapped from the wire's `{ "error": "...", "error_description": "..." }`
 /// envelope per RFC 6749 §5.2. Pattern-match on ``code`` for branching:
@@ -35,7 +35,7 @@ public final class OAuthError: MymeError, @unchecked Sendable {
 }
 
 /// RFC 8628 Device Authorization Grant errors raised during the polling
-/// loop on `/auth/device/token`.
+/// loop on the device-flow polling endpoint.
 public final class DeviceFlowError: MymeError, @unchecked Sendable {
     public enum Code: String, Sendable {
         /// The user has not yet completed the verification step. The
