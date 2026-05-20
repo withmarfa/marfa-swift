@@ -353,4 +353,68 @@ public struct BulkActionResult: Codable, Sendable {
         case dryRun = "dry_run"
         case blobHashesReferenced = "blob_hashes_referenced"
     }
+
+    public init(
+        action: String,
+        matched: Int,
+        succeeded: Int,
+        errored: Int,
+        dryRun: Bool,
+        ids: [String]?,
+        errors: [BulkActionErrorEntry]?,
+        blobHashesReferenced: Int?
+    ) {
+        self.action = action
+        self.matched = matched
+        self.succeeded = succeeded
+        self.errored = errored
+        self.dryRun = dryRun
+        self.ids = ids
+        self.errors = errors
+        self.blobHashesReferenced = blobHashesReferenced
+    }
+}
+
+/// T-218: terminal vs non-terminal lifecycle states for an async
+/// `bulk_action` job. The worker only transitions
+/// `queued` → `in_progress` → terminal; terminal values freeze the row.
+public enum BulkActionJobStatus: String, Codable, Sendable {
+    case queued
+    case inProgress = "in_progress"
+    case completed
+    case failed
+    case cancelled
+}
+
+/// T-218: async-job envelope returned by `POST /items/bulk_action`
+/// (non-dry-run) and by `GET /items/bulk_action/jobs/:id`.
+///
+/// ``ItemsNamespace/bulkAction(_:options:)`` resolves with the embedded
+/// ``BulkActionResult`` once `status` reaches a terminal value;
+/// advanced callers using ``ItemsNamespace/bulkActionAsync(_:)`` get
+/// the envelope directly and drive their own polling via
+/// ``ItemsNamespace/bulkActionStatus(jobId:)``.
+public struct BulkActionJob: Codable, Sendable {
+    public let id: String
+    public let action: String
+    public let status: BulkActionJobStatus
+    public let matched: Int
+    public let processed: Int
+    public let succeeded: Int
+    public let errored: Int
+    public let startedAt: String?
+    public let finishedAt: String?
+    /// Set when `status == .failed`.
+    public let error: String?
+    /// Set when `status == .completed`. Absent on `cancelled` — the
+    /// envelope's `processed` / `succeeded` / `errored` fields carry
+    /// the partial-progress state in that case.
+    public let result: BulkActionResult?
+
+    enum CodingKeys: String, CodingKey {
+        case id, action, status, matched, processed, succeeded, errored
+        case startedAt = "started_at"
+        case finishedAt = "finished_at"
+        case error, result
+    }
 }

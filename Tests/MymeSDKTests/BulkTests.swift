@@ -38,6 +38,48 @@ struct BulkTests {
         )
     }
 
+    /// T-218: sample queued envelope returned by `POST /items/bulk_action`
+    /// (status 202). The SDK polls until terminal.
+    func sampleQueuedJob(action: String, id: String = "baj_test") -> BulkActionJob {
+        BulkActionJob(
+            id: id,
+            action: action,
+            status: .queued,
+            matched: 3,
+            processed: 0,
+            succeeded: 0,
+            errored: 0,
+            startedAt: nil,
+            finishedAt: nil,
+            error: nil,
+            result: nil
+        )
+    }
+
+    /// T-218: sample completed envelope — the result the polling loop
+    /// resolves with.
+    func sampleCompletedJob(action: String, id: String = "baj_test") -> BulkActionJob {
+        BulkActionJob(
+            id: id,
+            action: action,
+            status: .completed,
+            matched: 3,
+            processed: 3,
+            succeeded: 3,
+            errored: 0,
+            startedAt: "2026-05-20T20:00:00.000Z",
+            finishedAt: "2026-05-20T20:00:01.000Z",
+            error: nil,
+            result: sampleBulkActionResult(action: action)
+        )
+    }
+
+    /// Encode + raw-enqueue a BulkActionJob as the 202 POST response.
+    func enqueueQueued(_ mock: MockTransport, job: BulkActionJob) {
+        let data = try! JSONEncoder().encode(job)
+        mock.enqueueRaw(data: data, statusCode: 202)
+    }
+
     // MARK: - bulk
 
     @Test("bulk sends POST /items/bulk with BulkInput body")
@@ -91,22 +133,173 @@ struct BulkTests {
 
     // MARK: - bulkAction
 
-    @Test("bulkAction transition posts to /items/bulk_action")
+    @Test("bulkAction transition posts to /items/bulk_action, polls to terminal")
     func bulkActionTransitionPath() async throws {
         let (client, mock) = makeClient()
-        mock.enqueue(sampleBulkActionResult(action: "transition"))
+        // T-218: POST returns 202 + queued envelope; SDK then polls
+        // GET /items/bulk_action/jobs/:id and resolves with the
+        // embedded BulkActionResult.
+        enqueueQueued(mock, job: sampleQueuedJob(action: "transition"))
+        mock.enqueue(sampleCompletedJob(action: "transition"))
 
         let input = BulkActionInput.transition(
             filter: BulkActionFilter(tags: ["x"]),
             state: .archived
         )
-        let result = try await client.items.bulkAction(input)
+        let result = try await client.items.bulkAction(
+            input,
+            options: BulkActionPollOptions(pollIntervalMs: 1)
+        )
 
         #expect(result.action == "transition")
         #expect(result.succeeded == 3)
-        #expect(mock.calls.count == 1)
+        #expect(mock.calls.count == 2)
         #expect(mock.calls[0].path == "/items/bulk_action")
         #expect(mock.calls[0].method == .post)
+        #expect(mock.calls[1].path == "/items/bulk_action/jobs/baj_test")
+        #expect(mock.calls[1].method == .get)
+    }
+
+    // MARK: - T-218: async job lifecycle
+
+    @Test("bulkAction polls through queued → in_progress → completed")
+    func bulkActionPollsThroughIntermediateStates() async throws {
+        let (client, mock) = makeClient()
+        enqueueQueued(mock, job: sampleQueuedJob(action: "update_tier"))
+        // First poll: in_progress
+        let inProgress = BulkActionJob(
+            id: "baj_test", action: "update_tier", status: .inProgress,
+            matched: 3, processed: 1, succeeded: 1, errored: 0,
+            startedAt: "2026-05-20T20:00:00Z", finishedAt: nil,
+            error: nil, result: nil
+        )
+        mock.enqueue(inProgress)
+        // Second poll: completed
+        mock.enqueue(sampleCompletedJob(action: "update_tier"))
+
+        // Swift 6 strict concurrency: onProgress runs in a Sendable
+        // closure, so we capture via a lock-guarded class.
+        final class TickCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var n = 0
+            func tick() { lock.lock(); n += 1; lock.unlock() }
+            var count: Int { lock.lock(); defer { lock.unlock() }; return n }
+        }
+        let ticks = TickCounter()
+        let result = try await client.items.bulkAction(
+            BulkActionInput.updateTier(filter: BulkActionFilter(tags: ["x"]), tier: .feed),
+            options: BulkActionPollOptions(pollIntervalMs: 1, onProgress: { _ in ticks.tick() })
+        )
+
+        #expect(result.action == "update_tier")
+        #expect(ticks.count == 1)
+        #expect(mock.calls.count == 3)
+    }
+
+    @Test("bulkAction throws BulkJobCancelledError when status is cancelled")
+    func bulkActionThrowsOnCancelled() async throws {
+        let (client, mock) = makeClient()
+        enqueueQueued(mock, job: sampleQueuedJob(action: "purge"))
+        let cancelled = BulkActionJob(
+            id: "baj_test", action: "purge", status: .cancelled,
+            matched: 3, processed: 1, succeeded: 1, errored: 0,
+            startedAt: "2026-05-20T20:00:00Z", finishedAt: "2026-05-20T20:00:00.5Z",
+            error: nil, result: nil
+        )
+        mock.enqueue(cancelled)
+
+        do {
+            _ = try await client.items.bulkAction(
+                BulkActionInput.purge(filter: BulkActionFilter(tags: ["x"]), options: .init(confirm: "PURGE")),
+                options: BulkActionPollOptions(pollIntervalMs: 1)
+            )
+            Issue.record("Expected BulkJobCancelledError")
+        } catch let err as BulkJobCancelledError {
+            #expect(err.jobId == "baj_test")
+            #expect(err.processed == 1)
+        }
+    }
+
+    @Test("bulkAction throws BulkJobFailedError when status is failed")
+    func bulkActionThrowsOnFailed() async throws {
+        let (client, mock) = makeClient()
+        enqueueQueued(mock, job: sampleQueuedJob(action: "transition"))
+        let failed = BulkActionJob(
+            id: "baj_test", action: "transition", status: .failed,
+            matched: 3, processed: 1, succeeded: 0, errored: 1,
+            startedAt: "2026-05-20T20:00:00Z", finishedAt: "2026-05-20T20:00:00.5Z",
+            error: "Storage exception during chunk 2",
+            result: nil
+        )
+        mock.enqueue(failed)
+
+        do {
+            _ = try await client.items.bulkAction(
+                BulkActionInput.transition(filter: BulkActionFilter(tags: ["x"]), state: .archived),
+                options: BulkActionPollOptions(pollIntervalMs: 1)
+            )
+            Issue.record("Expected BulkJobFailedError")
+        } catch let err as BulkJobFailedError {
+            #expect(err.jobId == "baj_test")
+            #expect(err.reason.contains("chunk 2"))
+        }
+    }
+
+    @Test("bulkActionAsync returns the queued envelope without polling")
+    func bulkActionAsyncSurfacesQueuedEnvelope() async throws {
+        let (client, mock) = makeClient()
+        enqueueQueued(mock, job: sampleQueuedJob(action: "transition", id: "baj_async"))
+
+        let job = try await client.items.bulkActionAsync(
+            BulkActionInput.transition(filter: BulkActionFilter(tags: ["x"]), state: .archived)
+        )
+
+        #expect(job.id == "baj_async")
+        #expect(job.status == .queued)
+        #expect(mock.calls.count == 1)
+    }
+
+    @Test("bulkActionStatus and bulkActionCancel hit the jobs endpoint")
+    func bulkActionStatusAndCancel() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(sampleCompletedJob(action: "transition", id: "baj_x"))
+        mock.enqueue(sampleCompletedJob(action: "transition", id: "baj_x"))
+
+        let status = try await client.items.bulkActionStatus(jobId: "baj_x")
+        #expect(status.id == "baj_x")
+        #expect(mock.calls[0].method == .get)
+        #expect(mock.calls[0].path == "/items/bulk_action/jobs/baj_x")
+
+        let cancelled = try await client.items.bulkActionCancel(jobId: "baj_x")
+        #expect(cancelled.id == "baj_x")
+        #expect(mock.calls[1].method == .delete)
+        #expect(mock.calls[1].path == "/items/bulk_action/jobs/baj_x")
+    }
+
+    @Test("bulkAction dry_run path stays synchronous (status 200)")
+    func bulkActionDryRunStaysSynchronous() async throws {
+        let (client, mock) = makeClient()
+        let dryRunResult = BulkActionResult(
+            action: "transition", matched: 3, succeeded: 0, errored: 0,
+            dryRun: true, ids: ["a", "b", "c"], errors: nil,
+            blobHashesReferenced: nil
+        )
+        let data = try JSONEncoder().encode(dryRunResult)
+        mock.enqueueRaw(data: data, statusCode: 200)
+
+        let result = try await client.items.bulkAction(
+            BulkActionInput.transition(
+                filter: BulkActionFilter(tags: ["x"]),
+                state: .archived,
+                options: .init(dryRun: true)
+            ),
+            options: BulkActionPollOptions(pollIntervalMs: 1)
+        )
+
+        #expect(result.dryRun == true)
+        #expect(result.ids == ["a", "b", "c"])
+        // Only the POST happened — no polling for dry-run.
+        #expect(mock.calls.count == 1)
     }
 
     @Test("bulkAction encodes discriminator + params for each verb")
