@@ -5,6 +5,34 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.2.0] — 2026-05-22
+
+OAuth endpoint discovery, plus the async bulk-action surface.
+
+### Changed
+
+- **OAuth endpoints are discovered, not hardcoded** (T-216). `MymeAuth` and `DeviceFlow` now fetch `${issuer}/.well-known/oauth-authorization-server` and resolve the token / authorize / revoke / device endpoints from it. T-131 moved the server's OAuth surface to `/auth/oauth2/*`; the SDK still constructed the pre-T-131 paths, so refresh, code-flow exchange, and revoke 404'd against an updated server. The discovery doc is fetched once and cached for the process; a discovery failure raises a clear error rather than falling back to dead paths. Public `MymeAuth` / `DeviceFlow` call sites are unchanged — discovery happens internally.
+
+### Added
+
+- **Async `bulk_action` jobs** (T-218 parity). The remote-mode `bulkAction(_:options:)` signature is unchanged for callers — internally it now distinguishes the `200` (dry-run) and `202` (queued) responses and polls `GET /items/bulk_action/jobs/:id` to a terminal status, resolving with the embedded `BulkActionResult` exactly as the synchronous endpoint did. New surface: `BulkActionJob` / `BulkActionJobStatus`, `BulkActionPollOptions`, `bulkActionAsync(_:)`, `bulkActionStatus(jobId:)`, `bulkActionCancel(jobId:)`, and `BulkJobCancelledError` / `BulkJobFailedError`. Synced mode waits for the server-side job to terminate before settling the mutation; pure-local mode is untouched.
+
+### Internal
+
+- Content-correctness sweep across doc comments and strings.
+
+## [8.1.0] — 2026-05-17
+
+Released to consumers but not recorded here at the time — backfilled.
+
+### Added
+
+- **`client.tenants` namespace** and **`client.connections.previewEvent`**.
+
+### Internal
+
+- Test-coverage hardening for auth, transport, and namespaces.
+
 ## [8.0.0] — 2026-05-17
 
 Combined major bump. Tags T-148 (`waitForCondition` promotion + SyncEngineTests split) and T-149 (DeviceFlow testability seams) which shipped to `main` after `v7.0.0` but were never released to consumers — T-149's DeviceFlow parameter rename drives the major. Also lands the post-T-131 carry-across: refreshed OpenAPI snapshot (61 → 68 paths), two new top-level namespaces (`client.admin`, `client.auth`), `source_id` on item updates, and the `createWithAttachments` helper.
