@@ -12,7 +12,7 @@ public struct WebhookDelivery: Codable, Sendable, Hashable, Identifiable {
     public let event: String
     public let id: String
     public let statusCode: Int?
-    public let success: Bool
+    public let succeeded: Bool
     public let webhookId: String
 
     public init(
@@ -22,7 +22,7 @@ public struct WebhookDelivery: Codable, Sendable, Hashable, Identifiable {
         event: String,
         id: String,
         statusCode: Int? = nil,
-        success: Bool,
+        succeeded: Bool,
         webhookId: String
     ) {
         self.attempt = attempt
@@ -31,7 +31,7 @@ public struct WebhookDelivery: Codable, Sendable, Hashable, Identifiable {
         self.event = event
         self.id = id
         self.statusCode = statusCode
-        self.success = success
+        self.succeeded = succeeded
         self.webhookId = webhookId
     }
 
@@ -42,7 +42,7 @@ public struct WebhookDelivery: Codable, Sendable, Hashable, Identifiable {
         case event
         case id
         case statusCode = "status_code"
-        case success
+        case succeeded
         case webhookId = "webhook_id"
     }
 }

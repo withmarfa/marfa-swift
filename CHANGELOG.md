@@ -5,6 +5,19 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0] — 2026-05-22
+
+OpenAPI re-sync for the server's `workspace_admin` → `tenant_admin` role rename.
+
+### Changed
+
+- **`KeyRole` gains a `tenantAdmin` case** (T-224 follow-up). The server renamed the `workspace_admin` role to `tenant_admin`; the SDK's `KeyRole` enum was missing the mid-tier role entirely — it carried only `admin` and `member`, so decoding an `ApiKey` or `CreatedKey` whose role is the mid-tier value threw a decoding error. `KeyRole` is now `admin | tenantAdmin | member`, with `tenantAdmin` carrying the raw value `tenant_admin`. Adding a public enum case is source-breaking for exhaustive `switch` statements over `KeyRole`, hence the major bump.
+- **`WebhookDelivery.success` renamed to `succeeded`** (T-224 boolean-naming sweep). The server renamed the `outbound_webhook_deliveries.success` column to `succeeded`; the regenerated wire type follows. Consumers reading `delivery.success` update to `delivery.succeeded`.
+
+### Internal
+
+- `scripts/openapi.json` re-synced from the monorepo. Doc comments across `MymeClient`, `AuthNamespace`, `TenantsNamespace`, `ConnectionsNamespace`, and `TenantQuota` updated from `workspace-admin` to `tenant-admin`.
+
 ## [8.2.0] — 2026-05-22
 
 OAuth endpoint discovery, plus the async bulk-action surface.

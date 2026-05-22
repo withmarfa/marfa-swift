@@ -64,8 +64,8 @@ public final class MymeClient: Sendable {
     public let integrations: IntegrationsNamespace
 
     /// Tenants API: tenant-scoped configuration plus quota read/write.
-    /// `client.tenants.{getConfig, setConfig}` are workspace-admin-gated;
-    /// `client.tenants.quotas.{getOwn, getById, set}` mixes workspace
+    /// `client.tenants.{getConfig, setConfig}` are tenant-admin-gated;
+    /// `client.tenants.quotas.{getOwn, getById, set}` mixes tenant
     /// and platform admin per method. The server enforces the role split.
     public let tenants: TenantsNamespace
 

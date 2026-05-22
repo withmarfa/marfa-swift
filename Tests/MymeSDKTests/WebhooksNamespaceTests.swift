@@ -109,7 +109,7 @@ struct WebhooksNamespaceTests {
             event: "item.created",
             id: "del-1",
             statusCode: 200,
-            success: true,
+            succeeded: true,
             webhookId: "wh-1"
         )
         mock.enqueue(Envelope(deliveries: [delivery]))

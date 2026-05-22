@@ -5,6 +5,6 @@
   "event": "item.created",
   "id": "del_01ABC",
   "status_code": 502,
-  "success": false,
+  "succeeded": false,
   "webhook_id": "whk_01ABC"
 }

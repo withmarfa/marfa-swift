@@ -2,12 +2,12 @@ import Foundation
 
 /// Tenant-scoped configuration and quotas. Mirrors the TS SDK's
 /// `client.tenants.*` surface — the SDK exposes one tenants surface; the
-/// server gates each method by role (workspace-admin vs platform-admin).
+/// server gates each method by role (tenant-admin vs platform-admin).
 ///
 /// Routes:
-/// - `GET /tenants/current/config` — workspace-admin (or platform-admin)
-/// - `PUT /tenants/current/config` — workspace-admin (or platform-admin)
-/// - `GET /tenants/me/quotas` — workspace-admin (or platform-admin)
+/// - `GET /tenants/current/config` — tenant-admin (or platform-admin)
+/// - `PUT /tenants/current/config` — tenant-admin (or platform-admin)
+/// - `GET /tenants/me/quotas` — tenant-admin (or platform-admin)
 /// - `GET /tenants/{id}/quotas` — platform-admin only
 /// - `PUT /tenants/{id}/quotas` — platform-admin only
 ///
@@ -28,7 +28,7 @@ public struct TenantsNamespace: Sendable {
 
     /// Reads the calling tenant's configuration. Returns an empty
     /// ``TenantConfig`` value when no overrides have been written.
-    /// Workspace-admin or platform-admin.
+    /// Tenant-admin or platform-admin.
     public func getConfig() async throws -> TenantConfig {
         try ensureRemote("tenants.getConfig")
         return try await transport.request(
@@ -41,7 +41,7 @@ public struct TenantsNamespace: Sendable {
 
     /// Replaces the calling tenant's configuration. PUT semantics — every
     /// field absent from ``config`` reverts to the env default.
-    /// Workspace-admin or platform-admin.
+    /// Tenant-admin or platform-admin.
     @discardableResult
     public func setConfig(_ config: TenantConfig) async throws -> TenantConfig {
         try ensureRemote("tenants.setConfig")
@@ -53,7 +53,7 @@ public struct TenantsNamespace: Sendable {
         )
     }
 
-    /// Per-tenant quota read/write. Workspace-admin can read their own
+    /// Per-tenant quota read/write. Tenant-admin can read their own
     /// row via ``TenantQuotasNamespace/getOwn()``; reads and writes
     /// targeting a specific tenant by id require platform-admin.
     public var quotas: TenantQuotasNamespace {
@@ -79,7 +79,7 @@ public struct TenantQuotasNamespace: Sendable {
     /// Reads the calling tenant's quota row. The server resolves the
     /// tenant from the bearer; the SDK never sends the tenant id on this
     /// path. Returns a row of `nil` fields when no override is
-    /// configured. Workspace-admin (or platform-admin with a
+    /// configured. Tenant-admin (or platform-admin with a
     /// tenant-bound key).
     ///
     /// Platform-admin keys with no `tenant_id` receive `400` from the
