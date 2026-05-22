@@ -5,7 +5,7 @@ import Foundation
 /// override row exists.
 ///
 /// Returned by every quota read path:
-/// - `client.tenants.quotas.getOwn()` — workspace-admin reading their own row
+/// - `client.tenants.quotas.getOwn()` — tenant-admin reading their own row
 /// - `client.tenants.quotas.getById(_:)` — platform-admin reading a specific tenant
 /// - `client.tenants.quotas.set(id:_:)` — platform-admin writing a row
 public struct TenantQuota: Codable, Sendable, Hashable {

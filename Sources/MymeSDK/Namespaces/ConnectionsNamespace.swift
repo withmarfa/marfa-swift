@@ -142,7 +142,7 @@ public struct ConnectionsNamespace: Sendable {
     ///
     /// Defaults to every subscriber in the caller's tenant; pass
     /// ``PreviewEventRequest/connectionId`` to filter to one.
-    /// Workspace-admin only.
+    /// Tenant-admin only.
     public func previewEvent(_ input: PreviewEventRequest) async throws -> PreviewEventResult {
         try ensureRemote("connections.previewEvent")
         return try await transport.request(

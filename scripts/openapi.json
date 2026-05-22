@@ -1615,7 +1615,7 @@
                     "type": "integer",
                     "minimum": 0
                   },
-                  "snapshot": {
+                  "force_snapshot": {
                     "type": "boolean"
                   },
                   "tier": {
@@ -4804,7 +4804,7 @@
         },
         "responses": {
           "200": {
-            "description": "Bulk action result",
+            "description": "Dry-run result (synchronous; non-dry-run goes async)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4863,6 +4863,122 @@
                     "succeeded",
                     "errored",
                     "dry_run"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Job queued. Poll GET /items/bulk_action/jobs/{id} until status is terminal (completed / failed / cancelled). SDKs do this transparently for callers; the envelope is exposed for explicit-control use cases.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "in_progress",
+                        "completed",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "matched": {
+                      "type": "integer"
+                    },
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "succeeded": {
+                      "type": "integer"
+                    },
+                    "errored": {
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "type": "string"
+                    },
+                    "finished_at": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "matched": {
+                          "type": "integer"
+                        },
+                        "succeeded": {
+                          "type": "integer"
+                        },
+                        "errored": {
+                          "type": "integer"
+                        },
+                        "dry_run": {
+                          "type": "boolean"
+                        },
+                        "ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "message"
+                            ]
+                          }
+                        },
+                        "blob_hashes_referenced": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "matched",
+                        "succeeded",
+                        "errored",
+                        "dry_run"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "action",
+                    "status",
+                    "matched",
+                    "processed",
+                    "succeeded",
+                    "errored"
                   ]
                 }
               }
@@ -4963,6 +5079,522 @@
                           "type": "string",
                           "enum": [
                             "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/items/bulk_action/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Items"
+        ],
+        "summary": "Get bulk_action job status",
+        "description": "Returns the current state of an asynchronous bulk_action job. Status progresses queued → in_progress → one of (completed | failed | cancelled). Once terminal, the `result` field carries the BulkActionResult envelope (matching the historic synchronous response). Only the credential that created the job or an admin can read it.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "in_progress",
+                        "completed",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "matched": {
+                      "type": "integer"
+                    },
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "succeeded": {
+                      "type": "integer"
+                    },
+                    "errored": {
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "type": "string"
+                    },
+                    "finished_at": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "matched": {
+                          "type": "integer"
+                        },
+                        "succeeded": {
+                          "type": "integer"
+                        },
+                        "errored": {
+                          "type": "integer"
+                        },
+                        "dry_run": {
+                          "type": "boolean"
+                        },
+                        "ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "message"
+                            ]
+                          }
+                        },
+                        "blob_hashes_referenced": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "matched",
+                        "succeeded",
+                        "errored",
+                        "dry_run"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "action",
+                    "status",
+                    "matched",
+                    "processed",
+                    "succeeded",
+                    "errored"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the originating credential and not an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "bulk_job_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Items"
+        ],
+        "summary": "Cancel a bulk_action job",
+        "description": "Signal cancellation. Queued jobs flip to `cancelled` immediately; in-progress jobs flip when the worker observes the flag between chunks (typically within seconds). Terminal jobs return their existing final state — no error. Auth: the originating credential or an admin.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job state after the cancel signal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "in_progress",
+                        "completed",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "matched": {
+                      "type": "integer"
+                    },
+                    "processed": {
+                      "type": "integer"
+                    },
+                    "succeeded": {
+                      "type": "integer"
+                    },
+                    "errored": {
+                      "type": "integer"
+                    },
+                    "started_at": {
+                      "type": "string"
+                    },
+                    "finished_at": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "matched": {
+                          "type": "integer"
+                        },
+                        "succeeded": {
+                          "type": "integer"
+                        },
+                        "errored": {
+                          "type": "integer"
+                        },
+                        "dry_run": {
+                          "type": "boolean"
+                        },
+                        "ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "message"
+                            ]
+                          }
+                        },
+                        "blob_hashes_referenced": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "matched",
+                        "succeeded",
+                        "errored",
+                        "dry_run"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "action",
+                    "status",
+                    "matched",
+                    "processed",
+                    "succeeded",
+                    "errored"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the originating credential and not an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "bulk_job_not_found"
                           ]
                         },
                         "message": {
@@ -7823,7 +8455,7 @@
           "Types"
         ],
         "summary": "Register a custom type",
-        "description": "Registers a custom type at runtime. Identifier must namespace under one of `app.<app-name>.<type>`, `user.<type>`, or `<publisher>.<type>` — reserved roots (`core`, `system`, `myme`) reject with `400 reserved_namespace`. Bodies are validated; mismatched semver bumps (additive change submitted as major, etc.) reject with `400 version_bump_mismatch`. Child types may not redefine ancestor fields — `400 inheritance_violation`.\n\nAdmin keys bypass; non-admin credentials need the `metadata.types:write` scope, default-off for new keys. See [Authoring types](/concepts/authoring-types) for the rubric and error catalogue.",
+        "description": "Registers a custom type at runtime. Identifier must namespace under one of `app.<app-name>.<type>`, `user.<type>`, or `<publisher>.<type>` — reserved roots (`core`, `system`, `myme`) reject with `400 reserved_namespace`. Bodies are validated; mismatched semver bumps (additive change submitted as major, etc.) reject with `400 version_bump_mismatch`. Child types may not redefine ancestor fields — `400 inheritance_violation`. Property names may not shadow first-class `Item` wire fields (`device`, `source_id`, `timestamp`, `version`, `schema_version`, `tier`, `state`, `capture_latitude`, `capture_longitude`, etc.) — `400 property_shadows_field`.\n\nAdmin keys bypass; non-admin credentials need the `metadata.types:write` scope, default-off for new keys. See [Authoring types](/concepts/authoring-types) for the rubric and error catalogue.",
         "security": [
           {
             "bearerAuth": []
@@ -10573,7 +11205,7 @@
           "Keys"
         ],
         "summary": "Create an API key",
-        "description": "Creates a new API key in the caller's tenant. The plaintext `key` field is returned **once** in the response — the server never shows it again. Store it securely; rotating means revoking the old key and creating a new one.\n\n`role` controls scope: `admin` bypasses every permission check; `workspace_admin` is the admin tier within a tenant; `member` is scoped by the three permission maps (`type_permissions`, `extension_permissions`, `edge_permissions`) plus `metadata_permissions`. `source` is stamped onto every item written by the key and is unique per tenant. `default_tier` stamps `library` or `feed` when the writing client omits a tier.\n\nIn bootstrap mode (zero keys exist on a fresh server), no auth is required and the minted key is always admin. Once any key exists, bootstrap mode disables — further key creation requires an admin or workspace_admin token. See [Permissions](/api/permissions) for the permission-map grammar.",
+        "description": "Creates a new API key in the caller's tenant. The plaintext `key` field is returned **once** in the response — the server never shows it again. Store it securely; rotating means revoking the old key and creating a new one.\n\n`role` controls scope: `admin` bypasses every permission check; `tenant_admin` is the admin tier within a tenant; `member` is scoped by the three permission maps (`type_permissions`, `extension_permissions`, `edge_permissions`) plus `metadata_permissions`. `source` is stamped onto every item written by the key and is unique per tenant. `default_tier` stamps `library` or `feed` when the writing client omits a tier.\n\nIn bootstrap mode (zero keys exist on a fresh server), no auth is required and the minted key is always admin. Once any key exists, bootstrap mode disables — further key creation requires an admin or tenant_admin token. See [Permissions](/api/permissions) for the permission-map grammar.",
         "security": [
           {
             "bearerAuth": []
@@ -10598,7 +11230,7 @@
                     "type": "string",
                     "enum": [
                       "admin",
-                      "workspace_admin",
+                      "tenant_admin",
                       "member"
                     ]
                   },
@@ -10686,7 +11318,7 @@
                       "type": "string",
                       "enum": [
                         "admin",
-                        "workspace_admin",
+                        "tenant_admin",
                         "member"
                       ]
                     },
@@ -10811,7 +11443,7 @@
           "Keys"
         ],
         "summary": "List API keys",
-        "description": "Returns every API key in the caller's tenant. Hashes are returned in lieu of plaintext — the plaintext is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour per key; treat it as a coarse activity signal, not an audit log. Admin or workspace_admin only.",
+        "description": "Returns every API key in the caller's tenant. Hashes are returned in lieu of plaintext — the plaintext is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour per key; treat it as a coarse activity signal, not an audit log. Admin or tenant_admin only.",
         "security": [
           {
             "bearerAuth": []
@@ -10970,7 +11602,7 @@
           "Keys"
         ],
         "summary": "Revoke an API key",
-        "description": "Revokes the key immediately. The next request bearing the revoked token returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. The revocation is audit-logged. Admin or workspace_admin only.",
+        "description": "Revokes the key immediately. The next request bearing the revoked token returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. The revocation is audit-logged. Admin or tenant_admin only.",
         "security": [
           {
             "bearerAuth": []
@@ -11054,7 +11686,7 @@
           "Keys"
         ],
         "summary": "Update an API key",
-        "description": "Updates mutable fields on an API key in place — `label`, `default_tier`, and the four permission maps (`type_permissions`, `extension_permissions`, `edge_permissions`, `metadata_permissions`). `source` and `role` are immutable after creation and rejected with `400 validation_error` if present in the body — to change them, revoke and recreate. Admin or workspace_admin only.",
+        "description": "Updates mutable fields on an API key in place — `label`, `default_tier`, and the four permission maps (`type_permissions`, `extension_permissions`, `edge_permissions`, `metadata_permissions`). `source` and `role` are immutable after creation and rejected with `400 validation_error` if present in the body — to change them, revoke and recreate. Admin or tenant_admin only.",
         "security": [
           {
             "bearerAuth": []
@@ -11160,7 +11792,7 @@
                       "type": "string",
                       "enum": [
                         "admin",
-                        "workspace_admin",
+                        "tenant_admin",
                         "member"
                       ]
                     },
@@ -12809,7 +13441,7 @@
           "Tenants"
         ],
         "summary": "Get the current tenant's configuration",
-        "description": "Returns the tenant-level configuration. Carries the three optional schema-enforcement levers under `enforcement` (`strict_mode`, `source_allowlist`, `source_filter` — see [Schema enforcement](/concepts/schema-enforcement)) plus the per-tenant cleanup-job overrides (`audit_retention_days`, `event_log_retention_hours`, `trash_retention_days`) that override the instance env defaults per-tenant. Returns an empty object when nothing is configured. Admin or workspace_admin.",
+        "description": "Returns the tenant-level configuration. Carries the three optional schema-enforcement levers under `enforcement` (`strict_mode`, `source_allowlist`, `source_filter` — see [Schema enforcement](/concepts/schema-enforcement)) plus the per-tenant cleanup-job overrides (`audit_retention_days`, `event_log_retention_hours`, `trash_retention_days`) that override the instance env defaults per-tenant. Returns an empty object when nothing is configured. Admin or tenant_admin.",
         "security": [
           {
             "bearerAuth": []
@@ -12986,7 +13618,7 @@
           "Tenants"
         ],
         "summary": "Replace the current tenant's configuration",
-        "description": "Overwrites the tenant's config with the supplied object — full replacement, not merge. The accepted shape carries the optional `enforcement` block (`strict_mode`, `source_allowlist`, `source_filter`) plus the per-tenant cleanup-job overrides (`audit_retention_days`, `event_log_retention_hours`, `trash_retention_days`). Cleanup-job override values must be non-negative — `0` disables the corresponding job for this tenant.\n\nAdmin or workspace_admin. See [Schema enforcement](/concepts/schema-enforcement).",
+        "description": "Overwrites the tenant's config with the supplied object — full replacement, not merge. The accepted shape carries the optional `enforcement` block (`strict_mode`, `source_allowlist`, `source_filter`) plus the per-tenant cleanup-job overrides (`audit_retention_days`, `event_log_retention_hours`, `trash_retention_days`). Cleanup-job override values must be non-negative — `0` disables the corresponding job for this tenant.\n\nAdmin or tenant_admin. See [Schema enforcement](/concepts/schema-enforcement).",
         "security": [
           {
             "bearerAuth": []
@@ -13289,7 +13921,7 @@
           "Tenants"
         ],
         "summary": "Get current tenant quotas",
-        "description": "Returns the calling tenant's quota ceilings, resolved from the calling credential's tenant so the caller doesn't need to know its own tenant id. Returns a row of nulls when no per-tenant override is configured (env defaults apply). Platform-admin keys with no tenant id receive `400` — use `GET /tenants/{id}/quotas` with the explicit id instead. Admin or workspace_admin.",
+        "description": "Returns the calling tenant's quota ceilings, resolved from the calling credential's tenant so the caller doesn't need to know its own tenant id. Returns a row of nulls when no per-tenant override is configured (env defaults apply). Platform-admin keys with no tenant id receive `400` — use `GET /tenants/{id}/quotas` with the explicit id instead. Admin or tenant_admin.",
         "security": [
           {
             "bearerAuth": []
@@ -13980,7 +14612,7 @@
           "Export"
         ],
         "summary": "Export tenant data",
-        "description": "Streams the tenant's items, edges, metadata, extensions, and blob references as NDJSON or a tar.gz archive. Filterable by `type`, `state`, `tags`, `tier`, `since` / `until`. NDJSON is the default — one JSON object per line, items first then edges then metadata, suitable for piping into another store or `jq`. `format=archive` produces a `myme-archive-v1.tar.gz` ingestible by `POST /admin/restore-archive` for tenant-to-tenant migrations.\n\nLong-running; the response keeps streaming until the filter is exhausted. Tenant-scoped — exports only what the caller can read. See [Bulk operations — archive restore](/api/bulk-operations#archive-restore) for the round-trip.",
+        "description": "Streams the tenant's items, edges, metadata, extensions, and blob references as NDJSON or a tar.gz archive. Filterable by `type`, `state`, `source`, `since` / `until`. NDJSON is the default — one JSON object per line, items first then edges then metadata, suitable for piping into another store or `jq`. `format=archive` produces a `myme-archive-v1.tar.gz` ingestible by `POST /admin/restore-archive` for tenant-to-tenant migrations.\n\nLong-running; the response keeps streaming until the filter is exhausted. Tenant-scoped — exports only what the caller can read. See [Bulk operations — archive restore](/api/bulk-operations#archive-restore) for the round-trip.",
         "security": [
           {
             "bearerAuth": []
@@ -14001,6 +14633,14 @@
             },
             "required": false,
             "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "source",
             "in": "query"
           },
           {
@@ -17609,7 +18249,7 @@
                           "attempt": {
                             "type": "number"
                           },
-                          "success": {
+                          "succeeded": {
                             "type": "boolean"
                           },
                           "error": {
@@ -17626,7 +18266,7 @@
                           "event",
                           "status_code",
                           "attempt",
-                          "success",
+                          "succeeded",
                           "error",
                           "created_at"
                         ]

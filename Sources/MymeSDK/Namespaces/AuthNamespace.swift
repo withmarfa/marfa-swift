@@ -7,7 +7,7 @@ import Foundation
 /// account-lifecycle endpoints (`/auth/account/...`).
 ///
 /// **Authentication shape.** The server accepts EITHER a bearer
-/// (workspace_admin / admin in the user's tenant) OR a better-auth session
+/// (tenant_admin / admin in the user's tenant) OR a better-auth session
 /// cookie on these endpoints. The Swift SDK always sends the bearer; CLI
 /// and SDK callers operating with an API key or an OAuth token just work.
 /// Web flows that need the cookie path use the browser directly.
