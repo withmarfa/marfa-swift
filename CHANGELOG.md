@@ -5,6 +5,72 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.0.0] — 2026-05-24
+
+Parity with the server's v7.0.0 release (`@mymehq/sdk@7.0.0`,
+`@mymehq/shared@7.0.0`). New credential surface, an extended install
+input, and a stack of new typed domain models pulled in from the
+monorepo.
+
+### Added
+
+- **`client.credentials` namespace** — `CredentialsNamespace` with two
+  factory methods. `createOAuthProvider(_:)` creates a
+  `system.credential` of kind `oauth_token` for OAuth-based integrations
+  (T-231 PR1) — used to share one Google OAuth provider row across every
+  `google.*` integration. `createApiToken(_:)` creates a credential of
+  kind `api_token` for token-based integrations (T-241 PR1, T-246) —
+  used by Todoist, Readwise, Raindrop. Both routes are tenant-admin
+  gated server-side.
+- **`CredentialKind` enum** (`apiKey | oauthToken | apiToken`) under
+  `Sources/MymeSDK/Types/Wire/Hand/`. Hand-written closed enum so apps
+  can pattern-match without comparing raw strings.
+- **`AuthScheme` enum** (`bearer | token | basic`) — controls which
+  `Authorization` header the Myme proxy stamps on outbound calls when
+  the connection's credential is of kind `api_token`. Mirrors the
+  server's `auth_scheme` field (T-246) — Readwise, GitHub PATs, and a
+  few other upstreams need `Token` instead of `Bearer`.
+- **`CreateOAuthProviderCredentialInput`**, **`CreateApiTokenCredentialInput`**,
+  **`CreatedCredential`** input/response types under
+  `Sources/MymeSDK/Inputs/CredentialInputs.swift`. Mirror the server's
+  `POST /credentials/oauth-provider` and `POST /credentials/api-token`
+  shapes.
+- **`ConnectionInstallInput` gains `credentialRef: String?` and
+  `configuration: [String: JSONValue]?`** (regenerated wire type). Pass
+  the credential id returned by ``CredentialsNamespace`` so the new
+  connection inherits the shared upstream credential; pass
+  `configuration` for per-connection overrides (T-254 added
+  `upstream_base_url` as the first such override).
+- **New typed domain models** auto-pulled from the monorepo's core type
+  set: `todoist.task` (TodoistTask), `readwise.book` / `readwise.highlight`
+  (ReadwiseBook / ReadwiseHighlight), `raindrop.raindrop` / `raindrop.collection`
+  (RaindropRaindrop / RaindropCollection), `mymehq.captured_email`
+  (MymehqCapturedEmail), `google.tasks.task` / `google.contacts.contact` /
+  `google.drive.file` (GoogleTasksTask / GoogleContactsContact /
+  GoogleDriveFile). 32 core types total — every type the monorepo's
+  `packages/types/core/` ships.
+
+### Fixed
+
+- **`codegen-domain` now backtick-escapes Swift reserved keywords**
+  (`public`, `private`, `default`, etc.) when they appear as JSON field
+  names. Surfaced by `raindrop.collection.public: Bool` — the previous
+  generator emitted `var public: Bool?` which failed to compile. The
+  fix mirrors what the custom-type codegen has had since day one.
+
+### Changed
+
+- **`MymeClient` constructor now wires `credentials`** alongside
+  `connections`, `integrations`, etc. No source-breaking impact on
+  existing call sites — the new namespace is additive.
+
+### Internal
+
+- `scripts/openapi.json` re-synced from monorepo `main` at `32906a1`.
+- `scripts/MymeCodegenCore/core-types/` re-synced from monorepo
+  `packages/types/core/` at `32906a1`.
+- All 619 SDK tests pass.
+
 ## [9.0.0] — 2026-05-22
 
 OpenAPI re-sync for the server's `workspace_admin` → `tenant_admin` role rename.

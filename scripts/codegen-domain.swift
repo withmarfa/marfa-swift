@@ -96,11 +96,34 @@ func swiftType(for field: FieldDefinition, required: Bool) -> String {
     return required ? base : "\(base)?"
 }
 
-/// Converts a snake_case field name to lowerCamelCase Swift identifier.
+/// Swift reserved words that need backtick escaping when used as
+/// identifiers. Field names like `public`, `private`, `default` etc. on
+/// upstream core types (e.g. `raindrop.collection.public`) trip the
+/// compiler otherwise. Conservative list — extends as new collisions
+/// surface.
+let swiftReservedWords: Set<String> = [
+    "associatedtype", "class", "deinit", "enum", "extension", "fileprivate",
+    "func", "import", "init", "inout", "internal", "let", "open", "operator",
+    "private", "protocol", "public", "rethrows", "static", "struct", "subscript",
+    "typealias", "var", "break", "case", "catch", "continue", "default", "defer",
+    "do", "else", "fallthrough", "for", "guard", "if", "in", "repeat", "return",
+    "switch", "throw", "throws", "where", "while", "as", "false", "is", "nil",
+    "self", "Self", "super", "true", "try",
+]
+
+/// Wraps a Swift identifier in backticks if it collides with a reserved
+/// word. Otherwise returns the identifier unchanged.
+func escapeIfReserved(_ identifier: String) -> String {
+    swiftReservedWords.contains(identifier) ? "`\(identifier)`" : identifier
+}
+
+/// Converts a snake_case field name to lowerCamelCase Swift identifier,
+/// backtick-escaping if the result collides with a Swift reserved word.
 func camelCase(_ snake: String) -> String {
     let parts = snake.split(separator: "_", omittingEmptySubsequences: true)
-    guard let first = parts.first else { return snake }
-    return String(first) + parts.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+    guard let first = parts.first else { return escapeIfReserved(snake) }
+    let raw = String(first) + parts.dropFirst().map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+    return escapeIfReserved(raw)
 }
 
 /// Converts a type ID like "core.media.tv_episode" to a Swift struct name "CoreMediaTvEpisode".
