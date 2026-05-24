@@ -1,0 +1,14 @@
+{
+  "created_at": "2026-04-14T10:00:00Z",
+  "default_tier": "library",
+  "edge_permissions": { "parent": "write" },
+  "extension_permissions": { "marfa.source": "read" },
+  "id": "key_01NEW",
+  "is_platform": false,
+  "key": "marfa_k1_abcdef0123456789",
+  "label": "New integration key",
+  "last_used_at": "2026-04-14T10:00:00Z",
+  "role": "admin",
+  "source": "cli",
+  "type_permissions": { "core.note": "write" }
+}

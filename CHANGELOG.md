@@ -7,8 +7,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [10.0.0] — 2026-05-24
 
-Parity with the server's v7.0.0 release (`@mymehq/sdk@7.0.0`,
-`@mymehq/shared@7.0.0`). New credential surface, an extended install
+Parity with the server's v7.0.0 release (`@withmarfa/sdk@7.0.0`,
+`@withmarfa/shared@7.0.0`). New credential surface, an extended install
 input, and a stack of new typed domain models pulled in from the
 monorepo.
 
@@ -23,16 +23,16 @@ monorepo.
   used by Todoist, Readwise, Raindrop. Both routes are tenant-admin
   gated server-side.
 - **`CredentialKind` enum** (`apiKey | oauthToken | apiToken`) under
-  `Sources/MymeSDK/Types/Wire/Hand/`. Hand-written closed enum so apps
+  `Sources/MarfaSDK/Types/Wire/Hand/`. Hand-written closed enum so apps
   can pattern-match without comparing raw strings.
 - **`AuthScheme` enum** (`bearer | token | basic`) — controls which
-  `Authorization` header the Myme proxy stamps on outbound calls when
+  `Authorization` header the Marfa proxy stamps on outbound calls when
   the connection's credential is of kind `api_token`. Mirrors the
   server's `auth_scheme` field (T-246) — Readwise, GitHub PATs, and a
   few other upstreams need `Token` instead of `Bearer`.
 - **`CreateOAuthProviderCredentialInput`**, **`CreateApiTokenCredentialInput`**,
   **`CreatedCredential`** input/response types under
-  `Sources/MymeSDK/Inputs/CredentialInputs.swift`. Mirror the server's
+  `Sources/MarfaSDK/Inputs/CredentialInputs.swift`. Mirror the server's
   `POST /credentials/oauth-provider` and `POST /credentials/api-token`
   shapes.
 - **`ConnectionInstallInput` gains `credentialRef: String?` and
@@ -44,8 +44,8 @@ monorepo.
 - **New typed domain models** auto-pulled from the monorepo's core type
   set: `todoist.task` (TodoistTask), `readwise.book` / `readwise.highlight`
   (ReadwiseBook / ReadwiseHighlight), `raindrop.raindrop` / `raindrop.collection`
-  (RaindropRaindrop / RaindropCollection), `mymehq.captured_email`
-  (MymehqCapturedEmail), `google.tasks.task` / `google.contacts.contact` /
+  (RaindropRaindrop / RaindropCollection), `withmarfa.captured_email`
+  (MarfahqCapturedEmail), `google.tasks.task` / `google.contacts.contact` /
   `google.drive.file` (GoogleTasksTask / GoogleContactsContact /
   GoogleDriveFile). 32 core types total — every type the monorepo's
   `packages/types/core/` ships.
@@ -60,14 +60,14 @@ monorepo.
 
 ### Changed
 
-- **`MymeClient` constructor now wires `credentials`** alongside
+- **`MarfaClient` constructor now wires `credentials`** alongside
   `connections`, `integrations`, etc. No source-breaking impact on
   existing call sites — the new namespace is additive.
 
 ### Internal
 
 - `scripts/openapi.json` re-synced from monorepo `main` at `32906a1`.
-- `scripts/MymeCodegenCore/core-types/` re-synced from monorepo
+- `scripts/MarfaCodegenCore/core-types/` re-synced from monorepo
   `packages/types/core/` at `32906a1`.
 - All 619 SDK tests pass.
 
@@ -82,7 +82,7 @@ OpenAPI re-sync for the server's `workspace_admin` → `tenant_admin` role renam
 
 ### Internal
 
-- `scripts/openapi.json` re-synced from the monorepo. Doc comments across `MymeClient`, `AuthNamespace`, `TenantsNamespace`, `ConnectionsNamespace`, and `TenantQuota` updated from `workspace-admin` to `tenant-admin`.
+- `scripts/openapi.json` re-synced from the monorepo. Doc comments across `MarfaClient`, `AuthNamespace`, `TenantsNamespace`, `ConnectionsNamespace`, and `TenantQuota` updated from `workspace-admin` to `tenant-admin`.
 
 ## [8.2.0] — 2026-05-22
 
@@ -90,7 +90,7 @@ OAuth endpoint discovery, plus the async bulk-action surface.
 
 ### Changed
 
-- **OAuth endpoints are discovered, not hardcoded** (T-216). `MymeAuth` and `DeviceFlow` now fetch `${issuer}/.well-known/oauth-authorization-server` and resolve the token / authorize / revoke / device endpoints from it. T-131 moved the server's OAuth surface to `/auth/oauth2/*`; the SDK still constructed the pre-T-131 paths, so refresh, code-flow exchange, and revoke 404'd against an updated server. The discovery doc is fetched once and cached for the process; a discovery failure raises a clear error rather than falling back to dead paths. Public `MymeAuth` / `DeviceFlow` call sites are unchanged — discovery happens internally.
+- **OAuth endpoints are discovered, not hardcoded** (T-216). `MarfaAuth` and `DeviceFlow` now fetch `${issuer}/.well-known/oauth-authorization-server` and resolve the token / authorize / revoke / device endpoints from it. T-131 moved the server's OAuth surface to `/auth/oauth2/*`; the SDK still constructed the pre-T-131 paths, so refresh, code-flow exchange, and revoke 404'd against an updated server. The discovery doc is fetched once and cached for the process; a discovery failure raises a clear error rather than falling back to dead paths. Public `MarfaAuth` / `DeviceFlow` call sites are unchanged — discovery happens internally.
 
 ### Added
 
@@ -126,14 +126,14 @@ Combined major bump. Tags T-148 (`waitForCondition` promotion + SyncEngineTests 
   - `client.admin.tenants.keys(id:)` — active key listing for a tenant.
   - `client.admin.tenants.quotas.get(id:)` / `set(id:_:)` — per-tenant quota read/write.
   - `client.admin.accountDeletion.purgeNow()` — force a one-shot run of the pending-delete purger.
-- **`client.auth.account`** (T-116) — post-sign-in account-lifecycle endpoints. Distinct from `MymeAuth` / `Passkey` / `DeviceFlow` which run the sign-in ceremony.
+- **`client.auth.account`** (T-116) — post-sign-in account-lifecycle endpoints. Distinct from `MarfaAuth` / `Passkey` / `DeviceFlow` which run the sign-in ceremony.
   - `client.auth.account.requestDelete()` — initiate deletion (mints token + dispatches confirmation email).
   - `client.auth.account.confirmDelete(token:)` — programmatic equivalent of the confirmation-email link.
   - `client.auth.account.cancel()` — cancel an in-flight deletion.
-- **`client.items.createWithAttachments(_:)`** (T-100) — atomic host + attachment(s) write. Uploads every attachment's blob concurrently, then issues one `items.bulk` call with `mode: .createOnly` and `atomic: true`, and hydrates the host + attachments via per-id reads. Auto-edges from each attachment back to the host (default `attached-to`; configurable via `edgeType`). Caller-supplied edges merge additively. Throws annotated `MymeError`s on per-step failure.
+- **`client.items.createWithAttachments(_:)`** (T-100) — atomic host + attachment(s) write. Uploads every attachment's blob concurrently, then issues one `items.bulk` call with `mode: .createOnly` and `atomic: true`, and hydrates the host + attachments via per-id reads. Auto-edges from each attachment back to the host (default `attached-to`; configurable via `edgeType`). Caller-supplied edges merge additively. Throws annotated `MarfaError`s on per-step failure.
 - **`source_id` on item updates** (T-131, server v5.5.0) — `UpdateOptions.sourceId` and the underlying `UpdateItemBody.source_id` field. Renames the natural key under the item's `source`; server enforces `(source, source_id)` uniqueness with a fresh `source_id_conflict` 409 code (separate from the existing version-conflict path). Travels through the mutation queue + replay for synced-mode callers.
 - **SSE decode-failure logging.** Malformed SSE events now log on the `sync` category (`sync.sse.decode_failed event=... type=... reason=...`) rather than silently dropping via `try?`. Closes the "stream open, no events applied" invisible-failure mode.
-- **Structured `lastError` on dropped mutations.** `SyncEngine` formats the failing `MymeError` into `code=... status=... message=... details={...}` rather than calling `error.localizedDescription`, preserving the structured code / status / details for downstream surfaces.
+- **Structured `lastError` on dropped mutations.** `SyncEngine` formats the failing `MarfaError` into `code=... status=... message=... details={...}` rather than calling `error.localizedDescription`, preserving the structured code / status / details for downstream surfaces.
 
 ### Changed
 
@@ -163,16 +163,16 @@ existing rows survive untouched.
 
 - **`DroppedMutationModel` (V2 schema, `@Model`).** Persistent record
   of every mutation the engine drops permanently. Carries the
-  original payload, the dropping `MymeError` shape (status / code /
+  original payload, the dropping `MarfaError` shape (status / code /
   message capped at 1024 chars / details JSON), the original
   enqueue timestamp, and the drop timestamp.
 - **`DroppedMutationRecord` Sendable DTO + `MutationQueue.fetchDropped()`.**
   Returns every dropped row, newest first.
-- **`MymeStore.queryDroppedMutations()`** vending
+- **`MarfaStore.queryDroppedMutations()`** vending
   `DroppedMutationsQuery` (`@Observable @MainActor`). Refreshes on
   the same `ModelContext.didSave` + 50 ms debounce as every other
   reactive query. Returns `nil` for clients without a sync engine.
-- **Dismissal APIs on `MymeStore`** (forwarding to `MutationQueue`):
+- **Dismissal APIs on `MarfaStore`** (forwarding to `MutationQueue`):
   - `store.dismissDropped(id:)` — single row.
   - `store.dismissDroppedOlderThan(_:)` — strictly less-than the
     cutoff. Lets long-running apps clear stale rows without the SDK
@@ -180,7 +180,7 @@ existing rows survive untouched.
   - `store.dismissAllDropped()` — clears the table.
 - **First on-disk migration test in the repo.**
   `SchemaMigrationTests` writes a V1 store, closes the container,
-  reopens via `MymeModelContainer.make` (which uses the V2
+  reopens via `MarfaModelContainer.make` (which uses the V2
   migration plan), and asserts: existing rows survive,
   `DroppedMutationModel` queryable + empty, post-migration inserts
   succeed.
@@ -202,7 +202,7 @@ existing rows survive untouched.
 - Lightweight V1 → V2 migration shipped via
   `MigrationStage.lightweight(fromVersion:toVersion:)`. No data
   reshape, just a new table.
-- The drop-and-recreate fallback in `MymeModelContainer.make` is
+- The drop-and-recreate fallback in `MarfaModelContainer.make` is
   unchanged. It's conservative-aggressive — any future migration
   failure (corrupt store, broken custom stage) will also clear the
   `DroppedMutationModel` rows. The dropped log is therefore
@@ -228,7 +228,7 @@ Additive only — no schema bump, no wire breaks.
 - **`SyncEngine.fullSyncState`** point-read accessor for tests and
   headless callers; `SyncEngine.lastCleanDrainAt` exposes the persisted
   timestamp directly. Both are `async` getters on the actor.
-- **`MymeStore.queryFullSyncState()`** vending `FullSyncStateQuery`
+- **`MarfaStore.queryFullSyncState()`** vending `FullSyncStateQuery`
   (`@Observable @MainActor`). Seeds initial state from the persisted
   `last_clean_drain_at` timestamp, then folds `SyncEngine.events`
   (`.syncing` / `.synced(at:)` / `.failed(error:)`) into the discrete
@@ -272,13 +272,13 @@ CI hygiene release.
 TSC42 rollout. Breaking schema change on the local store; pre-5.0
 stores cannot be lightweight-migrated to this version. The SDK had
 no real users at this point and the recovery is drop-and-recreate
-(`MymeModelContainer.make` deletes and reopens on schema mismatch).
+(`MarfaModelContainer.make` deletes and reopens on schema mismatch).
 
 ### Changed
 
 - **`Item.library: Bool` → `Item.tier: String`.** Tier-axis rename
   with a new persisted field shape (`feed` / `vault`).
-- **New `SchemaVersionMismatchError` (`MymeError` subclass).** Surfaces
+- **New `SchemaVersionMismatchError` (`MarfaError` subclass).** Surfaces
   server-side schema-mismatch responses; `isPermanent` returns `true`
   so the engine drops mutations rejected for schema drift.
 - **Reserved-root type-id validator.** `core.*` and `sys.*` are now
@@ -317,7 +317,7 @@ for the SDK plus one new recommendation.
   `store.queryBlobUploadProgress()` (returns `nil` for network-only
   clients). Tracks per-hash `BlobUploadProgress` entries with `state:
   BlobUploadState` (`.pending` / `.uploading(bytesUploaded:totalBytes:)`
-  / `.completed` / `.failed(MymeError)`). Entries are evicted from
+  / `.completed` / `.failed(MarfaError)`). Entries are evicted from
   the `uploads` dict on `blobUploadCompleted` — apps wanting a
   "recently completed" fade layer it on top. Replaces the hand-rolled
   `AttachmentUploadTracker` pattern in consumer apps.
@@ -332,7 +332,7 @@ for the SDK plus one new recommendation.
   `MockTransport` both implement; third-party transports get a
   default that routes through `rawRequest` and drops progress.
 - **`BlobsNamespace.upload(data:mimeType:onProgress:)` optional
-  callback.** Direct-mode callers (network-only `MymeClient`) can
+  callback.** Direct-mode callers (network-only `MarfaClient`) can
   observe progress without subscribing to the reactive layer. Synced
   mode ignores the callback (uploads are queued; use the reactive
   query for progress). Unchanged default call signature.
@@ -414,7 +414,7 @@ and edges. The 4.3.0 tag is reserved for the parked
 - `MutationKind.bulkEdges` appended to the enum — additive-only as
   required for CloudKit-mirrored stores.
 - `openapi.json` snapshot resynced from the monorepo at
-  `@mymehq/sdk` 3.8.0.
+  `@withmarfa/sdk` 3.8.0.
 - Cross-batch atomicity does NOT hold for the `bulkAll` helpers.
   Each batch's `atomic` guarantee stops at its own transaction —
   callers relying on strict all-or-nothing semantics for a run larger
@@ -424,7 +424,7 @@ and edges. The 4.3.0 tag is reserved for the parked
 
 Defensive bug fix. `TypesNamespace`, `KeysNamespace`, and
 `WebhooksNamespace` previously hit the transport unconditionally. On a
-pure-local client (`MymeClient.local(path:)` or the iCloud-mode
+pure-local client (`MarfaClient.local(path:)` or the iCloud-mode
 `local(container:)`) the transport is bound to a placeholder
 `local://offline` URL, so every call exploded with an opaque
 `URLError` instead of a typed SDK error. Only `types.get(id:)` was
@@ -441,25 +441,25 @@ shape and would have failed the moment a consumer touched them.
 ## [4.2.1] — 2026-04-23
 
 Additive test-support release. Gives consumer-app test suites a
-one-liner path off the file-backed `MymeClient.local(path: <uuid>)`
+one-liner path off the file-backed `MarfaClient.local(path: <uuid>)`
 pattern that was crashing later tests in the same process with
-`"Failed to cast model MymeSDK.MymeItemModel… to MymeItemModel"`.
+`"Failed to cast model MarfaSDK.MarfaItemModel… to MarfaItemModel"`.
 
 ### Added
-- **`MymeSDKTest.makeInMemoryClient()`** — builds a pure-local
-  ``MymeClient`` backed by a fresh in-memory `ModelContainer`. Drop-in
-  replacement for `MymeClient.local(path: <uuid>)` in test setups.
+- **`MarfaSDKTest.makeInMemoryClient()`** — builds a pure-local
+  ``MarfaClient`` backed by a fresh in-memory `ModelContainer`. Drop-in
+  replacement for `MarfaClient.local(path: <uuid>)` in test setups.
 - **Consumer-app test-setup guidance** in
-  `Sources/MymeSDK/LocalStore/README.md`.
+  `Sources/MarfaSDK/LocalStore/README.md`.
 
 ### Notes
 - The most plausible root cause of the crash is XCTest host-bundle
-  linkage loading two distinct `MymeSDK.MymeItemModel` class pointers
+  linkage loading two distinct `MarfaSDK.MarfaItemModel` class pointers
   into the same process — the persistent-store code path is where that
   ambiguity surfaces. In-memory containers sidestep the persistent
   stack entirely. No SDK runtime change was made; this is a
   test-support and docs release.
-- `MymeSDKTestSupport` is explicitly non-semver-stable across SDK
+- `MarfaSDKTestSupport` is explicitly non-semver-stable across SDK
   minor versions. The helper is additive and safe to adopt immediately.
 
 ## [4.2.0] — 2026-04-23
@@ -467,27 +467,27 @@ pattern that was crashing later tests in the same process with
 Opens the SwiftData container up for caller-controlled CloudKit
 mirroring. Consumers that want iCloud sync can now build a container
 with `cloudKitDatabase: .automatic(containerIdentifier: …)` and pass it
-straight to `MymeClient`. The pure-local convenience path is unchanged.
+straight to `MarfaClient`. The pure-local convenience path is unchanged.
 
 ### Added
-- **`MymeClient.local(container:)`** — new public async factory taking a
+- **`MarfaClient.local(container:)`** — new public async factory taking a
   caller-built `ModelContainer`. This is the low-level entry point; use
   it when you need to configure the container directly (for example,
-  to opt into CloudKit mirroring). `MymeClient.local(path:)` remains
+  to opt into CloudKit mirroring). `MarfaClient.local(path:)` remains
   and is now a convenience that delegates to it.
-- **`cloudKitDatabase:` parameter on `MymeModelContainer.make`.**
+- **`cloudKitDatabase:` parameter on `MarfaModelContainer.make`.**
   Defaults to `.none` so existing call sites are unaffected. Pass
   `.automatic(containerIdentifier: "iCloud.…")` to turn on CloudKit
   mirroring. In-memory containers ignore the argument — mirroring
   requires a persistent store.
 
 ### Changed
-- **`MymeModelContainer` is now fully public** (previously
-  `@_spi(MymeSDKTestSupport) public`). Consumers need direct access to
+- **`MarfaModelContainer` is now fully public** (previously
+  `@_spi(MarfaSDKTestSupport) public`). Consumers need direct access to
   build containers with custom CloudKit configuration before handing
-  them to `MymeClient.local(container:)`.
+  them to `MarfaClient.local(container:)`.
 - **`scripts/cloudkit-smoke`** now uses the public
-  `MymeModelContainer.make(path:cloudKitDatabase:)` API instead of
+  `MarfaModelContainer.make(path:cloudKitDatabase:)` API instead of
   reaching into SPI internals. One less demonstration of the old
   pattern to remove later.
 
@@ -511,15 +511,15 @@ CloudKit-compatible schema. The reactive layer and the sync engine
 keep their public shape; the factories move to `async throws`.
 
 ### Added
-- **SwiftData `@Model` schema** (`Sources/MymeSDK/LocalStore/Schema/V1/`) — six models (item, edge, metadata, pending mutation, sync state, pending blob). CloudKit-compatible from day one: no `#Unique`, all properties defaulted, all relationships optional with explicit inverse on one side, no `.deny` rules, Codable enums persist via their `String` rawValue.
-- **`MymeModelContainer.make(path:)`** — single construction entry point. Exposed via `@_spi(MymeSDKTestSupport)` so test targets can build in-memory containers without leaking the constructor into the public surface.
-- **`MymeSDKTestSupport.MymeSDKTest`** — `makeInMemoryContainer()`, `makeInMemoryLocalStore()`, `makeInMemoryStorePair()`, `waitForRefetch(after:)` helpers so tests match the production actor-construction path (`Task.detached` off-main).
-- **`PredicateConventions.swift`** — documents the SwiftData predicate-safe subset every fetch and reactive refetch sticks to. `Tests/MymeSDKTests/PredicateSafetyTests.swift` regresses every supported predicate shape so a refactor can't silently drift off it.
-- **`cloudkit-smoke` executable** — manual pre-tag schema validation against a developer's CloudKit container (`MYME_CK_CONTAINER` env var). Not in CI (GitHub runners don't carry CloudKit entitlements). See `Sources/MymeSDK/LocalStore/README.md`.
+- **SwiftData `@Model` schema** (`Sources/MarfaSDK/LocalStore/Schema/V1/`) — six models (item, edge, metadata, pending mutation, sync state, pending blob). CloudKit-compatible from day one: no `#Unique`, all properties defaulted, all relationships optional with explicit inverse on one side, no `.deny` rules, Codable enums persist via their `String` rawValue.
+- **`MarfaModelContainer.make(path:)`** — single construction entry point. Exposed via `@_spi(MarfaSDKTestSupport)` so test targets can build in-memory containers without leaking the constructor into the public surface.
+- **`MarfaSDKTestSupport.MarfaSDKTest`** — `makeInMemoryContainer()`, `makeInMemoryLocalStore()`, `makeInMemoryStorePair()`, `waitForRefetch(after:)` helpers so tests match the production actor-construction path (`Task.detached` off-main).
+- **`PredicateConventions.swift`** — documents the SwiftData predicate-safe subset every fetch and reactive refetch sticks to. `Tests/MarfaSDKTests/PredicateSafetyTests.swift` regresses every supported predicate shape so a refactor can't silently drift off it.
+- **`cloudkit-smoke` executable** — manual pre-tag schema validation against a developer's CloudKit container (`MARFA_CK_CONTAINER` env var). Not in CI (GitHub runners don't carry CloudKit entitlements). See `Sources/MarfaSDK/LocalStore/README.md`.
 - **`RefreshDebounce.interval`** — single constant (50 ms) tuning the reactive debounce window across all seven query types.
 
 ### Changed
-- **Factories moved to `async throws`.** `MymeClient.local(_:)` and `MymeClient.synced(...)` construct their actors via `Task.detached` so the synthesised `@ModelActor` init doesn't bind to `@MainActor`. Every call site updates `try` → `try await`.
+- **Factories moved to `async throws`.** `MarfaClient.local(_:)` and `MarfaClient.synced(...)` construct their actors via `Task.detached` so the synthesised `@ModelActor` init doesn't bind to `@MainActor`. Every call site updates `try` → `try await`.
 - **`LocalStore` and `MutationQueue` are `@ModelActor`s** sharing one `ModelContainer`. Public method signatures preserved. Wire types (`Item`, `Edge`, `Metadata`) cross actor boundaries; `@Model` instances never do (mapped via `Schema/V1/Mappers.swift`).
 - **`PendingMutationRecord` is a Sendable Codable DTO** (not a GRDB `PersistableRecord`). The `SyncEngine` and the rewrite/cascade logic operate on records, not models. Shape is byte-for-byte the legacy struct.
 - **Reactive queries rebuilt on `ModelContext.didSave`** + 50 ms debounce + refetch. Every query type listens via `NotificationCenter.notifications(named:)` (an async sequence — no observer-token leak), runs the refetch on `@MainActor`. Public API of the seven query types (`ItemQuery`, `TypedItemQuery`, `SingleItemQuery`, `EdgesQuery`, `BackrefsQuery`, `TagsQuery`, `ItemsWithMetadataQuery`) unchanged.
@@ -538,8 +538,8 @@ keep their public shape; the factories move to `async throws`.
 
 - **No automatic migration from pre-4.0 stores.** Any on-disk store from SDK 3.x or earlier is incompatible with the new schema. Consumers must delete and recreate their stores on upgrade. The SDK is pre-release; no external users depend on automatic migration.
 - **CloudKit sync is unlocked but not enabled.** `cloudKitDatabase: .none` in 4.0. Phase 2 (consumer app's iCloud sync work) flips this to `.automatic` against the app's ubiquity container. The schema is already validated for CloudKit compatibility via `cloudkit-smoke`.
-- **Every namespace API is unchanged.** Items, Metadata, Extensions, Edges, Blobs, Types, Keys, Webhooks — same methods, same parameters, same return types. Only `MymeClient.local(_:)` and `MymeClient.synced(...)` need a `try await` at the call site.
+- **Every namespace API is unchanged.** Items, Metadata, Extensions, Edges, Blobs, Types, Keys, Webhooks — same methods, same parameters, same return types. Only `MarfaClient.local(_:)` and `MarfaClient.synced(...)` need a `try await` at the call site.
 
-[4.2.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.2.0
-[4.1.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.1.0
-[4.0.0]: https://github.com/mymehq/swift-sdk/releases/tag/4.0.0
+[4.2.0]: https://github.com/withmarfa/swift-sdk/releases/tag/4.2.0
+[4.1.0]: https://github.com/withmarfa/swift-sdk/releases/tag/4.1.0
+[4.0.0]: https://github.com/withmarfa/swift-sdk/releases/tag/4.0.0

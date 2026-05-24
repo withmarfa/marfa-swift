@@ -1,5 +1,5 @@
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 @Suite struct SchemaResolverTests {
 

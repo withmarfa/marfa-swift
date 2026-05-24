@@ -1,6 +1,6 @@
-# MymeSDK
+# MarfaSDK
 
-The Swift SDK for the [Myme](https://myme.so) API — a typed data layer for structured personal data.
+The Swift SDK for the [Marfa](https://marfa.so) API — a typed data layer for structured personal data.
 
 ## Requirements
 
@@ -9,13 +9,13 @@ The Swift SDK for the [Myme](https://myme.so) API — a typed data layer for str
 
 ## Install
 
-In Xcode: **File → Add Package Dependencies… → `https://github.com/mymehq/swift-sdk`**.
+In Xcode: **File → Add Package Dependencies… → `https://github.com/withmarfa/swift-sdk`**.
 
 Or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mymehq/swift-sdk", from: "8.1.0"),
+    .package(url: "https://github.com/withmarfa/swift-sdk", from: "8.1.0"),
 ]
 ```
 
@@ -24,24 +24,24 @@ dependencies: [
 Three client modes cover the common shapes:
 
 ```swift
-import MymeSDK
+import MarfaSDK
 
-// Remote — talks to a Myme server over HTTPS.
-let client = MymeClient(url: URL(string: "https://myme.example.com")!, apiKey: "myme_k1_…")
+// Remote — talks to a Marfa server over HTTPS.
+let client = MarfaClient(url: URL(string: "https://marfa.example.com")!, apiKey: "marfa_k1_…")
 
 let note = try await client.items.create(
     CreateItemInput(type: "core.note", properties: ["body": .string("Hello")])
 )
 
 // Pure-local — backed by an on-device SwiftData store. No server, no API key.
-let offline = try await MymeClient.local(path: "/path/to/store.sqlite")
+let offline = try await MarfaClient.local(path: "/path/to/store.sqlite")
 
 // Synced — writes go local first, replay to the server when reachable.
-let synced = try await MymeClient.synced(url: url, apiKey: key, storePath: "/path/to/store.sqlite")
+let synced = try await MarfaClient.synced(url: url, apiKey: key, storePath: "/path/to/store.sqlite")
 await synced.syncEngine?.start()
 ```
 
-SwiftUI-ready reactive queries are available on the pure-local and synced clients via `client.makeStore()`. See the [Swift SDK guide](https://docs.myme.so/sdks/swift) for reactive queries, custom-type codegen, and the full API surface.
+SwiftUI-ready reactive queries are available on the pure-local and synced clients via `client.makeStore()`. See the [Swift SDK guide](https://docs.marfa.so/sdks/swift) for reactive queries, custom-type codegen, and the full API surface.
 
 ## Build and test
 
@@ -53,13 +53,13 @@ swift test
 Integration tests against a running server opt in via environment variables:
 
 ```bash
-MYME_API_URL=… MYME_API_KEY=… swift test
+MARFA_API_URL=… MARFA_API_KEY=… swift test
 ```
 
 ## Documentation
 
 - Architecture, conventions, codegen workflows, and contributor guidance: [`CLAUDE.md`](./CLAUDE.md)
-- Guides and API reference: <https://docs.myme.so>
+- Guides and API reference: <https://docs.marfa.so>
 - Release notes: [`CHANGELOG.md`](./CHANGELOG.md)
 
 ## License

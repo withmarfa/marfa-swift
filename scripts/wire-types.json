@@ -1,6 +1,6 @@
 {
   "specPath": "scripts/openapi.json",
-  "outputDir": "Sources/MymeSDK/Types/Wire/Generated",
+  "outputDir": "Sources/MarfaSDK/Types/Wire/Generated",
   "numericIntFields": [
     "version",
     "schema_version",

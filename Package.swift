@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "MymeSDK",
+    name: "MarfaSDK",
     platforms: [
         .iOS(.v18),
         .macOS(.v15),
@@ -11,12 +11,12 @@ let package = Package(
         .tvOS(.v18),
     ],
     products: [
-        .library(name: "MymeSDK", targets: ["MymeSDK"]),
-        .library(name: "MymeSDKTestSupport", targets: ["MymeSDKTestSupport"]),
+        .library(name: "MarfaSDK", targets: ["MarfaSDK"]),
+        .library(name: "MarfaSDKTestSupport", targets: ["MarfaSDKTestSupport"]),
         .executable(name: "codegen-custom-types", targets: ["codegen-custom-types"]),
         .executable(name: "sync-custom-types", targets: ["sync-custom-types"]),
         .executable(name: "cloudkit-smoke", targets: ["cloudkit-smoke"]),
-        .plugin(name: "GenerateMymeCustomTypes", targets: ["GenerateMymeCustomTypes"]),
+        .plugin(name: "GenerateMarfaCustomTypes", targets: ["GenerateMarfaCustomTypes"]),
     ],
     dependencies: [
         // No external dependencies — the SDK builds on Foundation,
@@ -24,15 +24,15 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "MymeSDK"
+            name: "MarfaSDK"
         ),
         .target(
-            name: "MymeSDKTestSupport",
-            dependencies: ["MymeSDK"]
+            name: "MarfaSDKTestSupport",
+            dependencies: ["MarfaSDK"]
         ),
         .testTarget(
-            name: "MymeSDKTests",
-            dependencies: ["MymeSDK", "MymeSDKTestSupport"],
+            name: "MarfaSDKTests",
+            dependencies: ["MarfaSDK", "MarfaSDKTestSupport"],
             resources: [.copy("Fixtures")]
         ),
 
@@ -44,7 +44,7 @@ let package = Package(
             exclude: [
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
                 "sync-types.sh", "codegen-domain.swift",
-                "MymeCodegenCore", "codegen-custom-types", "sync-custom-types",
+                "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
                 "cloudkit-smoke",
             ],
             sources: ["codegen-wire.swift"]
@@ -55,7 +55,7 @@ let package = Package(
             exclude: [
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
                 "sync-types.sh", "codegen-wire.swift",
-                "MymeCodegenCore", "codegen-custom-types", "sync-custom-types",
+                "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
                 "cloudkit-smoke",
             ],
             sources: ["codegen-domain.swift"]
@@ -64,26 +64,26 @@ let package = Package(
         // MARK: - Codegen — custom types (new)
 
         .target(
-            name: "MymeCodegenCore",
-            path: "scripts/MymeCodegenCore",
+            name: "MarfaCodegenCore",
+            path: "scripts/MarfaCodegenCore",
             resources: [.copy("core-types")]
         ),
         .executableTarget(
             name: "codegen-custom-types",
-            dependencies: ["MymeCodegenCore"],
+            dependencies: ["MarfaCodegenCore"],
             path: "scripts/codegen-custom-types"
         ),
         .executableTarget(
             name: "sync-custom-types",
-            dependencies: ["MymeCodegenCore"],
+            dependencies: ["MarfaCodegenCore"],
             path: "scripts/sync-custom-types"
         ),
         .plugin(
-            name: "GenerateMymeCustomTypes",
+            name: "GenerateMarfaCustomTypes",
             capability: .command(
                 intent: .custom(
-                    verb: "generate-myme-custom-types",
-                    description: "Generate typed Swift wrappers for custom Myme types."
+                    verb: "generate-marfa-custom-types",
+                    description: "Generate typed Swift wrappers for custom Marfa types."
                 ),
                 permissions: [
                     .writeToPackageDirectory(
@@ -91,23 +91,23 @@ let package = Package(
                     ),
                     .allowNetworkConnections(
                         scope: .all(),
-                        reason: "Fetch custom type schemas from a live Myme instance (only when --sync is passed)."
+                        reason: "Fetch custom type schemas from a live Marfa instance (only when --sync is passed)."
                     ),
                 ]
             ),
             dependencies: ["codegen-custom-types", "sync-custom-types"],
-            path: "Plugins/GenerateMymeCustomTypes"
+            path: "Plugins/GenerateMarfaCustomTypes"
         ),
         .testTarget(
             name: "CodegenCustomTypesTests",
-            dependencies: ["MymeCodegenCore", "MymeSDK"],
+            dependencies: ["MarfaCodegenCore", "MarfaSDK"],
             path: "Tests/CodegenCustomTypesTests",
             exclude: ["CompileCheck"],
             resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "CodegenCompileCheckTests",
-            dependencies: ["MymeSDK"],
+            dependencies: ["MarfaSDK"],
             path: "Tests/CodegenCustomTypesTests/CompileCheck"
         ),
 
@@ -115,7 +115,7 @@ let package = Package(
 
         .executableTarget(
             name: "cloudkit-smoke",
-            dependencies: ["MymeSDK"],
+            dependencies: ["MarfaSDK"],
             path: "scripts/cloudkit-smoke"
         ),
     ],
