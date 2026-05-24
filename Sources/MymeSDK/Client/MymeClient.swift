@@ -60,6 +60,13 @@ public final class MymeClient: Sendable {
     /// webhooks.
     public let connections: ConnectionsNamespace
 
+    /// Credentials API: create OAuth-provider and api-token credentials
+    /// (T-231 PR1, T-241 PR1, T-246). The returned credential id is
+    /// passed as `credentialRef` on
+    /// ``ConnectionsNamespace/install(_:)`` so multiple integrations of
+    /// the same upstream share one credential row.
+    public let credentials: CredentialsNamespace
+
     /// Integrations API: list, get, register Integration manifests.
     public let integrations: IntegrationsNamespace
 
@@ -164,6 +171,7 @@ public final class MymeClient: Sendable {
             items: items,
             isLocalMode: isLocalMode
         )
+        self.credentials = CredentialsNamespace(transport: transport, isLocalMode: isLocalMode)
         self.integrations = IntegrationsNamespace(transport: transport, isLocalMode: isLocalMode)
         self.tenants = TenantsNamespace(transport: transport, isLocalMode: isLocalMode)
         self.admin = AdminNamespace(transport: transport, isLocalMode: isLocalMode)
