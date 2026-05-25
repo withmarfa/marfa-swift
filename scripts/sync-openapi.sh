@@ -5,17 +5,21 @@
 #
 #   ./scripts/sync-openapi.sh
 #
-# Requires ~/aic-local/Dev/MymeHQ/myme (the monorepo) to be checked out as a
-# sibling of this repo.
+# By default expects the `myme` monorepo to live as a sibling of this repo
+# (i.e. `../myme/openapi.json`). Override with `MYME_REPO_ROOT` when the
+# monorepo lives elsewhere:
+#
+#   MYME_REPO_ROOT=/path/to/myme ./scripts/sync-openapi.sh
 
 set -euo pipefail
 
-MONOREPO_SPEC="../myme/openapi.json"
+MYME_REPO_ROOT="${MYME_REPO_ROOT:-../myme}"
+MONOREPO_SPEC="${MYME_REPO_ROOT}/openapi.json"
 LOCAL_SNAPSHOT="scripts/openapi.json"
 
 if [[ ! -f "$MONOREPO_SPEC" ]]; then
     echo "error: $MONOREPO_SPEC not found" >&2
-    echo "Expected the monorepo to be checked out at a sibling of this repo." >&2
+    echo "Set MYME_REPO_ROOT to the monorepo checkout (default: ../myme)." >&2
     exit 1
 fi
 
