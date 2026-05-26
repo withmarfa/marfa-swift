@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 /// Runs the full generator against the fixture schemas and compares the
 /// output against golden Swift files.
@@ -22,14 +22,14 @@ import Testing
         defer { try? FileManager.default.removeItem(at: tmpRoot) }
 
         let schemasSrc = fixturesBase.appendingPathComponent("schemas")
-        let schemasDst = tmpRoot.appendingPathComponent("MymeTypes")
+        let schemasDst = tmpRoot.appendingPathComponent("MarfaTypes")
         try FileManager.default.copyItem(at: schemasSrc, to: schemasDst)
 
         let outputDir = tmpRoot.appendingPathComponent("Generated")
 
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .public),
             types: nil
         )

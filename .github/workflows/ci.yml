@@ -139,7 +139,7 @@ jobs:
       - name: Codegen freshness (wire types)
         run: |
           swift run codegen-wire
-          if ! git diff --exit-code -- Sources/MymeSDK/Types/Wire/Generated; then
+          if ! git diff --exit-code -- Sources/MarfaSDK/Types/Wire/Generated; then
             echo "::error::codegen-wire output is stale. Run 'swift run codegen-wire' (or './scripts/sync-openapi.sh' if the OpenAPI snapshot is behind) locally and commit the delta."
             exit 1
           fi
@@ -147,7 +147,7 @@ jobs:
       - name: Codegen freshness (domain models)
         run: |
           swift run codegen-domain
-          if ! git diff --exit-code -- Sources/MymeSDK/DomainModels/Generated; then
+          if ! git diff --exit-code -- Sources/MarfaSDK/DomainModels/Generated; then
             echo "::error::codegen-domain output is stale. Run 'swift run codegen-domain' (or './scripts/sync-types.sh' if the core-types snapshot is behind) locally and commit the delta."
             exit 1
           fi
@@ -167,22 +167,22 @@ jobs:
         # reads expected/, so divergence here ships silently otherwise).
         #
         # The schemas are copied to a temp dir under a folder named
-        # `MymeTypes` because the codegen embeds the source path into each
-        # file's header comment (e.g. `// Source: MymeTypes/foo.json`).
+        # `MarfaTypes` because the codegen embeds the source path into each
+        # file's header comment (e.g. `// Source: MarfaTypes/foo.json`).
         # Pointing source.directory at the in-repo schemas dir would change
         # that header and produce false-positive drift on every run.
-        # GoldenTests uses the same MymeTypes-copy pattern.
+        # GoldenTests uses the same MarfaTypes-copy pattern.
         run: |
           set -euo pipefail
           tmpdir="$(mktemp -d)"
-          mkdir -p "$tmpdir/MymeTypes"
-          cp Tests/CodegenCustomTypesTests/Fixtures/schemas/*.json "$tmpdir/MymeTypes/"
-          cat > "$tmpdir/myme-codegen.json" <<JSON
+          mkdir -p "$tmpdir/MarfaTypes"
+          cp Tests/CodegenCustomTypesTests/Fixtures/schemas/*.json "$tmpdir/MarfaTypes/"
+          cat > "$tmpdir/marfa-codegen.json" <<JSON
           {
             "schema": 1,
             "source": {
               "mode": "local",
-              "directory": "MymeTypes"
+              "directory": "MarfaTypes"
             },
             "output": {
               "directory": "$GITHUB_WORKSPACE/Tests/CodegenCustomTypesTests/Fixtures/expected",
@@ -190,7 +190,7 @@ jobs:
             }
           }
           JSON
-          swift run codegen-custom-types --config "$tmpdir/myme-codegen.json"
+          swift run codegen-custom-types --config "$tmpdir/marfa-codegen.json"
 
           if ! git diff --exit-code -- Tests/CodegenCustomTypesTests/Fixtures/expected; then
             echo "::error::codegen-custom-types fixtures are stale. Run the regen procedure documented in Tests/CodegenCustomTypesTests/CompileCheckTests.swift locally and commit the delta."

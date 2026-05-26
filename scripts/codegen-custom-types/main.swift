@@ -1,10 +1,10 @@
 // codegen-custom-types — generates typed Swift domain-model structs for
-// custom Myme types registered by the app.
+// custom Marfa types registered by the app.
 //
 // Usage (from the consuming app's repo root):
-//   swift run codegen-custom-types [--config path/to/myme-codegen.json]
+//   swift run codegen-custom-types [--config path/to/marfa-codegen.json]
 //
-// Reads: myme-codegen.json (defaults to `<cwd>/myme-codegen.json`).
+// Reads: marfa-codegen.json (defaults to `<cwd>/marfa-codegen.json`).
 // Writes: <output.directory>/<StructName>.swift (one per custom type).
 // Prunes any stray .swift files in the output directory whose name no
 // longer matches a custom type ID.
@@ -14,7 +14,7 @@
 //   git diff --exit-code -- <output.directory>
 
 import Foundation
-import MymeCodegenCore
+import MarfaCodegenCore
 
 func parseArgs() -> (configPath: String?, showHelp: Bool) {
     var configPath: String?
@@ -45,16 +45,16 @@ func parseArgs() -> (configPath: String?, showHelp: Bool) {
 
 func printHelp() {
     print("""
-    codegen-custom-types — generates Swift domain models for custom Myme types.
+    codegen-custom-types — generates Swift domain models for custom Marfa types.
 
     Usage:
       swift run codegen-custom-types [options]
 
     Options:
-      --config, -c <path>   Path to myme-codegen.json (default: ./myme-codegen.json)
+      --config, -c <path>   Path to marfa-codegen.json (default: ./marfa-codegen.json)
       --help, -h            Show this help.
 
-    See Sources/MymeSDK/DomainModels/Generated/CoreNote.swift in the SDK
+    See Sources/MarfaSDK/DomainModels/Generated/CoreNote.swift in the SDK
     for the output shape.
     """)
 }

@@ -1,16 +1,16 @@
-// sync-custom-types — fetches custom Myme type schemas from a live instance
+// sync-custom-types — fetches custom Marfa type schemas from a live instance
 // and writes them to the local JSON cache directory, pruning stale files.
 // Optionally triggers codegen-custom-types afterwards.
 //
 // Usage (from the consuming app's repo root):
-//   swift run sync-custom-types [--config path/to/myme-codegen.json] [--no-generate]
+//   swift run sync-custom-types [--config path/to/marfa-codegen.json] [--no-generate]
 //
-// Reads: myme-codegen.json, MYME_API_URL (env), MYME_API_KEY (env).
+// Reads: marfa-codegen.json, MARFA_API_URL (env), MARFA_API_KEY (env).
 // Writes: <source.cacheDirectory>/<type.id>.json (one per custom type).
 // Prunes: stale <*.json> files in the cache directory.
 
 import Foundation
-import MymeCodegenCore
+import MarfaCodegenCore
 
 struct SyncArgs {
     var configPath: String?
@@ -47,19 +47,19 @@ func parseArgs() -> SyncArgs {
 
 func printHelp() {
     print("""
-    sync-custom-types — fetches custom Myme type schemas from a live instance.
+    sync-custom-types — fetches custom Marfa type schemas from a live instance.
 
     Usage:
       swift run sync-custom-types [options]
 
     Options:
-      --config, -c <path>   Path to myme-codegen.json (default: ./myme-codegen.json)
+      --config, -c <path>   Path to marfa-codegen.json (default: ./marfa-codegen.json)
       --no-generate         Skip running codegen-custom-types afterwards.
       --help, -h            Show this help.
 
     Environment:
-      MYME_API_URL          Base URL of the Myme instance (required).
-      MYME_API_KEY          API key with list-types permission (required).
+      MARFA_API_URL          Base URL of the Marfa instance (required).
+      MARFA_API_KEY          API key with list-types permission (required).
     """)
 }
 
@@ -84,11 +84,11 @@ struct SyncCustomTypes {
         let (config, configDir) = try ConfigLoader.load(path: args.configPath)
 
         let env = ProcessInfo.processInfo.environment
-        guard let apiURLString = env["MYME_API_URL"], let apiURL = URL(string: apiURLString) else {
-            throw SyncError("MYME_API_URL is not set or not a valid URL")
+        guard let apiURLString = env["MARFA_API_URL"], let apiURL = URL(string: apiURLString) else {
+            throw SyncError("MARFA_API_URL is not set or not a valid URL")
         }
-        guard let apiKey = env["MYME_API_KEY"], !apiKey.isEmpty else {
-            throw SyncError("MYME_API_KEY is not set")
+        guard let apiKey = env["MARFA_API_KEY"], !apiKey.isEmpty else {
+            throw SyncError("MARFA_API_KEY is not set")
         }
 
         let runner = SyncRunner(

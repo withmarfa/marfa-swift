@@ -1,0 +1,708 @@
+import Testing
+import Foundation
+@testable import MarfaSDK
+@testable import MarfaSDKTestSupport
+
+/// Mutation replay behavior:
+/// - Error classification (transient vs permanent) and failure accounting.
+/// - Cascade drop when a `createItem` fails permanently.
+/// - Id stamping + replay reconciliation (no-op when server echoes the id;
+///   dependent rewrites when server returns a different id).
+/// - Transient `createItem` blocking downstream same-item mutations within
+///   a single replay cycle (and *not* blocking unrelated items).
+/// - SSE reconnect nudge draining mutations queued after the first cycle.
+///
+/// Shared helpers live in ``SyncEngineTestKit`` (see SyncEngineTestSupport.swift).
+@Suite("SyncEngine replay")
+struct SyncEngineReplayTests {
+
+    // MARK: - Error classification
+
+    @Test("mutation replay records failure when transport throws") func mutationReplayRecordsFailure() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        // A single pending delete the engine will try to replay.
+        try await queue.enqueueDeleteItem(id: "server-x")
+
+        // Empty SSE stream (so runLoop proceeds to replay), then the
+        // DELETE itself throws a network-class error.
+        transport.enqueueEvents([])
+        let netError = NetworkError(
+            NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
+        )
+        transport.enqueueError(netError)
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            let all = try? await queue.fetchAll()
+            return (all?.first?.attemptCount ?? 0) >= 1
+        }
+
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].attemptCount == 1)
+        #expect(remaining[0].lastError?.contains("offline") == true)
+        await engine.stop()
+    }
+
+    @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        // Queue an update against an item the server "doesn't have"
+        // (matches the `019da086-…` pattern from the bug report).
+        try await queue.enqueueUpdateItem(
+            id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+            properties: ["body": .string("stale")]
+        )
+
+        // Subscribe before triggering the cycle so we can catch the
+        // `.mutationDropped` event.
+        let events = await engine.events
+        let collector = Task { () -> [SyncEvent] in
+            var out: [SyncEvent] = []
+            for await event in events {
+                out.append(event)
+                if case .mutationDropped = event { return out }
+                if case .synced = event { return out }
+            }
+            return out
+        }
+
+        transport.enqueueEvents([])
+        transport.enqueueError(NotFoundError(message: "Item not found"))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        // The replay should remove the record (no retry on permanent error).
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            (try? await queue.isEmpty) == true
+        }
+        #expect(try await queue.isEmpty)
+
+        let collected = await collector.value
+        let dropEvent = collected.first { if case .mutationDropped = $0 { return true } else { return false } }
+        #expect(dropEvent != nil)
+        if case let .mutationDropped(kind, itemId, attempt, error) = dropEvent {
+            #expect(kind == "updateItem")
+            #expect(itemId == "019da086-d675-7cd8-ba3f-3dc4e6e7bd42")
+            #expect(attempt == 1)
+            #expect(error is NotFoundError)
+        }
+
+        await engine.stop()
+    }
+
+    @Test("mutation replay drops queued record on 400 ValidationError") func mutationReplayDropsOn400() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        // Matches the `6837a0e8-…` UUIDv4 pattern from the bug report —
+        // server would reject the ID with INVALID_ID (400).
+        try await queue.enqueueUpdateItem(
+            id: "6837a0e8-d316-4433-ac4c-d1e40f19615f",
+            properties: ["body": .string("bad id")]
+        )
+
+        transport.enqueueEvents([])
+        transport.enqueueError(ValidationError(message: "Invalid item ID"))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            (try? await queue.isEmpty) == true
+        }
+        #expect(try await queue.isEmpty)
+        await engine.stop()
+    }
+
+    @Test("mutation replay retains queued record on transient 5xx") func mutationReplayRetainsOn5xx() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        try await queue.enqueueUpdateItem(
+            id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+            properties: ["body": .string("temp fail")]
+        )
+
+        transport.enqueueEvents([])
+        // 500 is transient — MarfaError base class, not a permanent subclass.
+        transport.enqueueError(MarfaError(
+            code: "server_error", message: "boom", status: 500
+        ))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            let all = try? await queue.fetchAll()
+            return (all?.first?.attemptCount ?? 0) >= 1
+        }
+
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].attemptCount == 1)
+        await engine.stop()
+    }
+
+    @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        // Two mutations: first fails permanently (404), second fails
+        // transiently (network). First should be dropped, second should
+        // stay queued. Order matters — replay processes in creation order.
+        try await queue.enqueueUpdateItem(
+            id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
+            properties: ["body": .string("stale")]
+        )
+        try await queue.enqueueUpdateItem(
+            id: "019eb000-0000-7000-8000-000000000000",
+            properties: ["body": .string("transient")]
+        )
+
+        transport.enqueueEvents([])
+        transport.enqueueError(NotFoundError(message: "gone"))
+        transport.enqueueError(NetworkError(
+            NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
+        ))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            let all = try? await queue.fetchAll()
+            return (all?.count == 1) && ((all?.first?.attemptCount ?? 0) >= 1)
+        }
+
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].localId == "019eb000-0000-7000-8000-000000000000")
+        #expect(remaining[0].attemptCount == 1)
+        await engine.stop()
+    }
+
+    // MARK: - Id stamping + replay reconciliation
+
+    @Test("ItemsNamespace.create stamps a UUIDv7 into the queued payload when input.id is nil")
+    func createStampsIdIntoEnqueuedPayload() async throws {
+        let (store, queue, transport, _, _) = try await SyncEngineTestKit.makeFixture()
+        let items = ItemsNamespace(
+            transport: transport,
+            defaultConflictStrategy: .auto,
+            localStore: store,
+            mutationQueue: queue
+        )
+
+        let created = try await items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("fresh")])
+        )
+
+        // The returned id is the UUIDv7 the SDK stamped.
+        #expect(created.id.isEmpty == false)
+
+        let records = try await queue.fetchAll()
+        #expect(records.count == 1)
+        let payload = try JSONDecoder().decode(
+            CreateItemPayload.self,
+            from: records[0].payloadJson.data(using: .utf8) ?? Data()
+        )
+        // Critical: the enqueued payload carries the same id the local
+        // store knows about. Without this, the server mints its own id
+        // and `SyncEngine.replayRecord` purges the local row, breaking
+        // any app view holding `created.id`.
+        #expect(payload.input.id == created.id)
+        #expect(records[0].localId == created.id)
+    }
+
+    @Test("createItem replay with stamped id takes the no-op path (no rewrite, no purge)")
+    func createReplayWithStampedIdIsNoOpReconcile() async throws {
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        // Compress reconnect schedule so the test doesn't hang waiting
+        // on back-off sleeps after the stream closes.
+        await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+        let items = ItemsNamespace(
+            transport: transport,
+            defaultConflictStrategy: .auto,
+            localStore: store,
+            mutationQueue: queue
+        )
+
+        let created = try await items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("v1")])
+        )
+
+        // Empty SSE + server echoes the client id on POST /items.
+        transport.enqueueEvents([])
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let echoed = Item(
+            createdAt: now, id: created.id,
+            properties: ["body": .string("v1")],
+            schemaVersion: 1, source: "test", state: .active, tier: .feed,
+            timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        transport.enqueue(ItemResponse(item: echoed, metadata: nil))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            (try? await queue.isEmpty) == true
+        }
+
+        // Local row still present under the stamped id — no purge fired.
+        let fetched = try await store.fetchItem(id: created.id)
+        #expect(fetched.id == created.id)
+        await engine.stop()
+    }
+
+    @Test("createItem replay with a different server id rewrites dependents")
+    func replayRewritesDependentsOnDifferentServerId() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        // Queue: createItem(localId = client-A), then an updateItem that
+        // references client-A. Server will return a different id — the
+        // update must be rewritten so it targets the server id, not a 404.
+        let input = CreateItemInput(type: "core.note", properties: ["body": .string("v1")])
+        try await queue.enqueueCreateItem(input, localId: "client-A")
+        try await queue.enqueueUpdateItem(id: "client-A", properties: ["body": .string("v2")])
+
+        // Empty SSE stream so runLoop proceeds to replay.
+        transport.enqueueEvents([])
+
+        // POST /items returns a server-assigned id.
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let serverItem = Item(
+            createdAt: now, id: "server-A",
+            properties: ["body": .string("v1")],
+            schemaVersion: 1, source: "test", state: .active, tier: .feed,
+            timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        transport.enqueue(ItemResponse(item: serverItem, metadata: nil))
+        // PATCH /items/server-A succeeds with the updated body.
+        let updated = Item(
+            createdAt: now, id: "server-A",
+            properties: ["body": .string("v2")],
+            schemaVersion: 1, source: "test", state: .active, tier: .feed,
+            timestamp: now, type: "core.note", updatedAt: now, version: 2
+        )
+        transport.enqueue(ItemResponse(item: updated, metadata: nil))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            (try? await queue.isEmpty) == true
+        }
+
+        let patchCalls = await transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/server-A"
+        }
+        #expect(patchCalls.count == 1, "update should have been retargeted to server id")
+
+        // And no PATCH should have been issued to the stale local id.
+        let stalePatch = await transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/client-A"
+        }
+        #expect(stalePatch.isEmpty)
+        await engine.stop()
+    }
+
+    // MARK: - Cascade drop on permanent createItem failure
+
+    @Test("permanent createItem drop cascades to dependent mutations and purges the local row")
+    func createItemCascadeDropsDependents() async throws {
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+
+        // Seed the local store + queue as if the app had created a note,
+        // edited it, and spun off a reply edge — all before sync fires.
+        // "A" is the note that will fail server-side; "X" and "Y" are
+        // unrelated siblings that must survive.
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let ghost = Item(
+            createdAt: now, id: "A",
+            properties: ["body": .string("")], schemaVersion: 1, source: "test",
+            state: .active, tier: .feed, timestamp: now, type: "core.note",
+            updatedAt: now, version: 1
+        )
+        try await store.upsertItem(ghost)
+        let survivor = Item(
+            createdAt: now, id: "Y",
+            properties: ["body": .string("kept")], schemaVersion: 1, source: "test",
+            state: .active, tier: .feed, timestamp: now, type: "core.note",
+            updatedAt: now, version: 1
+        )
+        try await store.upsertItem(survivor)
+
+        let createInput = CreateItemInput(
+            type: "core.note", properties: ["body": .string("")], id: "A"
+        )
+        try await queue.enqueueCreateItem(createInput, localId: "A")
+        try await queue.enqueueUpdateItem(id: "A", properties: ["body": .string("typed")])
+        try await queue.enqueueCreateEdge(
+            source: "A", target: "X", edgeType: "in-thread",
+            properties: nil, localEdgeId: "E-AX"
+        )
+        try await queue.enqueueUpdateItem(id: "Y", properties: ["body": .string("untouched")])
+
+        // Collect `.mutationDropped` events so we can assert cascade emission.
+        let events = await engine.events
+        let collector = Task { () -> [SyncEvent] in
+            var out: [SyncEvent] = []
+            for await event in events {
+                out.append(event)
+                // Stop once we've seen a `.synced` or `.failed` terminal.
+                if case .synced = event { return out }
+                if case .failed = event { return out }
+            }
+            return out
+        }
+
+        transport.enqueueEvents([])
+        // POST /items → 400 ValidationError (permanent, triggers cascade).
+        transport.enqueueError(ValidationError(message: "bad create"))
+        // PATCH /items/Y still needs a response — the sibling survives
+        // and replays successfully.
+        let updatedY = Item(
+            createdAt: now, id: "Y",
+            properties: ["body": .string("untouched")], schemaVersion: 1, source: "test",
+            state: .active, tier: .feed, timestamp: now, type: "core.note",
+            updatedAt: now, version: 2
+        )
+        transport.enqueue(ItemResponse(item: updatedY, metadata: nil))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            (try? await queue.isEmpty) == true
+        }
+
+        // Queue is fully drained — A's createItem + cascade dropped,
+        // Y's updateItem replayed successfully.
+        #expect(try await queue.isEmpty)
+
+        // Ghost A purged from local store; survivor Y intact.
+        let ghostFetch = try? await store.fetchItem(id: "A")
+        #expect(ghostFetch == nil)
+        let survivorFetch = try await store.fetchItem(id: "Y")
+        #expect(survivorFetch.id == "Y")
+
+        let collected = await collector.value
+        let drops = collected.compactMap { event -> (String, String?)? in
+            if case let .mutationDropped(kind, itemId, _, _) = event {
+                return (kind, itemId)
+            }
+            return nil
+        }
+        // Three drops total: the createItem root + the cascaded
+        // updateItem + createEdge. Y's updateItem is *not* dropped.
+        #expect(drops.count == 3)
+        let droppedKinds = Set(drops.map { $0.0 })
+        #expect(droppedKinds == Set(["createItem", "updateItem", "createEdge"]))
+        // Every drop carries a local id matching "A" or the cascaded
+        // edge id "E-AX".
+        let droppedItemIds = Set(drops.compactMap { $0.1 })
+        #expect(droppedItemIds == Set(["A", "E-AX"]))
+        await engine.stop()
+    }
+
+    // MARK: - SSE reconnect nudge
+
+    @Test("SSE reconnect nudge drains mutations queued after the first replay")
+    func sseReconnectDrainsLaterMutations() async throws {
+        let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        // Compress the back-off so the test runs in tens of ms, not seconds.
+        await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+        // First SSE stream: empty, finishes cleanly. No mutations queued
+        // yet, so the first replay emits `.synced` (no drops / no failures).
+        transport.enqueueEvents([])
+        // Second SSE stream (reached via the reconnect nudge): also empty.
+        transport.enqueueEvents([])
+        // Subsequent streams (any further reconnect cycles): empty too.
+        transport.enqueueEvents([])
+        transport.enqueueEvents([])
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        // Wait for the first SSE stream to be observed.
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await transport.calls.filter { $0.path == "/events" }.count >= 1
+        }
+
+        // Now enqueue a mutation AFTER the first replay cycle has
+        // already ticked. Without the reconnect nudge, this mutation
+        // would sit forever — no network transition will fire.
+        try await queue.enqueueDeleteItem(id: "019eb000-0000-7000-8000-000000000042")
+        transport.enqueueError(NotFoundError(message: "server gone"))
+
+        // Assert the mutation drains without us manually re-triggering
+        // `.connecting`.
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+            (try? await queue.isEmpty) == true
+        }
+        #expect(try await queue.isEmpty)
+
+        // And assert we actually opened the SSE stream more than once —
+        // the reconnect nudge drove the re-open.
+        let sseCallCount = await transport.calls.filter { $0.path == "/events" }.count
+        #expect(sseCallCount >= 2, "expected reconnect nudge to re-open SSE at least once; got \(sseCallCount)")
+
+        await engine.stop()
+    }
+
+    // MARK: - Transient createItem blocks same-item downstream mutations
+
+    @Test("transient createItem blocks downstream deleteItem from running in the same cycle")
+    func transientCreateItemBlocksDeleteItemSameCycle() async throws {
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        // Compress back-off so cycle 2 fires automatically in tens of ms.
+        await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+        // Local state: user created a note and immediately trashed it before
+        // any sync fired. The note has never reached the server.
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let itemId = "019ea000-0000-7000-8000-000000000042"
+        let localItem = Item(
+            createdAt: now, id: itemId,
+            properties: ["body": .string("new note")], schemaVersion: 1, source: "sdk",
+            state: .trashed, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 2
+        )
+        try await store.upsertItem(localItem)
+        let createInput = CreateItemInput(
+            type: "core.note", properties: ["body": .string("new note")], id: itemId
+        )
+        try await queue.enqueueCreateItem(createInput, localId: itemId)
+        try await queue.enqueueDeleteItem(id: itemId)
+
+        // Cycle 1: createItem POST fails transiently (500). deleteItem must
+        // NOT fire — no response for it is queued in this cycle, so if the
+        // fix is absent and deleteItem does fire it would consume the cycle-2
+        // createItem response and cause cycle 2 to fail (decoding mismatch).
+        transport.enqueueEvents([])
+        transport.enqueueError(MarfaError(code: "server_error", message: "transient", status: 500))
+
+        // Cycle 2: createItem succeeds, then deleteItem succeeds.
+        transport.enqueueEvents([])
+        let serverCreated = Item(
+            createdAt: now, id: itemId,
+            properties: ["body": .string("new note")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        transport.enqueue(ItemResponse(item: serverCreated, metadata: nil))
+        transport.enqueue(EmptyResponse())
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        // Wait for full drain — both cycles must complete cleanly.
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+            (try? await queue.isEmpty) == true
+        }
+        #expect(try await queue.isEmpty)
+
+        // createItem reached the server twice (once transient, once success).
+        let postCalls = await transport.calls.filter {
+            $0.method == .post && $0.path == "/items"
+        }
+        #expect(postCalls.count == 2)
+
+        // deleteItem reached the server exactly once (in cycle 2, not cycle 1).
+        let deleteCalls = await transport.calls.filter {
+            $0.method == .delete && $0.path == "/items/\(itemId)"
+        }
+        #expect(deleteCalls.count == 1)
+
+        // The DELETE came after the second POST (the one that succeeded).
+        let allCalls = await transport.calls
+        let secondPostIndex = allCalls.lastIndex(where: {
+            $0.method == .post && $0.path == "/items"
+        })
+        let deleteIndex = allCalls.firstIndex(where: {
+            $0.method == .delete && $0.path == "/items/\(itemId)"
+        })
+        if let pi = secondPostIndex, let di = deleteIndex {
+            #expect(pi < di, "DELETE must follow the successful POST in cycle 2")
+        } else {
+            Issue.record("Expected both POST /items and DELETE /items/\(itemId) in transport calls")
+        }
+
+        await engine.stop()
+    }
+
+    @Test("transient createItem also blocks downstream updateItem and metadata mutations")
+    func transientCreateItemBlocksAllItemScopedMutations() async throws {
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let itemId = "019ea001-0000-7000-8000-000000000043"
+        let localItem = Item(
+            createdAt: now, id: itemId,
+            properties: ["body": .string("draft")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 3
+        )
+        try await store.upsertItem(localItem)
+
+        // createItem + update + tag — all queued before sync fires.
+        let createInput = CreateItemInput(
+            type: "core.note", properties: ["body": .string("draft")], id: itemId
+        )
+        try await queue.enqueueCreateItem(createInput, localId: itemId)
+        try await queue.enqueueUpdateItem(id: itemId, properties: ["body": .string("edited")])
+        try await queue.enqueueAddTags(itemId: itemId, tags: ["note"])
+
+        // Cycle 1: createItem fails transiently; update + tag must be skipped.
+        transport.enqueueEvents([])
+        transport.enqueueError(MarfaError(code: "server_error", message: "transient", status: 500))
+
+        // Cycle 2: all three replay in order and succeed.
+        transport.enqueueEvents([])
+        let serverCreated = Item(
+            createdAt: now, id: itemId,
+            properties: ["body": .string("draft")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        transport.enqueue(ItemResponse(item: serverCreated, metadata: nil))
+        let serverUpdated = Item(
+            createdAt: now, id: itemId,
+            properties: ["body": .string("edited")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 2
+        )
+        transport.enqueue(ItemResponse(item: serverUpdated, metadata: nil))
+        transport.enqueue(MetadataResponse(metadata: Metadata(
+            extensions: [:], itemId: itemId, tags: ["note"]
+        )))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+            (try? await queue.isEmpty) == true
+        }
+        #expect(try await queue.isEmpty)
+
+        // All three operations reached the server — and only once each.
+        let postCalls = await transport.calls.filter {
+            $0.method == .post && $0.path == "/items"
+        }
+        let patchCalls = await transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/\(itemId)"
+        }
+        let tagCalls = await transport.calls.filter {
+            $0.method == .post && $0.path == "/items/\(itemId)/tags"
+        }
+        // createItem ran twice (cycle 1 fail + cycle 2 success).
+        #expect(postCalls.count == 2)
+        // updateItem and addTags ran once each (cycle 2 only).
+        #expect(patchCalls.count == 1)
+        #expect(tagCalls.count == 1)
+
+        // Order within cycle 2: POST → PATCH → tag POST.
+        let allCalls = await transport.calls
+        let successPostIdx = allCalls.lastIndex(where: {
+            $0.method == .post && $0.path == "/items"
+        })
+        let patchIdx = allCalls.firstIndex(where: {
+            $0.method == .patch && $0.path == "/items/\(itemId)"
+        })
+        let tagIdx = allCalls.firstIndex(where: {
+            $0.method == .post && $0.path == "/items/\(itemId)/tags"
+        })
+        if let pi = successPostIdx, let pa = patchIdx, let ti = tagIdx {
+            #expect(pi < pa, "PATCH must come after the successful POST")
+            #expect(pa < ti, "tag POST must come after PATCH")
+        } else {
+            Issue.record("Expected POST /items, PATCH /items/:id, and POST /items/:id/tags in transport calls")
+        }
+
+        await engine.stop()
+    }
+
+    @Test("transient createItem for item A does not affect unrelated item B mutations")
+    func transientCreateItemDoesNotBlockUnrelatedMutations() async throws {
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 0.02, max: 0.05)
+
+        let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        let itemA = "019ea002-0000-7000-8000-000000000044"
+        let itemB = "019ea003-0000-7000-8000-000000000045"
+
+        // Item A: pending create (will fail transiently).
+        let itemALocal = Item(
+            createdAt: now, id: itemA,
+            properties: ["body": .string("A")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        try await store.upsertItem(itemALocal)
+        let createA = CreateItemInput(type: "core.note", properties: ["body": .string("A")], id: itemA)
+        try await queue.enqueueCreateItem(createA, localId: itemA)
+
+        // Item B: pre-existing update (must replay in cycle 1 despite A's failure).
+        let itemBLocal = Item(
+            createdAt: now, id: itemB,
+            properties: ["body": .string("B")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        try await store.upsertItem(itemBLocal)
+        try await queue.enqueueUpdateItem(id: itemB, properties: ["body": .string("B updated")])
+
+        // Cycle 1: createItem(A) fails transiently; updateItem(B) must proceed.
+        transport.enqueueEvents([])
+        transport.enqueueError(MarfaError(code: "server_error", message: "transient", status: 500))
+        let updatedB = Item(
+            createdAt: now, id: itemB,
+            properties: ["body": .string("B updated")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 2
+        )
+        transport.enqueue(ItemResponse(item: updatedB, metadata: nil))
+
+        // Cycle 2: createItem(A) succeeds; no more mutations.
+        transport.enqueueEvents([])
+        let serverA = Item(
+            createdAt: now, id: itemA,
+            properties: ["body": .string("A")], schemaVersion: 1, source: "sdk",
+            state: .active, tier: .feed, timestamp: now, type: "core.note", updatedAt: now, version: 1
+        )
+        transport.enqueue(ItemResponse(item: serverA, metadata: nil))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+            (try? await queue.isEmpty) == true
+        }
+        #expect(try await queue.isEmpty)
+
+        // updateItem(B) was called exactly once (in cycle 1).
+        let patchBCalls = await transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/\(itemB)"
+        }
+        #expect(patchBCalls.count == 1)
+
+        // createItem(A) was called twice (transient + success).
+        let postCalls = await transport.calls.filter {
+            $0.method == .post && $0.path == "/items"
+        }
+        #expect(postCalls.count == 2)
+
+        // updateItem(B) landed in cycle 1 — before the second createItem(A).
+        let allCalls = await transport.calls
+        let patchBIdx = allCalls.firstIndex(where: {
+            $0.method == .patch && $0.path == "/items/\(itemB)"
+        })
+        let secondPostIdx = allCalls.lastIndex(where: {
+            $0.method == .post && $0.path == "/items"
+        })
+        if let bi = patchBIdx, let pi = secondPostIdx {
+            #expect(bi < pi, "B's update should run in cycle 1, before cycle 2's createItem(A)")
+        } else {
+            Issue.record("Expected PATCH /items/\(itemB) and POST /items in transport calls")
+        }
+
+        await engine.stop()
+    }
+}

@@ -1,5 +1,5 @@
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 @Suite struct NameMapperTests {
 
@@ -75,9 +75,9 @@ import Testing
     }
 
     @Test func sdkReservedNameThrows() {
-        // `myme.item` → MymeItem collides with the MymeSDK protocol.
+        // `marfa.item` → MarfaItem collides with the MarfaSDK protocol.
         #expect(throws: NameMapperError.self) {
-            _ = try NameMapper.buildNameMap(for: ["myme.item"])
+            _ = try NameMapper.buildNameMap(for: ["marfa.item"])
         }
     }
 

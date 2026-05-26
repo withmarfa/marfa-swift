@@ -4,7 +4,7 @@
 
 import Foundation
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 @Suite struct FilterFlowTests {
 
@@ -37,13 +37,13 @@ import Testing
     @Test func excludeGlobDropsMatches() throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let schemasDir = root.appendingPathComponent("MymeTypes")
+        let schemasDir = root.appendingPathComponent("MarfaTypes")
         try writeSchema(id: "myapp.keep", to: schemasDir)
         try writeSchema(id: "myapp.internal.debug", to: schemasDir)
 
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .public),
             types: TypeFilters(include: nil, exclude: ["myapp.internal.**"])
         )
@@ -56,7 +56,7 @@ import Testing
     @Test func pruningRemovesStaleOutput() throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let schemasDir = root.appendingPathComponent("MymeTypes")
+        let schemasDir = root.appendingPathComponent("MarfaTypes")
         let outDir = root.appendingPathComponent("Generated")
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
@@ -69,7 +69,7 @@ import Testing
 
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .public),
             types: nil
         )
@@ -83,12 +83,12 @@ import Testing
     @Test func coreTypeInSourceDirectoryFailsFast() throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let schemasDir = root.appendingPathComponent("MymeTypes")
+        let schemasDir = root.appendingPathComponent("MarfaTypes")
         try writeSchema(id: "core.note", to: schemasDir)
 
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .public),
             types: nil
         )
@@ -103,7 +103,7 @@ import Testing
     @Test func internalAccessLevelEmitsInternal() throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let schemasDir = root.appendingPathComponent("MymeTypes")
+        let schemasDir = root.appendingPathComponent("MarfaTypes")
         try writeSchema(
             id: "myapp.internal_access",
             fields: ["x": ["type": "string"]],
@@ -112,7 +112,7 @@ import Testing
 
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .internal),
             types: nil
         )
@@ -126,7 +126,7 @@ import Testing
     @Test func parentInCoreRegistryResolves() throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let schemasDir = root.appendingPathComponent("MymeTypes")
+        let schemasDir = root.appendingPathComponent("MarfaTypes")
         // This schema references `core.note` which comes from the bundled
         // registry — verifies the bundled core-types resource is loadable.
         try writeSchema(
@@ -138,7 +138,7 @@ import Testing
 
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .public),
             types: nil
         )
@@ -155,7 +155,7 @@ import Testing
     @Test func missingParentFailsFast() throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let schemasDir = root.appendingPathComponent("MymeTypes")
+        let schemasDir = root.appendingPathComponent("MarfaTypes")
         try writeSchema(
             id: "myapp.orphan",
             fields: ["x": ["type": "string"]],
@@ -164,7 +164,7 @@ import Testing
         )
         let config = CodegenConfig(
             schema: 1,
-            source: SourceConfig(mode: .local, directory: "MymeTypes"),
+            source: SourceConfig(mode: .local, directory: "MarfaTypes"),
             output: OutputConfig(directory: "Generated", accessLevel: .public),
             types: nil
         )

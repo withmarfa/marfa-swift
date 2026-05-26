@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 @Suite struct ConfigLoaderTests {
 
@@ -11,7 +11,7 @@ import Testing
             .appendingPathComponent("codegen-config-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let configURL = tmp.appendingPathComponent("myme-codegen.json")
+        let configURL = tmp.appendingPathComponent("marfa-codegen.json")
         try? json.write(to: configURL, atomically: true, encoding: .utf8)
         try body(tmp)
     }
@@ -22,14 +22,14 @@ import Testing
         try withTempConfig(#"""
         {
           "schema": 1,
-          "source": { "mode": "local", "directory": "MymeTypes" },
+          "source": { "mode": "local", "directory": "MarfaTypes" },
           "output": { "directory": "Sources/Generated", "accessLevel": "public" }
         }
         """#) { dir in
             let (config, configDir) = try ConfigLoader.load(cwd: dir)
             #expect(config.schema == 1)
             #expect(config.source.mode == .local)
-            #expect(config.source.directory == "MymeTypes")
+            #expect(config.source.directory == "MarfaTypes")
             #expect(config.output.directory == "Sources/Generated")
             #expect(config.output.accessLevel == .public)
             #expect(configDir.standardizedFileURL.path == dir.standardizedFileURL.path)
@@ -40,13 +40,13 @@ import Testing
         try withTempConfig(#"""
         {
           "schema": 1,
-          "source": { "mode": "live", "cacheDirectory": ".myme-types" },
+          "source": { "mode": "live", "cacheDirectory": ".marfa-types" },
           "output": { "directory": "Sources/Generated" }
         }
         """#) { dir in
             let (config, _) = try ConfigLoader.load(cwd: dir)
             #expect(config.source.mode == .live)
-            #expect(config.source.cacheDirectory == ".myme-types")
+            #expect(config.source.cacheDirectory == ".marfa-types")
             #expect(config.output.accessLevel == .public, "default access level should be public")
         }
     }
@@ -55,7 +55,7 @@ import Testing
         try withTempConfig(#"""
         {
           "schema": 1,
-          "source": { "mode": "local", "directory": "MymeTypes" },
+          "source": { "mode": "local", "directory": "MarfaTypes" },
           "output": { "directory": "Sources/Generated", "accessLevel": "internal" }
         }
         """#) { dir in

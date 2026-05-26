@@ -1,5 +1,5 @@
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 @Suite("Reserved namespace root validator")
 struct ReservedRootValidatorTests {
@@ -13,11 +13,11 @@ struct ReservedRootValidatorTests {
         #expect(warning?.contains("system.*") ?? false)
     }
 
-    @Test("myme.* flagged")
-    func mymeFlagged() {
-        let warning = Generator.reservedRootWarning(for: "myme.something")
+    @Test("marfa.* flagged")
+    func marfaFlagged() {
+        let warning = Generator.reservedRootWarning(for: "marfa.something")
         #expect(warning != nil)
-        #expect(warning?.contains("myme.*") ?? false)
+        #expect(warning?.contains("marfa.*") ?? false)
     }
 
     @Test("app without app-name segment flagged")

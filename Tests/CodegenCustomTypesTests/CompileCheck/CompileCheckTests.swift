@@ -12,11 +12,11 @@
 //   3. Copy the output Swift files over these ones
 
 import Testing
-import MymeSDK
+import MarfaSDK
 
 @Suite struct CompileCheckTests {
 
-    @Test func generatedTypesConformToMymeItem() {
+    @Test func generatedTypesConformToMarfaItem() {
         #expect(MyappBooking.typeIdentifier == "myapp.booking")
         #expect(MyappSimpleNote.typeIdentifier == "myapp.simple_note")
         #expect(MyappAllTypes.typeIdentifier == "myapp.all_types")

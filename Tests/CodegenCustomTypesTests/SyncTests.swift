@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import MymeCodegenCore
+@testable import MarfaCodegenCore
 
 @Suite struct SyncTests {
 
@@ -40,7 +40,7 @@ import Testing
         try! JSONSerialization.data(withJSONObject: types)
     }
 
-    func liveConfig(cacheDir: String = "MymeTypes") -> CodegenConfig {
+    func liveConfig(cacheDir: String = "MarfaTypes") -> CodegenConfig {
         CodegenConfig(
             schema: 1,
             source: SourceConfig(mode: .live, cacheDirectory: cacheDir),
@@ -73,7 +73,7 @@ import Testing
         let result = try await runner.run()
 
         #expect(result.written.sorted() == ["myapp.booking", "myapp.user"])
-        let cacheDir = root.appendingPathComponent("MymeTypes")
+        let cacheDir = root.appendingPathComponent("MarfaTypes")
         let files = try FileManager.default.contentsOfDirectory(atPath: cacheDir.path).sorted()
         #expect(files == ["myapp.booking.json", "myapp.user.json"])
 
@@ -87,7 +87,7 @@ import Testing
     @Test func syncPrunesStaleCacheFiles() async throws {
         let root = makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let cacheDir = root.appendingPathComponent("MymeTypes")
+        let cacheDir = root.appendingPathComponent("MarfaTypes")
         try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         // Seed a stale file
         try "{}".write(
