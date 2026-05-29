@@ -2,6 +2,10 @@
 
 Swift SDK for the Marfa API. Equivalent to the TypeScript `@withmarfa/sdk`.
 
+Vault Surface: [[Marfa Swift SDK]] in `~/aic-vault/Projects/marfa-TCC02/Surfaces/Marfa Swift SDK.md` — principle + intent.
+
+Docs MCP convention: query the docs MCP for concept-level questions about Marfa types, edges, runtime substrates — don't re-derive from source. Lit up in Phase 5 of the docs source wave.
+
 ## Architecture
 
 - **SPM package**, zero external dependencies. Built from Foundation, Security, SwiftData, and `os`.
