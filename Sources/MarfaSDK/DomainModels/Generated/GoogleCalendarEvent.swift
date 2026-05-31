@@ -54,7 +54,7 @@ public struct GoogleCalendarEvent: MarfaItem {
     /// When set, this event is an instance of a recurring series; value is the Calendar event id of the series parent.
     public var recurringEventId: String? { item.properties["recurring_event_id"]?.stringValue }
 
-    /// ID of the Google Calendar this event lives on (the user's `oblix.cyzr@gmail.com` primary calendar, a shared work calendar, etc.). Set on inbound items so multi-calendar mappings round-trip; outbound writes derive the target calendar from this field or fall back to the connection's configured default.
+    /// ID of the Google Calendar this event lives on (the user's primary calendar, a shared work calendar, etc.). Set on inbound items so multi-calendar mappings round-trip; outbound writes derive the target calendar from this field or fall back to the connection's configured default.
     public var sourceCalendarId: String? { item.properties["source_calendar_id"]?.stringValue }
 
     /// Start time. ISO datetime for timed events; ISO date (YYYY-MM-DD) for all-day events.

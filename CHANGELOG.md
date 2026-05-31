@@ -349,7 +349,7 @@ for the SDK plus one new recommendation.
 ### Fixed / audited
 
 - **`LocalModeUnsupportedError` guard on `TypesNamespace.get()` —
-  verified present.** Follow-up to the vault backlog suspicion that
+  verified present.** Follow-up to an earlier suspicion that
   4.2.2's guard covered `list()` but not `get()`. Audit confirmed all
   five methods (`list`, `get`, `register`, `update`, `delete`) call
   `ensureRemote` correctly. Any consumer-app retry storm in local
