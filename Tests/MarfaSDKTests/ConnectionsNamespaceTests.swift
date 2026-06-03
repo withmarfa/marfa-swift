@@ -53,7 +53,7 @@ struct ConnectionsNamespaceTests {
         #expect(mock.calls[0].path == "/connections/conn-1/uninstall")
     }
 
-    @Test("leaseTokens.create sends POST /connections/{id}/lease-token")
+    @Test("leaseTokens.create sends POST /connections/{id}/lease-tokens")
     func leaseTokenCreate() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(CreatedLeaseToken(
@@ -76,7 +76,7 @@ struct ConnectionsNamespaceTests {
         )
 
         #expect(result.leaseToken == "secret-token-value")
-        #expect(mock.calls[0].path == "/connections/conn-1/lease-token")
+        #expect(mock.calls[0].path == "/connections/conn-1/lease-tokens")
     }
 
     @Test("leaseTokens.list returns array under leases envelope")

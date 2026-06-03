@@ -36,7 +36,7 @@ public struct BulkActionPollOptions: Sendable {
 /// to hold a reference to ``ItemsNamespace``.
 enum BulkActionRunner {
 
-    /// Initial response from `POST /items/bulk_action`.
+    /// Initial response from `POST /items/bulk-actions`.
     ///
     /// - ``inline(_:)``: server returned 200 with an inline
     ///   ``BulkActionResult`` (dry-run path).
@@ -59,7 +59,7 @@ enum BulkActionRunner {
         let bodyData = try JSONEncoder().encode(input)
         let (data, response) = try await transport.rawRequest(
             method: .post,
-            path: "/items/bulk_action",
+            path: "/items/bulk-actions",
             body: bodyData,
             contentType: "application/json",
             query: nil
@@ -76,7 +76,7 @@ enum BulkActionRunner {
         return .queued(try decoder.decode(BulkActionJob.self, from: data))
     }
 
-    /// Poll `GET /items/bulk_action/jobs/:id` until the row reaches a
+    /// Poll `GET /items/bulk-actions/jobs/:id` until the row reaches a
     /// terminal state (`completed` / `failed` / `cancelled`).
     /// Exponential backoff from `pollIntervalMs` to `maxPollIntervalMs`;
     /// throws ``MarfaError`` with `code: "poll_timeout"` past
@@ -92,7 +92,7 @@ enum BulkActionRunner {
         while true {
             let job: BulkActionJob = try await transport.request(
                 method: .get,
-                path: "/items/bulk_action/jobs/\(jobId)",
+                path: "/items/bulk-actions/jobs/\(jobId)",
                 body: nil,
                 query: nil
             )

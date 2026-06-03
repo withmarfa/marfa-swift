@@ -395,7 +395,7 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
-    /// T-218: POST `/items/bulk_action` and return the initial
+    /// T-218: POST `/items/bulk-actions` and return the initial
     /// ``BulkActionJob`` envelope without polling. Suits callers that
     /// want explicit control over the lifecycle — UI surfaces that
     /// render progress directly, agents returning a job id to the
@@ -425,13 +425,13 @@ public struct ItemsNamespace: Sendable {
         }
     }
 
-    /// T-218: single GET against `/items/bulk_action/jobs/:id`. The
+    /// T-218: single GET against `/items/bulk-actions/jobs/:id`. The
     /// caller is responsible for back-off — see
     /// ``BulkActionPollOptions`` if you want the SDK to drive the loop.
     public func bulkActionStatus(jobId: String) async throws -> BulkActionJob {
         try await transport.request(
             method: .get,
-            path: "/items/bulk_action/jobs/\(jobId)",
+            path: "/items/bulk-actions/jobs/\(jobId)",
             body: nil,
             query: nil
         )
@@ -446,7 +446,7 @@ public struct ItemsNamespace: Sendable {
     public func bulkActionCancel(jobId: String) async throws -> BulkActionJob {
         try await transport.request(
             method: .delete,
-            path: "/items/bulk_action/jobs/\(jobId)",
+            path: "/items/bulk-actions/jobs/\(jobId)",
             body: nil,
             query: nil
         )

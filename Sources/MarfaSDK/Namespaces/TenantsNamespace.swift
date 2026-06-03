@@ -5,8 +5,8 @@ import Foundation
 /// server gates each method by role (tenant-admin vs platform-admin).
 ///
 /// Routes:
-/// - `GET /tenants/current/config` — tenant-admin (or platform-admin)
-/// - `PUT /tenants/current/config` — tenant-admin (or platform-admin)
+/// - `GET /tenants/me/config` — tenant-admin (or platform-admin)
+/// - `PUT /tenants/me/config` — tenant-admin (or platform-admin)
 /// - `GET /tenants/me/quotas` — tenant-admin (or platform-admin)
 /// - `GET /tenants/{id}/quotas` — platform-admin only
 /// - `PUT /tenants/{id}/quotas` — platform-admin only
@@ -33,7 +33,7 @@ public struct TenantsNamespace: Sendable {
         try ensureRemote("tenants.getConfig")
         return try await transport.request(
             method: .get,
-            path: "/tenants/current/config",
+            path: "/tenants/me/config",
             body: nil,
             query: nil
         )
@@ -47,7 +47,7 @@ public struct TenantsNamespace: Sendable {
         try ensureRemote("tenants.setConfig")
         return try await transport.request(
             method: .put,
-            path: "/tenants/current/config",
+            path: "/tenants/me/config",
             body: config,
             query: nil
         )

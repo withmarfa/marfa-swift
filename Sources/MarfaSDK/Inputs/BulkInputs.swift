@@ -135,7 +135,7 @@ public struct BulkResult: Codable, Sendable {
     }
 }
 
-// MARK: - /items/bulk_action — filter-in
+// MARK: - /items/bulk-actions — filter-in
 
 /// Filter shape for `bulk_action` calls. Mirrors the `GET /items` query
 /// grammar — every field is AND-composed.
@@ -386,8 +386,8 @@ public enum BulkActionJobStatus: String, Codable, Sendable {
     case cancelled
 }
 
-/// T-218: async-job envelope returned by `POST /items/bulk_action`
-/// (non-dry-run) and by `GET /items/bulk_action/jobs/:id`.
+/// T-218: async-job envelope returned by `POST /items/bulk-actions`
+/// (non-dry-run) and by `GET /items/bulk-actions/jobs/:id`.
 ///
 /// ``ItemsNamespace/bulkAction(_:options:)`` resolves with the embedded
 /// ``BulkActionResult`` once `status` reaches a terminal value;

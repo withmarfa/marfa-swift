@@ -255,7 +255,7 @@ struct BulkPayload: Codable, Sendable {
     let input: BulkInput
 }
 
-/// Payload for `bulkAction` — `POST /items/bulk_action` filter-in.
+/// Payload for `bulkAction` — `POST /items/bulk-actions` filter-in.
 /// Same round-trip-exact semantics as `BulkPayload`.
 struct BulkActionPayload: Codable, Sendable {
     let input: BulkActionInput

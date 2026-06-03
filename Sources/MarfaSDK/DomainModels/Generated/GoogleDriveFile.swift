@@ -26,7 +26,7 @@ public struct GoogleDriveFile: MarfaItem {
     /// File name (maps to Drive `name`).
     public var title: String { item.properties["title"]?.stringValue ?? "" }
 
-    /// Reference to the downloaded binary content as a Marfa blob (`sha256:<hex>`). Populated only when `connection.properties.configuration.download_mode` is `all-files` (or a matching glob). Stays empty in the default `metadata` mode. **Substrate dependency:** the `@withmarfa/runtime-sdk` ConnectionClient does not yet expose a blob-upload primitive — v1 ships with metadata-only ingest; the all-files mode requires a follow-on substrate PR that adds `uploadBlob` to the SDK.
+    /// Reference to the downloaded binary content as a Marfa blob (`sha256:<hex>`). Present iff the bytes were successfully ingested into the Marfa blob store — i.e. `connection.properties.configuration.download_mode` is `all-files` (or a matching glob), the file is downloadable (not a Google-native `application/vnd.google-apps.*` type), and the download stayed within the per-file size ceiling. Absent in metadata mode and whenever an all-files attempt was skipped or failed (the activity log carries the reason). Programmatic gate: `typeof blob_ref === "string"` means the bytes are retrievable via `GET /blobs/{blob_ref}`.
     public var blobRef: String? { item.properties["blob_ref"]?.stringValue }
 
     /// Drive-side created timestamp (maps to Drive `createdTime`).
