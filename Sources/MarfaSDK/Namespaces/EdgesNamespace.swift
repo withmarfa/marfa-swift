@@ -348,7 +348,7 @@ public struct EdgeTypesAPI: Sendable {
     @discardableResult
     public func create(_ input: CreateEdgeTypeInput) async throws -> EdgeType {
         let response: EdgeTypeResponse = try await transport.request(
-            method: .post, path: "/edges/types", body: input, query: nil
+            method: .post, path: "/edge-types", body: input, query: nil
         )
         return response.edgeType
     }
@@ -357,7 +357,7 @@ public struct EdgeTypesAPI: Sendable {
     /// custom types registered by the tenant.
     public func list() async throws -> [EdgeType] {
         let response: EdgeTypesListResponse = try await transport.request(
-            method: .get, path: "/edges/types", body: nil, query: nil
+            method: .get, path: "/edge-types", body: nil, query: nil
         )
         return response.edgeTypes
     }
@@ -367,7 +367,7 @@ public struct EdgeTypesAPI: Sendable {
     /// registered via ``create(_:)`` can be removed.
     public func delete(id: String) async throws {
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/edges/types/\(id)", body: nil, query: nil
+            method: .delete, path: "/edge-types/\(id)", body: nil, query: nil
         )
     }
 }

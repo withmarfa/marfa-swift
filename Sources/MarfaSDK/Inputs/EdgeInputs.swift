@@ -1,6 +1,6 @@
 import Foundation
 
-/// Input shape for `POST /edges/types` — custom edge-type registration.
+/// Input shape for `POST /edge-types` — custom edge-type registration.
 ///
 /// Admin-only on the server: attempts from a non-admin key return 403.
 /// Matches the TypeScript SDK's `EdgeTypeSchema` shape so the two SDKs

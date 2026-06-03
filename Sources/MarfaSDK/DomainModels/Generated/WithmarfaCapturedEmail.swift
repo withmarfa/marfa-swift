@@ -4,12 +4,12 @@
 // To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
 
 import Foundation
-/// ``MarfahqCapturedEmail`` — typed wrapper for `withmarfa.captured_email` items.
+/// ``WithmarfaCapturedEmail`` — typed wrapper for `withmarfa.captured_email` items.
 ///
 /// An email captured by the withmarfa.inbox integration via Cloudflare Email Routing → Email Worker → webhook. Parsed MIME landed as a structured item. Maps onto `core.note` via `compatible_with` so cross-app readers see a title + body without knowing the captured-email shape. Attachment blob upload is gated on T-239; v1 captures attachment metadata (filename, mime_type, size_bytes) only.
 ///
 /// Display hints — title: `subject`, body: `text_body`.
-public struct MarfahqCapturedEmail: MarfaItem {
+public struct WithmarfaCapturedEmail: MarfaItem {
     public static let typeIdentifier = "withmarfa.captured_email"
 
     /// The underlying generic item from the Marfa API.

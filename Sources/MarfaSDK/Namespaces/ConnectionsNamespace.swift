@@ -4,7 +4,7 @@ import Foundation
 ///
 /// `system.connection` items are still managed via ``ItemsNamespace`` for
 /// generic CRUD; this namespace adds the orchestrated lifecycle
-/// operations (`install`, `uninstall`) plus convenience reads, lease-token
+/// operations (`install`, `uninstall`) plus convenience reads, lease-tokens
 /// management, and inbound webhook administration.
 ///
 /// Available in remote and synced modes. In **pure-local mode** every
@@ -168,7 +168,7 @@ public struct LeaseTokensNamespace: Sendable {
         }
     }
 
-    /// Creates a lease token via `POST /connections/{id}/lease-token`.
+    /// Creates a lease token via `POST /connections/{id}/lease-tokens`.
     ///
     /// Returns a ``CreatedLeaseToken`` containing the actual token string
     /// in `lease_token` — this is the **only** time the token value is
@@ -188,7 +188,7 @@ public struct LeaseTokensNamespace: Sendable {
         )
         return try await transport.request(
             method: .post,
-            path: "/connections/\(connectionId)/lease-token",
+            path: "/connections/\(connectionId)/lease-tokens",
             body: input,
             query: nil
         )

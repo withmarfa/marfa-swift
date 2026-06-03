@@ -31,7 +31,7 @@ struct EdgeTypesTests {
 
     // MARK: - create
 
-    @Test("create sends POST /edges/types with snake_case body")
+    @Test("create sends POST /edge-types with snake_case body")
     func create() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(["edge_type": sampleEdgeType()])
@@ -50,7 +50,7 @@ struct EdgeTypesTests {
         #expect(created.cardinality == .manyToMany)
         #expect(mock.calls.count == 1)
         #expect(mock.calls[0].method == .post)
-        #expect(mock.calls[0].path == "/edges/types")
+        #expect(mock.calls[0].path == "/edge-types")
 
         // Body must be snake_case'd for source_type_constraints etc.
         let body = try #require(mock.calls[0].body)
@@ -64,7 +64,7 @@ struct EdgeTypesTests {
 
     // MARK: - list
 
-    @Test("list sends GET /edges/types and unwraps edge_types")
+    @Test("list sends GET /edge-types and unwraps edge_types")
     func list() async throws {
         let (client, mock) = makeClient()
         let a = sampleEdgeType(id: "a.rel")
@@ -77,12 +77,12 @@ struct EdgeTypesTests {
         #expect(types.map(\.id) == ["a.rel", "b.rel"])
         #expect(mock.calls.count == 1)
         #expect(mock.calls[0].method == .get)
-        #expect(mock.calls[0].path == "/edges/types")
+        #expect(mock.calls[0].path == "/edge-types")
     }
 
     // MARK: - delete
 
-    @Test("delete sends DELETE /edges/types/{id}")
+    @Test("delete sends DELETE /edge-types/{id}")
     func delete() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(["ok": true])
@@ -91,7 +91,7 @@ struct EdgeTypesTests {
 
         #expect(mock.calls.count == 1)
         #expect(mock.calls[0].method == .delete)
-        #expect(mock.calls[0].path == "/edges/types/team.commented-on")
+        #expect(mock.calls[0].path == "/edge-types/team.commented-on")
     }
 
     // MARK: - admin gate

@@ -15,7 +15,7 @@ struct TenantsNamespaceTests {
 
     // MARK: - getConfig / setConfig
 
-    @Test("getConfig sends GET /tenants/current/config and decodes nested enforcement")
+    @Test("getConfig sends GET /tenants/me/config and decodes nested enforcement")
     func getConfig() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(TenantConfig(
@@ -38,7 +38,7 @@ struct TenantsNamespaceTests {
         #expect(config.eventLogRetentionHours == 72)
         #expect(config.trashRetentionDays == 14)
         #expect(mock.calls[0].method == .get)
-        #expect(mock.calls[0].path == "/tenants/current/config")
+        #expect(mock.calls[0].path == "/tenants/me/config")
     }
 
     @Test("getConfig decodes empty payload as empty config")
@@ -57,7 +57,7 @@ struct TenantsNamespaceTests {
         #expect(config.trashRetentionDays == nil)
     }
 
-    @Test("setConfig sends PUT /tenants/current/config with snake_case body")
+    @Test("setConfig sends PUT /tenants/me/config with snake_case body")
     func setConfig() async throws {
         let (client, mock) = makeClient()
         let payload = TenantConfig(
@@ -77,7 +77,7 @@ struct TenantsNamespaceTests {
         #expect(result.auditRetentionDays == 90)
         #expect(result.enforcement?.sourceFilter?.types == ["core.bookmark"])
         #expect(mock.calls[0].method == .put)
-        #expect(mock.calls[0].path == "/tenants/current/config")
+        #expect(mock.calls[0].path == "/tenants/me/config")
 
         let body = mock.calls[0].body!
         let json = try JSONSerialization.jsonObject(with: body) as! [String: Any]

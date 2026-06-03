@@ -61,7 +61,7 @@ struct EdgeResponse: Codable, Sendable {
     let edge: Edge
 }
 
-/// Response from GET /edges/types: `{ "edge_types": [...] }`.
+/// Response from GET /edge-types: `{ "edge_types": [...] }`.
 struct EdgeTypesListResponse: Codable, Sendable {
     let edgeTypes: [EdgeType]
 
@@ -70,7 +70,7 @@ struct EdgeTypesListResponse: Codable, Sendable {
     }
 }
 
-/// Response from POST /edges/types: `{ "edge_type": ... }`.
+/// Response from POST /edge-types: `{ "edge_type": ... }`.
 struct EdgeTypeResponse: Codable, Sendable {
     let edgeType: EdgeType
 

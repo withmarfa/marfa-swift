@@ -38,7 +38,7 @@ struct BulkTests {
         )
     }
 
-    /// T-218: sample queued envelope returned by `POST /items/bulk_action`
+    /// T-218: sample queued envelope returned by `POST /items/bulk-actions`
     /// (status 202). The SDK polls until terminal.
     func sampleQueuedJob(action: String, id: String = "baj_test") -> BulkActionJob {
         BulkActionJob(
@@ -133,11 +133,11 @@ struct BulkTests {
 
     // MARK: - bulkAction
 
-    @Test("bulkAction transition posts to /items/bulk_action, polls to terminal")
+    @Test("bulkAction transition posts to /items/bulk-actions, polls to terminal")
     func bulkActionTransitionPath() async throws {
         let (client, mock) = makeClient()
         // T-218: POST returns 202 + queued envelope; SDK then polls
-        // GET /items/bulk_action/jobs/:id and resolves with the
+        // GET /items/bulk-actions/jobs/:id and resolves with the
         // embedded BulkActionResult.
         enqueueQueued(mock, job: sampleQueuedJob(action: "transition"))
         mock.enqueue(sampleCompletedJob(action: "transition"))
@@ -154,9 +154,9 @@ struct BulkTests {
         #expect(result.action == "transition")
         #expect(result.succeeded == 3)
         #expect(mock.calls.count == 2)
-        #expect(mock.calls[0].path == "/items/bulk_action")
+        #expect(mock.calls[0].path == "/items/bulk-actions")
         #expect(mock.calls[0].method == .post)
-        #expect(mock.calls[1].path == "/items/bulk_action/jobs/baj_test")
+        #expect(mock.calls[1].path == "/items/bulk-actions/jobs/baj_test")
         #expect(mock.calls[1].method == .get)
     }
 
@@ -268,12 +268,12 @@ struct BulkTests {
         let status = try await client.items.bulkActionStatus(jobId: "baj_x")
         #expect(status.id == "baj_x")
         #expect(mock.calls[0].method == .get)
-        #expect(mock.calls[0].path == "/items/bulk_action/jobs/baj_x")
+        #expect(mock.calls[0].path == "/items/bulk-actions/jobs/baj_x")
 
         let cancelled = try await client.items.bulkActionCancel(jobId: "baj_x")
         #expect(cancelled.id == "baj_x")
         #expect(mock.calls[1].method == .delete)
-        #expect(mock.calls[1].path == "/items/bulk_action/jobs/baj_x")
+        #expect(mock.calls[1].path == "/items/bulk-actions/jobs/baj_x")
     }
 
     @Test("bulkAction dry_run path stays synchronous (status 200)")

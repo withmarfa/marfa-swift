@@ -37,7 +37,7 @@
     },
     {
       "name": "EdgeType",
-      "pointer": "/paths/~1edges~1types/get/responses/200/content/application~1json/schema/properties/edge_types/items",
+      "pointer": "/paths/~1edge-types/get/responses/200/content/application~1json/schema/properties/edge_types/items",
       "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
       "identifiableKey": "id"
     },
@@ -187,13 +187,13 @@
     },
     {
       "name": "CreatedLeaseToken",
-      "pointer": "/paths/~1connections~1{id}~1lease-token/post/responses/201/content/application~1json/schema",
+      "pointer": "/paths/~1connections~1{id}~1lease-tokens/post/responses/201/content/application~1json/schema",
       "conformances": ["Codable", "Sendable", "Identifiable"],
       "identifiableKey": "id"
     },
     {
       "name": "LeaseTokenInput",
-      "pointer": "/paths/~1connections~1{id}~1lease-token/post/requestBody/content/application~1json/schema",
+      "pointer": "/paths/~1connections~1{id}~1lease-tokens/post/requestBody/content/application~1json/schema",
       "conformances": ["Codable", "Sendable", "Hashable"]
     },
     {
