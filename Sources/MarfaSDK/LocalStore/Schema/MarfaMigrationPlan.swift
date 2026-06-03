@@ -13,7 +13,7 @@ import SwiftData
 /// versioned schema but mutates `MarfaItemModel`'s shape in place —
 /// SwiftData computes a different content hash than v6.x stores wrote.
 /// No migration stage can bridge the two within a single binary
-/// (SwiftData hashes the current class shape, not the historical one),
+/// (SwiftData hashes the class shape at compile time, not at write time),
 /// so v6.x → v7.0 takes the schema-mismatch recovery path in
 /// ``MarfaModelContainer/make(path:cloudKitDatabase:)``: the old store
 /// is deleted and a fresh one is built. Pre-release pragmatism;

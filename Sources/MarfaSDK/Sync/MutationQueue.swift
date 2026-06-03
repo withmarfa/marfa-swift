@@ -470,7 +470,7 @@ public actor MutationQueue {
     /// `PendingBlobModel` table (keyed by hash) and records an
     /// `uploadBlob` mutation. Both writes run in a single
     /// `modelContext.save()` so the mutation is never left without its
-    /// data — atomicity guarantee from the legacy schema, preserved.
+    /// data — both writes share a single `modelContext.save()` for atomicity.
     ///
     /// If a blob row for this hash already exists (same data uploaded
     /// twice while offline), the existing row is preserved and a second

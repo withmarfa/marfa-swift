@@ -77,10 +77,9 @@ public enum SyncEvent: Sendable {
     /// the post-merge state. Apps can use this to show a "merged" toast
     /// or navigate to a spawned conflicted-copy sibling.
     ///
-    /// **v3.0 break:** previously `case conflictAutoMerged(itemId: String)`.
-    /// Apps that subscribed to the bare itemId need to update the call
-    /// site to read `payload.itemId` and check `payload.conflictedCopyId`
-    /// to decide whether a sibling note exists to show.
+    /// Read `payload.itemId` for the affected item and check
+    /// `payload.conflictedCopyId` to determine whether a sibling item
+    /// was created.
     case conflictAutoMerged(payload: ConflictAutoMergedPayload)
 
     /// An item was created on the server (either via SSE event from

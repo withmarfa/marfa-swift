@@ -5,7 +5,7 @@ import Foundation
 /// `Codable` so the strategy can be persisted with queued mutations and
 /// re-applied during replay. The `.callback` resolver closure itself is
 /// not serialisable; on replay, `.callback` degrades to `.auto` because
-/// the original resolver function no longer exists in memory.
+/// the closure is not available in the new process context.
 public enum ConflictStrategy: String, Codable, Sendable {
     /// Auto-merge non-conflicting fields. For conflicting fields, follow
     /// the type's `merge_policy` (server-resolved, embedded in the 409
@@ -35,8 +35,7 @@ public struct ConflictData: Sendable {
     public let clientPatch: [String: JSONValue]
 
     /// The type's resolved merge policy, as emitted by the server in the 409
-    /// response. Present in conformant server responses; the SDK falls back
-    /// to last-writer-wins per field if absent (legacy / future-proof).
+    /// response. The SDK falls back to last-writer-wins per field when absent.
     public let mergePolicy: MergePolicy?
 }
 

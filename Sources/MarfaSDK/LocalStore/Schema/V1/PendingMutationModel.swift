@@ -10,9 +10,8 @@ import SwiftData
 
 @Model
 final class PendingMutationModel {
-    /// UUIDv4 string — preserved from the legacy schema so the SyncEngine
-    /// can continue to identify mutations by id without coordination with
-    /// the server (the server never sees this id).
+    /// UUIDv4 string. The SyncEngine uses this to identify mutations
+    /// locally; the server never sees it.
     var id: String = ""
 
     /// Stored as `MutationKind.rawValue`. Use `kind` for typed access.
@@ -20,9 +19,8 @@ final class PendingMutationModel {
 
     /// JSON-encoded payload matching the wire shape of the typed payload
     /// struct for this kind (CreateItemPayload, UpdateItemPayload, etc.).
-    /// Stored as `String` rather than `Data` for parity with the legacy
-    /// schema and to keep the row trivially inspectable in CloudKit's
-    /// dashboard.
+    /// Stored as `String` rather than `Data` to keep the row trivially
+    /// inspectable in CloudKit's dashboard.
     var payloadJson: String = "{}"
 
     /// For `createItem` mutations, the stable client id used for server-side

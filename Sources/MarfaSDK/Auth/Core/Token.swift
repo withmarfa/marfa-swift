@@ -19,7 +19,8 @@ import Foundation
 /// `expires_at` ISO 8601) so a Token round-trips through Keychain
 /// storage without losing state. The decoder accepts both wire forms
 /// (`expires_in` + `scope` from the server) and persistence forms
-/// (`expires_at` + `scope` or legacy `scopes` array from Keychain).
+/// (`expires_at` + `scope` from Keychain, or the `scopes` array for
+/// tokens persisted before the canonical `scope` string form).
 public struct Token: Codable, Sendable, Hashable {
     /// The bearer string sent in the `Authorization` header.
     public let accessToken: String
@@ -103,8 +104,8 @@ public struct Token: Codable, Sendable, Hashable {
         }
 
         // Wire form is `scope` (single space-separated string per
-        // RFC 6749 §3.3). Falls back to `scopes` (array) for backward
-        // compat with anything persisted under the pre-fix shape.
+        // RFC 6749 §3.3). Falls back to `scopes` (array) for tokens
+        // persisted under the older array form.
         if let scopeStr = try c.decodeIfPresent(String.self, forKey: .scope) {
             self.scopes = scopeStr
                 .split(whereSeparator: \.isWhitespace)

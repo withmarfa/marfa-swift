@@ -27,7 +27,7 @@ struct ConflictTests {
             mergePolicy: nil
         )
 
-        let merged = autoMerge(conflict: conflict)
+        let merged = autoMergeLastWriterWins(conflict: conflict)
 
         // Server wins on conflicting field
         #expect(merged["title"] == .string("Server Title"))
@@ -50,7 +50,7 @@ struct ConflictTests {
             mergePolicy: nil
         )
 
-        let merged = autoMerge(conflict: conflict)
+        let merged = autoMergeLastWriterWins(conflict: conflict)
 
         #expect(merged["title"] == .string("Client Title"))
         #expect(merged["body"] == .string("New Body"))
@@ -72,7 +72,7 @@ struct ConflictTests {
             mergePolicy: nil
         )
 
-        let merged = autoMerge(conflict: conflict)
+        let merged = autoMergeLastWriterWins(conflict: conflict)
 
         #expect(merged["title"] == .string("Server Title"))
         #expect(merged["body"] == .string("Server Body"))

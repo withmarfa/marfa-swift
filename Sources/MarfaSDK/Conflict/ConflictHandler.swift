@@ -184,8 +184,8 @@ func handleConflictUpdateWithStats(
 /// conflicting field with `keep_both_copies`, spawn a sibling item via
 /// ``keepBothFlow``; the original item retains the server's value (no
 /// client claim survives in the merged patch). For `last_writer_wins` (or
-/// missing/legacy policy) the server's value wins on conflict and the
-/// client wins on non-conflicting fields — the v2.x behaviour, now explicit.
+/// a missing policy) the server's value wins on conflict and the client
+/// wins on non-conflicting fields.
 func autoMergeWithPolicy(
     transport: any Transport,
     itemId: String,
@@ -239,8 +239,8 @@ func autoMergeWithPolicy(
 }
 
 /// Resolve the per-field strategy. Field-level entries override the policy
-/// `default`; both fall back to `last_writer_wins` when absent (legacy
-/// servers that don't emit `merge_policy`, or unclassified fields).
+/// `default`; both fall back to `last_writer_wins` when absent (servers
+/// that omit `merge_policy`, or unclassified fields).
 func strategyForField(
     _ field: String,
     policy: MergePolicy?
@@ -310,12 +310,12 @@ func keepBothFlow(
     return response.item.id
 }
 
-// MARK: - Legacy entry point
+// MARK: - Last-writer-wins merge
 
 /// Last-writer-wins auto-merge — server wins on conflicting fields, client
 /// wins elsewhere. Equivalent to applying `last_writer_wins` to every field.
-/// Retained for tests and as a primitive used by ``autoMergeWithPolicy``.
-func autoMerge(conflict: ConflictData) -> [String: JSONValue] {
+/// Used by tests and as a primitive used by ``autoMergeWithPolicy``.
+func autoMergeLastWriterWins(conflict: ConflictData) -> [String: JSONValue] {
     var merged = conflict.current.properties
     for (key, value) in conflict.clientPatch {
         if !conflict.conflictingFields.contains(key) {
