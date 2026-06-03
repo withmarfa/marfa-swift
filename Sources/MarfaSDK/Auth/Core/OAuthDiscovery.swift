@@ -2,12 +2,9 @@ import Foundation
 
 /// OAuth endpoint discovery via RFC 8414 (`/.well-known/oauth-authorization-server`).
 ///
-/// The SDK previously hardcoded `/auth/authorize`, `/auth/token`, and
-/// `/auth/revoke` against the server's pre-T-131 URL layout. The server
-/// migration (Better Auth OAuth Provider plugin) moved those to
-/// `/auth/oauth2/{authorize,token,revoke}`. Rather than chasing URL
-/// changes through hardcoded literals, the SDK now reads the canonical
-/// metadata doc on first use and caches the result.
+/// The SDK reads OAuth endpoints from the server's canonical well-known
+/// metadata document on first use and caches the result, rather than
+/// relying on hardcoded URL paths that could diverge from the server layout.
 ///
 /// ``OAuthDiscovery/shared`` is the process-wide instance — three OAuth-
 /// touching code paths (``MarfaAuth``, ``DeviceFlow``,
@@ -15,7 +12,7 @@ import Foundation
 /// first-calls on app boot share a single in-flight fetch.
 ///
 /// Failure is hard — ``OAuthDiscoveryError`` on HTTP, network, or schema
-/// failure. No fallback to legacy paths.
+/// failure. Endpoint discovery is required; there is no fallback.
 public actor OAuthDiscovery {
 
     public static let shared = OAuthDiscovery()
@@ -163,7 +160,8 @@ public actor OAuthDiscovery {
 }
 
 /// Surfaced when ``OAuthDiscovery`` cannot resolve endpoints from the
-/// server's well-known doc. No fallback to legacy paths.
+/// server's well-known doc. Endpoint discovery is required; there is no
+/// fallback.
 public enum OAuthDiscoveryError: Error, Sendable {
     case networkError(issuer: URL, underlying: Error)
     case invalidResponse(issuer: URL)

@@ -472,7 +472,7 @@ public actor LocalStore {
     }
 
     /// Replaces all metadata for an item (tags only — `extensions` is
-    /// reset to empty, matching the legacy `setMetadata` contract).
+    /// reset to empty; the `setMetadata` contract is replace, not merge).
     @discardableResult
     func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
         let metadata = Metadata(
@@ -524,12 +524,12 @@ public actor LocalStore {
     /// in Swift over the JSON-decoded tags. Avoids the predicate-engine
     /// blind spot on Codable struct fields (`tagsData`).
     func listTags() throws -> [TagWithCount] {
-        // Trashed items contribute no tags; this matches the legacy
-        // `WHERE state != 'trashed'` SQL filter.
+        // Trashed items contribute no tags — equivalent to a
+        // `WHERE state != 'trashed'` filter.
         let trashedRaw = ItemState.trashed.rawValue
         // `item` is the inverse relationship — only metadata rows
         // attached to a non-trashed item count. A nil `item` (orphan)
-        // contributes nothing, matching the legacy JOIN. The predicate
+        // contributes nothing (no JOIN match). The predicate
         // engine requires a single expression, hence the `&&` chain
         // rather than an `if let`.
         let predicate = #Predicate<MarfaMetadataModel> { meta in

@@ -10,10 +10,11 @@ public struct ClientConfiguration: Sendable {
     /// constructed with a custom ``TokenProvider`` (e.g. via OAuth);
     /// non-empty for the static-key path.
     ///
-    /// Internally, the SDK reaches for ``tokenProvider`` on every request
-    /// — `apiKey` is preserved on the surface for backward compatibility
-    /// with callers that round-trip an API key (notably
-    /// ``MarfaClient/saveToKeychain(service:account:accessGroup:)``).
+    /// Internally, the SDK reaches for ``tokenProvider`` on every request.
+    /// `apiKey` is exposed on the surface so callers that round-trip an
+    /// API key (notably
+    /// ``MarfaClient/saveToKeychain(service:account:accessGroup:)``) can
+    /// read it back.
     public let apiKey: String
 
     /// Internal auth contract — the transport awaits

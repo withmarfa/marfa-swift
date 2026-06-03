@@ -2,11 +2,11 @@ import Foundation
 
 /// The kind of mutation queued for replay against the Marfa server.
 ///
-/// Lifted out of the legacy `PendingMutationRecord.Kind` so that
-/// `PendingMutationModel` (the SwiftData `@Model`) can persist the case as
-/// a String rawValue while the actor and the SyncEngine continue to switch
-/// on the typed enum. New mutation kinds must be appended to the end of
-/// this enum (CloudKit-mirrored stores enforce additive-only schemas).
+/// A top-level enum so that `PendingMutationModel` (the SwiftData `@Model`)
+/// can persist the case as a String rawValue while the actor and the
+/// SyncEngine continue to switch on the typed enum. New mutation kinds must
+/// be appended to the end of this enum (CloudKit-mirrored stores enforce
+/// additive-only schemas).
 public enum MutationKind: String, Codable, Sendable, CaseIterable {
     case createItem
     case updateItem

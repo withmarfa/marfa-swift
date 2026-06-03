@@ -14,8 +14,8 @@ import os
 /// schema is CloudKit-compatible regardless of the mode chosen.
 public enum MarfaModelContainer {
     /// Builds a container at `path`, or an in-memory container when `path`
-    /// is `:memory:` (matches the legacy `LocalStore(path:)` contract used
-    /// by every test that wants an ephemeral database).
+    /// is `:memory:` (the contract used by every test that wants an
+    /// ephemeral database).
     ///
     /// - Parameters:
     ///   - path: Filesystem path for the SQLite store, or `":memory:"` for
@@ -55,9 +55,8 @@ public enum MarfaModelContainer {
             // dropping `MarfaItemModel.originRaw` mutates V2's shape in
             // place and produces a content hash that no migration stage
             // can bridge inside a single binary. The destructive
-            // recovery is consistent with the pre-release "no legacy
-            // carry-over" principle — see
-            // ``MarfaMigrationPlan`` for the rationale.
+            // recovery is consistent with the pre-release no-carry-over
+            // principle — see ``MarfaMigrationPlan`` for the rationale.
             //
             // Trade-off: any future migration that fails (custom stage
             // gone wrong, corrupt store) will also nuke the
