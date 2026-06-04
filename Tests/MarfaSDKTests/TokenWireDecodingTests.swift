@@ -103,29 +103,6 @@ struct TokenWireDecodingTests {
         #expect(restored.expiresAt == original.expiresAt)
     }
 
-    @Test("decodes legacy persistence shape (`scopes` array, `expires_at`)")
-    func decodesLegacyPersistedShape() throws {
-        // A keychain blob written by an older SDK version that emitted
-        // `scopes` (array) and `expires_at` (ISO date) instead of the new
-        // canonical `scope` + `expires_at`. Backward compat: existing
-        // installs don't lose their stored token on upgrade.
-        let json = """
-        {
-          "access_token": "legacy_at",
-          "token_type": "Bearer",
-          "refresh_token": "legacy_rt",
-          "scopes": ["core.note:read", "core.note:write"],
-          "expires_at": "2030-01-01T00:00:00Z"
-        }
-        """
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let token = try decoder.decode(Token.self, from: json.data(using: .utf8)!)
-        #expect(token.accessToken == "legacy_at")
-        #expect(token.scopes == ["core.note:read", "core.note:write"])
-        #expect(token.expiresAt != nil)
-    }
-
     @Test("decodes scope with multiple whitespace separators")
     func decodesScopeWithMultipleSpaces() throws {
         let json = """

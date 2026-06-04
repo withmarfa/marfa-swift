@@ -64,7 +64,7 @@ struct TenantsNamespaceTests {
             enforcement: TenantConfig.Enforcement(
                 strictMode: .init(types: ["core.note", "core.task"]),
                 sourceAllowlist: nil,
-                sourceFilter: .init(types: ["core.bookmark"], sources: ["legacy-importer"])
+                sourceFilter: .init(types: ["core.bookmark"], sources: ["bulk-importer"])
             ),
             auditRetentionDays: 90,
             eventLogRetentionHours: nil,
@@ -87,7 +87,7 @@ struct TenantsNamespaceTests {
         #expect(json["event_log_retention_hours"] == nil)
         let enforcement = json["enforcement"] as! [String: Any]
         let filter = enforcement["source_filter"] as! [String: Any]
-        #expect(filter["sources"] as? [String] == ["legacy-importer"])
+        #expect(filter["sources"] as? [String] == ["bulk-importer"])
     }
 
     // MARK: - quotas.getOwn
