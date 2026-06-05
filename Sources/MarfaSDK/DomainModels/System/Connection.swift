@@ -3,12 +3,11 @@ import Foundation
 /// Typed wrapper for `system.connection` items — an approved relationship
 /// between this Marfa tenant and an external authority.
 ///
-/// ``kind`` discriminates between three variants:
+/// ``kind`` discriminates between two variants:
 /// - ``ConnectionKind/app``: an OAuth client this user has authorized
 ///   (e.g. Notes signing in via the Authorization Code + PKCE flow).
 /// - ``ConnectionKind/integration``: a hosted or local connector that
 ///   reads or writes Marfa on the user's behalf.
-/// - ``ConnectionKind/tenant``: cross-tenant access (reserved).
 ///
 /// Lifecycle is bounded to ``ItemState/active`` and ``ItemState/revoked``
 /// — there is no archived/trashed state for connections. Pause/resume is

@@ -5,6 +5,26 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.0.0] — 2026-06-05
+
+Correctness fix: align `ConnectionKind` with the server. The server reduced
+`system.connection.kind` to `app | integration` — the `tenant` kind was
+removed and the server now returns 400 for `kind=tenant`. The SDK still
+shipped a `.tenant` enum case the server rejects.
+
+### Removed
+
+- **`ConnectionKind.tenant`** — the reserved cross-tenant case is gone. The
+  enum is now exactly `app | integration`, matching the server's
+  `system.connection.kind` enum. Source-breaking for any caller that
+  referenced `.tenant`; there was no live server path for it.
+
+### Changed
+
+- **`ConnectionKind` now decodes only `app | integration`** — decoding a
+  `"tenant"` wire value fails loudly (as it does for any unknown value),
+  rather than producing a kind the server will reject on write.
+
 ## [10.0.0] — 2026-05-24
 
 Parity with the server's v7.0.0 release (`@withmarfa/sdk@7.0.0`,
