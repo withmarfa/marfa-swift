@@ -2,7 +2,7 @@
 
 Swift SDK for the Marfa API. Equivalent to the TypeScript `@withmarfa/sdk`.
 
-Docs MCP convention: when working on documented surfaces (types, edges, runtime substrates, connections, auth flows), query the docs MCP at `https://docs.marfa.so/mcp` (or use `marfa docs search "<query>"` from CLI) before re-deriving from source. After changing a public surface, update the relevant docs page in the same PR.
+Docs MCP convention: when working on documented surfaces (types, edges, runtime substrates, connections, auth flows), query the docs MCP at `https://docs.marfa.so/mcp` (or use `marfa docs search "<query>"` from CLI) before re-deriving from source. Docs live **only** in `withmarfa/docs` — never author docs pages in this repo; when a change touches a public surface, open a companion `withmarfa/docs` PR and link it.
 
 ## Architecture
 
