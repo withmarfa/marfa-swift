@@ -104,14 +104,19 @@ struct SystemDomainModelsTests {
         #expect(Activity(from: item) == nil)
     }
 
-    @Test("ConnectionKind decodes app | integration | tenant verbatim from JSON")
+    @Test("ConnectionKind decodes app | integration verbatim from JSON")
     func connectionKindJSON() throws {
         let app = try JSONDecoder().decode(ConnectionKind.self, from: Data(#""app""#.utf8))
         let integration = try JSONDecoder().decode(ConnectionKind.self, from: Data(#""integration""#.utf8))
-        let tenant = try JSONDecoder().decode(ConnectionKind.self, from: Data(#""tenant""#.utf8))
         #expect(app == .app)
         #expect(integration == .integration)
-        #expect(tenant == .tenant)
+    }
+
+    @Test("ConnectionKind rejects the removed `tenant` value")
+    func connectionKindRejectsTenant() {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(ConnectionKind.self, from: Data(#""tenant""#.utf8))
+        }
     }
 
     @Test("ActivitySeverity rawValue matches snake_case wire spelling")

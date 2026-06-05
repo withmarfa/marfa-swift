@@ -43,7 +43,7 @@ public struct ConnectionsNamespace: Sendable {
     /// Lists connection items. Wraps `items.list({type: "system.connection"})`
     /// and projects the result to the typed ``Connection`` domain model.
     ///
-    /// Filter by ``ConnectionKind`` (`app | integration | tenant`) and/or
+    /// Filter by ``ConnectionKind`` (`app | integration`) and/or
     /// ``ItemState`` (`active | revoked`). Local-store backed in synced
     /// mode.
     public func list(

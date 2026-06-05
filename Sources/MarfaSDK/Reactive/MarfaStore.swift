@@ -162,7 +162,7 @@ public final class MarfaStore {
 
     /// Creates a live typed query over `system.connection` items.
     ///
-    /// Filters by ``ConnectionKind`` (`app | integration | tenant`) and
+    /// Filters by ``ConnectionKind`` (`app | integration`) and
     /// ``ItemState`` (`active | revoked`). Backed by ``TypedItemQuery``
     /// over the local store; observation rides the same
     /// `ModelContext.didSave` debounced refresh as every other reactive
