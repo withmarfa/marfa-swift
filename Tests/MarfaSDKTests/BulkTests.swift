@@ -297,7 +297,6 @@ struct BulkTests {
 
         #expect(result.dryRun == true)
         #expect(result.ids == ["a", "b", "c"])
-        // Only the POST happened — no polling for dry-run.
         #expect(mock.calls.count == 1)
     }
 

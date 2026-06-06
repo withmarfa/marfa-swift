@@ -149,7 +149,6 @@ public actor SyncEngine {
         continuations.append(continuation)
     }
 
-    /// Yield to every active subscriber. Drops finished continuations.
     private func emit(_ event: SyncEvent) {
         continuations.removeAll { c in
             switch c.yield(event) {
@@ -481,12 +480,9 @@ public actor SyncEngine {
                 eventsConsumed += 1
             }
         } catch {
-            // Network/server error — record and let ConnectionStateManager
-            // handle reconnect when the path recovers.
             errored = true
         }
 
-        // Stream ended or errored — drain the mutation queue and go online.
         await replayMutations()
         if running {
             await connectionManager.markOnline()
@@ -1134,8 +1130,6 @@ public actor SyncEngine {
             )
         }
 
-        // Only the `createItem` path returns `true`; every other replay is a
-        // straight server call and never rewrites the queue.
         return false
     }
 }

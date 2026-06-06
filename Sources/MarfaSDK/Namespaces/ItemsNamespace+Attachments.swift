@@ -150,14 +150,11 @@ public extension ItemsNamespace {
             )
         }
 
-        // Step 1 — upload every blob concurrently. TaskGroup preserves
-        // index ↔ result ordering via the (index, response) tuple so
-        // the per-attachment assembly downstream is deterministic.
+        // TaskGroup preserves index ↔ result ordering via (index, response) tuples.
         let uploads = try await uploadAttachments(input.attachments)
 
-        // Step 2 — build the bulk payload. Host first, then attachments
-        // in declared order. Host id is stamped if absent so step 4 can
-        // hydrate by id.
+        // Build the bulk payload: host first, then attachments in declared order.
+        // Host id is stamped if absent so the hydration step can fetch by id.
         let hostId = input.item.id ?? UUIDv7.generateString()
         var hostBulkItem = input.item
         hostBulkItem.id = hostId
@@ -200,13 +197,10 @@ public extension ItemsNamespace {
             atomic: true
         )
 
-        // Step 3 — the single atomic bulk write.
         let bulkResult = try await bulk(bulkInput)
 
-        // Step 4 — surface server-side errors before the hydrate step.
-        // `atomic: true` means a single errored entry rolls the whole
-        // batch back server-side; we still translate the outcome into
-        // a typed throw for the caller.
+        // `atomic: true` means a single errored entry rolls the whole batch
+        // back server-side; translate the outcome into a typed throw.
         if let errored = bulkResult.results.first(where: { $0.outcome == .errored }) {
             let message = errored.error?.message ?? errored.reason ?? "unknown"
             throw ValidationError(
@@ -221,9 +215,7 @@ public extension ItemsNamespace {
             )
         }
 
-        // Step 5 — hydrate the items via per-id reads (concurrent).
-        // Order is preserved by holding (index, item) tuples and
-        // sorting on join.
+        // Hydrate via concurrent per-id reads. Order is preserved via (index, item) tuples.
         let hydrationOrder = [hostId] + attachmentIds
         let hydrated = try await withThrowingTaskGroup(
             of: (Int, Item).self

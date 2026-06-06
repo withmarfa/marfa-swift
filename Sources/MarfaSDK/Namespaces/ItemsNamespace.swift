@@ -13,9 +13,6 @@ public struct ItemsNamespace: Sendable {
     /// server URL.
     let apiBaseURL: URL?
 
-    /// Designated init. `apiBaseURL` is optional with a `nil` default so
-    /// existing call sites (tests, pure-local factories) don't need to
-    /// be retrofitted — only ``createWithAttachments(_:)`` needs it.
     init(
         transport: any Transport,
         defaultConflictStrategy: ConflictStrategy,
