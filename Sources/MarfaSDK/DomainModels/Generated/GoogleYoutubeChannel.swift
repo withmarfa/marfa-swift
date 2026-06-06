@@ -6,7 +6,7 @@
 import Foundation
 /// ``GoogleYoutubeChannel`` — typed wrapper for `google.youtube.channel` items.
 ///
-/// A YouTube channel — surfaced when the connected user has subscribed to it OR when it owns a liked video / user playlist (T-249). Captures upstream-fidelity channel metadata from the YouTube Data API v3 `channels` resource. `subscribed_at` carries the time the connected user subscribed (when known); for channels that are merely the owner of a liked video this field is absent.
+/// A YouTube channel — surfaced when the connected user has subscribed to it OR when it owns a liked video / user playlist. Captures upstream-fidelity channel metadata from the YouTube Data API v3 `channels` resource. `subscribed_at` carries the time the connected user subscribed (when known); for channels that are merely the owner of a liked video this field is absent.
 ///
 /// Display hints — title: `title`, body: `description`.
 public struct GoogleYoutubeChannel: MarfaItem {

@@ -6,7 +6,7 @@
 import Foundation
 /// ``GoogleYoutubeVideo`` — typed wrapper for `google.youtube.video` items.
 ///
-/// A YouTube video — liked by the connected user or surfaced via a walked user-created playlist (T-249). Mirrors the YouTube Data API v3 `videos` resource at upstream fidelity. `liked_at` is a property on the video (sourced from the liked-playlist item's `snippet.publishedAt`), NOT modelled as an edge.
+/// A YouTube video — liked by the connected user or surfaced via a walked user-created playlist. Mirrors the YouTube Data API v3 `videos` resource at upstream fidelity. `liked_at` is a property on the video (sourced from the liked-playlist item's `snippet.publishedAt`), NOT modelled as an edge.
 ///
 /// Display hints — title: `title`, body: `description`.
 public struct GoogleYoutubeVideo: MarfaItem {

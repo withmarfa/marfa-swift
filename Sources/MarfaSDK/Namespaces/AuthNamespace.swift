@@ -1,8 +1,8 @@
 import Foundation
 
-/// Account-management REST surface (T-116). Distinct from the OAuth /
-/// Passkey / DeviceFlow ceremony exposed under ``MarfaAuth``, ``Passkey``,
-/// and ``DeviceFlow`` — those run the sign-in dance and produce a
+/// Account-management REST surface. Distinct from the OAuth / Passkey /
+/// DeviceFlow ceremony exposed under ``MarfaAuth``, ``Passkey``, and
+/// ``DeviceFlow`` — those run the sign-in dance and produce a
 /// ``TokenProvider``. This namespace targets the post-sign-in
 /// account-lifecycle endpoints (`/auth/account/...`).
 ///
@@ -27,11 +27,10 @@ public struct AuthNamespace: Sendable {
     }
 }
 
-/// Account-lifecycle endpoints (T-116). Deletion is two-phase: an
-/// initial request mints a confirmation token and dispatches the
-/// confirmation email; the user clicks the link (or the CLI calls
-/// ``confirmDelete(token:)``) which arms the grace window; cancel
-/// short-circuits before the purger sweeps.
+/// Account-lifecycle endpoints. Deletion is two-phase: an initial request
+/// mints a confirmation token and dispatches the confirmation email; the
+/// user clicks the link (or the CLI calls ``confirmDelete(token:)``) which
+/// arms the grace window; cancel short-circuits before the purger sweeps.
 public struct AuthAccountNamespace: Sendable {
 
     let transport: any Transport
@@ -44,11 +43,9 @@ public struct AuthAccountNamespace: Sendable {
     }
 
     /// Initiate deletion. Mints a confirm token and dispatches the
-    /// confirmation email. Returns when the request is accepted
-    /// (HTTP 202). Idempotent within the token TTL — a second call inside
-    /// the window re-uses the in-flight token rather than minting a new
-    /// one, which keeps the per-account cancel-email throttle effective
-    /// (see `MARFA_ACCOUNT_DELETE_CANCEL_COOLDOWN_MS`).
+    /// confirmation email. Returns when the request is accepted (HTTP 202).
+    /// Idempotent within the token TTL — a second call inside the window
+    /// re-uses the in-flight token rather than minting a new one.
     public func requestDelete() async throws {
         try ensureRemote("auth.account.requestDelete")
         let _: EmptyResponse = try await transport.request(

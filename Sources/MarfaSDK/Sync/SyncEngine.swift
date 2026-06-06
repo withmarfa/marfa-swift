@@ -1115,14 +1115,13 @@ public actor SyncEngine {
 
         case .bulkAction:
             let p = try decoder.decode(BulkActionPayload.self, from: data)
-            // T-218: the server now returns 202 + a BulkActionJob
-            // envelope for non-dry-run bulk_action. Replay is considered
-            // settled only when the server-side job reaches a terminal
-            // status — `BulkActionRunner.runToCompletion` polls and
-            // resolves with the unwrapped result (or throws on
-            // cancelled / failed). Synced-mode replays never set
-            // `dry_run: true` (dry-runs aren't enqueued in the first
-            // place), so the inline-200 fork is unreachable here.
+            // The server returns 202 + a BulkActionJob envelope for non-dry-run
+            // bulk_action. Replay is considered settled only when the server-side
+            // job reaches a terminal status — `BulkActionRunner.runToCompletion`
+            // polls and resolves with the unwrapped result (or throws on
+            // cancelled / failed). Synced-mode replays never set `dry_run: true`
+            // (dry-runs aren't enqueued in the first place), so the inline-200
+            // fork is unreachable here.
             _ = try await BulkActionRunner.runToCompletion(
                 transport: transport,
                 input: p.input

@@ -80,11 +80,11 @@ public struct Generator: Sendable {
         return Result(generated: generated, pruned: pruned, skipped: skipped)
     }
 
-    /// Reserved namespace roots per TSC42 §3. Authors registering custom
+    /// Reserved namespace roots. The `core`, `system`, `app`, `user`, and
+    /// `marfa` roots are owned by the platform. Authors registering custom
     /// types should claim their own publisher handle (`<publisher>.<type>`)
-    /// or use `user.<type>` for unpublished personal types; `app.<name>.<type>`
-    /// is reserved for registered apps. `core.*` is filtered out earlier;
-    /// the others surface here as warnings.
+    /// or use `user.<type>` for unpublished personal types. `core.*` is
+    /// filtered out earlier; the others surface here as warnings.
     static let reservedNamespaceRoots: Set<String> = [
         "core", "system", "app", "user", "marfa",
     ]

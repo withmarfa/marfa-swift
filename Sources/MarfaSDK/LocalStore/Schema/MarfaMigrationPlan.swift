@@ -4,7 +4,8 @@ import SwiftData
 /// Schema migration plan for the SDK's on-device store.
 ///
 /// Versions:
-/// - V1 (5.0.x): post-TSC42 reset baseline.
+/// - V1 (5.0.x): initial versioned schema. `tier` is a `String`; the
+///   store is CloudKit-compatible from this baseline.
 /// - V2 (5.2.0): adds ``DroppedMutationModel``. Lightweight stage —
 ///   purely additive, no existing model changed.
 ///
@@ -16,8 +17,8 @@ import SwiftData
 /// (SwiftData hashes the class shape at compile time, not at write time),
 /// so v6.x → v7.0 takes the schema-mismatch recovery path in
 /// ``MarfaModelContainer/make(path:cloudKitDatabase:)``: the old store
-/// is deleted and a fresh one is built. Pre-release pragmatism;
-/// matches the post-TSC42 baseline reset that preceded V1.
+/// is deleted and a fresh one is built. Pre-release pragmatism; data
+/// loss is acceptable before any real users depend on the store.
 ///
 /// Adding V3 later: if existing models change shape, copy
 /// `Schema/V2/` (and any unchanged-from-V1 models referenced by V2)

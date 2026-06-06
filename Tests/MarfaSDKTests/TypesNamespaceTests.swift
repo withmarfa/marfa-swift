@@ -55,7 +55,7 @@ struct TypesNamespaceTests {
         #expect(mock.calls[0].path == "/types/demo.foo")
     }
 
-    @Test("register sends POST /types and unwraps the type envelope (T-163)")
+    @Test("register sends POST /types and unwraps the type envelope")
     func register() async throws {
         let (client, mock) = makeClient()
         // Server returns { "type": ... }; SDK unwraps via TypeResponse.
@@ -72,7 +72,7 @@ struct TypesNamespaceTests {
         #expect(mock.calls[0].path == "/types")
     }
 
-    @Test("update sends PUT /types/{id} and unwraps the type envelope (T-167)")
+    @Test("update sends PUT /types/{id} and unwraps the type envelope")
     func update() async throws {
         let (client, mock) = makeClient()
         struct Envelope: Encodable { let type: TypeSchema }

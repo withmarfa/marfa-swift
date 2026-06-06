@@ -4,10 +4,10 @@ import Foundation
 ///
 /// `system.credential` items are still managed via ``ItemsNamespace`` for
 /// generic CRUD; this namespace adds the two creation factories that
-/// produce credentials of `oauth_token` (T-231 PR1) and `api_token`
-/// (T-241 PR1, T-246) kinds. The resulting credential id is passed as
-/// `credentialRef` on ``ConnectionsNamespace/install(_:)`` so multiple
-/// integrations of the same upstream share one credential row.
+/// produce credentials of `oauth_token` and `api_token` kinds. The
+/// resulting credential id is passed as `credentialRef` on
+/// ``ConnectionsNamespace/install(_:)`` so multiple integrations of the
+/// same upstream share one credential row.
 ///
 /// Both creation routes are tenant-admin gated server-side.
 ///

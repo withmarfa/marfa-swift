@@ -139,9 +139,9 @@ public final class ConflictError: MarfaError, @unchecked Sendable {
 // MARK: - Schema versioning
 
 /// 422 — A `POST /types` registration was rejected because the submitted
-/// schema version doesn't match the structural diff class. Per TSC42 §7,
-/// the server computes the diff between the prior and submitted schema
-/// and rejects mismatched bumps:
+/// schema version doesn't match the structural diff class. The server
+/// computes the diff between the prior and submitted schema and rejects
+/// mismatched bumps:
 /// - additive change → minor bump permitted
 /// - field removed or required-tightened → major bump required
 /// - description-only edit → patch bump permitted

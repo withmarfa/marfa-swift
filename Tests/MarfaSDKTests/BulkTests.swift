@@ -38,7 +38,7 @@ struct BulkTests {
         )
     }
 
-    /// T-218: sample queued envelope returned by `POST /items/bulk-actions`
+    /// Sample queued envelope returned by `POST /items/bulk-actions`
     /// (status 202). The SDK polls until terminal.
     func sampleQueuedJob(action: String, id: String = "baj_test") -> BulkActionJob {
         BulkActionJob(
@@ -56,8 +56,7 @@ struct BulkTests {
         )
     }
 
-    /// T-218: sample completed envelope — the result the polling loop
-    /// resolves with.
+    /// Sample completed envelope — the result the polling loop resolves with.
     func sampleCompletedJob(action: String, id: String = "baj_test") -> BulkActionJob {
         BulkActionJob(
             id: id,
@@ -136,7 +135,7 @@ struct BulkTests {
     @Test("bulkAction transition posts to /items/bulk-actions, polls to terminal")
     func bulkActionTransitionPath() async throws {
         let (client, mock) = makeClient()
-        // T-218: POST returns 202 + queued envelope; SDK then polls
+        // POST returns 202 + queued envelope; SDK then polls
         // GET /items/bulk-actions/jobs/:id and resolves with the
         // embedded BulkActionResult.
         enqueueQueued(mock, job: sampleQueuedJob(action: "transition"))
@@ -160,7 +159,7 @@ struct BulkTests {
         #expect(mock.calls[1].method == .get)
     }
 
-    // MARK: - T-218: async job lifecycle
+    // MARK: - Async job lifecycle
 
     @Test("bulkAction polls through queued → in_progress → completed")
     func bulkActionPollsThroughIntermediateStates() async throws {

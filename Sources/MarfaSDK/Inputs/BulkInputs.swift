@@ -375,9 +375,9 @@ public struct BulkActionResult: Codable, Sendable {
     }
 }
 
-/// T-218: terminal vs non-terminal lifecycle states for an async
-/// `bulk_action` job. The worker only transitions
-/// `queued` → `in_progress` → terminal; terminal values freeze the row.
+/// Terminal vs non-terminal lifecycle states for an async `bulk_action` job.
+/// The worker only transitions `queued` → `in_progress` → terminal;
+/// terminal values freeze the row.
 public enum BulkActionJobStatus: String, Codable, Sendable {
     case queued
     case inProgress = "in_progress"
@@ -386,8 +386,8 @@ public enum BulkActionJobStatus: String, Codable, Sendable {
     case cancelled
 }
 
-/// T-218: async-job envelope returned by `POST /items/bulk-actions`
-/// (non-dry-run) and by `GET /items/bulk-actions/jobs/:id`.
+/// Async-job envelope returned by `POST /items/bulk-actions` (non-dry-run)
+/// and by `GET /items/bulk-actions/jobs/:id`.
 ///
 /// ``ItemsNamespace/bulkAction(_:options:)`` resolves with the embedded
 /// ``BulkActionResult`` once `status` reaches a terminal value;

@@ -60,9 +60,8 @@ public final class MarfaClient: Sendable {
     /// webhooks.
     public let connections: ConnectionsNamespace
 
-    /// Credentials API: create OAuth-provider and api-token credentials
-    /// (T-231 PR1, T-241 PR1, T-246). The returned credential id is
-    /// passed as `credentialRef` on
+    /// Credentials API: create OAuth-provider and api-token credentials.
+    /// The returned credential id is passed as `credentialRef` on
     /// ``ConnectionsNamespace/install(_:)`` so multiple integrations of
     /// the same upstream share one credential row.
     public let credentials: CredentialsNamespace
@@ -76,13 +75,13 @@ public final class MarfaClient: Sendable {
     /// and platform admin per method. The server enforces the role split.
     public let tenants: TenantsNamespace
 
-    /// Admin API (T-117, T-124): platform-admin-only operator surface.
+    /// Admin API: platform-admin-only operator surface.
     /// `client.admin.tenants.{list, get, suspend, unsuspend, metrics, keys}`
     /// plus `client.admin.accountDeletion.purgeNow()`. Tenant quota
     /// read/write lives on ``tenants`` (`client.tenants.quotas.*`).
     public let admin: AdminNamespace
 
-    /// Auth API (T-116): post-sign-in account-lifecycle endpoints.
+    /// Auth API: post-sign-in account-lifecycle endpoints.
     /// `client.auth.account.{requestDelete, cancel, confirmDelete}`. The
     /// OAuth / Passkey / DeviceFlow sign-in surfaces live under
     /// ``MarfaAuth``, ``Passkey``, and ``DeviceFlow`` — this namespace is

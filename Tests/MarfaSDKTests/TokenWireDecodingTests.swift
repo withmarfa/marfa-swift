@@ -14,8 +14,7 @@ import Foundation
 struct TokenWireDecodingTests {
 
     /// The exact JSON shape `/auth/token` returns for an OAuth code
-    /// exchange with `openid profile email` granted, captured from
-    /// staging during T-086 manual smoke.
+    /// exchange with `openid profile email` granted.
     private let openIdResponse: String = """
     {
       "access_token": "marfa_at_abc",

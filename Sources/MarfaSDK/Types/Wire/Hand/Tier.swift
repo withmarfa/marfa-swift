@@ -1,7 +1,7 @@
 /// The intent dimension of an item: `library` (curated, kept, indexed) or
 /// `feed` (high-volume, low-intent capture). Items move between tiers
-/// through manual or automated curation. Per TSC42, retention is operator
-/// configuration and lives separately from this dimension.
+/// through manual or automated curation. Retention windows are operator
+/// configuration and live separately from this dimension.
 ///
 /// `tier` is optional on the wire — `system.*` items have no tier, and
 /// the SDK models that as `tier == nil`. For `core.*` and other tiered

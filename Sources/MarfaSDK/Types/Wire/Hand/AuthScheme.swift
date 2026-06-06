@@ -3,7 +3,7 @@ import Foundation
 /// Authorization scheme stamped by the Marfa proxy on outbound calls
 /// when the connection's credential is of kind `api_token`.
 ///
-/// Mirrors the server's `auth_scheme` enum (T-246) on
+/// Mirrors the server's `auth_scheme` enum on
 /// `system.credential.api_token_config`. Some upstreams (Readwise,
 /// HubSpot, Atlassian) reject the default `Bearer` scheme and require
 /// `Token` or `Basic`; this enum carries the choice from the credential
