@@ -19,39 +19,29 @@ public struct Generator: Sendable {
     }
 
     public func run() throws -> Result {
-        // 1. Resolve source + output directories to absolute URLs.
         guard let sourceDirRel = config.source.resolvedDirectory else {
             throw ConfigLoaderError.missingField("source.directory or source.cacheDirectory")
         }
         let sourceDir = ConfigLoader.resolvePath(sourceDirRel, relativeTo: configDir)
         let outputDir = ConfigLoader.resolvePath(config.output.directory, relativeTo: configDir)
 
-        // 2. Load custom schemas from user directory, rejecting any core.* id.
         let customSchemas = try SchemaLoader.loadSchemas(from: sourceDir, allowCoreTypes: false)
 
-        // 3. Load bundled core types (used only as a parent-resolution registry).
+        // Core types are loaded only as a parent-resolution registry; they are
+        // never emitted (SchemaLoader guards against custom types redefining core ids).
         let coreSchemas = try SchemaLoader.loadBundledCoreTypes()
-
-        // 4. Combined registry for parent-chain resolution. Custom types
-        //    cannot redefine core ids (SchemaLoader already guards that).
         var registry = coreSchemas
         for (k, v) in customSchemas { registry[k] = v }
 
-        // 5. Filter custom ids via include/exclude. `core.*` is always excluded.
         let customIDs = Array(customSchemas.keys).sorted()
         let emittableIDs = filterTypeIDs(customIDs, filters: config.types)
         let skipped = Set(customIDs).subtracting(emittableIDs).sorted()
 
-        // 6. Pre-check: collision-free struct names. Also surface a soft
-        //    warning if any custom id sits under a reserved namespace root
-        //    (`core`, `system`, `app`, `user`, `marfa`). Soft because the
-        //    server is the authoritative validator at registration; this
-        //    catches the most common author mistakes locally before a
-        //    round-trip.
+        // Reserved-root warnings are soft — the server is authoritative at
+        // registration time. This catches the most common author mistakes locally.
         Self.warnReservedRoots(emittableIDs)
         let nameMap = try NameMapper.buildNameMap(for: emittableIDs)
 
-        // 7. Resolve + emit.
         try FileWriter.ensureDirectory(outputDir)
         var generated: [URL] = []
         var expectedNames = Set<String>()
@@ -74,7 +64,6 @@ public struct Generator: Sendable {
             generated.append(url)
         }
 
-        // 8. Prune stale files.
         let pruned = FileWriter.prune(outputDir: outputDir, keeping: expectedNames)
 
         return Result(generated: generated, pruned: pruned, skipped: skipped)
@@ -121,8 +110,6 @@ public struct Generator: Sendable {
         }
     }
 
-    /// Emit a soft warning to stderr for each reserved-root violation.
-    /// Doesn't abort — the server is authoritative.
     static func warnReservedRoots(_ ids: [String]) {
         for id in ids {
             if let warning = reservedRootWarning(for: id) {
@@ -131,8 +118,8 @@ public struct Generator: Sendable {
         }
     }
 
-    // Best-effort "Source:" header path — relative to the config dir if we
-    // can work that out; otherwise the raw filename we found on disk.
+    // Returns a path relative to the config dir when possible; falls back
+    // to the bare filename (used as the "Source:" header in generated files).
     private func sourceRelativePath(
         schemaID: String,
         sourceDir: URL,

@@ -155,7 +155,6 @@ extension DroppedMutationModel {
 
 // MARK: - Typed payloads
 
-/// Payload stored for a `createItem` mutation.
 struct CreateItemPayload: Codable, Sendable {
     let input: CreateItemInput
 }
@@ -179,18 +178,15 @@ struct UpdateItemPayload: Codable, Sendable {
     var sourceId: String?
 }
 
-/// Payload for mutations that just need an item/edge ID.
 struct IDPayload: Codable, Sendable {
     let id: String
 }
 
-/// Payload for `transitionItem`.
 struct TransitionPayload: Codable, Sendable {
     let id: String
     let state: ItemState
 }
 
-/// Payload for `createEdge`.
 struct CreateEdgePayload: Codable, Sendable {
     let source: String
     let target: String
@@ -198,38 +194,32 @@ struct CreateEdgePayload: Codable, Sendable {
     let properties: [String: JSONValue]?
 }
 
-/// Payload for `updateEdge`.
 struct UpdateEdgePayload: Codable, Sendable {
     let id: String
     let properties: [String: JSONValue]
 }
 
-/// Payload for `setMetadata` and `mergeMetadata`.
 struct MetadataPayload: Codable, Sendable {
     let itemId: String
     let input: MetadataInput
 }
 
-/// Payload for `addTags`.
 struct AddTagsPayload: Codable, Sendable {
     let itemId: String
     let tags: [String]
 }
 
-/// Payload for `removeTag`.
 struct RemoveTagPayload: Codable, Sendable {
     let itemId: String
     let tag: String
 }
 
-/// Payload for `setExtension`.
 struct SetExtensionPayload: Codable, Sendable {
     let itemId: String
     let namespace: String
     let data: [String: JSONValue]
 }
 
-/// Payload for `deleteExtension`.
 struct DeleteExtensionPayload: Codable, Sendable {
     let itemId: String
     let namespace: String
@@ -249,20 +239,15 @@ struct UploadBlobPayload: Codable, Sendable {
     let size: Int
 }
 
-/// Payload for `bulk` — `POST /items/bulk` list-in. The whole caller
-/// input travels verbatim so replay re-issues the identical call.
+/// The whole input travels verbatim so replay re-issues the identical call.
 struct BulkPayload: Codable, Sendable {
     let input: BulkInput
 }
 
-/// Payload for `bulkAction` — `POST /items/bulk-actions` filter-in.
-/// Same round-trip-exact semantics as `BulkPayload`.
 struct BulkActionPayload: Codable, Sendable {
     let input: BulkActionInput
 }
 
-/// Payload for `bulkEdges` — `POST /edges/bulk` list-in. The whole caller
-/// input travels verbatim so replay re-issues the identical call.
 struct BulkEdgesPayload: Codable, Sendable {
     let input: BulkEdgeInput
 }
@@ -538,8 +523,6 @@ public actor MutationQueue {
 
     // MARK: - Dequeue / drain
 
-    /// Returns all pending mutations in creation order, snapshotted into
-    /// Sendable DTOs.
     func fetchAll() throws -> [PendingMutationRecord] {
         let descriptor = FetchDescriptor<PendingMutationModel>(
             sortBy: [SortDescriptor(\.createdAt, order: .forward)]
@@ -547,7 +530,6 @@ public actor MutationQueue {
         return try modelContext.fetch(descriptor).map { $0.toRecord() }
     }
 
-    /// Removes a successfully replayed mutation.
     func remove(id: String) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
@@ -819,8 +801,6 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
-    /// Returns every dropped mutation row, sorted by ``droppedAt``
-    /// descending (newest first).
     public func fetchDropped() throws -> [DroppedMutationRecord] {
         let descriptor = FetchDescriptor<DroppedMutationModel>(
             sortBy: [SortDescriptor(\.droppedAt, order: .reverse)]
@@ -828,8 +808,6 @@ public actor MutationQueue {
         return try modelContext.fetch(descriptor).map { $0.toRecord() }
     }
 
-    /// Removes a single dropped mutation row by id. No-op if the row
-    /// has already been dismissed.
     public func dismissDropped(id: String) throws {
         let predicate = #Predicate<DroppedMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<DroppedMutationModel>(predicate: predicate)
@@ -857,7 +835,6 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
-    /// Removes every dropped mutation row.
     public func dismissAllDropped() throws {
         let descriptor = FetchDescriptor<DroppedMutationModel>()
         let rows = try modelContext.fetch(descriptor)
@@ -902,8 +879,6 @@ public actor MutationQueue {
         date.ISO8601Format(.init(includingFractionalSeconds: true))
     }
 
-    // Rewrite the id fields inside a payload JSON for non-edge
-    // item-scoped mutations. Returns the rewritten JSON string.
     private static func rewritePayload(
         record: PendingMutationRecord,
         from oldId: String,
@@ -1003,9 +978,6 @@ public actor MutationQueue {
         return String(data: encoded, encoding: .utf8) ?? record.payloadJson
     }
 
-    // Rewrite source/target endpoints inside a createEdge payload.
-    // Returns the (possibly unchanged) JSON and a flag indicating
-    // whether any change was made.
     private static func rewriteEdgeEndpoints(
         payloadJson: String,
         from oldId: String,

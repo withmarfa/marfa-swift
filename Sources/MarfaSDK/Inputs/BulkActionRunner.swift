@@ -167,9 +167,6 @@ enum BulkActionRunner {
         }
     }
 
-    /// Best-effort JSON-error decoder mirroring the typed-throw shape
-    /// the rest of the SDK uses. Falls back to a generic ``MarfaError``
-    /// when the body isn't well-formed.
     private static func decodeErrorResponse(data: Data, status: Int) throws -> MarfaError {
         struct Body: Decodable {
             struct Inner: Decodable {

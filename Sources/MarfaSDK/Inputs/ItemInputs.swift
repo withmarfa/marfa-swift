@@ -96,7 +96,6 @@ public struct CreateItemEdge: Codable, Sendable, Hashable {
     }
 }
 
-/// Body for PATCH /items/:id.
 struct UpdateItemBody: Codable, Sendable {
     var properties: [String: JSONValue]?
     var version: Int?
@@ -142,7 +141,6 @@ public struct UpdateOptions: Sendable {
     }
 }
 
-/// Body for POST /items/:id/transition.
 struct TransitionBody: Codable, Sendable {
     let state: ItemState
 }

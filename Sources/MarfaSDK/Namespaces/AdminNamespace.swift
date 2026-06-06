@@ -10,8 +10,6 @@ import Foundation
 public struct AdminNamespace: Sendable {
 
     let transport: any Transport
-
-    /// `true` when this namespace is attached to a pure-local client.
     let isLocalMode: Bool
 
     fileprivate func ensureRemote(_ operation: String) throws {
@@ -20,19 +18,12 @@ public struct AdminNamespace: Sendable {
         }
     }
 
-    /// Per-tenant operator surface — listings, status flips, metrics,
-    /// and key listings. Mirrors the `/admin/tenants/...` route family.
-    /// Tenant quota read/write lives on ``MarfaClient/tenants`` (the
-    /// `client.tenants.quotas.*` surface) rather than here; that endpoint
-    /// is already platform-admin-gated and exposing it twice would
-    /// duplicate the operator surface.
+    /// Tenant quota read/write lives on ``MarfaClient/tenants``
+    /// (`client.tenants.quotas.*`), not here.
     public var tenants: AdminTenantsNamespace {
         AdminTenantsNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
-    /// Account-deletion operator controls. Exposes
-    /// ``AdminAccountDeletionNamespace/purgeNow()`` for one-shot sweeper
-    /// runs.
     public var accountDeletion: AdminAccountDeletionNamespace {
         AdminAccountDeletionNamespace(transport: transport, isLocalMode: isLocalMode)
     }
@@ -52,8 +43,6 @@ public struct AdminTenantsNamespace: Sendable {
         }
     }
 
-    /// Lists every tenant in the instance with current operator-status.
-    /// Platform-admin only.
     public func list() async throws -> [TenantSummary] {
         try ensureRemote("admin.tenants.list")
         let response: TenantListResponse = try await transport.request(
@@ -100,8 +89,6 @@ public struct AdminTenantsNamespace: Sendable {
         )
     }
 
-    /// Per-tenant usage snapshot — item count by state, blob count and
-    /// total bytes, plus recent activity. Platform-admin only.
     public func metrics(id: String) async throws -> TenantMetrics {
         try ensureRemote("admin.tenants.metrics")
         return try await transport.request(
@@ -113,8 +100,7 @@ public struct AdminTenantsNamespace: Sendable {
     }
 
     /// Active (non-revoked) API-key listing for the named tenant.
-    /// Operator surface for emergency revocation — pair with
-    /// ``KeysNamespace/revoke(id:)``. Platform-admin only.
+    /// Pair with ``KeysNamespace/revoke(id:)`` for emergency revocation.
     public func keys(id: String) async throws -> [TenantApiKeySummary] {
         try ensureRemote("admin.tenants.keys")
         let response: TenantApiKeysResponse = try await transport.request(
@@ -164,7 +150,6 @@ public struct AdminAccountDeletionNamespace: Sendable {
 
 // MARK: - Wire-adjacent input/output shapes
 
-/// One tenant in the operator listing.
 public struct TenantSummary: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let name: String?
@@ -191,8 +176,6 @@ public enum TenantStatus: String, Codable, Sendable, Hashable {
     case suspended
 }
 
-/// Composite "show one tenant" response — tenant row + optional quota
-/// override + most-recent activity.
 public struct TenantDetail: Codable, Sendable {
     public let tenant: TenantSummary
     public let quotas: TenantQuota?
@@ -214,7 +197,6 @@ public struct TenantDetail: Codable, Sendable {
     }
 }
 
-/// One `system.activity` entry surfaced through the admin reads.
 public struct TenantActivityEntry: Codable, Sendable, Hashable {
     public let id: String
     public let severity: String
@@ -234,8 +216,6 @@ public struct TenantActivityEntry: Codable, Sendable, Hashable {
     }
 }
 
-/// Per-tenant usage snapshot — item / blob counts and a recent-activity
-/// tail. Returned by ``AdminTenantsNamespace/metrics(id:)``.
 public struct TenantMetrics: Codable, Sendable {
     public let tenantId: String
     public let items: TenantItemCounts
@@ -294,7 +274,6 @@ public struct TenantBlobCounts: Codable, Sendable, Hashable {
     }
 }
 
-/// One active key in the operator-facing tenant-keys listing.
 public struct TenantApiKeySummary: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let label: String
@@ -330,7 +309,6 @@ public struct TenantApiKeySummary: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
-/// Result of ``AdminAccountDeletionNamespace/purgeNow()``.
 public struct PurgeNowResult: Codable, Sendable, Hashable {
     public let purgedCount: Int
     public let runAt: String
@@ -346,7 +324,7 @@ public struct PurgeNowResult: Codable, Sendable, Hashable {
     }
 }
 
-// MARK: - Internal response envelopes
+// MARK: - Internal response envelopes (unwrapped by namespace methods above)
 
 struct TenantListResponse: Codable, Sendable {
     let data: [TenantSummary]

@@ -25,67 +25,38 @@ public final class MarfaClient: Sendable {
     /// The underlying transport (internal for testing).
     let transport: any Transport
 
-    /// The client configuration.
     public let configuration: ClientConfiguration
-
-    /// Items API: create, get, list, update, delete, restore, transition, versions, stats.
     public let items: ItemsNamespace
-
-    /// Metadata API: get, set, merge tags and about references.
     public let metadata: MetadataNamespace
-
-    /// Extensions API: read and write namespaced extension data.
     public let extensions: ExtensionsNamespace
-
-    /// Edges API: create, update, delete typed edges; list from source / to target.
     public let edges: EdgesNamespace
-
-    /// Blobs API: upload, download, check existence, get URLs.
     public let blobs: BlobsNamespace
-
-    /// Types API: list, get, register, update, delete type schemas.
     public let types: TypesNamespace
-
-    /// Keys API: create, list, revoke API keys.
     public let keys: KeysNamespace
-
-    /// Webhooks API: create, list, get, update, delete, delivery history.
     public let webhooks: WebhooksNamespace
-
-    /// Profile API: get / update the calling user's profile, manage avatar.
     public let profile: ProfileNamespace
-
-    /// Connections API: install / uninstall lifecycle plus convenience
-    /// reads for `system.connection` items, lease tokens, and inbound
-    /// webhooks.
     public let connections: ConnectionsNamespace
 
-    /// Credentials API: create OAuth-provider and api-token credentials.
-    /// The returned credential id is passed as `credentialRef` on
-    /// ``ConnectionsNamespace/install(_:)`` so multiple integrations of
-    /// the same upstream share one credential row.
+    /// Credential id returned by ``createOAuthProvider(_:)`` or ``createApiToken(_:)``
+    /// is passed as `credentialRef` on ``ConnectionsNamespace/install(_:)`` so
+    /// multiple integrations of the same upstream share one credential row.
     public let credentials: CredentialsNamespace
 
-    /// Integrations API: list, get, register Integration manifests.
     public let integrations: IntegrationsNamespace
 
-    /// Tenants API: tenant-scoped configuration plus quota read/write.
     /// `client.tenants.{getConfig, setConfig}` are tenant-admin-gated;
-    /// `client.tenants.quotas.{getOwn, getById, set}` mixes tenant
-    /// and platform admin per method. The server enforces the role split.
+    /// `client.tenants.quotas.{getOwn, getById, set}` mixes tenant and platform
+    /// admin per method. The server enforces the role split.
     public let tenants: TenantsNamespace
 
-    /// Admin API: platform-admin-only operator surface.
-    /// `client.admin.tenants.{list, get, suspend, unsuspend, metrics, keys}`
-    /// plus `client.admin.accountDeletion.purgeNow()`. Tenant quota
-    /// read/write lives on ``tenants`` (`client.tenants.quotas.*`).
+    /// Platform-admin-only operator surface.
+    /// Tenant quota read/write lives on ``tenants`` (`client.tenants.quotas.*`),
+    /// not here.
     public let admin: AdminNamespace
 
-    /// Auth API: post-sign-in account-lifecycle endpoints.
-    /// `client.auth.account.{requestDelete, cancel, confirmDelete}`. The
-    /// OAuth / Passkey / DeviceFlow sign-in surfaces live under
-    /// ``MarfaAuth``, ``Passkey``, and ``DeviceFlow`` — this namespace is
-    /// for account management after a session exists.
+    /// Post-sign-in account-lifecycle endpoints (`requestDelete`, `cancel`,
+    /// `confirmDelete`). The OAuth / Passkey / DeviceFlow sign-in surfaces live
+    /// under ``MarfaAuth``, ``Passkey``, and ``DeviceFlow``.
     public let auth: AuthNamespace
 
     /// The active sync engine, present only in synced mode (``MarfaClient/synced(url:apiKey:storePath:)``).
@@ -108,7 +79,6 @@ public final class MarfaClient: Sendable {
 
     // MARK: - Init
 
-    /// Designated init — used by every other init path, including tests.
     init(
         configuration: ClientConfiguration,
         transport: any Transport,
@@ -177,7 +147,6 @@ public final class MarfaClient: Sendable {
         self.auth = AuthNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
-    /// Creates a client with the given configuration.
     public convenience init(configuration: ClientConfiguration) {
         self.init(
             configuration: configuration,
@@ -185,7 +154,6 @@ public final class MarfaClient: Sendable {
         )
     }
 
-    /// Creates a client with a URL and API key using default settings.
     public convenience init(url: URL, apiKey: String) {
         self.init(configuration: ClientConfiguration(url: url, apiKey: apiKey))
     }
@@ -251,11 +219,10 @@ public final class MarfaClient: Sendable {
     /// the main thread.
     public static func local(container: ModelContainer) async throws -> MarfaClient {
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
-        // The transport is never invoked in pure-local mode: every
-        // namespace method checks `localStore` first before touching the
-        // transport. URL is a placeholder; the fallback guards against
-        // the synthetic `local://offline` scheme ever failing to parse
-        // in a future SDK.
+        // Transport is never invoked in pure-local mode — every namespace
+        // method checks `localStore` first. URL is a placeholder; the
+        // fallback guards against `local://offline` failing to parse in a
+        // future SDK.
         let config = ClientConfiguration(
             url: URL(string: "local://offline") ?? URL(fileURLWithPath: "/dev/null"),
             apiKey: ""
@@ -333,8 +300,6 @@ public final class MarfaClient: Sendable {
         )
     }
 
-    /// Designated synced-factory — both `synced(url:apiKey:...)` and
-    /// `synced(url:tokenProvider:...)` route through here.
     private static func synced(
         configuration config: ClientConfiguration,
         storePath: String,
@@ -387,8 +352,8 @@ public final class MarfaClient: Sendable {
         return try await fromSecureStorage(service: service, account: account, url: url, storage: storage)
     }
 
-    /// Protocol-based helper — takes any ``SecureStorage`` so tests can
-    /// pass an ``InMemoryKeychain`` without touching the real Keychain.
+    /// Protocol-based variant — accepts any ``SecureStorage`` so tests can inject an
+    /// in-memory keychain without touching the system keychain.
     public static func fromSecureStorage(
         service: String = "marfa.sdk",
         account: String,
@@ -401,7 +366,6 @@ public final class MarfaClient: Sendable {
         return MarfaClient(url: url, apiKey: apiKey)
     }
 
-    /// Writes the current client's API key back to the system Keychain.
     public func saveToKeychain(
         service: String = "marfa.sdk",
         account: String,
