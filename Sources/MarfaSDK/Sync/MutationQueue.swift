@@ -175,7 +175,7 @@ struct UpdateItemPayload: Codable, Sendable {
     var tier: Tier?
     /// Rename the natural key under this item's `source`. Travels through
     /// replay; the server still enforces `(source, source_id)` uniqueness
-    /// at replay time. Added v5.5.0 (T-131).
+    /// at replay time.
     var sourceId: String?
 }
 

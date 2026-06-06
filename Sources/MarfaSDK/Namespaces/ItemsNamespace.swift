@@ -373,14 +373,13 @@ public struct ItemsNamespace: Sendable {
     /// ``LocalStore/purgeItem(id:)``, etc.). Synced mode enqueues the
     /// input as a single ``MutationKind/bulkAction`` record for replay.
     ///
-    /// Remote mode (T-218): the server returns 200 for dry-run
-    /// (synchronous) and 202 + a ``BulkActionJob`` envelope for every
-    /// other action. The default shape of `bulkAction` keeps callers
-    /// blissfully unaware — polls internally until the job reaches a
-    /// terminal state and resolves with the embedded ``BulkActionResult``
-    /// exactly as the older synchronous endpoint did. Pass
-    /// ``BulkActionPollOptions`` to tune intervals or hook
-    /// ``BulkActionPollOptions/onProgress`` for live UI updates.
+    /// In remote mode, the server returns 200 for dry-run (synchronous) and
+    /// 202 + a ``BulkActionJob`` envelope for every other action. The default
+    /// shape of `bulkAction` keeps callers blissfully unaware — polls
+    /// internally until the job reaches a terminal state and resolves with
+    /// the embedded ``BulkActionResult``. Pass ``BulkActionPollOptions`` to
+    /// tune intervals or hook ``BulkActionPollOptions/onProgress`` for live
+    /// UI updates.
     public func bulkAction(
         _ input: BulkActionInput,
         options: BulkActionPollOptions = .default
@@ -395,12 +394,11 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
-    /// T-218: POST `/items/bulk-actions` and return the initial
-    /// ``BulkActionJob`` envelope without polling. Suits callers that
-    /// want explicit control over the lifecycle — UI surfaces that
-    /// render progress directly, agents returning a job id to the
-    /// caller, etc. Drive polling yourself via
-    /// ``bulkActionStatus(jobId:)``.
+    /// POST `/items/bulk-actions` and return the initial ``BulkActionJob``
+    /// envelope without polling. Suits callers that want explicit control
+    /// over the lifecycle — UI surfaces that render progress directly,
+    /// agents returning a job id to the caller, etc. Drive polling yourself
+    /// via ``bulkActionStatus(jobId:)``.
     ///
     /// Throws on `dry_run: true` — that path stays synchronous on the
     /// server, so callers should use ``bulkAction(_:options:)`` for
@@ -425,9 +423,9 @@ public struct ItemsNamespace: Sendable {
         }
     }
 
-    /// T-218: single GET against `/items/bulk-actions/jobs/:id`. The
-    /// caller is responsible for back-off — see
-    /// ``BulkActionPollOptions`` if you want the SDK to drive the loop.
+    /// Single GET against `/items/bulk-actions/jobs/:id`. The caller is
+    /// responsible for back-off — see ``BulkActionPollOptions`` if you
+    /// want the SDK to drive the loop.
     public func bulkActionStatus(jobId: String) async throws -> BulkActionJob {
         try await transport.request(
             method: .get,
@@ -437,12 +435,11 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
-    /// T-218: request cancellation of a bulk_action job. Idempotent —
-    /// already-terminal jobs return their existing final state
-    /// unchanged. The worker observes the flag between chunks and
-    /// stops; the response from this call surfaces the row as-of-now,
-    /// which may still show `in_progress` if the worker hasn't yet
-    /// observed it.
+    /// Request cancellation of a bulk_action job. Idempotent — already-terminal
+    /// jobs return their existing final state unchanged. The worker observes
+    /// the flag between chunks and stops; the response surfaces the row
+    /// as-of-now, which may still show `in_progress` if the worker hasn't
+    /// yet observed the cancel.
     public func bulkActionCancel(jobId: String) async throws -> BulkActionJob {
         try await transport.request(
             method: .delete,

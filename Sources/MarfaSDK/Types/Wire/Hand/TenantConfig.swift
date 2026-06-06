@@ -10,7 +10,7 @@ import Foundation
 /// to env defaults. The same shape is returned by `GET` and written by
 /// `PUT`.
 public struct TenantConfig: Codable, Sendable, Hashable {
-    /// Schema-enforcement levers (TSC42 §5). See ``TenantConfig/Enforcement``.
+    /// Schema-enforcement levers. See ``TenantConfig/Enforcement``.
     public var enforcement: Enforcement?
 
     /// Override for the audit-log retention window. `nil` falls back to

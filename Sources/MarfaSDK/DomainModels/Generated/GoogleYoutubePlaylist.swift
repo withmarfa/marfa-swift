@@ -6,7 +6,7 @@
 import Foundation
 /// ``GoogleYoutubePlaylist`` — typed wrapper for `google.youtube.playlist` items.
 ///
-/// A YouTube playlist created by the connected user (T-249). Captures upstream-fidelity playlist metadata from the YouTube Data API v3 `playlists` resource. The owning channel is wired via a `parent-of` edge (channel = source, playlist = target). When the connection's `materialise_playlists` configuration flag is true, the per-playlist video walk wires additional `parent-of` edges from this playlist to each member video.
+/// A YouTube playlist created by the connected user. Captures upstream-fidelity playlist metadata from the YouTube Data API v3 `playlists` resource. The owning channel is wired via a `parent-of` edge (channel = source, playlist = target). When the connection's `materialise_playlists` configuration flag is true, the per-playlist video walk wires additional `parent-of` edges from this playlist to each member video.
 ///
 /// Display hints — title: `title`, body: `description`.
 public struct GoogleYoutubePlaylist: MarfaItem {

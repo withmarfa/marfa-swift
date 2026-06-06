@@ -2,15 +2,14 @@ import Foundation
 
 /// Input for creating an OAuth provider credential.
 ///
-/// `POST /credentials/oauth-provider` (T-231 PR1). Creates a
-/// `system.credential` of kind `oauth_token` carrying an upstream
-/// service's OAuth client config — authorize URL, token URL, client_id,
-/// encrypted client_secret, upstream API base URL, and optional default
-/// scope. The resulting credential id is passed as `credential_ref` on
-/// subsequent ``ConnectionsNamespace/install(_:)`` calls so multiple
-/// integrations of the same upstream (e.g. `google.calendar` +
-/// `google.tasks`) share one OAuth client and one stored secret instead
-/// of duplicating per-integration.
+/// `POST /credentials/oauth-provider`. Creates a `system.credential` of
+/// kind `oauth_token` carrying an upstream service's OAuth client config —
+/// authorize URL, token URL, client_id, encrypted client_secret, upstream
+/// API base URL, and optional default scope. The resulting credential id is
+/// passed as `credential_ref` on subsequent ``ConnectionsNamespace/install(_:)``
+/// calls so multiple integrations of the same upstream (e.g. `google.calendar`
+/// + `google.tasks`) share one OAuth client and one stored secret instead of
+/// duplicating per-integration.
 ///
 /// The client_secret is encrypted server-side under the
 /// `connectionOauthToken` HKDF domain (AES-256-GCM). Decryption only
@@ -58,11 +57,10 @@ public struct CreateOAuthProviderCredentialInput: Codable, Sendable, Hashable {
 
 /// Input for creating an API-token credential.
 ///
-/// `POST /credentials/api-token` (T-241 PR1, T-246). Creates a
-/// `system.credential` of kind `api_token` carrying a static upstream
-/// bearer credential. The `upstreamBaseUrl` is the Marfa proxy's target;
-/// the `apiToken` is encrypted server-side and decrypted only at the
-/// proxy gate.
+/// `POST /credentials/api-token`. Creates a `system.credential` of kind
+/// `api_token` carrying a static upstream bearer credential. The
+/// `upstreamBaseUrl` is the Marfa proxy's target; the `apiToken` is
+/// encrypted server-side and decrypted only at the proxy gate.
 ///
 /// `authScheme` controls the header the proxy stamps on outbound calls:
 /// - `.bearer` (default) → `Authorization: Bearer <token>`

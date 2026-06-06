@@ -43,27 +43,19 @@ public enum MarfaModelContainer {
         do {
             return try buildContainer(url: url, cloudKitDatabase: cloudKitDatabase)
         } catch {
-            // Schema-mismatch recovery: pre-5.0 stores cannot be migrated
-            // to the post-TSC42 V1 shape (library Bool → tier String) or
-            // any later version. The SDK has no real users yet, so the
-            // pragmatic recovery is to delete the stale store and reopen.
-            // The lightweight V1 → V2 stage shipped in 5.2.0 should never
-            // hit this path — V1 stores migrate cleanly. If the second
-            // attempt fails too, surface the underlying error.
+            // Schema-mismatch recovery. When the on-disk store shape does not
+            // match the current schema (e.g. a field was removed between SDK
+            // versions and SwiftData's content hash changed), no migration stage
+            // can bridge the gap inside a single binary. The pragmatic recovery
+            // is to delete the stale store and reopen cleanly. The lightweight
+            // V1 → V2 stage (added in 5.2.0) migrates cleanly and never hits
+            // this path.
             //
-            // v7.0 also reaches this path for stores written by v6.x:
-            // dropping `MarfaItemModel.originRaw` mutates V2's shape in
-            // place and produces a content hash that no migration stage
-            // can bridge inside a single binary. The destructive
-            // recovery is consistent with the pre-release no-carry-over
-            // principle — see ``MarfaMigrationPlan`` for the rationale.
-            //
-            // Trade-off: any future migration that fails (custom stage
-            // gone wrong, corrupt store) will also nuke the
-            // ``DroppedMutationModel`` rows added in 5.2.0. The dropped
-            // mutation log is therefore best-effort across migration
-            // boundaries — apps should treat it as a recovery aid, not
-            // a durable audit trail.
+            // Trade-off: any future migration failure (corrupt store, a custom
+            // stage gone wrong) will also discard ``DroppedMutationModel`` rows.
+            // The dropped-mutation log is therefore best-effort across migration
+            // boundaries — apps should treat it as a recovery aid, not a durable
+            // audit trail.
             let logger = Logger(subsystem: MarfaLogger.subsystem, category: "local")
             logger.error("LocalStore open failed (\(error.localizedDescription, privacy: .public)); deleting store and recreating fresh under current schema.")
             removeStoreFiles(at: url)

@@ -105,8 +105,7 @@ struct UpdateItemBody: Codable, Sendable {
     /// Rename the natural key under this item's `source`. Server validates
     /// uniqueness of `(source, source_id)` and 409s with
     /// `source_id_conflict` on collision. Independent of the version-merge
-    /// path; never participates in `conflicting_fields`. Added v5.5.0
-    /// (T-131).
+    /// path; never participates in `conflicting_fields`.
     var sourceId: String?
 
     enum CodingKeys: String, CodingKey {
@@ -126,7 +125,6 @@ public struct UpdateOptions: Sendable {
     /// Rename the item's `source_id` (natural key under its `source`).
     /// Server enforces `(source, source_id)` uniqueness; collisions return
     /// `409 source_id_conflict` rather than the version-conflict path.
-    /// Added v5.5.0 (T-131).
     public var sourceId: String?
 
     public init(

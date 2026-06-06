@@ -6,7 +6,7 @@
 import Foundation
 /// ``WithmarfaCapturedEmail`` — typed wrapper for `withmarfa.captured_email` items.
 ///
-/// An email captured by the withmarfa.inbox integration via Cloudflare Email Routing → Email Worker → webhook. Parsed MIME landed as a structured item. Maps onto `core.note` via `compatible_with` so cross-app readers see a title + body without knowing the captured-email shape. Attachment blob upload is gated on T-239; v1 captures attachment metadata (filename, mime_type, size_bytes) only.
+/// An email captured by the withmarfa.inbox integration via Cloudflare Email Routing → Email Worker → webhook. Parsed MIME landed as a structured item. Maps onto `core.note` via `compatible_with` so cross-app readers see a title + body without knowing the captured-email shape. v1 captures attachment metadata (filename, mime_type, size_bytes) only; blob upload requires the runtime SDK upload primitive.
 ///
 /// Display hints — title: `subject`, body: `text_body`.
 public struct WithmarfaCapturedEmail: MarfaItem {
@@ -23,7 +23,7 @@ public struct WithmarfaCapturedEmail: MarfaItem {
     /// Address the email was delivered to (the connection's capture address — e.g. `capture@inbox.marfa.so`).
     public var toAddress: String { item.properties["to_address"]?.stringValue ?? "" }
 
-    /// Per-attachment metadata `{ filename, mime_type, size_bytes }`. Actual blob upload is gated on T-239 — v1 captures metadata only. A follow-on ticket wires `blob_ref` once the runtime SDK gains an upload primitive.
+    /// Per-attachment metadata `{ filename, mime_type, size_bytes }`. v1 captures metadata only; blob upload requires the runtime SDK upload primitive and wires `blob_ref` once available.
     /// Element type: `object`.
     public var attachments: [String]? { item.properties["attachments"]?.arrayValue?.compactMap { $0.stringValue } }
 

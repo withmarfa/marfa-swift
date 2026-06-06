@@ -1,6 +1,6 @@
 import Foundation
 
-/// T-218: poll knobs accepted by ``ItemsNamespace/bulkAction(_:options:)``.
+/// Poll knobs accepted by ``ItemsNamespace/bulkAction(_:options:)``.
 ///
 /// Defaults: 250ms initial interval, doubling to 2s ceiling, 30-minute
 /// total wall-clock budget. Tests typically supply tight intervals
@@ -26,10 +26,9 @@ public struct BulkActionPollOptions: Sendable {
     public static let `default` = BulkActionPollOptions()
 }
 
-/// T-218: shared remote runner used by both
-/// ``ItemsNamespace/bulkAction(_:options:)`` and the synced-mode
-/// mutation-queue replay path in ``SyncEngine``. POSTs the input,
-/// distinguishes the 200 (dry-run) and 202 (queued) responses, and
+/// Shared remote runner used by both ``ItemsNamespace/bulkAction(_:options:)``
+/// and the synced-mode mutation-queue replay path in ``SyncEngine``. POSTs
+/// the input, distinguishes the 200 (dry-run) and 202 (queued) responses, and
 /// polls a queued job through to a terminal state.
 ///
 /// Kept namespace-independent so the synced-mode replayer doesn't have
@@ -194,9 +193,9 @@ enum BulkActionRunner {
     }
 }
 
-/// T-218: the async bulk_action job reached `status: .cancelled`. The
-/// envelope carries partial counts so callers know how far the worker
-/// got before observing the cancel signal.
+/// The async bulk_action job reached `status: .cancelled`. The envelope
+/// carries partial counts so callers know how far the worker got before
+/// observing the cancel signal.
 public struct BulkJobCancelledError: Error, Sendable {
     public let jobId: String
     public let processed: Int
@@ -204,9 +203,9 @@ public struct BulkJobCancelledError: Error, Sendable {
     public let errored: Int
 }
 
-/// T-218: the async bulk_action job reached `status: .failed`. The
-/// worker hit an unrecoverable error (typically a storage-level
-/// problem); `reason` carries the underlying message.
+/// The async bulk_action job reached `status: .failed`. The worker hit an
+/// unrecoverable error (typically a storage-level problem); `reason` carries
+/// the underlying message.
 public struct BulkJobFailedError: Error, Sendable {
     public let jobId: String
     public let reason: String

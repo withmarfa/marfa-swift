@@ -1,10 +1,9 @@
 import Foundation
 
-/// Operator-level admin surface (T-117, T-124). Backs the `my admin`
-/// CLI command tree. Every method requires a platform-admin key
-/// (`is_platform: true`); non-platform credentials receive a
-/// `403 forbidden` — CLI/UI layers should render
-/// `"this command requires a platform-admin key"`.
+/// Operator-level admin surface. Backs the `my admin` CLI command tree.
+/// Every method requires a platform-admin key (`is_platform: true`);
+/// non-platform credentials receive a `403 forbidden` — CLI/UI layers
+/// should render `"this command requires a platform-admin key"`.
 ///
 /// A client created via ``MarfaClient/local(path:)`` has no live server;
 /// every method here throws ``LocalModeUnsupportedError``.
@@ -31,7 +30,7 @@ public struct AdminNamespace: Sendable {
         AdminTenantsNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
-    /// Account-deletion operator controls (T-124). Today exposes
+    /// Account-deletion operator controls. Exposes
     /// ``AdminAccountDeletionNamespace/purgeNow()`` for one-shot sweeper
     /// runs.
     public var accountDeletion: AdminAccountDeletionNamespace {
@@ -131,7 +130,7 @@ public struct AdminTenantsNamespace: Sendable {
 
 // MARK: - Account deletion
 
-/// Operator controls for the account-deletion lifecycle (T-124).
+/// Operator controls for the account-deletion lifecycle.
 public struct AdminAccountDeletionNamespace: Sendable {
 
     let transport: any Transport

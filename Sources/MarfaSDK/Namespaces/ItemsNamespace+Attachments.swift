@@ -2,12 +2,12 @@ import Foundation
 
 // MARK: - items.createWithAttachments — atomic host + attachments helper
 
-/// Input to ``ItemsNamespace/createWithAttachments(_:)`` (T-100).
+/// Input to ``ItemsNamespace/createWithAttachments(_:)``.
 ///
-/// Wraps the existing blob-upload + `items.bulk` pattern: upload each
-/// attachment's blob, then issue one atomic bulk call containing the
-/// host item and the `core.file.*` items with inline edges from each
-/// attachment back to the host.
+/// Wraps the blob-upload + `items.bulk` pattern: upload each attachment's
+/// blob, then issue one atomic bulk call containing the host item and the
+/// `core.file.*` items with inline edges from each attachment back to the
+/// host.
 public struct CreateWithAttachmentsInput: Sendable {
 
     /// The host item — the thing the attachments are attached *to*
@@ -24,8 +24,8 @@ public struct CreateWithAttachmentsInput: Sendable {
     public var attachments: [Attachment]
 
     /// Edge type from each attachment back to the host. Defaults to
-    /// `"attached-to"` (the canonical attachment edge — T-108).
-    /// Override for app-specific semantics like `"cover-image"`.
+    /// `"attached-to"` (the canonical attachment edge). Override for
+    /// app-specific semantics like `"cover-image"`.
     public var edgeType: String
 
     public init(
@@ -141,11 +141,9 @@ public extension ItemsNamespace {
         _ input: CreateWithAttachmentsInput
     ) async throws -> CreateWithAttachmentsResult {
         // Local + synced modes don't have a clean "atomic across the
-        // local store and the queue" story today (parked follow-on in
-        // T-155). Reject loudly rather than partial-state on the local
-        // side; callers that need pure-local attachments can fall back
-        // to the per-call primitives until the dual-save atomicity work
-        // lands.
+        // local store and the queue" story. Reject loudly rather than
+        // leave the local side in partial state; callers that need
+        // pure-local attachments can fall back to the per-call primitives.
         if localStore != nil {
             throw LocalModeUnsupportedError(
                 operation: "items.createWithAttachments"
