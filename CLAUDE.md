@@ -71,7 +71,7 @@ Three sibling sub-directories:
 
 ### System domain models (`DomainModels/System/`)
 
-Hand-written (codegen-domain currently scans only `core.*` types): `Connection` (typed wrapper for `system.connection` items, surfacing `kind: ConnectionKind`, `scopes`, `integrationRef`, `runtimeStatus`, etc.) and `Activity` (typed wrapper for `system.activity`, surfacing `severity: ActivitySeverity`, `summary`, `connectionId`). Both conform to `MarfaItem` so they slot into `client.items.list({type: ...})`, `typedQuery<T>()`, and the reactive `queryConnections` / `queryActivity` factories. The closed enum types `ConnectionKind` (`app | integration | tenant`) and `ActivitySeverity` (`info | warning | error | actionRequired`) are hand-written under `Types/Wire/Hand/` so apps can pattern-match without comparing raw strings.
+Hand-written (codegen-domain currently scans only `core.*` types): `Connection` (typed wrapper for `system.connection` items, surfacing `kind: ConnectionKind`, `scopes`, `integrationRef`, `runtimeStatus`, etc.) and `Activity` (typed wrapper for `system.activity`, surfacing `severity: ActivitySeverity`, `summary`, `connectionId`). Both conform to `MarfaItem` so they slot into `client.items.list({type: ...})`, `typedQuery<T>()`, and the reactive `queryConnections` / `queryActivity` factories. The closed enum types `ConnectionKind` (`app | integration`) and `ActivitySeverity` (`info | warning | error | actionRequired`) are hand-written under `Types/Wire/Hand/` so apps can pattern-match without comparing raw strings.
 
 ## Build
 
