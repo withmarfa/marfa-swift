@@ -26,7 +26,7 @@ public struct GoogleTasksTask: MarfaItem {
     /// Tasks API `deleted` flag (surfaces when `showDeleted=true` is passed on the list). Handler maps a true value to a Marfa tombstone (state-trashed) rather than persisting the flag literally.
     public var deleted: Bool? { item.properties["deleted"]?.boolValue }
 
-    /// Due date. Tasks API stores due as an RFC 3339 timestamp but only the date portion is honoured — time-of-day is ignored upstream.
+    /// Due date. Tasks API stores due as an RFC 3339 timestamp but only the date portion is honored — time-of-day is ignored upstream.
     public var dueAt: String? { item.properties["due_at"]?.stringValue }
 
     /// Tasks API change-detection token. Used as the content-hash key for echo suppression.

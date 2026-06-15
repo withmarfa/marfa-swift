@@ -6,7 +6,7 @@
 ///   rate limit). Surfaced in feed-style views but not in inboxes.
 /// - ``error``: recoverable failure that the connector itself will retry.
 ///   Surfaced for visibility, not for action.
-/// - ``actionRequired``: the user has to do something — re-authorise a
+/// - ``actionRequired``: the user has to do something — re-authorize a
 ///   connection, resolve a tombstone conflict, etc. Surfaced as a
 ///   Repairs-style inbox via `/items?type=system.activity&filter=metadata.severity="action_required"`.
 ///

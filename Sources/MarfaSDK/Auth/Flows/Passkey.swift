@@ -3,7 +3,7 @@
 import AuthenticationServices
 import Foundation
 
-/// Passkey enrolment for OAuth-bearer-driven Marfa apps.
+/// Passkey enrollment for OAuth-bearer-driven Marfa apps.
 ///
 /// ## Why this is a thin wrapper, not a native `ASAuthorizationController`
 /// flow
@@ -20,12 +20,12 @@ import Foundation
 /// The architectural answer is to delegate to the web flow that the
 /// server already ships:
 ///
-/// - **Enrolment** — open `/auth/passkey/enroll` in
+/// - **Enrollment** — open `/auth/passkey/enroll` in
 ///   `ASWebAuthenticationSession`. The system passkey sheet runs inside
 ///   the web view (Safari/WKWebView dispatch the WebAuthn ceremony to
 ///   `ASAuthorizationController` under the hood, so the UX is identical
 ///   to a fully-native flow). The sign-in page handles the cookie/session
-///   gate; on successful enrolment the user dismisses the window.
+///   gate; on successful enrollment the user dismisses the window.
 /// - **Sign-in** — use ``MarfaAuth/signIn(presentationContextProvider:)``.
 ///   Once a passkey is enrolled, the consent / sign-in page surfaces a
 ///   "Use a passkey" button automatically. The OAuth flow returns a
@@ -48,16 +48,16 @@ public enum Passkey {
     ///   - presentationContextProvider: SwiftUI/UIKit context provider for
     ///     the system browser window.
     ///   - callbackURLScheme: Custom scheme passed to the underlying
-    ///     `ASWebAuthenticationSession`. The enrolment flow has no
+    ///     `ASWebAuthenticationSession`. The enrollment flow has no
     ///     server-side redirect to a custom scheme — the user dismissing
     ///     the window IS the completion signal — so the scheme just has
     ///     to be a valid identifier (default `marfa-auth-host`).
     ///
-    /// Returns when the user dismisses the enrolment window. Whether
-    /// enrolment actually succeeded is **not observable** from this side
+    /// Returns when the user dismisses the enrollment window. Whether
+    /// enrollment actually succeeded is **not observable** from this side
     /// — `/auth/passkey/enroll` doesn't redirect to a custom scheme on
     /// completion or failure, so any dismissal looks identical to the
-    /// SDK. Callers verify enrolment by attempting a passkey-backed
+    /// SDK. Callers verify enrollment by attempting a passkey-backed
     /// sign-in: the OAuth sign-in page surfaces a "Use a passkey" button
     /// once a credential is stored against the account. Never throws on
     /// user dismissal — would be misleading given we can't tell success
@@ -74,7 +74,7 @@ public enum Passkey {
                 callbackURLScheme: callbackURLScheme
             ) { _, _ in
                 // The completion handler fires either on a custom-scheme
-                // callback URL (never happens for the enrol page) or on
+                // callback URL (never happens for the enroll page) or on
                 // the user closing the window (`canceledLogin`). Both
                 // paths resume successfully — see method doc for why.
                 continuation.resume()

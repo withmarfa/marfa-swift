@@ -41,7 +41,7 @@ public protocol MarfaItem: Sendable {
     /// - a required property is absent from `item.properties`.
     init?(from item: Item)
 
-    /// Serialises the typed properties back to a raw dictionary, suitable for
+    /// Serializes the typed properties back to a raw dictionary, suitable for
     /// ``CreateItemInput`` or
     /// ``ItemsNamespace/update(id:properties:options:)``.
     func toProperties() -> [String: JSONValue]

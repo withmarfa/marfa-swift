@@ -21,11 +21,11 @@ public struct ListFilters: Sendable {
     public var cursor: String?
     /// Outbound edge filter — `[edgeType: targetId]`. Restricts to items that
     /// have at least one outbound edge of `edgeType` pointing at `targetId`.
-    /// Serialises as `?edge[<type>]=<targetId>`.
+    /// Serializes as `?edge[<type>]=<targetId>`.
     public var edge: [String: String]?
     /// Inbound edge filter — `[edgeType: sourceId]`. Restricts to items that
     /// are the target of at least one edge of `edgeType` from `sourceId`.
-    /// Serialises as `?backref[<type>]=<sourceId>`.
+    /// Serializes as `?backref[<type>]=<sourceId>`.
     public var backref: [String: String]?
 
     public init(
@@ -124,7 +124,7 @@ public struct SearchFilters: Sendable {
     public var state: ItemState?
     public var tier: TierFilter?
     /// Items must have ALL specified tags. Mirrors `ListFilters.tags` and
-    /// `/items?tags=`. Comma-joined when serialised.
+    /// `/items?tags=`. Comma-joined when serialized.
     public var tags: [String]?
     public var filter: String?
     public var limit: Int?

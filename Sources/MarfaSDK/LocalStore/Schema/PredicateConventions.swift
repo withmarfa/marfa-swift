@@ -48,7 +48,7 @@
 //        )
 //
 //    The captured booleans short-circuit at the predicate engine; constant-
-//    true branches optimise away.
+//    true branches optimize away.
 //
 // Every reactive query file carries a `// MARK: - Predicate safety`
 // comment pointing back here. Every predicate is exercised in

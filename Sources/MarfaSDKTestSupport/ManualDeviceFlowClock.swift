@@ -19,7 +19,7 @@ import MarfaSDK
 /// External `Task.cancel()` on a task that's suspended inside
 /// `sleep(for:)` resolves to `CancellationError` via
 /// `withTaskCancellationHandler` — exercising the same cancellation
-/// path the production clock honours via `Task.sleep`.
+/// path the production clock honors via `Task.sleep`.
 public final class ManualDeviceFlowClock: DeviceFlowClock, @unchecked Sendable {
 
     private let lock = NSLock()

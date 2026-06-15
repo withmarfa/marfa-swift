@@ -20,7 +20,7 @@ public struct CoreHighlight: MarfaItem {
     /// The highlighted passage
     public var text: String { item.properties["text"]?.stringValue ?? "" }
 
-    /// Highlight colour
+    /// Highlight color
     /// Allowed values: `yellow`, `blue`, `green`, `pink`, `orange`, `purple`.
     public var color: String? { item.properties["color"]?.stringValue }
 

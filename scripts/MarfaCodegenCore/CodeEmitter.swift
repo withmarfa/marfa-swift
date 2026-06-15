@@ -110,7 +110,7 @@ public struct CodeEmitter: Sendable {
         out += "        self.item = item\n"
         out += "    }\n\n"
 
-        out += "    /// Serialises typed properties back to a ``JSONValue`` dictionary,\n"
+        out += "    /// Serializes typed properties back to a ``JSONValue`` dictionary,\n"
         out += "    /// suitable for ``CreateItemInput`` or ``ItemsNamespace/update(id:properties:options:)``.\n"
         out += "    \(ak) func toProperties() -> [String: JSONValue] {\n"
         out += "        var props: [String: JSONValue] = [:]\n"

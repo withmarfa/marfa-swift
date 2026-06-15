@@ -55,7 +55,7 @@ func handleConflictUpdate(
     return result.item
 }
 
-/// Returns the resolved item plus a `ConflictAutoMergedPayload` summarising
+/// Returns the resolved item plus a `ConflictAutoMergedPayload` summarizing
 /// the auto-merges that fired (or `nil` when the first attempt succeeded).
 /// Callers that surface a "merged" event (e.g. ``SyncEngine`` for replay-time
 /// auto-merges) inspect the payload to decide whether to emit

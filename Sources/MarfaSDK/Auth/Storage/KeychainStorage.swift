@@ -14,7 +14,7 @@ import Security
 ///
 /// ### Thread safety
 /// Actor-isolated: all Security framework calls funnel through the actor,
-/// so concurrent callers serialise without explicit locking.
+/// so concurrent callers serialize without explicit locking.
 public actor KeychainStorage: SecureStorage {
 
     public let service: String

@@ -41,7 +41,7 @@ struct InMemoryKeychainTests {
         try await storage.delete(for: "nothing")
     }
 
-    @Test("Concurrent sets from multiple tasks serialise cleanly")
+    @Test("Concurrent sets from multiple tasks serialize cleanly")
     func concurrentWrites() async throws {
         let storage = InMemoryKeychain()
         await withTaskGroup(of: Void.self) { group in

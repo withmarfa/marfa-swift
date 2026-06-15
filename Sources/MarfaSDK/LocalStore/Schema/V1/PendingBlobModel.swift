@@ -10,7 +10,7 @@ import SwiftData
 ///
 /// `data` carries `@Attribute(.externalStorage)` so SwiftData stores
 /// large blob bytes in a sibling file rather than inline in the main
-/// SQLite row. The hint is honoured at SwiftData's discretion (it's
+/// SQLite row. The hint is honored at SwiftData's discretion (it's
 /// documented as a suggestion, not a guarantee) but is the right
 /// hint to give for multi-MB image / video uploads.
 @Model

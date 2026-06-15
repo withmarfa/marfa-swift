@@ -42,7 +42,7 @@ public struct MyappBaseDerived: MarfaItem, Sendable {
         self.item = item
     }
 
-    /// Serialises typed properties back to a ``JSONValue`` dictionary,
+    /// Serializes typed properties back to a ``JSONValue`` dictionary,
     /// suitable for ``CreateItemInput`` or ``ItemsNamespace/update(id:properties:options:)``.
     public func toProperties() -> [String: JSONValue] {
         var props: [String: JSONValue] = [:]

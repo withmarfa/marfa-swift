@@ -85,7 +85,7 @@ public enum SchemaResolver {
         }
 
         // Detect field redeclaration between child and any ancestor.
-        // (Matches server-side INHERITANCE_VIOLATION behaviour.)
+        // (Matches server-side INHERITANCE_VIOLATION behavior.)
         let ancestors = chain.dropFirst()
         for (fieldName, _) in schema.fields.sorted(by: { $0.key < $1.key }) {
             for ancestor in ancestors where ancestor.fields[fieldName] != nil {

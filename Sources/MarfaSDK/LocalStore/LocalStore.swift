@@ -20,14 +20,14 @@ import SwiftData
 ///   Reads are served locally; the sync engine keeps the store fresh via
 ///   SSE.
 ///
-/// `@ModelActor` synthesises:
+/// `@ModelActor` synthesizes:
 ///   - `init(modelContainer: ModelContainer)`
 ///   - `nonisolated let modelContainer: ModelContainer`
 ///   - `nonisolated let modelExecutor: any ModelExecutor`
 ///   - actor-isolated `modelContext: ModelContext`
 ///
 /// `LocalStore` and ``MutationQueue`` share a single ``ModelContainer`` —
-/// each holds its own `ModelContext`, so cross-actor saves serialise at
+/// each holds its own `ModelContext`, so cross-actor saves serialize at
 /// the SQLite layer underneath.
 ///
 /// `@Model` instances must never cross actor boundaries; every method
@@ -143,7 +143,7 @@ public actor LocalStore {
     }
 
     /// Updates an item with **partial-merge semantics for properties**,
-    /// mirroring the server's `PATCH /items/:id` behaviour. Caller passes
+    /// mirroring the server's `PATCH /items/:id` behavior. Caller passes
     /// only the fields it wants to change; existing keys not in the delta
     /// are preserved. `tier` is an optional dimension flag — if provided,
     /// it overrides the existing value; otherwise the existing value is
@@ -537,7 +537,7 @@ public actor LocalStore {
         }
         var descriptor = FetchDescriptor<MarfaMetadataModel>(predicate: predicate)
         // Fault the parent item alongside the metadata rows so we don't
-        // pay a per-row materialisation cost when the predicate engine
+        // pay a per-row materialization cost when the predicate engine
         // walks the relationship.
         descriptor.relationshipKeyPathsForPrefetching = [\.item]
         let models = try modelContext.fetch(descriptor)
@@ -636,7 +636,7 @@ public actor LocalStore {
         // Captured-value short-circuit pattern (predicate convention 8):
         // SwiftData has no runtime `Predicate<T>` composition, so we
         // capture booleans alongside string defaults and let the
-        // predicate engine optimise constant-true branches away.
+        // predicate engine optimize constant-true branches away.
         let typeFilter = filters?.type ?? ""
         let hasTypeFilter = filters?.type != nil
         let stateFilter = filters?.state?.rawValue ?? ""
@@ -663,7 +663,7 @@ public actor LocalStore {
         return descriptor
     }
 
-    /// Shared sort descriptor honouring `filters.sort` / `filters.direction`.
+    /// Shared sort descriptor honoring `filters.sort` / `filters.direction`.
     /// Default is `updatedAt` DESC, matching the server's
     /// `GET /items` default. Falls back to `updatedAt` for any
     /// unsupported sort key — predicate-safe access only.

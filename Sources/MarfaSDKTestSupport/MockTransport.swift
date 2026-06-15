@@ -40,7 +40,7 @@ public final class MockTransport: Transport, @unchecked Sendable {
         public let query: [(String, String)]?
         /// Populated only for `eventStream(...)` calls — the `Last-Event-ID`
         /// the SDK passed when opening the SSE stream. Lets tests assert
-        /// cursor-resume behaviour.
+        /// cursor-resume behavior.
         public let lastEventID: String?
 
         public init(

@@ -6,13 +6,13 @@ import Foundation
 
 /// Locks in the URL contract Passkey.enroll opens.
 ///
-/// The full enrolment flow (ASWebAuthenticationSession + WebAuthn
+/// The full enrollment flow (ASWebAuthenticationSession + WebAuthn
 /// ceremony) is a UI path that can't run inside `swift test` — it needs
 /// a host process and a system browser. This suite asserts the
 /// observable invariant: the SDK constructs the right server URL,
 /// preserving the issuer's scheme/host/port and appending
 /// `/auth/passkey/enroll` exactly once regardless of trailing slashes.
-@Suite("Passkey enrol URL construction")
+@Suite("Passkey enroll URL construction")
 struct PasskeyEnrollUrlTests {
 
     @Test("appends /auth/passkey/enroll to a clean issuer")
@@ -28,11 +28,11 @@ struct PasskeyEnrollUrlTests {
         let target = issuer.appendingPathComponent("auth/passkey/enroll")
         // The exact URL string can vary on slashes between Foundation
         // versions; what matters is the path resolves to the same
-        // canonical endpoint when normalised.
-        let normalised = target.absoluteString.replacingOccurrences(
+        // canonical endpoint when normalized.
+        let normalized = target.absoluteString.replacingOccurrences(
             of: "//auth", with: "/auth"
         )
-        #expect(normalised.hasSuffix("/auth/passkey/enroll"))
+        #expect(normalized.hasSuffix("/auth/passkey/enroll"))
     }
 
     @Test("preserves a non-default port")

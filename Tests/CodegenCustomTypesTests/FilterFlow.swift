@@ -1,6 +1,6 @@
 // End-to-end flow tests that hit Generator.run() against temp dirs with
 // various filter configs. Cover things GoldenTests doesn't: filtering,
-// pruning, include/exclude behaviour, and config-driven access levels.
+// pruning, include/exclude behavior, and config-driven access levels.
 
 import Foundation
 import Testing

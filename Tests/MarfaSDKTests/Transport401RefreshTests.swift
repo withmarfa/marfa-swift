@@ -99,7 +99,7 @@ private func makeStubbedTransport(provider: any TokenProvider) -> URLSessionTran
     return URLSessionTransport(configuration: clientConfig, session: session)
 }
 
-@Suite("Transport 401 refresh-once behaviour", .serialized)
+@Suite("Transport 401 refresh-once behavior", .serialized)
 struct Transport401RefreshTests {
 
     @Test("401 then 200 invalidates the provider and retries with a fresh bearer")

@@ -23,7 +23,7 @@ public struct ReadwiseHighlight: MarfaItem {
     /// External Readwise `user_book_id` of the parent book. Read-only; persisted alongside the typed `parent-of` edge so consumers can look up the parent book without traversing edges.
     public var bookId: String? { item.properties["book_id"]?.stringValue }
 
-    /// Highlight colour as reported by Readwise (e.g. `yellow`, `blue`).
+    /// Highlight color as reported by Readwise (e.g. `yellow`, `blue`).
     public var color: String? { item.properties["color"]?.stringValue }
 
     /// When the user highlighted the source.

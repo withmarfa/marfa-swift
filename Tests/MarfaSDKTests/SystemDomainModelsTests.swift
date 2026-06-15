@@ -82,14 +82,14 @@ struct SystemDomainModelsTests {
             properties: [
                 "connection_id": .string("conn-1"),
                 "severity": .string("action_required"),
-                "summary": .string("Re-authorise the calendar integration")
+                "summary": .string("Re-authorize the calendar integration")
             ]
         )
         let activity = Activity(from: item)
         #expect(activity != nil)
         #expect(activity?.severity == .actionRequired)
         #expect(activity?.connectionId == "conn-1")
-        #expect(activity?.summary.contains("Re-authorise") == true)
+        #expect(activity?.summary.contains("Re-authorize") == true)
     }
 
     @Test("Activity rejects missing severity")

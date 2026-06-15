@@ -515,7 +515,7 @@ struct MarfaStoreTests {
         query.stop()
     }
 
-    @Test("ItemsWithMetadataQuery honours type filter") func itemsWithMetadataTypeFilter() async throws {
+    @Test("ItemsWithMetadataQuery honors type filter") func itemsWithMetadataTypeFilter() async throws {
         let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return
@@ -533,7 +533,7 @@ struct MarfaStoreTests {
         query.stop()
     }
 
-    @Test("ItemsWithMetadataQuery honours limit") func itemsWithMetadataLimit() async throws {
+    @Test("ItemsWithMetadataQuery honors limit") func itemsWithMetadataLimit() async throws {
         let client = try await makeClient()
         guard let store = client.makeStore() else {
             Issue.record("Expected non-nil store"); return

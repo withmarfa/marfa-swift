@@ -20,7 +20,7 @@ public struct RaindropCollection: MarfaItem {
     /// Collection name (maps to Raindrop `title`).
     public var title: String { item.properties["title"]?.stringValue ?? "" }
 
-    /// Operator-assigned colour (Raindrop ships free-form CSS strings).
+    /// Operator-assigned color (Raindrop ships free-form CSS strings).
     public var color: String? { item.properties["color"]?.stringValue }
 
     /// Number of raindrops in this collection at last sync.
