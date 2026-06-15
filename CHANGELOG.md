@@ -5,6 +5,21 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.1.0] — 2026-06-16
+
+Normalize all prose to American English across source, doc comments, string
+literals, and markdown — matching the spelling convention already applied to
+the server and docs repos. Contract and enum literals (e.g. `cancelled`,
+`completed`, `failed`) are unchanged.
+
+### Changed (breaking, shipped as a minor)
+
+- **`RetryPolicy.honoursRetryAfter` renamed to `honorsRetryAfter`** — the
+  public property and its initializer parameter both change spelling.
+  Source-breaking for any caller that set the parameter or read the property by
+  name; the type, default, and behavior are identical. Shipped as a minor
+  release at the maintainer's discretion.
+
 ## [11.0.0] — 2026-06-05
 
 Correctness fix: align `ConnectionKind` with the server. The server reduced
@@ -331,7 +346,7 @@ for the SDK plus one new recommendation.
   Refreshes on the same `ModelContext.didSave` + 50 ms debounce as
   every other reactive query. Lets consumer apps render richer
   offline UX than the coarse `hasPendingMutations: Bool` allowed —
-  per-item badges, queue visualisations, retry banners.
+  per-item badges, queue visualizations, retry banners.
   `hasPendingMutations` is unchanged for consumer-app compatibility.
 - **`BlobUploadProgressQuery` reactive surface.** Vended via
   `store.queryBlobUploadProgress()` (returns `nil` for network-only
@@ -539,14 +554,14 @@ keep their public shape; the factories move to `async throws`.
 - **`RefreshDebounce.interval`** — single constant (50 ms) tuning the reactive debounce window across all seven query types.
 
 ### Changed
-- **Factories moved to `async throws`.** `MarfaClient.local(_:)` and `MarfaClient.synced(...)` construct their actors via `Task.detached` so the synthesised `@ModelActor` init doesn't bind to `@MainActor`. Every call site updates `try` → `try await`.
+- **Factories moved to `async throws`.** `MarfaClient.local(_:)` and `MarfaClient.synced(...)` construct their actors via `Task.detached` so the synthesized `@ModelActor` init doesn't bind to `@MainActor`. Every call site updates `try` → `try await`.
 - **`LocalStore` and `MutationQueue` are `@ModelActor`s** sharing one `ModelContainer`. Public method signatures preserved. Wire types (`Item`, `Edge`, `Metadata`) cross actor boundaries; `@Model` instances never do (mapped via `Schema/V1/Mappers.swift`).
 - **`PendingMutationRecord` is a Sendable Codable DTO** (not a GRDB `PersistableRecord`). The `SyncEngine` and the rewrite/cascade logic operate on records, not models. Shape is byte-for-byte the legacy struct.
 - **Reactive queries rebuilt on `ModelContext.didSave`** + 50 ms debounce + refetch. Every query type listens via `NotificationCenter.notifications(named:)` (an async sequence — no observer-token leak), runs the refetch on `@MainActor`. Public API of the seven query types (`ItemQuery`, `TypedItemQuery`, `SingleItemQuery`, `EdgesQuery`, `BackrefsQuery`, `TagsQuery`, `ItemsWithMetadataQuery`) unchanged.
 - **`TagsQuery` aggregation moved to Swift.** The legacy `SELECT … FROM json_each(tags_json)` raw SQL is replaced by a single fetch with `relationshipKeyPathsForPrefetching = [\.item]` and bucketing in Swift. Same canonical ordering (count DESC, tag ASC).
 - **Three atomicity guarantees preserved as single `modelContext.save()` calls:** `enqueueBlobUpload` (blob row + mutation row), `purgeItem` (item + cascade metadata), `dropMutationsReferencingLocalId` (three fetch passes, all deletes in one commit).
 - **Platform minimums bumped** to iOS 26 / macOS 26 / visionOS 26 / watchOS 26 / tvOS 26. Required for the iOS-26-era SwiftData APIs the SDK uses (`#Index`, relationship-prefetching hints).
-- **`PendingBlobModel.hash` renamed to `contentHash`.** The legacy name conflicts with `Hashable.hash(into:)` and triggers an `__NSCFNumber` → `NSString` cast crash inside SwiftData's runtime metadata pipeline on save. Wire payload still serialises `hash` (in `UploadBlobPayload`); only the `@Model` property moved.
+- **`PendingBlobModel.hash` renamed to `contentHash`.** The legacy name conflicts with `Hashable.hash(into:)` and triggers an `__NSCFNumber` → `NSString` cast crash inside SwiftData's runtime metadata pipeline on save. Wire payload still serializes `hash` (in `UploadBlobPayload`); only the `@Model` property moved.
 - **Predicate convention rule 1 amended.** `String.isEmpty` (and its negation) silently match every row under current SwiftData. The SDK uses explicit `prop != ""` comparisons everywhere; `PredicateConventions.swift` and the regression test reflect this.
 
 ### Removed

@@ -6,7 +6,7 @@
 import Foundation
 /// ``GoogleContactsContact`` — typed wrapper for `google.contacts.contact` items.
 ///
-/// A contact (person) from Google Contacts, captured with upstream fidelity. Mirrors the People API person resource — names, email addresses, phone numbers, postal addresses, organisations, biographies, etag — so a round-trip preserves what Google considers authoritative. For cross-app interop with non-Google consumers, the Google Contacts integration can also be configured to write to `core.entity.person` instead, but the default and the fidelity choice is this type.
+/// A contact (person) from Google Contacts, captured with upstream fidelity. Mirrors the People API person resource — names, email addresses, phone numbers, postal addresses, organizations, biographies, etag — so a round-trip preserves what Google considers authoritative. For cross-app interop with non-Google consumers, the Google Contacts integration can also be configured to write to `core.entity.person` instead, but the default and the fidelity choice is this type.
 ///
 /// Display hints — title: `title`, body: `biography`.
 public struct GoogleContactsContact: MarfaItem {
@@ -30,7 +30,7 @@ public struct GoogleContactsContact: MarfaItem {
     /// Date of birth — ISO 8601 (YYYY-MM-DD or YYYY when year is unknown). Reconstructed from People API `birthdays[0].date.{year,month,day}`.
     public var birthday: String? { item.properties["birthday"]?.stringValue }
 
-    /// Department within the primary organisation (maps to `organizations[0].department`).
+    /// Department within the primary organization (maps to `organizations[0].department`).
     public var department: String? { item.properties["department"]?.stringValue }
 
     /// Email addresses. Each entry is a JSON-encoded object: `{ value, type, formattedType }`. Round-trips the full People API `emailAddresses` array.
@@ -46,7 +46,7 @@ public struct GoogleContactsContact: MarfaItem {
     /// Given (first) name (maps to `names[0].givenName`).
     public var givenName: String? { item.properties["given_name"]?.stringValue }
 
-    /// Job title within the primary organisation (maps to `organizations[0].title`).
+    /// Job title within the primary organization (maps to `organizations[0].title`).
     public var jobTitle: String? { item.properties["job_title"]?.stringValue }
 
     /// Middle name (maps to `names[0].middleName`).
@@ -55,7 +55,7 @@ public struct GoogleContactsContact: MarfaItem {
     /// Familiar name or alias (maps to `nicknames[0].value`).
     public var nickname: String? { item.properties["nickname"]?.stringValue }
 
-    /// Primary employer / organisation name (maps to `organizations[0].name`).
+    /// Primary employer / organization name (maps to `organizations[0].name`).
     public var organization: String? { item.properties["organization"]?.stringValue }
 
     /// Phone numbers. Each entry is a JSON-encoded object: `{ value, type, formattedType }`. Round-trips the full People API `phoneNumbers` array.

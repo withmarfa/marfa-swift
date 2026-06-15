@@ -7,7 +7,7 @@
 /// `system.*` items use `active | revoked` only, while `core.*` and other
 /// tiered types use the three-state graph (`active | archived | trashed`).
 /// If the server ever introduces a new value, decoding a wire payload that
-/// carries it will fail loudly — which is the right behaviour.
+/// carries it will fail loudly — which is the right behavior.
 public enum ItemState: String, Codable, Sendable, Hashable, CaseIterable {
     case active
     case archived

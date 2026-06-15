@@ -163,7 +163,7 @@ struct CreateItemPayload: Codable, Sendable {
 ///
 /// `version` and `conflict` capture the per-call conflict context so a
 /// replay can apply the same strategy the caller chose. The `.callback`
-/// resolver closure is not serialisable — on replay, `.callback` degrades
+/// resolver closure is not serializable — on replay, `.callback` degrades
 /// to `.auto`. `tier` mirrors the server's separate tier-axis flip on
 /// `PATCH /items/:id`.
 struct UpdateItemPayload: Codable, Sendable {
@@ -263,7 +263,7 @@ struct BulkEdgesPayload: Codable, Sendable {
 /// pair already exists, which the engine treats as a successful no-op.
 ///
 /// `@ModelActor`-isolated. Shares its ``ModelContainer`` with
-/// ``LocalStore``; cross-actor saves serialise at the SQLite layer.
+/// ``LocalStore``; cross-actor saves serialize at the SQLite layer.
 @ModelActor
 public actor MutationQueue {
 

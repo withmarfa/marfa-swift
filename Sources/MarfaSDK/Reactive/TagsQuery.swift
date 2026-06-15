@@ -59,7 +59,7 @@ public final class TagsQuery {
             }
             var descriptor = FetchDescriptor<MarfaMetadataModel>(predicate: predicate)
             // Fault the parent item alongside the metadata rows so the
-            // predicate engine doesn't pay a per-row materialisation
+            // predicate engine doesn't pay a per-row materialization
             // cost when walking the relationship.
             descriptor.relationshipKeyPathsForPrefetching = [\.item]
             let models = try context.fetch(descriptor)

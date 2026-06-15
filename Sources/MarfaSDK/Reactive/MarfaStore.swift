@@ -218,7 +218,7 @@ public final class MarfaStore {
     /// ``PendingMutationStatus`` — `.pending`, `.inFlight`, or
     /// `.retrying(...)`. Apps use this to render richer offline UX
     /// than ``SyncEngine/hasPendingMutations`` allows: per-item badges,
-    /// queue visualisations, retry banners.
+    /// queue visualizations, retry banners.
     ///
     /// Updates whenever any mutation is enqueued, transitions to
     /// `.inFlight`, records a transient failure, or is removed after
@@ -318,7 +318,7 @@ public final class MarfaStore {
 ///
 /// Subscribes to `ModelContext.didSave` notifications via the modern
 /// `NotificationCenter.notifications(named:)` async sequence (no
-/// observer-token leak risk — cancelling the consuming task tears
+/// observer-token leak risk — canceling the consuming task tears
 /// down the subscription), coalesces bursts via
 /// ``RefreshDebounce/interval``, and invokes the per-query refetch
 /// closure on the `@MainActor`.
@@ -366,7 +366,7 @@ final class RefetchObserver {
     }
 
     deinit {
-        // Cancelling tasks is safe from a nonisolated deinit; the tasks
+        // Canceling tasks is safe from a nonisolated deinit; the tasks
         // themselves are isolated to @MainActor and finish their work
         // there.
         listenerTask?.cancel()

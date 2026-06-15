@@ -109,7 +109,7 @@ public final class ConflictError: MarfaError, @unchecked Sendable {
         )
     }
 
-    /// Convenience initialiser for 409 conflicts without version-conflict
+    /// Convenience initializer for 409 conflicts without version-conflict
     /// snapshot data (e.g. `duplicate_id` from a `create_only` bulk
     /// outcome). Snapshot fields are populated with empty placeholders;
     /// consumers that need to distinguish should branch on `code` or use

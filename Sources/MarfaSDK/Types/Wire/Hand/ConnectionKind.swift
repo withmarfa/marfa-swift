@@ -1,7 +1,7 @@
 /// Discriminator for `system.connection` items — identifies which kind of
 /// external authority a connection represents.
 ///
-/// - ``app``: an OAuth client this user has authorised to act on their behalf
+/// - ``app``: an OAuth client this user has authorized to act on their behalf
 ///   (e.g. Notes signing in via Auth Code + PKCE). Carries `client_id`,
 ///   `scopes`, and lifecycle bookkeeping.
 /// - ``integration``: a hosted or local connector the user has installed to

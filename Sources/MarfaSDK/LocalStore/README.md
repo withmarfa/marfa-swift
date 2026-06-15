@@ -93,4 +93,4 @@ process (the class resolves by name but compares by pointer identity),
 and the persistent-store code path is where that ambiguity surfaces.
 In-memory containers sidestep the persistent stack entirely. The SDK's
 own suite exercises the in-memory pattern, so the reactive-query
-behaviour you depend on is already covered there.
+behavior you depend on is already covered there.

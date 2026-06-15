@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import MarfaSDK
 
-@Suite("ListFilters query serialisation")
+@Suite("ListFilters query serialization")
 struct ListFiltersTests {
 
     // MARK: - tier
@@ -14,14 +14,14 @@ struct ListFiltersTests {
         #expect(!params.contains(where: { $0.0 == "tier" }))
     }
 
-    @Test("tier filter serialises .library as \"library\"")
+    @Test("tier filter serializes .library as \"library\"")
     func tierLibrary() {
         let filters = ListFilters(tier: .library)
         let params = filters.toQueryParams()
         #expect(params.contains(where: { $0.0 == "tier" && $0.1 == "library" }))
     }
 
-    @Test("tier filter serialises .feed as \"feed\"")
+    @Test("tier filter serializes .feed as \"feed\"")
     func tierFeed() {
         let filters = ListFilters(tier: .feed)
         let params = filters.toQueryParams()
@@ -30,21 +30,21 @@ struct ListFiltersTests {
 
     // MARK: - edge / backref
 
-    @Test("edge filter serialises as edge[<type>]=<targetId>")
+    @Test("edge filter serializes as edge[<type>]=<targetId>")
     func edgeFilter() {
         let filters = ListFilters(edge: ["parent-of": "parent-1"])
         let params = filters.toQueryParams()
         #expect(params.contains(where: { $0.0 == "edge[parent-of]" && $0.1 == "parent-1" }))
     }
 
-    @Test("backref filter serialises as backref[<type>]=<sourceId>")
+    @Test("backref filter serializes as backref[<type>]=<sourceId>")
     func backrefFilter() {
         let filters = ListFilters(backref: ["in-thread": "thread-1"])
         let params = filters.toQueryParams()
         #expect(params.contains(where: { $0.0 == "backref[in-thread]" && $0.1 == "thread-1" }))
     }
 
-    @Test("multiple edge keys serialise in sorted order for stable requests")
+    @Test("multiple edge keys serialize in sorted order for stable requests")
     func edgeFilterSorted() {
         let filters = ListFilters(edge: ["zzz": "z1", "aaa": "a1", "mmm": "m1"])
         let params = filters.toQueryParams()
@@ -60,9 +60,9 @@ struct ListFiltersTests {
         #expect(!params.contains(where: { $0.0.hasPrefix("backref[") }))
     }
 
-    // MARK: - sanity: retained fields still serialise
+    // MARK: - sanity: retained fields still serialize
 
-    @Test("basic fields still serialise after the prune")
+    @Test("basic fields still serialize after the prune")
     func coreFieldsUnchanged() {
         let filters = ListFilters(
             type: "core.note",

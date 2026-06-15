@@ -20,7 +20,7 @@ import SwiftData
 ///
 /// Filtering, sorting, and `limit` mirror ``ItemQuery``. Items with no
 /// metadata row fall back to empty ``Metadata``, matching the
-/// one-shot's behaviour.
+/// one-shot's behavior.
 @Observable
 @MainActor
 public final class ItemsWithMetadataQuery {

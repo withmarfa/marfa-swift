@@ -4,7 +4,7 @@ import Foundation
 ///
 /// `Codable` so the strategy can be persisted with queued mutations and
 /// re-applied during replay. The `.callback` resolver closure itself is
-/// not serialisable; on replay, `.callback` degrades to `.auto` because
+/// not serializable; on replay, `.callback` degrades to `.auto` because
 /// the closure is not available in the new process context.
 public enum ConflictStrategy: String, Codable, Sendable {
     /// Auto-merge non-conflicting fields. For conflicting fields, follow

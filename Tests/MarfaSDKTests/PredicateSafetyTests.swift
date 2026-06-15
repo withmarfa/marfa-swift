@@ -95,7 +95,7 @@ struct PredicateSafetyTests {
         let (context, _) = try await seededContext()
         // No filters set — every captured boolean is false, so the
         // entire predicate reduces to `true`. Constant-true branches
-        // optimise away in the predicate engine.
+        // optimize away in the predicate engine.
         let typeFilter: String = ""
         let hasTypeFilter = false
         let stateFilter: String = ""

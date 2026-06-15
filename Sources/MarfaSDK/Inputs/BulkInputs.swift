@@ -176,7 +176,7 @@ public struct BulkActionFilter: Codable, Sendable {
 /// Shared knobs that every bulk action accepts.
 public struct BulkActionOptions: Sendable {
     public var dryRun: Bool?
-    /// Required literal `"PURGE"` on purge actions; the typed initialiser
+    /// Required literal `"PURGE"` on purge actions; the typed initializer
     /// ``BulkActionInput/purge(filter:options:)`` refuses to encode without it.
     public var confirm: String?
     public var maxItems: Int?

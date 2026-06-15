@@ -8,7 +8,7 @@ import SwiftData
 /// `MutationQueue.recordDropped(record:droppedAt:error:)`,
 /// `fetchDropped()`, `dismissDropped(id:)`,
 /// `dismissDroppedOlderThan(_:)`, `dismissAllDropped()`, and the
-/// cascade-persists-orphans behaviour of
+/// cascade-persists-orphans behavior of
 /// `dropMutationsReferencingLocalId(_:droppedAt:error:)`.
 @Suite("DroppedMutationLog")
 struct DroppedMutationLogTests {

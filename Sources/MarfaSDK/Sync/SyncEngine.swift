@@ -22,7 +22,7 @@ private struct MetadataEventPayload: Decodable {
 
 // MARK: - SyncEngine
 
-/// Drives bidirectional synchronisation between the local SQLite store and the
+/// Drives bidirectional synchronization between the local SQLite store and the
 /// Marfa server.
 ///
 /// ## Lifecycle
@@ -106,7 +106,7 @@ public actor SyncEngine {
     /// ``ConnectionStateManager`` back to `.connecting`. Detached so the
     /// SSE consumer loop inside `openStream` can return promptly and let
     /// ``runLoop`` observe any state changes (network drop, test-driven
-    /// transition, `catchup_too_old` finalise) that happen during the wait.
+    /// transition, `catchup_too_old` finalize) that happen during the wait.
     /// Cancelled and replaced on every reconnect cycle and on `stop()`.
     private var reconnectTask: Task<Void, Never>?
 
@@ -200,7 +200,7 @@ public actor SyncEngine {
     /// freshness budget is a signal to pull, even when the local store already
     /// holds items from an earlier session.
     ///
-    /// Serialised as ISO 8601 with fractional seconds
+    /// Serialized as ISO 8601 with fractional seconds
     /// (`Date.ISO8601FormatStyle(includingFractionalSeconds: true)`). Returns
     /// `nil` when the value is absent or fails to parse — unreadable and
     /// never-synced are indistinguishable to the caller and both warrant a
@@ -230,7 +230,7 @@ public actor SyncEngine {
     /// apps that want "is the local store currently caught up?" read
     /// this accessor or subscribe via ``MarfaStore/queryFullSyncState()``.
     ///
-    /// Serialised as ISO 8601 with fractional seconds; returns `nil`
+    /// Serialized as ISO 8601 with fractional seconds; returns `nil`
     /// when absent or unparseable.
     public var lastCleanDrainAt: Date? {
         get async {
@@ -489,7 +489,7 @@ public actor SyncEngine {
         }
 
         // Reconnect nudge. Without this, a closed-but-not-errored SSE stream
-        // (server-side idle timeout, catchup_too_old finalise, transport
+        // (server-side idle timeout, catchup_too_old finalize, transport
         // timeout) would leave the engine parked on `.online` forever —
         // `runLoop` only re-enters `openStream` on a `.connecting` transition
         // from `NWPathMonitor`. After a brief back-off we flip
@@ -631,7 +631,7 @@ public actor SyncEngine {
             }
 
         case "catchup_too_old":
-            // Server signalled the requested Last-Event-ID is older than the
+            // Server signaled the requested Last-Event-ID is older than the
             // retention window. The stream is closed after this event; clear
             // our cursor and run a fresh full resync so the next reconnect
             // opens a stream with no cursor.
@@ -860,7 +860,7 @@ public actor SyncEngine {
         }
     }
 
-    /// Centralises the bookkeeping for a clean drain cycle: stamps the
+    /// Centralizes the bookkeeping for a clean drain cycle: stamps the
     /// persisted `last_clean_drain_at` timestamp, clears the in-memory
     /// failure record, and emits ``SyncEvent/synced(at:)`` to subscribers
     /// (when running). Both ``replayMutations()`` clean-completion paths
@@ -876,7 +876,7 @@ public actor SyncEngine {
         if running { emit(.synced(at: now)) }
     }
 
-    /// Returns `true` if the replay rewrote a local-id in the queue, signalling
+    /// Returns `true` if the replay rewrote a local-id in the queue, signaling
     /// to the caller that the in-memory replay list is stale.
     @discardableResult
     private func replayRecord(_ record: PendingMutationRecord, decoder: JSONDecoder) async throws -> Bool {
@@ -893,7 +893,7 @@ public actor SyncEngine {
             // dependent queued mutations. Under the current flow this branch
             // never fires — `ItemsNamespace.create` stamps the local UUIDv7
             // into `input.id` so the server echoes it back. Preserved as
-            // defence against a future server-assigned-id path or direct
+            // defense against a future server-assigned-id path or direct
             // callers that bypass the namespace.
             if let localId = record.localId, localId != response.item.id {
                 try await mutationQueue.rewriteLocalId(from: localId, to: response.item.id)
@@ -909,7 +909,7 @@ public actor SyncEngine {
             // wants conflict-aware replay — go through `handleConflictUpdate`
             // so the captured strategy is applied against any 409 the server
             // returns. `.callback` degrades to `.auto` because the resolver
-            // closure isn't serialisable.
+            // closure isn't serializable.
             if let v = p.version {
                 let strategy: ConflictStrategy = {
                     switch p.conflict ?? .auto {

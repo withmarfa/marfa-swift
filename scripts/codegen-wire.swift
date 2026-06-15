@@ -165,7 +165,7 @@ func normalize(_ raw: Any) throws -> NormalizedSchema {
     if let enumValues = dict["enum"] as? [Any] {
         // String enums become Swift enums. Numeric/other enums fall through
         // to the underlying scalar type (used e.g. for `status: { type:
-        // number, enum: [409] }` in the conflict envelope — modelled as Int).
+        // number, enum: [409] }` in the conflict envelope — modeled as Int).
         if enumValues.allSatisfy({ $0 is String }) {
             let strings = enumValues.compactMap { $0 as? String }
             return NormalizedSchema(node: .stringEnum(strings), isNullable: nullable)

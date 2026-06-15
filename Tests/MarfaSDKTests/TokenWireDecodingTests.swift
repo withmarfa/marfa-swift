@@ -2,10 +2,10 @@ import Testing
 import Foundation
 @testable import MarfaSDK
 
-/// Locks in `Token`'s decode behaviour against the RFC 6749 §5.1 wire
+/// Locks in `Token`'s decode behavior against the RFC 6749 §5.1 wire
 /// shape that `/auth/token` and `/auth/device/token` return.
 ///
-/// Pre-fix, the auto-synthesised Codable looked for `scopes` (plural array)
+/// Pre-fix, the auto-synthesized Codable looked for `scopes` (plural array)
 /// and `expires_at` (ISO date) — neither field is on the wire — and threw
 /// `DecodingError.keyNotFound("scopes")`, surfacing as
 /// "data couldn't be read because it is missing" in user-facing flows

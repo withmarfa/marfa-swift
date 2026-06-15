@@ -5,7 +5,7 @@ import os
 /// Single source of truth for constructing the SDK's `ModelContainer`.
 ///
 /// Both `LocalStore` and `MutationQueue` are `@ModelActor`s sharing this
-/// container. Cross-actor saves serialise at the SQLite layer.
+/// container. Cross-actor saves serialize at the SQLite layer.
 ///
 /// The `cloudKitDatabase` parameter lets consumers opt into CloudKit sync
 /// against a ubiquity container of their choosing. The default is `.none`

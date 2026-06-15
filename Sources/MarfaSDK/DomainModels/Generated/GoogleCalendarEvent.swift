@@ -23,7 +23,7 @@ public struct GoogleCalendarEvent: MarfaItem {
     /// True when the event is an all-day event (Calendar `start.date` instead of `start.dateTime`).
     public var allDay: Bool? { item.properties["all_day"]?.boolValue }
 
-    /// Calendar event colour id (numeric string, 1–11; see Calendar's `colors.get`).
+    /// Calendar event color id (numeric string, 1–11; see Calendar's `colors.get`).
     public var colorId: String? { item.properties["color_id"]?.stringValue }
 
     /// Email address of the event creator (Calendar `creator.email`).

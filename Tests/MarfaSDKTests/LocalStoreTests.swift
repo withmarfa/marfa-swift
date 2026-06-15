@@ -6,7 +6,7 @@ import MarfaSDKTestSupport
 /// Tests for ``LocalStore`` CRUD and ``MarfaClient/local(path:)`` pure-local mode.
 ///
 /// All tests use an in-memory SwiftData container so they leave no on-disk
-/// artefacts and run safely in parallel.
+/// artifacts and run safely in parallel.
 @Suite("LocalStore")
 struct LocalStoreTests {
 
@@ -42,7 +42,7 @@ struct LocalStoreTests {
         let item = try await client.items.create(noteInput(body: "hello"))
         #expect(item.properties["body"] == .string("hello"))
         // Round-trip: fetch through a second client on the same container
-        // to prove the SDK honours the injected store (not a fresh one).
+        // to prove the SDK honors the injected store (not a fresh one).
         let second = try await MarfaClient.local(container: container)
         let fetched = try await second.items.get(id: item.id)
         #expect(fetched.id == item.id)

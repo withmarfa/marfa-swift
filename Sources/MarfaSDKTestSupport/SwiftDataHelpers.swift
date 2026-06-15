@@ -25,7 +25,7 @@ public enum MarfaSDKTest {
     /// Builds an in-memory ``LocalStore`` and a sibling ``MutationQueue``
     /// sharing one container — the same shape as `MarfaClient.synced(...)`.
     /// Sequential construction (not `async let`) — the `@ModelActor`
-    /// synthesised init isn't safe against concurrent construction on
+    /// synthesized init isn't safe against concurrent construction on
     /// the same container in current SwiftData.
     public static func makeInMemoryStorePair() async throws -> (LocalStore, MutationQueue, ModelContainer) {
         let container = try makeInMemoryContainer()

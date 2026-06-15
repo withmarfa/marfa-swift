@@ -12,7 +12,7 @@ import Foundation
 /// Wire shape conforms to RFC 6749 §5.1: `access_token`, `token_type`,
 /// `refresh_token`, `expires_in` (seconds), `scope` (single space-separated
 /// string), and — when `openid` was granted — `id_token` (a signed JWT).
-/// The decoder normalises `expires_in` to an absolute `expiresAt` date and
+/// The decoder normalizes `expires_in` to an absolute `expiresAt` date and
 /// splits `scope` into a `[String]` for ergonomic Swift consumption.
 ///
 /// The encode side emits a canonical persistence shape (`scope` string,

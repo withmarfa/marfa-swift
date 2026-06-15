@@ -61,7 +61,7 @@ public final class MarfaClient: Sendable {
 
     /// The active sync engine, present only in synced mode (``MarfaClient/synced(url:apiKey:storePath:)``).
     ///
-    /// Call ``SyncEngine/start()`` to begin synchronisation and
+    /// Call ``SyncEngine/start()`` to begin synchronization and
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
@@ -182,7 +182,7 @@ public final class MarfaClient: Sendable {
     /// the container themselves and call ``MarfaClient/local(container:)``.
     ///
     /// `async` because the underlying `LocalStore` is constructed off
-    /// the main actor via `Task.detached` — `@ModelActor`'s synthesised
+    /// the main actor via `Task.detached` — `@ModelActor`'s synthesized
     /// init binds the actor's executor to whatever actor calls it, so
     /// calling from `@MainActor` would silently route every method onto
     /// the main thread.
@@ -213,7 +213,7 @@ public final class MarfaClient: Sendable {
     /// pure-local mode.
     ///
     /// `async` because the underlying `LocalStore` is constructed off
-    /// the main actor via `Task.detached` — `@ModelActor`'s synthesised
+    /// the main actor via `Task.detached` — `@ModelActor`'s synthesized
     /// init binds the actor's executor to whatever actor calls it, so
     /// calling from `@MainActor` would silently route every method onto
     /// the main thread.

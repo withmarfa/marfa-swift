@@ -11,7 +11,7 @@ import Foundation
 ///   with `\n`.
 /// - ``retry`` — the server's reconnect hint in seconds, if this block
 ///   carried a `retry:` field. Advisory; the SDK's reconnect policy owns
-///   whether to honour it.
+///   whether to honor it.
 public struct SSEEvent: Sendable, Equatable {
     public let id: String?
     public let event: String?

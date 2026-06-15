@@ -96,7 +96,7 @@ private func makeStubbedTransport(
     return URLSessionTransport(configuration: clientConfig, session: session)
 }
 
-@Suite("Transport retry behaviour", .serialized)
+@Suite("Transport retry behavior", .serialized)
 struct TransportRetryTests {
 
     @Test("429 + Retry-After then 200 retries once and succeeds")
@@ -106,7 +106,7 @@ struct TransportRetryTests {
             .ok(),
         ])
 
-        let policy = RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, jitter: 0, honoursRetryAfter: true)
+        let policy = RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, jitter: 0, honorsRetryAfter: true)
         let transport = makeStubbedTransport(retryPolicy: policy)
 
         let (data, response) = try await transport.rawRequest(

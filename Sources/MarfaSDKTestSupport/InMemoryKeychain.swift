@@ -3,7 +3,7 @@ import MarfaSDK
 
 /// In-memory `SecureStorage` for unit tests. No Security framework calls;
 /// no code-signing required. Actor-isolated so concurrent callers
-/// serialise.
+/// serialize.
 public actor InMemoryKeychain: SecureStorage {
 
     private var store: [String: String] = [:]

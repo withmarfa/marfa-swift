@@ -19,7 +19,7 @@ import Foundation
 /// `@Observable` view bound to the local store.
 ///
 /// Not `Equatable` — the ``failed(at:error:)`` case carries an `Error`
-/// which doesn't synthesise. SwiftUI animation can drive off the case
+/// which doesn't synthesize. SwiftUI animation can drive off the case
 /// discriminator (e.g. `state.caseId`) when comparison is needed.
 public enum FullSyncState: Sendable {
     /// Engine has not completed a clean drain cycle since this local

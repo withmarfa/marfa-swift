@@ -24,25 +24,25 @@ public struct RetryPolicy: Sendable, Equatable {
     public var maxDelay: TimeInterval
 
     /// Jitter fraction applied to each delay (0.0 to 1.0). `0.2` adds up to
-    /// ±20% randomness to smooth synchronised retries across clients.
+    /// ±20% randomness to smooth synchronized retries across clients.
     public var jitter: Double
 
     /// When `true`, a `Retry-After` header on a 429 or 503 response
     /// overrides the computed delay.
-    public var honoursRetryAfter: Bool
+    public var honorsRetryAfter: Bool
 
     public init(
         maxAttempts: Int = 3,
         baseDelay: TimeInterval = 0.25,
         maxDelay: TimeInterval = 10,
         jitter: Double = 0.2,
-        honoursRetryAfter: Bool = true
+        honorsRetryAfter: Bool = true
     ) {
         self.maxAttempts = max(1, maxAttempts)
         self.baseDelay = max(0, baseDelay)
         self.maxDelay = max(0, maxDelay)
         self.jitter = min(max(0, jitter), 1)
-        self.honoursRetryAfter = honoursRetryAfter
+        self.honorsRetryAfter = honorsRetryAfter
     }
 
     /// Conventional default.

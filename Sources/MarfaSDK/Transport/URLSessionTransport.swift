@@ -256,7 +256,7 @@ final class URLSessionTransport: Transport {
             if attempt > 1 {
                 let delay = retryPolicy.delay(forAttempt: attempt)
                 let serverDelay = await currentRetryAfterOverride()
-                let effective = retryPolicy.honoursRetryAfter
+                let effective = retryPolicy.honorsRetryAfter
                     ? max(delay, serverDelay ?? 0)
                     : delay
                 if effective > 0 {

@@ -63,7 +63,7 @@ final class DroppedMutationModel {
 
     /// HTTP status code from the dropping error (typically 400, 403,
     /// 404). `0` is reserved for non-HTTP permanent failures (e.g. the
-    /// blob-data-missing `ValidationError` synthesised inside the
+    /// blob-data-missing `ValidationError` synthesized inside the
     /// engine).
     var errorStatus: Int = 0
 

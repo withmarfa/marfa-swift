@@ -33,10 +33,10 @@ public struct WithmarfaCapturedEmail: MarfaItem {
     /// Display name from the `From:` header, if present.
     public var fromName: String? { item.properties["from_name"]?.stringValue }
 
-    /// Selected subset of normalised lower-case header keys → values. Pruned at parse time to a documented allowlist (List-Id, List-Unsubscribe, X-Mailer, Reply-To, Return-Path); the raw header set is not retained to keep the item shape bounded.
+    /// Selected subset of normalized lower-case header keys → values. Pruned at parse time to a documented allowlist (List-Id, List-Unsubscribe, X-Mailer, Reply-To, Return-Path); the raw header set is not retained to keep the item shape bounded.
     public var headers: [String: JSONValue]? { item.properties["headers"]?.dictionaryValue }
 
-    /// HTML body (`text/html` MIME part). Captured verbatim; not sanitised on storage.
+    /// HTML body (`text/html` MIME part). Captured verbatim; not sanitized on storage.
     public var htmlBody: String? { item.properties["html_body"]?.stringValue }
 
     /// RFC 5322 `In-Reply-To:` header. Sets up thread inference for follow-up replies on the same conversation.

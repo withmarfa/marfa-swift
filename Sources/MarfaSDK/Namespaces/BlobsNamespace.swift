@@ -12,7 +12,7 @@ import CryptoKit
 /// engine drains the queued upload when connectivity is available.
 ///
 /// In **network-only mode** (`MarfaClient(url:apiKey:)`) `upload` hits the
-/// transport directly, identical to the previous behaviour.
+/// transport directly, identical to the previous behavior.
 ///
 /// A client created via ``MarfaClient/local(path:)`` has no live server;
 /// calling `upload`, `download`, `exists`, or `presignedURL` throws

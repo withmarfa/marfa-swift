@@ -116,7 +116,7 @@ public struct ConnectionsNamespace: Sendable {
     /// 5. Transitions the connection state to `revoked`.
     /// 6. Emits a `system.activity` row.
     ///
-    /// Idempotent at the artefact level — revoking already-revoked
+    /// Idempotent at the artifact level — revoking already-revoked
     /// tokens is a no-op — but rejects with `400 ValidationError` when
     /// the connection itself is already in state `revoked`.
     ///

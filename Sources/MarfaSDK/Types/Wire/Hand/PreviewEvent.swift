@@ -96,7 +96,7 @@ public struct PreviewEventRequest: Codable, Sendable, Hashable {
     }
 }
 
-/// Hop-count cycle metadata embedded inside a synthesised queue body.
+/// Hop-count cycle metadata embedded inside a synthesized queue body.
 /// Distinct from ``PreviewEventCycle`` (the request override) — this is
 /// the fully-resolved cycle the bridge would emit.
 public struct PreviewEventQueueCycle: Codable, Sendable, Hashable {
