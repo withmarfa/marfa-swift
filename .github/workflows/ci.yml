@@ -2,11 +2,8 @@ name: CI
 
 on:
   pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - 'LICENSE'
+    # No paths-ignore here: a required status check must report on every PR,
+    # including docs-only ones, or branch protection blocks the merge.
   push:
     branches: [main]
     paths-ignore:
