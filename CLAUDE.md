@@ -84,9 +84,10 @@ Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries
 
 ## CI — tiered validation
 
-**CI is deliberately cheap on PR and thorough on main. Do not "strengthen" PR CI without a deliberate decision and update to this note.**
+**CI is deliberately cheap on PR and thorough on main. Do not "strengthen" PR CI (beyond compile + typecheck) without a deliberate decision and update to this note.**
 
 - **PR pushes** run `swift build --build-tests` only — compile + typecheck, no test run. Fast feedback, catches ~the same class of breakage as the full suite at roughly 30% the cost.
+- **Runs on every PR, including docs-only ones.** The `pull_request` trigger carries no `paths-ignore`: the branch ruleset requires this check, and a required check that never reports (because a docs-only PR was path-filtered out of the workflow) blocks the merge with no way for an agent to clear it. So it runs on every PR — a docs-only PR pays one compile + typecheck on the macOS runner. Accepted as the cost of fully autonomous delivery (no human merge clicks); if those macOS minutes add up, the cost-free fix is a cheap Ubuntu gate job that greenlights docs-only PRs without compiling.
 - **Merges to `main`** run the full suite: `swift build`, `swift test --parallel`, and both codegen freshness checks (wire types, domain models).
 - **Both tiers** cache the `.build/checkouts` and `.build` directories keyed on `Package.resolved` + source hashes, so iterative source-only changes hit a warm cache.
 
