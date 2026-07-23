@@ -23,6 +23,10 @@ public final class OAuthError: MarfaError, @unchecked Sendable {
         case unauthorizedClient = "unauthorized_client"
         case unsupportedGrantType = "unsupported_grant_type"
         case invalidScope = "invalid_scope"
+        /// A refresh token was replayed after its successor had been issued.
+        /// Refresh-token rotation invalidates both halves of the pair on
+        /// reuse, so the grant is gone and the flow must start over.
+        case tokenReuseDetected = "token_reuse_detected"
         case unknown
     }
 

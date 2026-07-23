@@ -31,10 +31,13 @@ import Foundation
 public protocol TokenProvider: Sendable {
     /// Returns the current valid token, refreshing if necessary.
     ///
-    /// Throws when the underlying credential is no longer recoverable —
-    /// the caller (typically the SDK transport) translates this into
-    /// ``UnauthorizedError`` so application code can surface a sign-in
-    /// prompt.
+    /// Throws the underlying auth failure — an ``OAuthError`` from
+    /// ``StoredTokenProvider`` — which propagates to the caller as-is rather
+    /// than being reshaped into ``UnauthorizedError``, so the OAuth error
+    /// code survives. Apps that need to react to a session ending should
+    /// subscribe to ``StoredTokenProvider/authEvents`` instead of inspecting
+    /// throws at every call site, since background work (sync, prefetch) has
+    /// no call site the user is looking at.
     func currentToken() async throws -> Token
 
     /// Marks any cached token as stale.
@@ -67,68 +70,158 @@ public struct StaticTokenProvider: TokenProvider {
 }
 
 /// A ``TokenProvider`` that holds an OAuth-issued ``Token`` and refreshes
-/// it transparently when it expires.
+/// it transparently as it nears expiry.
 ///
 /// Tokens are persisted via the injected ``SecureStorage`` (typically
 /// ``KeychainStorage``). On each ``currentToken()`` call the actor:
 ///
-/// 1. Returns the in-memory cached token when fresh.
-/// 2. Attempts a refresh against ``tokenEndpoint`` when the cached token
-///    is expired and a refresh token is available.
-/// 3. Throws ``OAuthError`` if no refresh path remains — the caller must
-///    re-run a sign-in flow.
+/// 1. Returns the cached token while it still has comfortable life left.
+/// 2. Refreshes against ``tokenEndpoint`` shortly *before* expiry, so
+///    requests rarely queue behind an exchange.
+/// 3. Fails permanently once the server says the grant is gone, emitting
+///    ``AuthEvent/signedOut(reason:)`` on ``authEvents``.
 ///
-/// Concurrent callers funnel through actor isolation, so a single refresh
-/// covers any number of in-flight requests waiting on the same expired
-/// token.
+/// ## Refresh-token rotation
+///
+/// The server issues a new refresh token on every exchange and invalidates
+/// the previous one; replaying a superseded token reads as theft and revokes
+/// the entire grant. Two properties follow, and both are load-bearing:
+///
+/// - **Refreshes are single-flight.** Actor isolation alone does not give
+///   this. The exchange suspends on the network, which releases the actor and
+///   lets the next caller observe the same stale token and start a second
+///   exchange; the loser then replays a rotated token and kills the session.
+///   Concurrent callers are coalesced onto one task instead.
+/// - **Only unambiguous failures are retried.** Replaying a token the server
+///   may already have rotated is indistinguishable from an attack, so retries
+///   are limited to statuses that prove the grant was never reached.
 public actor StoredTokenProvider: TokenProvider {
     private let storage: any SecureStorage
     private let storageKey: String
     private let tokenEndpoint: URL
     private let clientId: String
     private let urlSession: URLSession
+    private let retryPolicy: RetryPolicy
     private var cached: Token?
+
+    /// How long before actual expiry a token is treated as due for refresh.
+    /// Refreshing early means in-flight requests don't all pile onto one
+    /// exchange at the instant the token lapses.
+    private static let proactiveRefreshWindow: TimeInterval = 60
+
+    /// Statuses safe to replay a refresh token against. Both mean the server
+    /// turned the request away before it reached the grant, so the token is
+    /// provably unrotated. A timeout or a 5xx is ambiguous — the exchange may
+    /// have succeeded with the response lost, and replaying then trips reuse
+    /// detection and ends the session, turning a recoverable blip into a
+    /// forced sign-out.
+    private static let retryableStatuses: Set<Int> = [429, 503]
+
+    /// Set once the server has rejected the grant. While non-nil every
+    /// ``currentToken()`` fails immediately with no network call: a revoked
+    /// grant cannot be revived by asking again, and asking again in a loop is
+    /// how a stale session becomes a request storm.
+    private var terminalFailure: OAuthError?
+
+    /// The exchange every concurrent caller awaits.
+    private var inflightRefresh: Task<Token, Error>?
+
+    private var continuations: [AsyncStream<AuthEvent>.Continuation] = []
 
     public init(
         storage: any SecureStorage,
         storageKey: String,
         tokenEndpoint: URL,
         clientId: String,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .shared,
+        retryPolicy: RetryPolicy = .default
     ) {
         self.storage = storage
         self.storageKey = storageKey
         self.tokenEndpoint = tokenEndpoint
         self.clientId = clientId
         self.urlSession = urlSession
+        self.retryPolicy = retryPolicy
     }
 
-    /// Stores `token` in memory and in ``storage``. Called by auth flows
-    /// after an initial token grant.
+    // MARK: - Auth events
+
+    /// Session-lifecycle events. A ``AuthEvent/signedOut(reason:)`` is the
+    /// app's cue to present sign-in.
+    ///
+    /// Deliberate local sign-out through ``clear()`` deliberately does *not*
+    /// emit: the app already knows, and echoing it back invites a handler
+    /// that signs out in response to signing out. Past events are not
+    /// replayed to late subscribers.
+    public nonisolated var authEvents: AsyncStream<AuthEvent> {
+        AsyncStream<AuthEvent> { continuation in
+            Task { await self.subscribe(continuation) }
+        }
+    }
+
+    private func subscribe(_ continuation: AsyncStream<AuthEvent>.Continuation) {
+        continuations.append(continuation)
+    }
+
+    private func emit(_ event: AuthEvent) {
+        continuations.removeAll { continuation in
+            switch continuation.yield(event) {
+            case .terminated: return true
+            default: return false
+            }
+        }
+    }
+
+    // MARK: - Storage
+
+    /// Stores `token` in ``storage`` and in memory. Called by auth flows
+    /// after an initial grant, and after every rotation.
+    ///
+    /// Storage is written *before* the in-memory cache: if the write fails,
+    /// memory must not be left holding a token that disk doesn't have, or the
+    /// next launch reloads the superseded one and trips reuse detection. A
+    /// successful store also clears any terminal failure, since a fresh grant
+    /// revives the provider.
     public func store(_ token: Token) async throws {
-        cached = token
         let data = try JSONEncoder.iso8601.encode(token)
         guard let json = String(data: data, encoding: .utf8) else {
             throw OAuthError(rawCode: "encoding_failed", message: "could not encode token", status: 500)
         }
         try await storage.set(json, for: storageKey)
+        cached = token
+        terminalFailure = nil
     }
 
     /// Removes the stored token. Used by sign-out flows.
     public func clear() async throws {
         cached = nil
+        terminalFailure = nil
+        inflightRefresh?.cancel()
+        inflightRefresh = nil
         try await storage.delete(for: storageKey)
     }
 
     public func currentToken() async throws -> Token {
-        if let token = try await loadCached(), !token.isExpired {
+        if let terminalFailure { throw terminalFailure }
+        if let token = try await loadCached(), !needsRefresh(token) {
             return token
         }
         return try await refresh()
     }
 
+    /// Drops the in-memory copy so the next call re-reads storage and, if
+    /// needed, refreshes. A 401 on a data request means the access token went
+    /// stale, not that the grant died, so the persisted tokens and any
+    /// terminal latch are deliberately left alone.
     public func invalidate() async {
         cached = nil
+    }
+
+    /// True once the token is within ``proactiveRefreshWindow`` of expiry, or
+    /// already past it. Tokens with no expiry never need refreshing.
+    private func needsRefresh(_ token: Token) -> Bool {
+        guard let expiry = token.expiresAt else { return false }
+        return expiry.timeIntervalSinceNow <= Self.proactiveRefreshWindow
     }
 
     /// Loads the cached token, falling back to ``storage`` when the
@@ -144,40 +237,133 @@ public actor StoredTokenProvider: TokenProvider {
         return token
     }
 
-    /// Calls the configured `tokenEndpoint` with `grant_type=refresh_token`,
-    /// persists the returned bundle, and returns it.
+    // MARK: - Refresh
+
+    /// Coalesces concurrent callers onto a single exchange. Anyone arriving
+    /// while a refresh is in flight awaits that same task rather than
+    /// starting a second one against the same about-to-be-rotated token.
     private func refresh() async throws -> Token {
+        if let inflight = inflightRefresh {
+            return try await inflight.value
+        }
+        let task = Task<Token, Error> { try await self.performRefresh() }
+        inflightRefresh = task
+        defer { inflightRefresh = nil }
+        return try await task.value
+    }
+
+    private func performRefresh() async throws -> Token {
         guard let refreshToken = try await loadCached()?.refreshToken else {
-            throw OAuthError(
+            let error = OAuthError(
                 rawCode: "invalid_grant",
                 message: "no refresh token available — re-authenticate",
                 status: 401
             )
+            await enterTerminalState(reason: .noRefreshToken, error: error)
+            throw error
         }
 
+        var attempt = 1
+        while true {
+            let (data, http) = try await exchange(refreshToken: refreshToken)
+
+            if (200..<300).contains(http.statusCode) {
+                let fresh = try JSONDecoder.iso8601.decode(Token.self, from: data)
+                // Rotation normally returns a new refresh token. If a response
+                // omits one, keep the token we just spent so the session
+                // retains a way to refresh at all.
+                let token = fresh.refreshToken == nil
+                    ? Token(
+                        accessToken: fresh.accessToken,
+                        tokenType: fresh.tokenType,
+                        refreshToken: refreshToken,
+                        idToken: fresh.idToken,
+                        expiresAt: fresh.expiresAt,
+                        scopes: fresh.scopes
+                    )
+                    : fresh
+                try await store(token)
+                return token
+            }
+
+            let error = try parseOAuthError(data: data, status: http.statusCode)
+
+            if let reason = Self.terminalReason(for: error, status: http.statusCode) {
+                await enterTerminalState(reason: reason, error: error)
+                throw error
+            }
+
+            guard Self.retryableStatuses.contains(http.statusCode),
+                  attempt < retryPolicy.maxAttempts
+            else { throw error }
+
+            let pause = delay(afterAttempt: attempt, headers: http.allHeaderFields)
+            try await Task.sleep(for: .seconds(pause))
+            attempt += 1
+        }
+    }
+
+    private func exchange(refreshToken: String) async throws -> (Data, HTTPURLResponse) {
         var request = URLRequest(url: tokenEndpoint)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let body = [
+        request.httpBody = formURLEncode([
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
             "client_id": clientId,
-        ]
-        request.httpBody = formURLEncode(body).data(using: .utf8)
+        ]).data(using: .utf8)
 
         let (data, response) = try await urlSession.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw OAuthError(rawCode: "invalid_response", message: "no HTTP response", status: 500)
         }
+        return (data, http)
+    }
 
-        if !(200..<300).contains(http.statusCode) {
-            throw try parseOAuthError(data: data, status: http.statusCode)
+    /// Latches the failure, discards the tokens, and tells subscribers to
+    /// send the user back through sign-in.
+    private func enterTerminalState(reason: SignOutReason, error: OAuthError) async {
+        terminalFailure = error
+        cached = nil
+        try? await storage.delete(for: storageKey)
+        emit(.signedOut(reason: reason))
+    }
+
+    /// Classifies a failed exchange. A terminal result means the grant is
+    /// gone and only a fresh sign-in recovers it; anything else is worth
+    /// surfacing but leaves the session intact.
+    private static func terminalReason(for error: OAuthError, status: Int) -> SignOutReason? {
+        switch error.oauthCode {
+        case .tokenReuseDetected: return .reuseDetected
+        case .invalidGrant: return .refreshTokenRejected
+        default: break
         }
+        // A 400 or 401 the server didn't tag with a recognized OAuth code
+        // still means the credential was refused. Asking again cannot change
+        // that answer.
+        return (status == 400 || status == 401) ? .refreshTokenRejected : nil
+    }
 
-        let token = try JSONDecoder.iso8601.decode(Token.self, from: data)
-        try await store(token)
-        return token
+    /// Backoff before the next attempt, honoring `Retry-After` when the
+    /// server sent one — it knows when its window resets better than we do.
+    private func delay(afterAttempt attempt: Int, headers: [AnyHashable: Any]) -> TimeInterval {
+        let computed = retryPolicy.delay(forAttempt: attempt + 1)
+        guard retryPolicy.honorsRetryAfter,
+              let retryAfter = Self.retryAfterSeconds(headers)
+        else { return computed }
+        return max(computed, retryAfter)
+    }
+
+    private static func retryAfterSeconds(_ headers: [AnyHashable: Any]) -> TimeInterval? {
+        for (key, value) in headers {
+            guard let name = key as? String,
+                  name.caseInsensitiveCompare("Retry-After") == .orderedSame
+            else { continue }
+            if let text = value as? String { return TimeInterval(text) }
+            if let number = value as? NSNumber { return number.doubleValue }
+        }
+        return nil
     }
 }
 
