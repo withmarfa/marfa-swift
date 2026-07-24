@@ -64,4 +64,4 @@ MARFA_API_URL=… MARFA_API_KEY=… swift test
 
 ## License
 
-MIT.
+Apache-2.0.
