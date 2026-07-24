@@ -24,10 +24,10 @@ import Foundation
 /// token) but should be cheap on the happy path — the SDK awaits it on
 /// every request.
 ///
-/// ``invalidate()`` is invoked by the transport when the server returns
-/// `401 Unauthorized`; an implementation that caches a token in memory
-/// should mark it stale so the next ``currentToken()`` call performs a
-/// fresh fetch.
+/// ``invalidate(_:)`` is invoked by the transport when the server returns
+/// `401 Unauthorized`, naming the exact credential that was refused; an
+/// implementation holding a cached token should replace it so the next
+/// ``currentToken()`` call returns something different.
 public protocol TokenProvider: Sendable {
     /// Returns the current valid token, refreshing if necessary.
     ///
@@ -44,12 +44,34 @@ public protocol TokenProvider: Sendable {
     ///
     /// Default implementation is a no-op for static / non-cacheable
     /// providers. ``StoredTokenProvider`` overrides this to drop the
-    /// in-memory cache and force a refresh on the next call.
+    /// in-memory copy so the next call re-reads storage.
     func invalidate() async
+
+    /// Reports that the server refused `rejected`, so that the provider can
+    /// replace it before the transport retries.
+    ///
+    /// Naming the failed credential rather than saying "something is wrong"
+    /// is what keeps recovery bounded. Requests already in flight when a
+    /// replacement lands come back 401 carrying the *old* token; a provider
+    /// that renewed on every such report would spend one grant per straggler.
+    /// Comparing against what it currently holds lets it renew once and treat
+    /// the rest as already handled.
+    ///
+    /// Returns once the provider has either replaced the credential or
+    /// decided it can't. Failure is not thrown here: it surfaces from the
+    /// following ``currentToken()``, which is where callers already handle it.
+    func invalidate(_ rejected: Token) async
 }
 
 extension TokenProvider {
     public func invalidate() async {}
+
+    /// Providers that predate the token-scoped form, or that have no way to
+    /// tell one credential from another, fall back to the blanket
+    /// ``invalidate()``.
+    public func invalidate(_ rejected: Token) async {
+        await invalidate()
+    }
 }
 
 /// A ``TokenProvider`` backed by a single immutable API key.
@@ -78,7 +100,9 @@ public struct StaticTokenProvider: TokenProvider {
 /// 1. Returns the cached token while it still has comfortable life left.
 /// 2. Refreshes against ``tokenEndpoint`` shortly *before* expiry, so
 ///    requests rarely queue behind an exchange.
-/// 3. Fails permanently once the server says the grant is gone, emitting
+/// 3. Refreshes on demand when the transport reports a rejected credential,
+///    because expiry is only one of the ways a token dies.
+/// 4. Fails permanently once the server says the grant is gone, emitting
 ///    ``AuthEvent/signedOut(reason:)`` on ``authEvents``.
 ///
 /// ## Refresh-token rotation
@@ -209,12 +233,40 @@ public actor StoredTokenProvider: TokenProvider {
         return try await refresh()
     }
 
-    /// Drops the in-memory copy so the next call re-reads storage and, if
-    /// needed, refreshes. A 401 on a data request means the access token went
-    /// stale, not that the grant died, so the persisted tokens and any
-    /// terminal latch are deliberately left alone.
+    /// Drops the in-memory copy so the next call re-reads storage.
+    ///
+    /// This alone cannot recover a rejected credential: storage still holds
+    /// the same token, and one that has not reached its expiry is handed
+    /// straight back. Callers that know which credential was refused should
+    /// use ``invalidate(_:)``, which can exchange it.
     public func invalidate() async {
         cached = nil
+    }
+
+    /// Exchanges `rejected` for a new token, if it is still the credential
+    /// this provider hands out.
+    ///
+    /// Expiry is only one way an access token dies. Revocation, a signing-key
+    /// rotation, or a request that waited long enough to outlive the
+    /// credential it was stamped with all produce a 401 while the clock still
+    /// reads valid — which the proactive window cannot see. Without an
+    /// exchange here the retry re-reads the same token from storage and sends
+    /// it again, ending a session that a live refresh token could have saved.
+    ///
+    /// Recovery driven by request traffic is the shape that becomes a storm,
+    /// so it is bounded three ways: the exchange is single-flighted; a report
+    /// naming an already-superseded credential does nothing, because a
+    /// replacement already exists; and a grant the server has rejected latches,
+    /// so every later report returns without touching the network.
+    public func invalidate(_ rejected: Token) async {
+        guard terminalFailure == nil else { return }
+        guard let current = try? await loadCached(),
+              current.accessToken == rejected.accessToken
+        else { return }
+        // A failed exchange deliberately leaves the rejected token in place.
+        // The caller's retry then draws the same 401 and surfaces the auth
+        // error it already handles, rather than a second error shape from here.
+        _ = try? await refresh()
     }
 
     /// True once the token is within ``proactiveRefreshWindow`` of expiry, or
@@ -253,6 +305,12 @@ public actor StoredTokenProvider: TokenProvider {
     }
 
     private func performRefresh() async throws -> Token {
+        // The latch can be set between this task being created and its first
+        // line running, since every caller takes its own turn on the actor.
+        // Re-checking here stops a caller queued behind a just-failed exchange
+        // from replaying a refresh token the server has already rotated.
+        if let terminalFailure { throw terminalFailure }
+
         guard let refreshToken = try await loadCached()?.refreshToken else {
             let error = OAuthError(
                 rawCode: "invalid_grant",

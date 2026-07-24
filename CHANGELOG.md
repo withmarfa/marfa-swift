@@ -5,6 +5,35 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.2.0] — 2026-07-24
+
+Recover a session when the server rejects an access token that has not yet
+expired. Refresh was proactive only — it renewed inside a window before
+clock expiry — so a token revoked, rotated out, or outlived by a queued
+request came back 401 with nothing able to renew it. The transport retried,
+the provider handed back the same token from storage, and a session a live
+refresh token could have saved ended in a sign-in prompt.
+
+### Fixed
+
+- **A 401 on a clock-valid token now forces one refresh and one retry.**
+  The transport reports the refused credential to the provider, which
+  exchanges it and lets the retry go out with the replacement.
+- **Auth failures raised while re-minting a header keep their type.** An
+  `OAuthError` surfacing from the token provider mid-request was wrapped in
+  `NetworkError`, hiding the OAuth code callers branch on and presenting a
+  dead session as a connectivity problem.
+
+### Added
+
+- **`TokenProvider.invalidate(_ rejected: Token)`** — the token-scoped
+  form of `invalidate()`, called by the transport on a 401 with the exact
+  credential the server refused. Additive: the protocol supplies a default
+  that forwards to `invalidate()`, so an existing custom provider keeps
+  working unchanged. `StoredTokenProvider` implements it and exchanges the
+  token only when it is still the one it hands out, so requests already in
+  flight when a rotation lands do not each trigger their own refresh.
+
 ## [11.1.0] — 2026-06-16
 
 Normalize all prose to American English across source, doc comments, string

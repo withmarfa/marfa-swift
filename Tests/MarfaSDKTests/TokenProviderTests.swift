@@ -3,6 +3,21 @@ import Foundation
 @testable import MarfaSDK
 import MarfaSDKTestSupport
 
+/// A provider that implements only the blanket ``TokenProvider/invalidate()``,
+/// as an app-supplied token source written before the token-scoped form
+/// existed would.
+private actor BlanketInvalidateProvider: TokenProvider {
+    private var invalidateCalls = 0
+
+    func currentToken() async throws -> Token {
+        Token(accessToken: "external", tokenType: "Bearer")
+    }
+
+    func invalidate() async { invalidateCalls += 1 }
+
+    func calls() async -> Int { invalidateCalls }
+}
+
 @Suite("TokenProvider")
 struct TokenProviderTests {
 
@@ -22,6 +37,19 @@ struct TokenProviderTests {
         await provider.invalidate()
         let token = try await provider.currentToken()
         #expect(token.accessToken == "key-123")
+    }
+
+    @Test("a provider implementing only invalidate() still hears about a refusal")
+    func blanketInvalidateStillReceivesRejections() async throws {
+        let provider = BlanketInvalidateProvider()
+        let rejected = Token(accessToken: "external", tokenType: "Bearer")
+
+        await (provider as any TokenProvider).invalidate(rejected)
+
+        // The token-scoped form is additive: a custom provider that never
+        // adopted it keeps working through the protocol default rather than
+        // silently going deaf to 401s.
+        #expect(await provider.calls() == 1)
     }
 
     @Test("StoredTokenProvider returns cached non-expired token without network")
