@@ -136,9 +136,14 @@ final class URLSessionTransport: Transport {
     /// Applies the current bearer token to `request` by awaiting
     /// ``tokenProvider``. Used for the three header-setting paths:
     /// ``rawRequest``, ``rawUpload``, and the SSE stream init.
-    private func applyAuthHeader(to request: inout URLRequest) async throws {
+    ///
+    /// Returns the token it applied so a caller that later gets a 401 can
+    /// name the exact credential the server refused.
+    @discardableResult
+    private func applyAuthHeader(to request: inout URLRequest) async throws -> Token {
         let token = try await tokenProvider.currentToken()
         request.setValue("Bearer \(token.accessToken)", forHTTPHeaderField: "Authorization")
+        return token
     }
 
     func rawUpload(
@@ -215,7 +220,7 @@ final class URLSessionTransport: Transport {
         let url = try buildURL(path: path, query: query)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-        try await applyAuthHeader(to: &request)
+        let sentToken = try await applyAuthHeader(to: &request)
 
         // Stamp an `X-Request-ID` on every request so the server-side log
         // line and this client-side log line can be correlated when a
@@ -279,13 +284,17 @@ final class URLSessionTransport: Transport {
 
                 await rateLimitState.update(from: httpResponse.allHeaderFields)
 
-                // 401-refresh-once: if the credential turned out stale,
-                // invalidate the cached token, re-mint the auth header,
-                // and retry the same request a single time. Subsequent
-                // 401s surface as ``UnauthorizedError`` to the caller.
+                // 401-refresh-once: report the exact credential the server
+                // refused, re-mint the auth header, and retry the same
+                // request a single time. Naming the token is what lets the
+                // provider tell "this is dead, renew it" apart from "you are
+                // behind, a newer one already exists" — the second case is
+                // every request that was in flight when the renewal landed,
+                // and renewing for each of those is a storm. Subsequent 401s
+                // surface as ``UnauthorizedError`` to the caller.
                 if httpResponse.statusCode == 401 && !didRefreshOn401 {
                     didRefreshOn401 = true
-                    await tokenProvider.invalidate()
+                    await tokenProvider.invalidate(sentToken)
                     try await applyAuthHeader(to: &request)
                     logger.log.info(
                         "http.retry.refresh request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) attempt=\(attempt, privacy: .public)"
@@ -336,6 +345,16 @@ final class URLSessionTransport: Transport {
                 throw NetworkError(error)
             } catch is CancellationError {
                 throw CancellationError()
+            } catch let error as MarfaError {
+                // Already a fully formed SDK error — most often an
+                // ``OAuthError`` from the token provider when re-minting the
+                // header after a 401 finds the grant gone. Wrapping it in a
+                // NetworkError would bury the OAuth code callers branch on and
+                // dress an auth failure up as a connectivity one.
+                logger.log.error(
+                    "http.error request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) code=\(error.code, privacy: .public)"
+                )
+                throw error
             } catch {
                 logger.log.error(
                     "http.error request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) reason=\(String(describing: error), privacy: .public)"
