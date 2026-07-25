@@ -17,15 +17,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Tiered validation. PR tier (`pr-check`): compile + typecheck only.
-# Main tier (`main-validate`): full build + `swift test --parallel` +
-# codegen freshness checks, run on merge to main and on workflow_dispatch.
-# Caching keyed on `Package.resolved` + source hashes for both tiers.
+# `validate` (build + full test suite) runs on every PR and every merge to
+# main — a change is not validated until its tests have run, and a PR is
+# where that has to happen. `freshness` (three codegen regens plus diffs)
+# stays main-only: it catches drift in vendored inputs, which a source PR
+# cannot introduce, and it costs more than it would pay back per push.
+# Caching keyed on `Package.resolved` + source hashes for both jobs.
 
 jobs:
-  pr-check:
-    name: PR check (compile + typecheck)
-    if: github.event_name == 'pull_request'
+  validate:
+    name: Build + test
     runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v7
@@ -48,13 +49,12 @@ jobs:
       - name: Cache SPM checkouts
         uses: actions/cache@v6
         with:
-          # T-092: scope by runner.name. Self-hosted runners on the same
-          # host share the cache backend, but each runner's working dir
-          # is baked into compiled PCMs; a cross-runner restore surfaces
-          # as "missing required module 'SwiftShims'". Per-runner keys
-          # keep each runner reading its own correctly-pathed cache.
-          # GitHub-hosted runners get a stable runner.name per OS, so the
-          # keys still hit cache there.
+          # Scope by runner.name. Self-hosted runners on the same host share
+          # the cache backend, but each runner's working dir is baked into
+          # compiled PCMs; a cross-runner restore surfaces as "missing
+          # required module 'SwiftShims'". Per-runner keys keep each runner
+          # reading its own correctly-pathed cache. GitHub-hosted runners get
+          # a stable runner.name per OS, so the keys still hit cache there.
           path: .build/checkouts
           key: ${{ runner.name }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
           restore-keys: |
@@ -67,8 +67,8 @@ jobs:
           # separately with a finer key). Keyed by Package.resolved +
           # the hash of all Swift sources, so source-only edits still
           # get an incremental-compile hit and dependency bumps miss
-          # cleanly. Per-runner scoping (T-092) for the same reason as
-          # the checkouts cache above.
+          # cleanly. Per-runner scoping for the same reason as the
+          # checkouts cache above.
           path: |
             .build
             !.build/checkouts
@@ -77,14 +77,14 @@ jobs:
             ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved') }}-
             ${{ runner.name }}-spm-build-
 
-      - name: Compile library + tests (typecheck, no test run)
-        # `swift build --build-tests` compiles test targets too, which
-        # exercises the full type surface without actually running tests.
-        # This is the cheap pre-merge signal.
-        run: swift build --build-tests
+      - name: Build
+        run: swift build
 
-  main-validate:
-    name: Full build + test + freshness
+      - name: Test
+        run: swift test --parallel
+
+  freshness:
+    name: Codegen freshness
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
@@ -101,16 +101,13 @@ jobs:
           fi
           dev_dir="/Applications/$latest/Contents/Developer"
           echo "Selecting $dev_dir"
-          # Export DEVELOPER_DIR for subsequent steps. Avoids sudo xcode-select
-          # which requires passwordless sudo on self-hosted runners; works
-          # identically on GitHub-hosted macOS runners.
           echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$dev_dir" swift --version
 
       - name: Cache SPM checkouts
         uses: actions/cache@v6
         with:
-          # T-092: scope by runner.name (see pr-check job above for why).
+          # Per-runner scoping, same reason as the validate job above.
           path: .build/checkouts
           key: ${{ runner.name }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
           restore-keys: |
@@ -126,12 +123,6 @@ jobs:
           restore-keys: |
             ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved') }}-
             ${{ runner.name }}-spm-build-
-
-      - name: Build
-        run: swift build
-
-      - name: Test
-        run: swift test --parallel
 
       - name: Codegen freshness (wire types)
         run: |

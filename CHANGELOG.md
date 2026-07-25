@@ -5,6 +5,31 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Local search.** `MarfaStore.querySearch(text:filters:)` returns a live
+  `SearchQuery` over `title` and `body` in the local store, so search works
+  offline and without a round trip. It takes the same `SearchFilters` as
+  `MarfaClient.search(query:filters:)` — `type`, `state`, `tier`, `tags`,
+  `limit` — and mirrors the server's exclusion of `system.*` and trashed
+  records plus its default limit of 20, so a screen can move between the two.
+  Where they differ: only `title` and `body` are matched, ranking is ordinal
+  rather than BM25, and there are no snippets. All three are documented on
+  the method.
+- **`MarfaClient.search(query:filters:)` resolves locally on a pure-local
+  client** instead of failing against the placeholder URL, matching how every
+  namespace already behaves. Synced clients still query the server, whose
+  index beats a local scan.
+
+### Changed
+
+- **CI runs the full test suite on pull requests.** Tests were main-only, so
+  nothing between "it compiles" and "it's tagged" ever ran them. The codegen
+  freshness checks stay main-only — a source-only PR can't make a vendored
+  snapshot stale.
+
 ## [11.3.0] — 2026-07-25
 
 Ship the 11.2.0 fix. The `v11.2.0` tag was cut one commit early, so it points

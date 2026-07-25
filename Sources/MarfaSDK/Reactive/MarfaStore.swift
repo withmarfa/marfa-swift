@@ -35,6 +35,12 @@ public final class MarfaStore {
 
     private let container: ModelContainer
 
+    /// The actor that owns the SwiftData reads. Only ``querySearch(text:filters:)``
+    /// goes through it — the other queries hold their own `ModelContext`
+    /// and fetch on the main actor, which is fine for a plain fetch but
+    /// not for a scan that decodes JSON per row.
+    private let localStore: LocalStore
+
     /// The sync engine this store was vended against, if any. Populated
     /// for synced-mode clients; `nil` for pure-local. Gates
     /// ``queryBlobUploadProgress()`` — only synced clients have an
@@ -59,11 +65,13 @@ public final class MarfaStore {
 
     init(
         container: ModelContainer,
+        localStore: LocalStore,
         syncEngine: SyncEngine? = nil,
         mutationQueue: MutationQueue? = nil,
         profileNamespace: ProfileNamespace? = nil
     ) {
         self.container = container
+        self.localStore = localStore
         self.syncEngine = syncEngine
         self.mutationQueue = mutationQueue
         self.profileNamespace = profileNamespace
@@ -148,6 +156,26 @@ public final class MarfaStore {
         limit: Int? = nil
     ) -> BackrefsQuery {
         BackrefsQuery(container: container, targetIds: targetIds, edgeType: edgeType, limit: limit)
+    }
+
+    // MARK: - Search
+
+    /// Creates a live search over item `title` and `body`, served from
+    /// the local store — no network, works offline.
+    ///
+    ///     let hits = store.querySearch(text: "invoice")
+    ///     ForEach(hits.results, id: \.item.id) { hit in ... }
+    ///
+    /// `filters` takes the same surface as
+    /// ``MarfaClient/search(query:filters:)`` (`type`, `state`, `tier`,
+    /// `tags`, `limit`), so a screen can move between local and remote
+    /// search without reshaping its query. The trade-offs that come with
+    /// that — matched fields, ranking, no snippets — are documented on
+    /// ``LocalStore/searchItems(text:filters:)``.
+    ///
+    /// The scan runs off the main actor. See ``SearchQuery``.
+    public func querySearch(text: String, filters: SearchFilters? = nil) -> SearchQuery {
+        SearchQuery(store: localStore, text: text, filters: filters)
     }
 
     // MARK: - Tag queries
