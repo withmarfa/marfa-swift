@@ -28,7 +28,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Select latest Xcode (for Swift 6.2)
         run: |
@@ -46,7 +46,7 @@ jobs:
           DEVELOPER_DIR="$dev_dir" swift --version
 
       - name: Cache SPM checkouts
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # T-092: scope by runner.name. Self-hosted runners on the same
           # host share the cache backend, but each runner's working dir
@@ -61,7 +61,7 @@ jobs:
             ${{ runner.name }}-spm-checkouts-
 
       - name: Cache SPM build artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # Cache the whole .build directory (except checkouts, cached
           # separately with a finer key). Keyed by Package.resolved +
@@ -90,7 +90,7 @@ jobs:
       || github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Select latest Xcode (for Swift 6.2)
         run: |
@@ -108,7 +108,7 @@ jobs:
           DEVELOPER_DIR="$dev_dir" swift --version
 
       - name: Cache SPM checkouts
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # T-092: scope by runner.name (see pr-check job above for why).
           path: .build/checkouts
@@ -117,7 +117,7 @@ jobs:
             ${{ runner.name }}-spm-checkouts-
 
       - name: Cache SPM build artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .build
