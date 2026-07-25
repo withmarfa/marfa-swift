@@ -5,7 +5,26 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.3.0] — 2026-07-25
+
+Ship the 11.2.0 fix. The `v11.2.0` tag was cut one commit early, so it points
+at the single-flight refresh work and does not contain the 401 handling its
+notes describe. Anything pinned to 11.2.0 therefore still signs the user out
+on a 401 for a clock-valid token. Pin 11.3.0 to get the behavior documented
+below; the release notes for 11.2.0 are left as written so the record of what
+was intended stays intact.
+
+No source changes over 11.2.0 beyond the commit that tag missed.
+
+### Fixed
+
+- **A 401 on a clock-valid token now forces one refresh and one retry** — see
+  the 11.2.0 notes below for the full description. This release is the first
+  tag that actually contains it.
+
 ## [11.2.0] — 2026-07-24
+
+Note: this tag does not contain the change described here. See 11.3.0.
 
 Recover a session when the server rejects an access token that has not yet
 expired. Refresh was proactive only — it renewed inside a window before
