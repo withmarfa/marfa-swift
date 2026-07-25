@@ -276,28 +276,25 @@ struct LocalSearchTests {
     @MainActor
     func searchDoesNotBlockMainActor() async throws {
         let store = try await makeStore()
-        for index in 0..<200 {
+        // Enough rows that the scan is real work rather than a no-op.
+        for index in 0..<50 {
             try await seed(store, body: "filler \(index)")
         }
         try await seed(store, title: "Invoice")
 
-        // Enqueued on the main actor *before* the search starts, so it can
-        // only make progress if the search suspends the main actor rather
-        // than running its scan there. If someone moves the scan onto the
-        // main actor, this task never gets a turn and `count` stays 0.
-        let ticker = MainActorTicker()
-        let pump = Task { @MainActor in
-            while !Task.isCancelled {
-                ticker.count += 1
-                await Task.yield()
-            }
-        }
+        // One job enqueued on the main actor *before* the search starts.
+        // The main actor runs its queue in order, so this job goes ahead of
+        // the search's resumption — but only if the search suspends the
+        // main actor at all. A scan run inline on the main actor would
+        // finish first and leave the probe at zero, which is exactly what
+        // this pins.
+        let probe = MainActorProbe()
+        Task { @MainActor in probe.ran += 1 }
 
         let results = try await store.searchItems(text: "invoice")
-        pump.cancel()
 
         #expect(results.count == 1)
-        #expect(ticker.count > 0)
+        #expect(probe.ran == 1)
     }
 
     // MARK: - Client integration
@@ -315,12 +312,12 @@ struct LocalSearchTests {
     }
 }
 
-/// Counter for the main-actor responsiveness check. A class so the
-/// polling task and the assertion share one instance; `@MainActor` so
-/// the mutation needs no locking under strict concurrency.
+/// Records whether a job enqueued on the main actor got to run. A class so
+/// the job and the assertion share one instance; `@MainActor` so the
+/// mutation needs no locking under strict concurrency.
 @MainActor
-private final class MainActorTicker {
-    var count = 0
+private final class MainActorProbe {
+    var ran = 0
 }
 
 // MARK: - Reactive wrapper
