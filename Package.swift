@@ -24,7 +24,12 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "MarfaSDK"
+            name: "MarfaSDK",
+            // Developer documentation that lives beside the code it
+            // describes. SwiftPM treats any undeclared file in a target
+            // directory as an unhandled resource and warns — in every
+            // consuming app's build, not just this package's.
+            exclude: ["LocalStore/README.md"]
         ),
         .target(
             name: "MarfaSDKTestSupport",
