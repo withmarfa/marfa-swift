@@ -40,6 +40,12 @@ extension LocalStore {
     /// reaches six figures. Narrowing with `type` or `tier` is the
     /// cheapest lever a caller has.
     ///
+    /// Being on the store actor also means a scan holds it for its
+    /// duration, so writes queued behind it wait. That is true of every
+    /// read here; search is only notable because it is the longest one.
+    /// It is the reason a corpus that outgrows this needs the server
+    /// index rather than a bigger machine.
+    ///
     /// ## Known divergences from `MarfaClient.search(query:filters:)`
     ///
     /// - **Fields.** Only `title` and `body` are matched. The server also
