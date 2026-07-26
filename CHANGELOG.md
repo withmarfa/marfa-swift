@@ -99,11 +99,11 @@ monorepo.
 
 - **`client.credentials` namespace** — `CredentialsNamespace` with two
   factory methods. `createOAuthProvider(_:)` creates a
-  `system.credential` of kind `oauth_token` for OAuth-based integrations
-  (T-231 PR1) — used to share one Google OAuth provider row across every
+  `system.credential` of kind `oauth_token` for OAuth-based integrations,
+  used to share one Google OAuth provider row across every
   `google.*` integration. `createApiToken(_:)` creates a credential of
-  kind `api_token` for token-based integrations (T-241 PR1, T-246) —
-  used by Todoist, Readwise, Raindrop. Both routes are tenant-admin
+  kind `api_token` for token-based integrations, used by Todoist, Readwise,
+  and Raindrop. Both routes are tenant-admin
   gated server-side.
 - **`CredentialKind` enum** (`apiKey | oauthToken | apiToken`) under
   `Sources/MarfaSDK/Types/Wire/Hand/`. Hand-written closed enum so apps
@@ -111,7 +111,7 @@ monorepo.
 - **`AuthScheme` enum** (`bearer | token | basic`) — controls which
   `Authorization` header the Marfa proxy stamps on outbound calls when
   the connection's credential is of kind `api_token`. Mirrors the
-  server's `auth_scheme` field (T-246) — Readwise, GitHub PATs, and a
+  server's `auth_scheme` field — Readwise, GitHub PATs, and a
   few other upstreams need `Token` instead of `Bearer`.
 - **`CreateOAuthProviderCredentialInput`**, **`CreateApiTokenCredentialInput`**,
   **`CreatedCredential`** input/response types under
@@ -122,8 +122,8 @@ monorepo.
   `configuration: [String: JSONValue]?`** (regenerated wire type). Pass
   the credential id returned by ``CredentialsNamespace`` so the new
   connection inherits the shared upstream credential; pass
-  `configuration` for per-connection overrides (T-254 added
-  `upstream_base_url` as the first such override).
+  `configuration` for per-connection overrides, including
+  `upstream_base_url`.
 - **New typed domain models** auto-pulled from the monorepo's core type
   set: `todoist.task` (TodoistTask), `readwise.book` / `readwise.highlight`
   (ReadwiseBook / ReadwiseHighlight), `raindrop.raindrop` / `raindrop.collection`
@@ -160,8 +160,8 @@ OpenAPI re-sync for the server's `workspace_admin` → `tenant_admin` role renam
 
 ### Changed
 
-- **`KeyRole` gains a `tenantAdmin` case** (T-224 follow-up). The server renamed the `workspace_admin` role to `tenant_admin`; the SDK's `KeyRole` enum was missing the mid-tier role entirely — it carried only `admin` and `member`, so decoding an `ApiKey` or `CreatedKey` whose role is the mid-tier value threw a decoding error. `KeyRole` is now `admin | tenantAdmin | member`, with `tenantAdmin` carrying the raw value `tenant_admin`. Adding a public enum case is source-breaking for exhaustive `switch` statements over `KeyRole`, hence the major bump.
-- **`WebhookDelivery.success` renamed to `succeeded`** (T-224 boolean-naming sweep). The server renamed the `outbound_webhook_deliveries.success` column to `succeeded`; the regenerated wire type follows. Consumers reading `delivery.success` update to `delivery.succeeded`.
+- **`KeyRole` gains a `tenantAdmin` case.** The server renamed the `workspace_admin` role to `tenant_admin`; the SDK's `KeyRole` enum was missing the mid-tier role entirely — it carried only `admin` and `member`, so decoding an `ApiKey` or `CreatedKey` whose role is the mid-tier value threw a decoding error. `KeyRole` is now `admin | tenantAdmin | member`, with `tenantAdmin` carrying the raw value `tenant_admin`. Adding a public enum case is source-breaking for exhaustive `switch` statements over `KeyRole`, hence the major bump.
+- **`WebhookDelivery.success` renamed to `succeeded`.** The server renamed the `outbound_webhook_deliveries.success` column to `succeeded`; the regenerated wire type follows. Consumers reading `delivery.success` update to `delivery.succeeded`.
 
 ### Internal
 
@@ -173,11 +173,11 @@ OAuth endpoint discovery, plus the async bulk-action surface.
 
 ### Changed
 
-- **OAuth endpoints are discovered, not hardcoded** (T-216). `MarfaAuth` and `DeviceFlow` now fetch `${issuer}/.well-known/oauth-authorization-server` and resolve the token / authorize / revoke / device endpoints from it. T-131 moved the server's OAuth surface to `/auth/oauth2/*`; the SDK still constructed the pre-T-131 paths, so refresh, code-flow exchange, and revoke 404'd against an updated server. The discovery doc is fetched once and cached for the process; a discovery failure raises a clear error rather than falling back to dead paths. Public `MarfaAuth` / `DeviceFlow` call sites are unchanged — discovery happens internally.
+- **OAuth endpoints are discovered, not hardcoded.** `MarfaAuth` and `DeviceFlow` now fetch `${issuer}/.well-known/oauth-authorization-server` and resolve the token / authorize / revoke / device endpoints from it. The server's OAuth surface moved to `/auth/oauth2/*`, while the SDK still constructed the old paths, so refresh, code-flow exchange, and revoke 404'd against an updated server. The discovery doc is fetched once and cached for the process; a discovery failure raises a clear error rather than falling back to dead paths. Public `MarfaAuth` / `DeviceFlow` call sites are unchanged — discovery happens internally.
 
 ### Added
 
-- **Async `bulk_action` jobs** (T-218 parity). The remote-mode `bulkAction(_:options:)` signature is unchanged for callers — internally it now distinguishes the `200` (dry-run) and `202` (queued) responses and polls `GET /items/bulk_action/jobs/:id` to a terminal status, resolving with the embedded `BulkActionResult` exactly as the synchronous endpoint did. New surface: `BulkActionJob` / `BulkActionJobStatus`, `BulkActionPollOptions`, `bulkActionAsync(_:)`, `bulkActionStatus(jobId:)`, `bulkActionCancel(jobId:)`, and `BulkJobCancelledError` / `BulkJobFailedError`. Synced mode waits for the server-side job to terminate before settling the mutation; pure-local mode is untouched.
+- **Async `bulk_action` jobs.** The remote-mode `bulkAction(_:options:)` signature is unchanged for callers — internally it now distinguishes the `200` (dry-run) and `202` (queued) responses and polls `GET /items/bulk_action/jobs/:id` to a terminal status, resolving with the embedded `BulkActionResult` exactly as the synchronous endpoint did. New surface: `BulkActionJob` / `BulkActionJobStatus`, `BulkActionPollOptions`, `bulkActionAsync(_:)`, `bulkActionStatus(jobId:)`, `bulkActionCancel(jobId:)`, and `BulkJobCancelledError` / `BulkJobFailedError`. Synced mode waits for the server-side job to terminate before settling the mutation; pure-local mode is untouched.
 
 ### Internal
 
@@ -197,11 +197,11 @@ Released to consumers but not recorded here at the time — backfilled.
 
 ## [8.0.0] — 2026-05-17
 
-Combined major bump. Tags T-148 (`waitForCondition` promotion + SyncEngineTests split) and T-149 (DeviceFlow testability seams) which shipped to `main` after `v7.0.0` but were never released to consumers — T-149's DeviceFlow parameter rename drives the major. Also lands the post-T-131 carry-across: refreshed OpenAPI snapshot (61 → 68 paths), two new top-level namespaces (`client.admin`, `client.auth`), `source_id` on item updates, and the `createWithAttachments` helper.
+Combined major bump. Includes `waitForCondition` promotion, a SyncEngineTests split, and DeviceFlow testability seams that shipped to `main` after `v7.0.0` but were never released to consumers. The DeviceFlow parameter rename drives the major. Also lands the OAuth-surface carry-across: refreshed OpenAPI snapshot (61 → 68 paths), two new top-level namespaces (`client.admin`, `client.auth`), `source_id` on item updates, and the `createWithAttachments` helper.
 
 ### Added
 
-- **`client.admin`** (T-117, T-124) — platform-admin-only operator surface backing the `my admin` CLI command tree. Throws `LocalModeUnsupportedError` in pure-local mode; non-platform credentials get a `403 forbidden`.
+- **`client.admin`** — platform-admin-only operator surface backing the `my admin` CLI command tree. Throws `LocalModeUnsupportedError` in pure-local mode; non-platform credentials get a `403 forbidden`.
   - `client.admin.tenants.list()` — every tenant + status.
   - `client.admin.tenants.get(id:)` — single tenant + per-tenant quota overrides + recent activity.
   - `client.admin.tenants.suspend(id:)` / `unsuspend(id:)` — flip tenant `status`. Idempotent.
@@ -209,26 +209,26 @@ Combined major bump. Tags T-148 (`waitForCondition` promotion + SyncEngineTests 
   - `client.admin.tenants.keys(id:)` — active key listing for a tenant.
   - `client.admin.tenants.quotas.get(id:)` / `set(id:_:)` — per-tenant quota read/write.
   - `client.admin.accountDeletion.purgeNow()` — force a one-shot run of the pending-delete purger.
-- **`client.auth.account`** (T-116) — post-sign-in account-lifecycle endpoints. Distinct from `MarfaAuth` / `Passkey` / `DeviceFlow` which run the sign-in ceremony.
+- **`client.auth.account`** — post-sign-in account-lifecycle endpoints. Distinct from `MarfaAuth` / `Passkey` / `DeviceFlow` which run the sign-in ceremony.
   - `client.auth.account.requestDelete()` — initiate deletion (mints token + dispatches confirmation email).
   - `client.auth.account.confirmDelete(token:)` — programmatic equivalent of the confirmation-email link.
   - `client.auth.account.cancel()` — cancel an in-flight deletion.
-- **`client.items.createWithAttachments(_:)`** (T-100) — atomic host + attachment(s) write. Uploads every attachment's blob concurrently, then issues one `items.bulk` call with `mode: .createOnly` and `atomic: true`, and hydrates the host + attachments via per-id reads. Auto-edges from each attachment back to the host (default `attached-to`; configurable via `edgeType`). Caller-supplied edges merge additively. Throws annotated `MarfaError`s on per-step failure.
-- **`source_id` on item updates** (T-131, server v5.5.0) — `UpdateOptions.sourceId` and the underlying `UpdateItemBody.source_id` field. Renames the natural key under the item's `source`; server enforces `(source, source_id)` uniqueness with a fresh `source_id_conflict` 409 code (separate from the existing version-conflict path). Travels through the mutation queue + replay for synced-mode callers.
+- **`client.items.createWithAttachments(_:)`** — atomic host + attachment(s) write. Uploads every attachment's blob concurrently, then issues one `items.bulk` call with `mode: .createOnly` and `atomic: true`, and hydrates the host + attachments via per-id reads. Auto-edges from each attachment back to the host (default `attached-to`; configurable via `edgeType`). Caller-supplied edges merge additively. Throws annotated `MarfaError`s on per-step failure.
+- **`source_id` on item updates** (server v5.5.0) — `UpdateOptions.sourceId` and the underlying `UpdateItemBody.source_id` field. Renames the natural key under the item's `source`; server enforces `(source, source_id)` uniqueness with a fresh `source_id_conflict` 409 code (separate from the existing version-conflict path). Travels through the mutation queue + replay for synced-mode callers.
 - **SSE decode-failure logging.** Malformed SSE events now log on the `sync` category (`sync.sse.decode_failed event=... type=... reason=...`) rather than silently dropping via `try?`. Closes the "stream open, no events applied" invisible-failure mode.
 - **Structured `lastError` on dropped mutations.** `SyncEngine` formats the failing `MarfaError` into `code=... status=... message=... details={...}` rather than calling `error.localizedDescription`, preserving the structured code / status / details for downstream surfaces.
 
 ### Changed
 
-- **OpenAPI snapshot refreshed** to the post-T-131 monorepo spec. Only the three already-generated `ConflictResponse` / `ConflictSnapshot` / `MergePolicy` headers change (`anyOf/0` pointer redirect); all 28 wire types and 22 domain models regenerate byte-identical.
+- **OpenAPI snapshot refreshed** to the updated monorepo spec. Only the three already-generated `ConflictResponse` / `ConflictSnapshot` / `MergePolicy` headers change (`anyOf/0` pointer redirect); all 28 wire types and 22 domain models regenerate byte-identical.
 
 ### Breaking
 
-- **DeviceFlow parameter rename** (T-149) — `DeviceFlow.start(...)` and `DeviceFlowHandle` carry the testability seams (`DeviceFlowHTTPClient`, `DeviceFlowClock`) that shipped on main after v7.0.0. Callers depending on the older signature need to update; default-arg overloads cover the common case.
+- **DeviceFlow parameter rename** — `DeviceFlow.start(...)` and `DeviceFlowHandle` carry the testability seams (`DeviceFlowHTTPClient`, `DeviceFlowClock`) that shipped on main after v7.0.0. Callers depending on the older signature need to update; default-arg overloads cover the common case.
 
 ### Internal
 
-- **T-148 / T-149 already shipped to `main`** and are tagged here so consumer-app builds can pick them up.
+- **These changes already shipped to `main`** and are tagged here so consumer-app builds can pick them up.
 
 ## [5.2.0] — 2026-04-27
 
