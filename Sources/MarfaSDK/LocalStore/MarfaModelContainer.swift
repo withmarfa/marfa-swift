@@ -13,6 +13,8 @@ import os
 /// mirror the store through `NSPersistentCloudKitContainer`. The SwiftData
 /// schema is CloudKit-compatible regardless of the mode chosen.
 public enum MarfaModelContainer {
+    private static let creationLock = NSLock()
+
     /// Builds a container at `path`, or an in-memory container when `path`
     /// is `:memory:` (the contract used by every test that wants an
     /// ephemeral database).
@@ -27,6 +29,12 @@ public enum MarfaModelContainer {
         path: String,
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none
     ) throws -> ModelContainer {
+        // Core Data mutates process-global schema metadata while loading a
+        // persistent store. Concurrent ModelContainer initialisation can race
+        // inside that metadata setup and crash before Swift can report an error.
+        creationLock.lock()
+        defer { creationLock.unlock() }
+
         if path == ":memory:" {
             return try ModelContainer(
                 for: Schema(MarfaSchemaV2.models),

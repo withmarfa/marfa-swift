@@ -15,7 +15,7 @@ struct DeviceFlowPollingTests {
 
     // MARK: - Helpers
 
-    private static let issuer = URL(string: "https://example.test")!
+    private static let issuer = URL(string: "https://device-flow.example.test")!
 
     /// Builds a `DeviceFlowHandle` wired to per-test fakes. `expiresAt`
     /// defaults to 30 minutes ahead of the manual clock's `now()`.
@@ -31,7 +31,7 @@ struct DeviceFlowPollingTests {
             clientId: "test-client",
             deviceCode: "test-device-code",
             userCode: "ABCD-EFGH",
-            verificationURI: URL(string: "https://example.test/device")!,
+            verificationURI: URL(string: "https://device-flow.example.test/device")!,
             verificationURIComplete: nil,
             expiresAt: clock.now().addingTimeInterval(expiresIn),
             interval: initialInterval,
@@ -47,10 +47,10 @@ struct DeviceFlowPollingTests {
     /// polling tests don't need to script discovery responses for every
     /// case — discovery is exercised by the start() tests.
     private static let stubEndpoints = OAuthDiscovery.Endpoints(
-        token: URL(string: "https://example.test/auth/oauth2/token")!,
-        authorize: URL(string: "https://example.test/auth/oauth2/authorize")!,
-        revoke: URL(string: "https://example.test/auth/oauth2/revoke")!,
-        deviceAuthorize: URL(string: "https://example.test/auth/device")!
+        token: URL(string: "https://device-flow.example.test/auth/oauth2/token")!,
+        authorize: URL(string: "https://device-flow.example.test/auth/oauth2/authorize")!,
+        revoke: URL(string: "https://device-flow.example.test/auth/oauth2/revoke")!,
+        deviceAuthorize: URL(string: "https://device-flow.example.test/auth/device")!
     )
 
     /// Wire-shape discovery doc the SDK reads on first `start()` call.
@@ -100,7 +100,7 @@ struct DeviceFlowPollingTests {
         // Cadence held steady — authorization_pending must not escalate.
         #expect(clock.recordedSleeps == [5, 5])
         // Token persisted under the issuer+client storage key.
-        let stored = await storage.peek(account: "marfa.auth.tokens:example.test:test-client")
+        let stored = await storage.peek(account: "marfa.auth.tokens:device-flow.example.test:test-client")
         #expect(stored != nil)
         #expect(stored?.contains("real-access-token") == true)
     }
@@ -224,7 +224,7 @@ struct DeviceFlowPollingTests {
             clientId: "test-client",
             deviceCode: "code",
             userCode: "ABCD-EFGH",
-            verificationURI: URL(string: "https://example.test/device")!,
+            verificationURI: URL(string: "https://device-flow.example.test/device")!,
             verificationURIComplete: nil,
             expiresAt: clock.now().addingTimeInterval(-1),
             interval: 5,
@@ -294,8 +294,8 @@ struct DeviceFlowPollingTests {
         http.enqueueDeviceCodeResponse(
             deviceCode: "DC-1234",
             userCode: "WDJB-MJHT",
-            verificationURI: "https://example.test/device",
-            verificationURIComplete: "https://example.test/device?user_code=WDJB-MJHT",
+            verificationURI: "https://device-flow.example.test/device",
+            verificationURIComplete: "https://device-flow.example.test/device?user_code=WDJB-MJHT",
             expiresInSeconds: 1800,
             interval: 5
         )
@@ -310,8 +310,8 @@ struct DeviceFlowPollingTests {
         )
 
         #expect(handle.userCode == "WDJB-MJHT")
-        #expect(handle.verificationURI == URL(string: "https://example.test/device"))
-        #expect(handle.verificationURIComplete == URL(string: "https://example.test/device?user_code=WDJB-MJHT"))
+        #expect(handle.verificationURI == URL(string: "https://device-flow.example.test/device"))
+        #expect(handle.verificationURIComplete == URL(string: "https://device-flow.example.test/device?user_code=WDJB-MJHT"))
         #expect(handle.expiresAt == clock.now().addingTimeInterval(1800))
 
         // Request shape: discovery first, then POST /auth/device with
@@ -401,6 +401,6 @@ struct DeviceFlowPollingTests {
         )
 
         #expect(handle.verificationURIComplete == nil)
-        #expect(handle.verificationURI == URL(string: "https://example.test/device"))
+        #expect(handle.verificationURI == URL(string: "https://device-flow.example.test/device"))
     }
 }

@@ -77,12 +77,19 @@ public actor OAuthDiscovery {
         }
     }
 
-    /// Test-only — clears the in-actor cache. Production callers never
-    /// need this; the cache is correct by construction for process
-    /// lifetime.
-    public func reset() {
-        cache.removeAll()
-        inflight.removeAll()
+    /// Test-only cache reset. Pass an issuer when tests run in parallel so
+    /// one suite cannot evict another suite's discovery task or cached value.
+    /// Production callers never need this; the cache is correct by
+    /// construction for process lifetime.
+    public func reset(for issuer: URL? = nil) {
+        guard let issuer else {
+            cache.removeAll()
+            inflight.removeAll()
+            return
+        }
+        let key = Self.normalize(issuer).absoluteString
+        cache.removeValue(forKey: key)
+        inflight.removeValue(forKey: key)
     }
 
     // MARK: - Internals

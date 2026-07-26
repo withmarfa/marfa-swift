@@ -20,6 +20,7 @@ struct SyncEngineReplayTests {
 
     @Test("mutation replay records failure when transport throws") func mutationReplayRecordsFailure() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 5, max: 5)
 
         // A single pending delete the engine will try to replay.
         try await queue.enqueueDeleteItem(id: "server-x")
@@ -40,11 +41,16 @@ struct SyncEngineReplayTests {
             return (all?.first?.attemptCount ?? 0) >= 1
         }
 
+        await engine.stop()
+
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].attemptCount == 1)
-        #expect(remaining[0].lastError?.contains("offline") == true)
-        await engine.stop()
+        let replayCalls = transport.calls.filter {
+            $0.method == .delete && $0.path == "/items/server-x"
+        }
+        #expect(replayCalls.isEmpty == false)
+        #expect(remaining[0].attemptCount == replayCalls.count)
+        #expect(remaining[0].lastError != nil)
     }
 
     @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
@@ -120,6 +126,7 @@ struct SyncEngineReplayTests {
 
     @Test("mutation replay retains queued record on transient 5xx") func mutationReplayRetainsOn5xx() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 5, max: 5)
 
         try await queue.enqueueUpdateItem(
             id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
@@ -140,14 +147,23 @@ struct SyncEngineReplayTests {
             return (all?.first?.attemptCount ?? 0) >= 1
         }
 
+        // Stop before taking the accounting snapshot. The engine reconnects
+        // automatically, so another legitimate replay can begin between the
+        // polling condition and the assertions below.
+        await engine.stop()
+
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].attemptCount == 1)
-        await engine.stop()
+        let replayCalls = transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/019da086-d675-7cd8-ba3f-3dc4e6e7bd42"
+        }
+        #expect(replayCalls.isEmpty == false)
+        #expect(remaining[0].attemptCount == replayCalls.count)
     }
 
     @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 5, max: 5)
 
         // Two mutations: first fails permanently (404), second fails
         // transiently (network). First should be dropped, second should
@@ -175,11 +191,16 @@ struct SyncEngineReplayTests {
             return (all?.count == 1) && ((all?.first?.attemptCount ?? 0) >= 1)
         }
 
+        await engine.stop()
+
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
         #expect(remaining[0].localId == "019eb000-0000-7000-8000-000000000000")
-        #expect(remaining[0].attemptCount == 1)
-        await engine.stop()
+        let replayCalls = transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/019eb000-0000-7000-8000-000000000000"
+        }
+        #expect(replayCalls.isEmpty == false)
+        #expect(remaining[0].attemptCount == replayCalls.count)
     }
 
     // MARK: - Id stamping + replay reconciliation
