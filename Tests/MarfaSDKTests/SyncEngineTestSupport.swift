@@ -150,3 +150,75 @@ actor BlockingTransport: Transport {
         return eventStreams.removeFirst()
     }
 }
+
+// Cancellation-resistant replay transport used to prove `SyncEngine.stop()`
+// waits for an already-started mutation attempt to finish accounting.
+actor BlockingReplayTransport: Transport {
+    private var requestContinuation: CheckedContinuation<Void, Never>?
+    private var requestStarted = false
+    private var requestStartedWaiters: [CheckedContinuation<Void, Never>] = []
+    private(set) var requestCallCount = 0
+
+    func waitUntilRequestStarted() async {
+        if requestStarted { return }
+        await withCheckedContinuation { continuation in
+            requestStartedWaiters.append(continuation)
+        }
+    }
+
+    func releaseRequest() {
+        requestContinuation?.resume()
+        requestContinuation = nil
+    }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        requestCallCount += 1
+        requestStarted = true
+        for waiter in requestStartedWaiters { waiter.resume() }
+        requestStartedWaiters.removeAll()
+        await withCheckedContinuation { continuation in
+            requestContinuation = continuation
+        }
+        throw NetworkError(
+            NSError(
+                domain: "stop-barrier-test",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "released failure"]
+            )
+        )
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        fatalError("BlockingReplayTransport: requestWithConflict not supported")
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        fatalError("BlockingReplayTransport: rawRequest not supported")
+    }
+
+    nonisolated func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
+    }
+}

@@ -29,12 +29,23 @@ public enum MarfaModelContainer {
         path: String,
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none
     ) throws -> ModelContainer {
-        // Core Data mutates process-global schema metadata while loading a
-        // persistent store. Concurrent ModelContainer initialisation can race
-        // inside that metadata setup and crash before Swift can report an error.
-        creationLock.lock()
-        defer { creationLock.unlock() }
+        try withCreationLock {
+            try makeUnlocked(path: path, cloudKitDatabase: cloudKitDatabase)
+        }
+    }
 
+    /// Coordinates every ModelContainer constructor owned by this package.
+    /// Tests that must build an older schema use the same internal boundary.
+    /// Containers created directly by consumers are outside SDK ownership;
+    /// callers should use ``make(path:cloudKitDatabase:)`` when possible.
+    internal static func withCreationLock<T>(_ operation: () throws -> T) rethrows -> T {
+        try creationLock.withLock(operation)
+    }
+
+    private static func makeUnlocked(
+        path: String,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase
+    ) throws -> ModelContainer {
         if path == ":memory:" {
             return try ModelContainer(
                 for: Schema(MarfaSchemaV2.models),

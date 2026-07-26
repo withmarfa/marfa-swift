@@ -32,7 +32,11 @@ public actor OAuthDiscovery {
 
     private let path = "/.well-known/oauth-authorization-server"
     private var cache: [String: Endpoints] = [:]
-    private var inflight: [String: Task<Endpoints, Error>] = [:]
+    private struct InflightRequest {
+        let id: UUID
+        let task: Task<Endpoints, Error>
+    }
+    private var inflight: [String: InflightRequest] = [:]
 
     public init() {}
 
@@ -52,9 +56,10 @@ public actor OAuthDiscovery {
         if let cached = cache[key.absoluteString] {
             return cached
         }
-        if let task = inflight[key.absoluteString] {
-            return try await task.value
+        if let request = inflight[key.absoluteString] {
+            return try await request.task.value
         }
+        let requestID = UUID()
         let task = Task { [path] in
             try await Self.fetchEndpoints(
                 issuer: key,
@@ -62,46 +67,57 @@ public actor OAuthDiscovery {
                 httpClient: httpClient
             )
         }
-        inflight[key.absoluteString] = task
+        inflight[key.absoluteString] = InflightRequest(id: requestID, task: task)
         do {
             let resolved = try await task.value
-            cache[key.absoluteString] = resolved
-            inflight.removeValue(forKey: key.absoluteString)
+            // A test reset may have cancelled and replaced this request while
+            // its HTTP client ignored cancellation. Only the request that still
+            // owns the key may publish into the cache or clear the in-flight slot.
+            if inflight[key.absoluteString]?.id == requestID {
+                cache[key.absoluteString] = resolved
+                inflight.removeValue(forKey: key.absoluteString)
+            }
             return resolved
         } catch {
             // Evict the inflight entry on failure so a later call can
             // retry — a stuck failed task would permanently break the
             // SDK after a single network blip.
-            inflight.removeValue(forKey: key.absoluteString)
+            if inflight[key.absoluteString]?.id == requestID {
+                inflight.removeValue(forKey: key.absoluteString)
+            }
             throw error
         }
     }
 
-    /// Test-only cache reset. Pass an issuer when tests run in parallel so
-    /// one suite cannot evict another suite's discovery task or cached value.
-    /// Production callers never need this; the cache is correct by
-    /// construction for process lifetime.
-    public func reset(for issuer: URL? = nil) {
-        guard let issuer else {
-            cache.removeAll()
-            inflight.removeAll()
-            return
+    /// Test-only — clears every cached issuer while preserving the original
+    /// public symbol for source and binary compatibility.
+    public func reset() {
+        for request in inflight.values {
+            request.task.cancel()
         }
+        cache.removeAll()
+        inflight.removeAll()
+    }
+
+    /// Issuer-scoped test seam. Internal so cache control does not expand the
+    /// SDK's public API; package tests reach it through `@testable import`.
+    internal func reset(for issuer: URL) {
         let key = Self.normalize(issuer).absoluteString
         cache.removeValue(forKey: key)
-        inflight.removeValue(forKey: key)
+        inflight.removeValue(forKey: key)?.task.cancel()
     }
 
     // MARK: - Internals
 
     private static func normalize(_ url: URL) -> URL {
-        // Use the origin (scheme + host + port). Trailing-slash strip
-        // is implicit since URL absoluteString excludes path when there
-        // isn't one. For URLs with paths, fall back to the original.
-        var components = URLComponents()
-        components.scheme = url.scheme?.lowercased()
-        components.host = url.host?.lowercased()
-        components.port = url.port
+        // OAuth issuer identifiers may contain a path. Preserve the complete
+        // identifier while canonicalising only the case-insensitive URL parts;
+        // reducing to an origin would merge distinct tenant issuers.
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
         return components.url ?? url
     }
 

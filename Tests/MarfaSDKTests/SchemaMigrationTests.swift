@@ -41,16 +41,18 @@ struct SchemaMigrationTests {
     /// V2 migration test reopens it.
     private func makeV1ContainerOnDisk(at path: String) throws -> ModelContainer {
         let url = URL(fileURLWithPath: path)
-        return try ModelContainer(
-            for: Schema(MarfaSchemaV1.models),
-            configurations: ModelConfiguration(
-                "marfa",
-                schema: Schema(MarfaSchemaV1.models),
-                url: url,
-                allowsSave: true,
-                cloudKitDatabase: .none
+        return try MarfaModelContainer.withCreationLock {
+            try ModelContainer(
+                for: Schema(MarfaSchemaV1.models),
+                configurations: ModelConfiguration(
+                    "marfa",
+                    schema: Schema(MarfaSchemaV1.models),
+                    url: url,
+                    allowsSave: true,
+                    cloudKitDatabase: .none
+                )
             )
-        )
+        }
     }
 
     @Test("V1 store opens cleanly under the V2 migration plan and rows survive")

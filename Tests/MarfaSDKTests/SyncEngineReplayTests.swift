@@ -48,9 +48,42 @@ struct SyncEngineReplayTests {
         let replayCalls = transport.calls.filter {
             $0.method == .delete && $0.path == "/items/server-x"
         }
-        #expect(replayCalls.isEmpty == false)
-        #expect(remaining[0].attemptCount == replayCalls.count)
-        #expect(remaining[0].lastError != nil)
+        #expect(replayCalls.count == 1)
+        #expect(remaining[0].attemptCount == 1)
+        #expect(remaining[0].lastError?.contains("offline") == true)
+    }
+
+    @Test("stop waits for in-flight replay accounting to finish")
+    func stopIsQuiescenceBarrier() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-stop")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        #expect(await transport.requestCallCount == 1)
+
+        await transport.releaseRequest()
+        await stopTask.value
+
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].attemptCount == 1)
+        #expect(remaining[0].lastError?.contains("released failure") == true)
+        #expect(await transport.requestCallCount == 1)
     }
 
     @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
@@ -157,8 +190,8 @@ struct SyncEngineReplayTests {
         let replayCalls = transport.calls.filter {
             $0.method == .patch && $0.path == "/items/019da086-d675-7cd8-ba3f-3dc4e6e7bd42"
         }
-        #expect(replayCalls.isEmpty == false)
-        #expect(remaining[0].attemptCount == replayCalls.count)
+        #expect(replayCalls.count == 1)
+        #expect(remaining[0].attemptCount == 1)
     }
 
     @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
@@ -199,8 +232,8 @@ struct SyncEngineReplayTests {
         let replayCalls = transport.calls.filter {
             $0.method == .patch && $0.path == "/items/019eb000-0000-7000-8000-000000000000"
         }
-        #expect(replayCalls.isEmpty == false)
-        #expect(remaining[0].attemptCount == replayCalls.count)
+        #expect(replayCalls.count == 1)
+        #expect(remaining[0].attemptCount == 1)
     }
 
     // MARK: - Id stamping + replay reconciliation

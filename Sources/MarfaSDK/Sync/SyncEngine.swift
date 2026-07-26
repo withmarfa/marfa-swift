@@ -84,6 +84,7 @@ public actor SyncEngine {
     // MARK: - Internals
 
     private var streamTask: Task<Void, Never>?
+    private var stoppingTask: Task<Void, Never>?
     private var running = false
 
     /// Child task listening to `mutationQueue.drainRequests`. Feeds
@@ -294,6 +295,9 @@ public actor SyncEngine {
     /// updates; without this the engine's run loop would await on an inert
     /// stream stuck at `.offline`.
     public func start() async {
+        if let stoppingTask {
+            await stoppingTask.value
+        }
         guard !running else { return }
         running = true
         await connectionManager.start()
@@ -309,16 +313,40 @@ public actor SyncEngine {
     /// the underlying ``ConnectionStateManager`` so `NWPathMonitor` releases
     /// its queue and any open `stateUpdates` streams finish.
     public func stop() async {
+        if let stoppingTask {
+            await stoppingTask.value
+            return
+        }
+
         running = false
+        let streamTask = self.streamTask
+        let drainListenerTask = self.drainListenerTask
+        let drainDebounceTask = self.drainDebounceTask
+        let reconnectTask = self.reconnectTask
         streamTask?.cancel()
-        streamTask = nil
+        self.streamTask = nil
         drainListenerTask?.cancel()
-        drainListenerTask = nil
+        self.drainListenerTask = nil
         drainDebounceTask?.cancel()
-        drainDebounceTask = nil
+        self.drainDebounceTask = nil
         reconnectTask?.cancel()
-        reconnectTask = nil
-        await connectionManager.stop()
+        self.reconnectTask = nil
+
+        let connectionManager = self.connectionManager
+        let barrier = Task { @concurrent in
+            // Finish the source streams first so listener tasks can unwind,
+            // then await every task that was owned by this engine generation.
+            // Cancellation is cooperative: awaiting the values is what makes
+            // stop() a quiescence boundary rather than a cancellation request.
+            await connectionManager.stop()
+            await streamTask?.value
+            await drainListenerTask?.value
+            await drainDebounceTask?.value
+            await reconnectTask?.value
+        }
+        stoppingTask = barrier
+        await barrier.value
+        stoppingTask = nil
     }
 
     /// Performs a one-shot catch-up import: paginates through `GET
@@ -484,9 +512,8 @@ public actor SyncEngine {
         }
 
         await replayMutations()
-        if running {
-            await connectionManager.markOnline()
-        }
+        guard running else { return }
+        await connectionManager.markOnline()
 
         // Reconnect nudge. Without this, a closed-but-not-errored SSE stream
         // (server-side idle timeout, catchup_too_old finalize, transport
@@ -567,6 +594,11 @@ public actor SyncEngine {
     internal func setReconnectDelaysForTesting(base: TimeInterval, max: TimeInterval) {
         self.reconnectBaseDelay = base
         self.reconnectMaxDelay = max
+    }
+
+    /// Observation-only seam for deterministic stop-barrier coverage.
+    internal var isStoppingForTesting: Bool {
+        stoppingTask != nil
     }
 
     // MARK: - Event application

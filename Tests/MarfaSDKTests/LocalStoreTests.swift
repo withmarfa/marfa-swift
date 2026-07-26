@@ -55,6 +55,22 @@ struct LocalStoreTests {
         _ = try MarfaModelContainer.make(path: ":memory:")
     }
 
+    @Test("concurrent SDK container construction remains serialized")
+    func concurrentContainerConstruction() async throws {
+        // Several waves keep every call on the public SDK factory while
+        // forcing construction requests to overlap at the task boundary.
+        for _ in 0..<5 {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for _ in 0..<16 {
+                    group.addTask {
+                        _ = try MarfaModelContainer.make(path: ":memory:")
+                    }
+                }
+                try await group.waitForAll()
+            }
+        }
+    }
+
     // MARK: - Item CRUD (via LocalStore directly)
 
     @Test("createItem generates an ID and stores the item") func createItem() async throws {
