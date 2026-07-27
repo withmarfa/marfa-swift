@@ -14,17 +14,20 @@ struct OAuthDiscoveryTests {
     private let issuer = uniqueIssuer("oauth-discovery")
 
     private struct DiscoveryDoc: Encodable {
+        let issuer: String
         let authorization_endpoint: String?
         let token_endpoint: String?
         let revocation_endpoint: String?
         let device_authorization_endpoint: String?
 
         init(
+            issuer: String = "https://example.test",
             authorize: String? = "https://example.test/auth/oauth2/authorize",
             token: String? = "https://example.test/auth/oauth2/token",
             revoke: String? = "https://example.test/auth/oauth2/revoke",
             deviceAuthorize: String? = "https://example.test/auth/device"
         ) {
+            self.issuer = issuer
             self.authorization_endpoint = authorize
             self.token_endpoint = token
             self.revocation_endpoint = revoke
@@ -87,7 +90,7 @@ struct OAuthDiscoveryTests {
         #expect(endpoints.revoke == URL(string: "https://example.test/auth/oauth2/revoke"))
         #expect(endpoints.deviceAuthorize == URL(string: "https://example.test/auth/device"))
         #expect(http.calls.count == 1)
-        #expect(http.calls[0].url?.path == "/.well-known/oauth-authorization-server")
+        #expect(http.calls[0].url == URL(string: "https://example.test/.well-known/oauth-authorization-server"))
     }
 
     @Test("caches the result across sequential calls")
@@ -132,6 +135,32 @@ struct OAuthDiscoveryTests {
         }
     }
 
+    @Test("requires the metadata issuer")
+    func missingIssuerThrows() async throws {
+        let http = FakeDeviceFlowHTTPClient()
+        http.enqueue(
+            data: Data(#"{"token_endpoint":"https://example.test/token"}"#.utf8)
+        )
+
+        await #expect(throws: OAuthDiscoveryError.self) {
+            _ = try await OAuthDiscovery.shared.endpoints(for: issuer, httpClient: http)
+        }
+    }
+
+    @Test("rejects a metadata issuer that does not match the requested issuer")
+    func issuerMismatchThrows() async throws {
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(DiscoveryDoc(issuer: "https://other.example.test"))
+
+        do {
+            _ = try await OAuthDiscovery.shared.endpoints(for: issuer, httpClient: http)
+            Issue.record("expected metadata issuer mismatch")
+        } catch let error as OAuthDiscoveryError {
+            #expect(error.description.contains("https://other.example.test"))
+            #expect(error.description.contains("does not match"))
+        }
+    }
+
     @Test("evicts the cache on rejection so a later call retries")
     func cacheEvictedOnFailure() async throws {
         let http = FakeDeviceFlowHTTPClient()
@@ -159,12 +188,14 @@ struct OAuthDiscoveryTests {
         let httpA = FakeDeviceFlowHTTPClient()
         let httpB = FakeDeviceFlowHTTPClient()
         try httpA.enqueueJSON(DiscoveryDoc(
+            issuer: "https://multi-issuer.test/tenant-a",
             authorize: "https://multi-issuer.test/tenant-a/authorize",
             token: "https://multi-issuer.test/tenant-a/token",
             revoke: "https://multi-issuer.test/tenant-a/revoke",
             deviceAuthorize: "https://multi-issuer.test/tenant-a/device"
         ))
         try httpB.enqueueJSON(DiscoveryDoc(
+            issuer: "https://multi-issuer.test/tenant-b",
             authorize: "https://multi-issuer.test/tenant-b/authorize",
             token: "https://multi-issuer.test/tenant-b/token",
             revoke: "https://multi-issuer.test/tenant-b/revoke",
@@ -175,6 +206,8 @@ struct OAuthDiscoveryTests {
         let endpointsB = try await discovery.endpoints(for: issuerB, httpClient: httpB)
         #expect(endpointsA.token.path == "/tenant-a/token")
         #expect(endpointsB.token.path == "/tenant-b/token")
+        #expect(httpA.calls.first?.url == URL(string: "https://multi-issuer.test/.well-known/oauth-authorization-server/tenant-a"))
+        #expect(httpB.calls.first?.url == URL(string: "https://multi-issuer.test/.well-known/oauth-authorization-server/tenant-b"))
 
         await discovery.reset(for: issuerA)
         let unusedHTTP = FakeDeviceFlowHTTPClient()
@@ -188,6 +221,7 @@ struct OAuthDiscoveryTests {
         let discovery = OAuthDiscovery()
         let issuer = URL(string: "https://oauth-reset.test/tenant")!
         let staleHTTP = try SuspendedDiscoveryHTTPClient(DiscoveryDoc(
+            issuer: "https://oauth-reset.test/tenant",
             authorize: "https://stale.test/authorize",
             token: "https://stale.test/token",
             revoke: "https://stale.test/revoke",
@@ -201,6 +235,7 @@ struct OAuthDiscoveryTests {
         await discovery.reset(for: issuer)
         let freshHTTP = FakeDeviceFlowHTTPClient()
         try freshHTTP.enqueueJSON(DiscoveryDoc(
+            issuer: "https://oauth-reset.test/tenant",
             authorize: "https://fresh.test/authorize",
             token: "https://fresh.test/token",
             revoke: "https://fresh.test/revoke",

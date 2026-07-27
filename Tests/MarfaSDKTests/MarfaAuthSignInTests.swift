@@ -94,16 +94,17 @@ private func makeStubbedSession() -> URLSession {
 /// Stub well-known discovery doc — the SDK reads this on first OAuth
 /// operation. Tests queue it ahead of their scripted token/revoke
 /// responses.
-private func discoveryCanned() -> MarfaAuthStubURLProtocol.Canned {
-    let body = #"""
+private func discoveryCanned(for issuer: URL) -> MarfaAuthStubURLProtocol.Canned {
+    let base = issuer.absoluteString
+    let body = """
     {
-      "issuer": "https://staging.marfa.so",
-      "authorization_endpoint": "https://staging.marfa.so/auth/oauth2/authorize",
-      "token_endpoint": "https://staging.marfa.so/auth/oauth2/token",
-      "revocation_endpoint": "https://staging.marfa.so/auth/oauth2/revoke",
-      "device_authorization_endpoint": "https://staging.marfa.so/auth/device"
+      "issuer": "\(base)",
+      "authorization_endpoint": "\(base)/auth/oauth2/authorize",
+      "token_endpoint": "\(base)/auth/oauth2/token",
+      "revocation_endpoint": "\(base)/auth/oauth2/revoke",
+      "device_authorization_endpoint": "\(base)/auth/device"
     }
-    """#
+    """
     return .init(
         statusCode: 200,
         headers: ["Content-Type": "application/json"],
@@ -143,13 +144,13 @@ struct MarfaAuthSignInTests {
     func authorizeURLParameters() throws {
         let auth = makeAuth(session: makeStubbedSession())
         let url = try auth.buildAuthorizeURL(
-            authorize: URL(string: "https://staging.marfa.so/auth/oauth2/authorize")!,
+            authorize: URL(string: "https://auth-sign-in.example.test/auth/oauth2/authorize")!,
             challenge: "challenge-abc",
             state: "state-xyz"
         )
 
         #expect(url.scheme == "https")
-        #expect(url.host == "staging.marfa.so")
+        #expect(url.host == "auth-sign-in.example.test")
         #expect(url.path == "/auth/oauth2/authorize")
 
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
@@ -174,7 +175,7 @@ struct MarfaAuthSignInTests {
             urlSession: makeStubbedSession()
         )
         let url = try auth.buildAuthorizeURL(
-            authorize: URL(string: "https://staging.marfa.so/auth/oauth2/authorize")!,
+            authorize: URL(string: "https://auth-sign-in.example.test/auth/oauth2/authorize")!,
             challenge: "c",
             state: "s"
         )
@@ -265,7 +266,7 @@ struct MarfaAuthSignInTests {
         let token = try await auth.exchangeCode(
             code: "auth-code-123",
             verifier: "verifier-xyz",
-            tokenEndpoint: URL(string: "https://staging.marfa.so/auth/oauth2/token")!
+            tokenEndpoint: URL(string: "https://auth-sign-in.example.test/auth/oauth2/token")!
         )
 
         #expect(token.accessToken == "marfa_at_aaa")
@@ -304,7 +305,7 @@ struct MarfaAuthSignInTests {
             _ = try await auth.exchangeCode(
                 code: "c",
                 verifier: "v",
-                tokenEndpoint: URL(string: "https://staging.marfa.so/auth/oauth2/token")!
+                tokenEndpoint: URL(string: "https://auth-sign-in.example.test/auth/oauth2/token")!
             )
             Issue.record("expected OAuthError(invalid_grant)")
         } catch let error as OAuthError {
@@ -331,7 +332,7 @@ struct MarfaAuthSignInTests {
         try await storage.set(json, for: key)
 
         // restore() runs OAuth discovery to resolve the refresh endpoint.
-        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned()])
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: issuer)])
 
         let auth = makeAuth(session: makeStubbedSession(), storage: storage)
         let provider = try await auth.restore()
@@ -339,6 +340,102 @@ struct MarfaAuthSignInTests {
         #expect(provider != nil)
         let token = try await provider!.currentToken()
         #expect(token.accessToken == "a")
+    }
+
+    @Test("issuer identity isolates PKCE state and restored tokens")
+    func issuerIdentityIsolatesPendingAndTokens() async throws {
+        let storage = InMemoryKeychain()
+        let issuerA = URL(string: "https://tenant-auth.example.test:8443/tenant-a")!
+        let issuerB = URL(string: "http://tenant-auth.example.test:9443/tenant-b")!
+        let authA = MarfaAuth(
+            issuer: issuerA,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+        let authB = MarfaAuth(
+            issuer: issuerB,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+
+        try await authA.persistPendingForTesting(verifier: "verifier-a", state: "state-a")
+        try await authB.persistPendingForTesting(verifier: "verifier-b", state: "state-b")
+        #expect(await storage.peek(account: "marfa.auth.pending:https://tenant-auth.example.test:8443/tenant-a:test-client")?.contains("verifier-a") == true)
+        #expect(await storage.peek(account: "marfa.auth.pending:http://tenant-auth.example.test:9443/tenant-b:test-client")?.contains("verifier-b") == true)
+
+        let tokenA = #"{"access_token":"token-a","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        let tokenB = #"{"access_token":"token-b","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        try await storage.set(tokenA, for: "marfa.auth.tokens:https://tenant-auth.example.test:8443/tenant-a:test-client")
+        try await storage.set(tokenB, for: "marfa.auth.tokens:http://tenant-auth.example.test:9443/tenant-b:test-client")
+        await OAuthDiscovery.shared.reset(for: issuerA)
+        await OAuthDiscovery.shared.reset(for: issuerB)
+        MarfaAuthStubURLProtocol.reset(with: [
+            discoveryCanned(for: issuerA),
+            discoveryCanned(for: issuerB),
+        ])
+
+        let providerA = try #require(await authA.restore())
+        let providerB = try #require(await authB.restore())
+        #expect(try await providerA.currentToken().accessToken == "token-a")
+        #expect(try await providerB.currentToken().accessToken == "token-b")
+    }
+
+    @Test("restore migrates an origin-only token key")
+    func restoreMigratesLegacyTokenKey() async throws {
+        let storage = InMemoryKeychain()
+        let pathIssuer = URL(string: "https://tenant-auth.example.test:8443/legacy")!
+        let legacyKey = "marfa.auth.tokens:tenant-auth.example.test:test-client"
+        let canonicalKey = "marfa.auth.tokens:https://tenant-auth.example.test:8443/legacy:test-client"
+        let token = #"{"access_token":"legacy-token","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        try await storage.set(token, for: legacyKey)
+        await OAuthDiscovery.shared.reset(for: pathIssuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: pathIssuer)])
+        let auth = MarfaAuth(
+            issuer: pathIssuer,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+
+        let provider = try #require(await auth.restore())
+        #expect(try await provider.currentToken().accessToken == "legacy-token")
+        #expect(await storage.peek(account: canonicalKey) == token)
+        #expect(await storage.peek(account: legacyKey) == nil)
+    }
+
+    @Test("restore keeps a canonical token when a legacy key also exists")
+    func restorePrefersCanonicalTokenKey() async throws {
+        let storage = InMemoryKeychain()
+        let pathIssuer = URL(string: "https://tenant-auth.example.test:8443/canonical")!
+        let legacyKey = "marfa.auth.tokens:tenant-auth.example.test:test-client"
+        let canonicalKey = "marfa.auth.tokens:https://tenant-auth.example.test:8443/canonical:test-client"
+        let legacyToken = #"{"access_token":"legacy","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        let canonicalToken = #"{"access_token":"canonical","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        try await storage.set(legacyToken, for: legacyKey)
+        try await storage.set(canonicalToken, for: canonicalKey)
+        await OAuthDiscovery.shared.reset(for: pathIssuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: pathIssuer)])
+        let auth = MarfaAuth(
+            issuer: pathIssuer,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+
+        let provider = try #require(await auth.restore())
+        #expect(try await provider.currentToken().accessToken == "canonical")
+        #expect(await storage.peek(account: canonicalKey) == canonicalToken)
+        #expect(await storage.peek(account: legacyKey) == legacyToken)
     }
 }
 

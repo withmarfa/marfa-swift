@@ -25,26 +25,29 @@ public actor ConnectionStateManager {
 
     // MARK: - NWPathMonitor plumbing
 
-    private let monitor: NWPathMonitor
+    private var monitor: NWPathMonitor?
     private let monitorQueue = DispatchQueue(label: "marfa.sdk.path_monitor", qos: .utility)
     private var started = false
+    private var monitoringGeneration: UUID?
 
     // MARK: - Init
 
-    public init() {
-        monitor = NWPathMonitor()
-    }
+    public init() {}
 
     // MARK: - Lifecycle
 
     /// Starts monitoring. Idempotent — calling again while already started is a no-op.
     public func start() {
         guard !started else { return }
+        let monitor = NWPathMonitor()
+        let generation = UUID()
+        self.monitor = monitor
         started = true
+        monitoringGeneration = generation
         monitor.pathUpdateHandler = { [weak self] path in
             // Bridge from DispatchQueue into the actor.
             Task { [weak self] in
-                await self?.handlePath(path)
+                await self?.handlePath(path, generation: generation)
             }
         }
         monitor.start(queue: monitorQueue)
@@ -52,7 +55,11 @@ public actor ConnectionStateManager {
 
     /// Stops monitoring and terminates all open ``stateUpdates`` streams.
     public func stop() {
-        monitor.cancel()
+        started = false
+        monitoringGeneration = nil
+        monitor?.cancel()
+        monitor = nil
+        applyState(.offline)
         for continuation in continuations.values {
             continuation.finish()
         }
@@ -117,7 +124,11 @@ public actor ConnectionStateManager {
 
     // MARK: - Private
 
-    private func handlePath(_ path: NWPath) {
+    private func handlePath(_ path: NWPath, generation: UUID) {
+        // A cancelled monitor may already have queued an update. Ignore it so
+        // stop() remains terminal for that monitoring lifecycle, even if a
+        // later start() has installed a replacement monitor.
+        guard started, monitoringGeneration == generation else { return }
         let next: ConnectionState = path.status == .satisfied ? .connecting : .offline
         applyState(next)
     }

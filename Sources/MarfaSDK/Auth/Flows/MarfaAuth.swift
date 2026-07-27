@@ -66,6 +66,7 @@ public final class MarfaAuth {
     private let urlSession: URLSession
     private let pendingKey: String
     private let tokensKey: String
+    private let legacyTokensKey: String
 
     public init(
         issuer: URL,
@@ -75,15 +76,27 @@ public final class MarfaAuth {
         storage: any SecureStorage,
         urlSession: URLSession = .shared
     ) {
-        self.issuer = MarfaAuth.normalizeIssuer(issuer)
+        self.issuer = OAuthIssuer.normalize(issuer)
         self.clientId = clientId
         self.redirectURI = redirectURI
         self.scopes = scopes
         self.storage = storage
         self.urlSession = urlSession
-        let origin = self.issuer.host ?? self.issuer.absoluteString
-        self.pendingKey = "marfa.auth.pending:\(origin):\(clientId)"
-        self.tokensKey = "marfa.auth.tokens:\(origin):\(clientId)"
+        self.pendingKey = OAuthIssuer.storageKey(
+            kind: "pending",
+            issuer: self.issuer,
+            clientId: clientId
+        )
+        self.tokensKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: self.issuer,
+            clientId: clientId
+        )
+        self.legacyTokensKey = OAuthIssuer.legacyStorageKey(
+            kind: "tokens",
+            issuer: issuer,
+            clientId: clientId
+        )
     }
 
     /// Drives the full Authorization Code + PKCE flow and returns a
@@ -149,6 +162,11 @@ public final class MarfaAuth {
     /// Returns a ``TokenProvider`` backed by any token already persisted
     /// for this `(issuer, clientId)` pair, or `nil` when storage is empty.
     public func restore() async throws -> TokenProvider? {
+        _ = try await OAuthIssuer.migrateLegacyValueIfNeeded(
+            in: storage,
+            canonicalKey: tokensKey,
+            legacyKey: legacyTokensKey
+        )
         guard try await storage.get(for: tokensKey) != nil else { return nil }
         let endpoints = try await OAuthDiscovery.shared.endpoints(
             for: issuer,
@@ -200,18 +218,25 @@ public final class MarfaAuth {
         )
     }
 
-    private static func normalizeIssuer(_ url: URL) -> URL {
-        var s = url.absoluteString
-        while s.hasSuffix("/") { s.removeLast() }
-        return URL(string: s) ?? url
-    }
-
     private func persist(_ pending: PendingState) async throws {
         let data = try JSONEncoder().encode(pending)
         guard let json = String(data: data, encoding: .utf8) else {
             throw OAuthError(rawCode: "encoding_failed", message: "could not encode pending state", status: 500)
         }
         try await storage.set(json, for: pendingKey)
+    }
+
+    /// Test seam for asserting that PKCE state uses the same issuer identity
+    /// isolation as stored tokens. Not part of the public API.
+    internal func persistPendingForTesting(
+        verifier: String,
+        state: String
+    ) async throws {
+        try await persist(PendingState(
+            verifier: verifier,
+            state: state,
+            redirectURI: redirectURI.absoluteString
+        ))
     }
 
     internal func buildAuthorizeURL(

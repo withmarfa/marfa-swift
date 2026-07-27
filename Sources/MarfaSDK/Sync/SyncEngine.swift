@@ -601,6 +601,17 @@ public actor SyncEngine {
         stoppingTask != nil
     }
 
+    /// Observation-only seam for restart lifecycle coverage.
+    internal var isRunningForTesting: Bool {
+        running
+    }
+
+    /// Drives replay directly without changing lifecycle state. This lets tests
+    /// prove that a cancelled engine cannot stamp a clean drain before replay.
+    internal func replayMutationsForTesting() async {
+        await replayMutations()
+    }
+
     // MARK: - Event application
 
     /// Test seam — drives `applyEvent` directly from unit tests so we can
@@ -749,11 +760,20 @@ public actor SyncEngine {
         draining = true
         defer { draining = false }
 
-        guard let pending = try? await mutationQueue.fetchAll(), !pending.isEmpty else {
-            // Nothing to replay; the queue is already drained, which
-            // counts as a clean drain cycle for `last_clean_drain_at`
-            // bookkeeping.
-            await recordCleanDrain()
+        // A stop can race the SSE-close path. Never inspect or stamp the
+        // queue after shutdown has begun: no replay occurred in this engine
+        // generation, so it cannot establish a clean drain.
+        guard running else { return }
+
+        let pending: [PendingMutationRecord]
+        do {
+            pending = try await mutationQueue.fetchAll()
+        } catch {
+            recordReplayFailure(error)
+            return
+        }
+        guard !pending.isEmpty else {
+            await recordCleanDrainIfQueueIsEmpty()
             return
         }
 
@@ -782,7 +802,7 @@ public actor SyncEngine {
 
         while !remaining.isEmpty {
             let record = remaining.removeFirst()
-            guard running else { break }
+            guard running else { return }
 
             // Defer item-scoped mutations whose createItem is still pending a
             // transient retry. Replaying them now would 404 (item absent on
@@ -814,7 +834,12 @@ public actor SyncEngine {
                     // our in-memory `remaining` list still carries the stale
                     // payloads — re-fetch so the next iteration uses the
                     // rewritten ids.
-                    remaining = (try? await mutationQueue.fetchAll()) ?? []
+                    do {
+                        remaining = try await mutationQueue.fetchAll()
+                    } catch {
+                        recordReplayFailure(error)
+                        return
+                    }
                 }
             } catch let marfaError as MarfaError where marfaError.isPermanent {
                 // Persist the dropped row + remove the live row in one
@@ -865,7 +890,12 @@ public actor SyncEngine {
                     }
                     // In-memory replay list is now stale — refetch so we
                     // don't try to replay the cascade-deleted rows.
-                    remaining = (try? await mutationQueue.fetchAll()) ?? []
+                    do {
+                        remaining = try await mutationQueue.fetchAll()
+                    } catch {
+                        recordReplayFailure(error)
+                        return
+                    }
                 }
             } catch {
                 transientError = error
@@ -884,28 +914,57 @@ public actor SyncEngine {
         }
 
         if let transientError {
-            lastFailedError = transientError
-            lastFailedAt = Date()
-            emit(.failed(error: transientError))
+            recordReplayFailure(transientError)
         } else {
-            await recordCleanDrain()
+            await recordCleanDrainIfQueueIsEmpty()
         }
+    }
+
+    private func recordReplayFailure(_ error: Error) {
+        guard running else { return }
+        lastFailedError = error
+        lastFailedAt = Date()
+        emit(.failed(error: error))
+    }
+
+    /// Re-reads the queue after a replay cycle before claiming success. A
+    /// failed storage read, shutdown, or surviving row is an unknown or
+    /// incomplete state, not a clean drain.
+    private func recordCleanDrainIfQueueIsEmpty() async {
+        guard running else { return }
+        let queueIsEmpty: Bool
+        do {
+            queueIsEmpty = try await mutationQueue.isEmpty
+        } catch {
+            recordReplayFailure(error)
+            return
+        }
+        guard running, queueIsEmpty else { return }
+        await recordCleanDrain()
     }
 
     /// Centralizes the bookkeeping for a clean drain cycle: stamps the
     /// persisted `last_clean_drain_at` timestamp, clears the in-memory
     /// failure record, and emits ``SyncEvent/synced(at:)`` to subscribers
-    /// (when running). Both ``replayMutations()`` clean-completion paths
-    /// — the early-return on an empty queue, and the post-loop
-    /// success — funnel through here so the persisted timestamp and
-    /// the emitted event share a single source of truth.
+    /// (when running). ``replayMutations()`` calls this only after a fresh,
+    /// successful empty-queue read, so the persisted timestamp and emitted
+    /// event share the same proven completion boundary.
     private func recordCleanDrain() async {
+        guard running else { return }
         let now = Date()
         let stamp = now.ISO8601Format(.init(includingFractionalSeconds: true))
-        try? await mutationQueue.saveSyncState(key: cleanDrainKey, value: stamp)
+        do {
+            try await mutationQueue.saveSyncState(key: cleanDrainKey, value: stamp)
+        } catch {
+            recordReplayFailure(error)
+            return
+        }
+        // stop() may have begun while the persistence write was in flight.
+        // Do not publish a fresh clean-drain result into the stopped lifecycle.
+        guard running else { return }
         lastFailedError = nil
         lastFailedAt = nil
-        if running { emit(.synced(at: now)) }
+        emit(.synced(at: now))
     }
 
     /// Returns `true` if the replay rewrote a local-id in the queue, signaling

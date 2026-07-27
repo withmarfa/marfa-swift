@@ -222,3 +222,69 @@ actor BlockingReplayTransport: Transport {
         }
     }
 }
+
+// A cancellation-resistant successful replay. The first mutation waits until
+// the test releases it, letting stop() flip the engine lifecycle before the
+// replay loop reaches the next queued record.
+actor BlockingSuccessfulReplayTransport: Transport {
+    private var requestContinuation: CheckedContinuation<Void, Never>?
+    private var requestStarted = false
+    private var requestStartedWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func waitUntilRequestStarted() async {
+        if requestStarted { return }
+        await withCheckedContinuation { continuation in
+            requestStartedWaiters.append(continuation)
+        }
+    }
+
+    func releaseRequest() {
+        requestContinuation?.resume()
+        requestContinuation = nil
+    }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        requestStarted = true
+        for waiter in requestStartedWaiters { waiter.resume() }
+        requestStartedWaiters.removeAll()
+        await withCheckedContinuation { continuation in
+            requestContinuation = continuation
+        }
+        let data = try JSONEncoder().encode(EmptyResponse())
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        fatalError("BlockingSuccessfulReplayTransport: requestWithConflict not supported")
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        fatalError("BlockingSuccessfulReplayTransport: rawRequest not supported")
+    }
+
+    nonisolated func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.finish()
+        }
+    }
+}

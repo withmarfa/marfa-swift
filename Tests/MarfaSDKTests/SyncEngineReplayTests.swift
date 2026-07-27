@@ -86,6 +86,50 @@ struct SyncEngineReplayTests {
         #expect(await transport.requestCallCount == 1)
     }
 
+    @Test("cancellation before replay never stamps a clean drain")
+    func cancellationBeforeReplayDoesNotStampCleanDrain() async throws {
+        let (_, queue, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await queue.enqueueDeleteItem(id: "server-cancelled")
+
+        await engine.start()
+        await engine.stop()
+        await engine.replayMutationsForTesting()
+
+        #expect(await engine.lastCleanDrainAt == nil)
+        #expect(try await queue.isEmpty == false)
+    }
+
+    @Test("successful partial replay after stop does not stamp a clean drain")
+    func partialReplayAfterStopDoesNotStampCleanDrain() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingSuccessfulReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-first")
+        try await queue.enqueueDeleteItem(id: "server-second")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        await transport.releaseRequest()
+        await stopTask.value
+
+        #expect(await engine.lastCleanDrainAt == nil)
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].localId == "server-second")
+    }
+
     @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
 

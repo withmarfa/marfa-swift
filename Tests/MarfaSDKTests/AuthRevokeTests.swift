@@ -48,7 +48,7 @@ final class RevokeStubURLProtocol: URLProtocol, @unchecked Sendable {
         let responseBody: Data
         if request.url?.path == "/.well-known/oauth-authorization-server" {
             let discovery = #"""
-            {"issuer":"https://staging.marfa.so","authorization_endpoint":"https://staging.marfa.so/auth/oauth2/authorize","token_endpoint":"https://staging.marfa.so/auth/oauth2/token","revocation_endpoint":"https://staging.marfa.so/auth/oauth2/revoke","device_authorization_endpoint":"https://staging.marfa.so/auth/device"}
+            {"issuer":"https://auth-revoke.example.test","authorization_endpoint":"https://auth-revoke.example.test/auth/oauth2/authorize","token_endpoint":"https://auth-revoke.example.test/auth/oauth2/token","revocation_endpoint":"https://auth-revoke.example.test/auth/oauth2/revoke","device_authorization_endpoint":"https://auth-revoke.example.test/auth/device"}
             """#
             responseBody = Data(discovery.utf8)
         } else {
@@ -114,7 +114,7 @@ struct AuthRevokeTests {
         let provider = StoredTokenProvider(
             storage: storage,
             storageKey: tokensKey,
-            tokenEndpoint: URL(string: "https://staging.marfa.so/auth/oauth2/token")!,
+            tokenEndpoint: URL(string: "https://auth-revoke.example.test/auth/oauth2/token")!,
             clientId: clientId,
             urlSession: session
         )

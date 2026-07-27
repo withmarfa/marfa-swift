@@ -57,4 +57,24 @@ struct SyncEngineConnectionStateTests {
         // The stream yielded the initial .offline state then finished.
         #expect(collected == [.offline])
     }
+
+    @Test("start after stop creates a fresh monitor and stream")
+    func startAfterStopRestartsMonitoring() async throws {
+        let manager = ConnectionStateManager()
+        await manager.start()
+        await manager.stop()
+        await manager.start()
+
+        let stream = manager.stateUpdates
+        var iterator = stream.makeAsyncIterator()
+        let initial = await iterator.next()
+        #expect(initial != nil)
+        let expectedTransition: ConnectionState = initial == .connecting ? .online : .connecting
+        await manager.applyStateForTesting(expectedTransition)
+        #expect(await iterator.next() == expectedTransition)
+
+        await manager.stop()
+        #expect(await iterator.next() == .offline)
+        #expect(await iterator.next() == nil)
+    }
 }

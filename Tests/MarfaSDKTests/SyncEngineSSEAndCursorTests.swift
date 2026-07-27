@@ -33,6 +33,45 @@ struct SyncEngineSSEAndCursorTests {
         await engine.stop()  // second stop is a no-op
     }
 
+    @Test("start waits for an overlapping stop before creating a new lifecycle")
+    func startDuringStopRestartsEngine() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-restart")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        let restartTask = Task { await engine.start() }
+        await transport.releaseRequest()
+        await stopTask.value
+        await restartTask.value
+
+        #expect(await engine.isRunningForTesting)
+        await connManager.applyStateForTesting(.connecting)
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await transport.requestCallCount >= 2
+        }
+        let finalStopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        await transport.releaseRequest()
+        await finalStopTask.value
+    }
+
     @Test("SSE item.* events apply to local store") func ssEEventsApplyToLocalStore() async throws {
         let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
 
