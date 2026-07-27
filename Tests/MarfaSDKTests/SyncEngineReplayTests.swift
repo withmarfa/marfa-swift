@@ -530,6 +530,9 @@ struct SyncEngineReplayTests {
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
             await transport.calls.filter { $0.path == "/events" }.count >= 1
         }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await connManager.state == .online
+        }
 
         // Now enqueue a mutation AFTER the first replay cycle has
         // already ticked. Without the reconnect nudge, this mutation
@@ -537,17 +540,21 @@ struct SyncEngineReplayTests {
         try await queue.enqueueDeleteItem(id: "019eb000-0000-7000-8000-000000000042")
         transport.enqueueError(NotFoundError(message: "server gone"))
 
-        // Assert the mutation drains without us manually re-triggering
-        // `.connecting`.
+        // Assert the reconnect nudge re-opens SSE without us manually
+        // re-triggering `.connecting`. Wait for the observable effect instead
+        // of sampling immediately after the queue drains: proactive replay can
+        // empty the queue before the reconnect delay elapses.
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+            transport.calls.filter { $0.path == "/events" }.count >= 2
+        }
+        let sseCallCount = transport.calls.filter { $0.path == "/events" }.count
+        #expect(sseCallCount >= 2)
+
+        // The mutation also drains without another reachability transition.
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
             (try? await queue.isEmpty) == true
         }
         #expect(try await queue.isEmpty)
-
-        // And assert we actually opened the SSE stream more than once —
-        // the reconnect nudge drove the re-open.
-        let sseCallCount = await transport.calls.filter { $0.path == "/events" }.count
-        #expect(sseCallCount >= 2, "expected reconnect nudge to re-open SSE at least once; got \(sseCallCount)")
 
         await engine.stop()
     }

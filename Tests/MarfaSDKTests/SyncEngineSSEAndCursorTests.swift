@@ -33,6 +33,36 @@ struct SyncEngineSSEAndCursorTests {
         await engine.stop()  // second stop is a no-op
     }
 
+    @Test("stop during start prevents stale lifecycle task publication")
+    func stopDuringStartDoesNotPublishTasks() async throws {
+        let (_, _, _, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.suspendNextStartPublicationForTesting()
+
+        let startTask = Task { await engine.start() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            let isStarting = await engine.isStartingForTesting
+            let isSuspended = await engine.isStartPublicationSuspendedForTesting
+            return isStarting && isSuspended
+        }
+
+        await engine.stop()
+        #expect(await !engine.isRunningForTesting)
+        #expect(await !engine.isStartingForTesting)
+        #expect(await !engine.hasLifecycleTasksForTesting)
+        #expect(await !connManager.isStartedForTesting)
+
+        await engine.resumeStartPublicationForTesting()
+        await startTask.value
+        #expect(await !engine.isRunningForTesting)
+        #expect(await !engine.hasLifecycleTasksForTesting)
+        #expect(await !connManager.isStartedForTesting)
+
+        await engine.start()
+        #expect(await engine.isRunningForTesting)
+        #expect(await connManager.isStartedForTesting)
+        await engine.stop()
+    }
+
     @Test("start waits for an overlapping stop before creating a new lifecycle")
     func startDuringStopRestartsEngine() async throws {
         let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()

@@ -86,7 +86,9 @@ struct AuthRevokeTests {
     /// so no interference with suites running alongside this one.
     let issuer = uniqueIssuer("marfa-auth-revoke")
     let clientId = "test-client"
-    var tokensKey: String { "marfa.auth.tokens:\(issuer.host ?? ""):\(clientId)" }
+    var tokensKey: String {
+        OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
+    }
 
     func prepareAuth() async throws -> (MarfaAuth, InMemoryKeychain, URLSession) {
         let storage = InMemoryKeychain()

@@ -52,7 +52,7 @@ public actor OAuthDiscovery {
         for issuer: URL,
         httpClient: any DeviceFlowHTTPClient = URLSession.shared
     ) async throws -> Endpoints {
-        let key = OAuthIssuer.normalize(issuer)
+        let key = try OAuthIssuer.canonicalURL(issuer)
         if let cached = cache[key.absoluteString] {
             return cached
         }
@@ -102,7 +102,9 @@ public actor OAuthDiscovery {
     /// Issuer-scoped test seam. Internal so cache control does not expand the
     /// SDK's public API; package tests reach it through `@testable import`.
     internal func reset(for issuer: URL) {
-        let key = OAuthIssuer.identity(for: issuer)
+        guard let key = try? OAuthIssuer.canonicalURL(issuer).absoluteString else {
+            return
+        }
         cache.removeValue(forKey: key)
         inflight.removeValue(forKey: key)?.task.cancel()
     }
@@ -137,7 +139,8 @@ public actor OAuthDiscovery {
             throw OAuthDiscoveryError.malformedDoc(issuer: issuer, underlying: error)
         }
         guard let metadataIssuer = URL(string: doc.issuer),
-              OAuthIssuer.identity(for: metadataIssuer) == OAuthIssuer.identity(for: issuer)
+              (try? OAuthIssuer.canonicalURL(metadataIssuer)) != nil,
+              doc.issuer == issuer.absoluteString
         else {
             throw OAuthDiscoveryError.malformedDoc(
                 issuer: issuer,

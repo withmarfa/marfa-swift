@@ -161,6 +161,57 @@ struct OAuthDiscoveryTests {
         }
     }
 
+    @Test("rejects non-absolute and decorated requested issuers before HTTP")
+    func invalidRequestedIssuerShapesThrow() async throws {
+        let invalidIssuers = [
+            URL(string: "tenant")!,
+            URL(string: "https://user@example.test")!,
+            URL(string: "https://example.test?tenant=a")!,
+            URL(string: "https://example.test#tenant-a")!,
+        ]
+
+        for invalidIssuer in invalidIssuers {
+            let discovery = OAuthDiscovery()
+            let http = FakeDeviceFlowHTTPClient()
+            await #expect(throws: OAuthIssuerValidationError.self) {
+                _ = try await discovery.endpoints(for: invalidIssuer, httpClient: http)
+            }
+            #expect(http.calls.isEmpty)
+        }
+    }
+
+    @Test("metadata issuer must exactly equal the requested canonical string")
+    func metadataIssuerRequiresCanonicalExactMatch() async throws {
+        let nonCanonicalMetadata = [
+            "https://EXAMPLE.test",
+            "https://example.test/",
+            "https://user@example.test",
+            "https://example.test?tenant=a",
+            "https://example.test#tenant-a",
+        ]
+
+        for metadataIssuer in nonCanonicalMetadata {
+            let discovery = OAuthDiscovery()
+            let http = FakeDeviceFlowHTTPClient()
+            try http.enqueueJSON(DiscoveryDoc(issuer: metadataIssuer))
+            await #expect(throws: OAuthDiscoveryError.self) {
+                _ = try await discovery.endpoints(for: issuer, httpClient: http)
+            }
+        }
+    }
+
+    @Test("requested issuer is canonicalized before exact metadata comparison")
+    func requestedIssuerCanonicalization() async throws {
+        let discovery = OAuthDiscovery()
+        let requested = URL(string: "HTTPS://EXAMPLE.TEST/")!
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(DiscoveryDoc())
+
+        _ = try await discovery.endpoints(for: requested, httpClient: http)
+
+        #expect(http.calls.first?.url == URL(string: "https://example.test/.well-known/oauth-authorization-server"))
+    }
+
     @Test("evicts the cache on rejection so a later call retries")
     func cacheEvictedOnFailure() async throws {
         let http = FakeDeviceFlowHTTPClient()

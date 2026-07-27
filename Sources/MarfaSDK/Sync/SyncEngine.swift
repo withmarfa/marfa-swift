@@ -86,6 +86,13 @@ public actor SyncEngine {
     private var streamTask: Task<Void, Never>?
     private var stoppingTask: Task<Void, Never>?
     private var running = false
+    private var starting = false
+    private var lifecycleGeneration: UUID?
+
+    // Deterministic seam for the actor-reentry window after the
+    // ConnectionStateManager start hop and before task publication.
+    private var shouldSuspendNextStartPublicationForTesting = false
+    private var startPublicationContinuationForTesting: CheckedContinuation<Void, Never>?
 
     /// Child task listening to `mutationQueue.drainRequests`. Feeds
     /// `drainDebounceTask` — one schedule-and-coalesce cycle per burst.
@@ -295,12 +302,22 @@ public actor SyncEngine {
     /// updates; without this the engine's run loop would await on an inert
     /// stream stuck at `.offline`.
     public func start() async {
-        if let stoppingTask {
+        while let stoppingTask {
             await stoppingTask.value
+            // The stop owner clears `stoppingTask` after observing the same
+            // barrier. Yield so a resumed start cannot publish a new
+            // generation while that owner still considers stop in progress.
+            await Task.yield()
         }
-        guard !running else { return }
-        running = true
+        guard !running, !starting else { return }
+        let generation = UUID()
+        lifecycleGeneration = generation
+        starting = true
         await connectionManager.start()
+        await suspendStartPublicationIfNeededForTesting()
+        guard starting, lifecycleGeneration == generation else { return }
+        starting = false
+        running = true
         streamTask = Task { [weak self] in
             await self?.runLoop()
         }
@@ -318,6 +335,8 @@ public actor SyncEngine {
             return
         }
 
+        lifecycleGeneration = nil
+        starting = false
         running = false
         let streamTask = self.streamTask
         let drainListenerTask = self.drainListenerTask
@@ -405,7 +424,7 @@ public actor SyncEngine {
     // MARK: - Main run loop
 
     private func runLoop() async {
-        for await state in connectionManager.stateUpdates {
+        for await state in await connectionManager.stateUpdates {
             guard running else { break }
 
             switch state {
@@ -604,6 +623,36 @@ public actor SyncEngine {
     /// Observation-only seam for restart lifecycle coverage.
     internal var isRunningForTesting: Bool {
         running
+    }
+
+    internal var isStartingForTesting: Bool {
+        starting
+    }
+
+    internal var isStartPublicationSuspendedForTesting: Bool {
+        startPublicationContinuationForTesting != nil
+    }
+
+    internal var hasLifecycleTasksForTesting: Bool {
+        streamTask != nil || drainListenerTask != nil ||
+            drainDebounceTask != nil || reconnectTask != nil
+    }
+
+    internal func suspendNextStartPublicationForTesting() {
+        shouldSuspendNextStartPublicationForTesting = true
+    }
+
+    internal func resumeStartPublicationForTesting() {
+        startPublicationContinuationForTesting?.resume()
+        startPublicationContinuationForTesting = nil
+    }
+
+    private func suspendStartPublicationIfNeededForTesting() async {
+        guard shouldSuspendNextStartPublicationForTesting else { return }
+        shouldSuspendNextStartPublicationForTesting = false
+        await withCheckedContinuation { continuation in
+            startPublicationContinuationForTesting = continuation
+        }
     }
 
     /// Drives replay directly without changing lifecycle state. This lets tests

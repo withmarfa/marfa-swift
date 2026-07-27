@@ -14,7 +14,7 @@ struct SyncEngineConnectionStateTests {
 
     @Test("stateUpdates yields current state immediately") func stateUpdatesYieldsCurrentStateImmediately() async throws {
         let manager = ConnectionStateManager()
-        let stream = manager.stateUpdates
+        let stream = await manager.stateUpdates
         var iter = stream.makeAsyncIterator()
         let first = await iter.next()
         #expect(first == .offline)
@@ -35,27 +35,16 @@ struct SyncEngineConnectionStateTests {
         #expect(await manager.state == .offline) // Still offline — guard protects
     }
 
-    @Test("stop finishes stateUpdates stream") func stopFinishesStateUpdatesStream() async throws {
+    @Test("immediate subscribe then stop finishes stateUpdates stream")
+    func immediateSubscribeThenStopFinishesStream() async throws {
         let manager = ConnectionStateManager()
+        let stream = await manager.stateUpdates
+        var iterator = stream.makeAsyncIterator()
 
-        // Collect events from the stream in a background task, then stop.
-        let collected = await withTaskGroup(of: [ConnectionState].self) { group in
-            group.addTask {
-                let stream = manager.stateUpdates
-                var results: [ConnectionState] = []
-                for await state in stream {
-                    results.append(state)
-                }
-                return results
-            }
-            // Let the inner task subscribe and receive the initial state.
-            try? await Task.sleep(for: .milliseconds(10))
-            // Stop — should finish the stream.
-            await manager.stop()
-            return await group.next()!
-        }
-        // The stream yielded the initial .offline state then finished.
-        #expect(collected == [.offline])
+        await manager.stop()
+
+        #expect(await iterator.next() == .offline)
+        #expect(await iterator.next() == nil)
     }
 
     @Test("start after stop creates a fresh monitor and stream")
@@ -65,7 +54,7 @@ struct SyncEngineConnectionStateTests {
         await manager.stop()
         await manager.start()
 
-        let stream = manager.stateUpdates
+        let stream = await manager.stateUpdates
         var iterator = stream.makeAsyncIterator()
         let initial = await iterator.next()
         #expect(initial != nil)
@@ -76,5 +65,27 @@ struct SyncEngineConnectionStateTests {
         await manager.stop()
         #expect(await iterator.next() == .offline)
         #expect(await iterator.next() == nil)
+    }
+
+    @Test("a stopped lifecycle stream stays isolated from restart updates")
+    func oldStreamIsIsolatedAcrossRestart() async throws {
+        let manager = ConnectionStateManager()
+        let oldStream = await manager.stateUpdates
+        var oldIterator = oldStream.makeAsyncIterator()
+        #expect(await oldIterator.next() == .offline)
+
+        await manager.stop()
+        #expect(await oldIterator.next() == nil)
+        await manager.start()
+
+        let newStream = await manager.stateUpdates
+        var newIterator = newStream.makeAsyncIterator()
+        let initial = await newIterator.next()
+        let transition: ConnectionState = initial == .connecting ? .online : .connecting
+        await manager.applyStateForTesting(transition)
+
+        #expect(await newIterator.next() == transition)
+        #expect(await oldIterator.next() == nil)
+        await manager.stop()
     }
 }

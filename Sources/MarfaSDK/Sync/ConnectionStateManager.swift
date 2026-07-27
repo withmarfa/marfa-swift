@@ -10,7 +10,8 @@ import Network
 /// ## Usage
 ///
 ///     let manager = ConnectionStateManager()
-///     for await state in manager.stateUpdates {
+///     let updates = await manager.stateUpdates
+///     for await state in updates {
 ///         print("connection: \(state)")
 ///     }
 public actor ConnectionStateManager {
@@ -99,27 +100,20 @@ public actor ConnectionStateManager {
     /// An `AsyncStream` that yields the current state immediately, then any
     /// subsequent state changes. The stream ends when ``stop()`` is called.
     ///
-    /// Marked `nonisolated` so callers subscribe without an actor hop; the
-    /// registration and initial-state send happen inside an internal
-    /// actor-isolated task. Mirrors the shape of ``SyncEngine/events``.
-    public nonisolated var stateUpdates: AsyncStream<ConnectionState> {
-        AsyncStream { continuation in
-            let id = UUID()
-            Task { await self.subscribe(id: id, continuation: continuation) }
-            continuation.onTermination = { [weak self] _ in
-                Task { [weak self] in
-                    await self?.removeContinuation(id: id)
-                }
+    /// Actor isolation makes registration synchronous with property access:
+    /// once the caller receives the stream, an immediate ``stop()`` cannot
+    /// overtake a detached subscription task and leave the stream unfinished.
+    public var stateUpdates: AsyncStream<ConnectionState> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<ConnectionState>.makeStream()
+        continuation.onTermination = { [weak self] _ in
+            Task { [weak self] in
+                await self?.removeContinuation(id: id)
             }
         }
-    }
-
-    private func subscribe(
-        id: UUID,
-        continuation: AsyncStream<ConnectionState>.Continuation
-    ) {
         continuations[id] = continuation
         continuation.yield(state)
+        return stream
     }
 
     // MARK: - Private
@@ -154,5 +148,9 @@ public actor ConnectionStateManager {
     /// `@testable import MarfaSDK` tests can call it; no public API.
     internal func applyStateForTesting(_ state: ConnectionState) {
         applyState(state)
+    }
+
+    internal var isStartedForTesting: Bool {
+        started
     }
 }

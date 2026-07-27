@@ -100,7 +100,12 @@ struct DeviceFlowPollingTests {
         // Cadence held steady — authorization_pending must not escalate.
         #expect(clock.recordedSleeps == [5, 5])
         // Token persisted under the canonical issuer+client storage key.
-        let stored = await storage.peek(account: "marfa.auth.tokens:https://device-flow.example.test:test-client")
+        let storageKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: Self.issuer,
+            clientId: "test-client"
+        )
+        let stored = await storage.peek(account: storageKey)
         #expect(stored != nil)
         #expect(stored?.contains("real-access-token") == true)
     }
@@ -154,13 +159,15 @@ struct DeviceFlowPollingTests {
         clockB.advance(by: 5)
         #expect(try await tokenA.value.currentToken().accessToken == "token-a")
         #expect(try await tokenB.value.currentToken().accessToken == "token-b")
-        #expect(await storage.peek(account: "marfa.auth.tokens:https://device-flow.example.test:8443/tenant-a:test-client")?.contains("token-a") == true)
-        #expect(await storage.peek(account: "marfa.auth.tokens:http://device-flow.example.test:9443/tenant-b:test-client")?.contains("token-b") == true)
+        let keyA = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerA, clientId: "test-client")
+        let keyB = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerB, clientId: "test-client")
+        #expect(await storage.peek(account: keyA)?.contains("token-a") == true)
+        #expect(await storage.peek(account: keyB)?.contains("token-b") == true)
     }
 
-    @Test("start migrates a legacy origin-only token key")
-    func startMigratesLegacyTokenKey() async throws {
-        struct PathIssuerDiscoveryDoc: Encodable {
+    @Test("start never migrates a legacy origin-only token key")
+    func startDoesNotMigrateLegacyTokenKey() async throws {
+        struct RootIssuerDiscoveryDoc: Encodable {
             let issuer: String
             let authorization_endpoint = "https://device-flow.example.test/auth/oauth2/authorize"
             let token_endpoint = "https://device-flow.example.test/auth/oauth2/token"
@@ -168,14 +175,14 @@ struct DeviceFlowPollingTests {
             let device_authorization_endpoint = "https://device-flow.example.test/auth/device"
         }
 
-        let issuer = URL(string: "https://device-flow.example.test:8443/legacy")!
+        let issuer = URL(string: "https://device-flow.example.test")!
         let storage = InMemoryKeychain()
-        let legacyKey = "marfa.auth.tokens:device-flow.example.test:test-client"
-        let canonicalKey = "marfa.auth.tokens:https://device-flow.example.test:8443/legacy:test-client"
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: issuer, clientId: "test-client")
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: "test-client")
         try await storage.set("legacy-token", for: legacyKey)
         await OAuthDiscovery.shared.reset(for: issuer)
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(PathIssuerDiscoveryDoc(issuer: issuer.absoluteString))
+        try http.enqueueJSON(RootIssuerDiscoveryDoc(issuer: issuer.absoluteString))
         http.enqueueDeviceCodeResponse()
 
         _ = try await DeviceFlow.start(
@@ -187,8 +194,8 @@ struct DeviceFlowPollingTests {
             clock: ManualDeviceFlowClock()
         )
 
-        #expect(await storage.peek(account: canonicalKey) == "legacy-token")
-        #expect(await storage.peek(account: legacyKey) == nil)
+        #expect(await storage.peek(account: canonicalKey) == nil)
+        #expect(await storage.peek(account: legacyKey) == "legacy-token")
     }
 
     @Test("slow_down increments interval by 5 per RFC 8628")

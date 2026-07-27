@@ -47,20 +47,7 @@ public enum DeviceFlow {
         httpClient: any DeviceFlowHTTPClient = URLSession.shared,
         clock: any DeviceFlowClock = SystemDeviceFlowClock()
     ) async throws -> DeviceFlowHandle {
-        let normalized = OAuthIssuer.normalize(issuer)
-        _ = try await OAuthIssuer.migrateLegacyValueIfNeeded(
-            in: storage,
-            canonicalKey: OAuthIssuer.storageKey(
-                kind: "tokens",
-                issuer: normalized,
-                clientId: clientId
-            ),
-            legacyKey: OAuthIssuer.legacyStorageKey(
-                kind: "tokens",
-                issuer: issuer,
-                clientId: clientId
-            )
-        )
+        let normalized = try OAuthIssuer.canonicalURL(issuer)
         let endpoints = try await OAuthDiscovery.shared.endpoints(
             for: normalized,
             httpClient: httpClient

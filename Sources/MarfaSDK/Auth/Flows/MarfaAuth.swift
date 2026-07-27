@@ -66,7 +66,6 @@ public final class MarfaAuth {
     private let urlSession: URLSession
     private let pendingKey: String
     private let tokensKey: String
-    private let legacyTokensKey: String
 
     public init(
         issuer: URL,
@@ -92,11 +91,6 @@ public final class MarfaAuth {
             issuer: self.issuer,
             clientId: clientId
         )
-        self.legacyTokensKey = OAuthIssuer.legacyStorageKey(
-            kind: "tokens",
-            issuer: issuer,
-            clientId: clientId
-        )
     }
 
     /// Drives the full Authorization Code + PKCE flow and returns a
@@ -112,6 +106,7 @@ public final class MarfaAuth {
     public func signIn(
         presentationContextProvider: ASWebAuthenticationPresentationContextProviding
     ) async throws -> TokenProvider {
+        _ = try OAuthIssuer.canonicalURL(issuer)
         let verifier = PKCE.generateCodeVerifier()
         let challenge = PKCE.computeCodeChallenge(verifier: verifier)
         let state = PKCE.generateState()
@@ -162,10 +157,11 @@ public final class MarfaAuth {
     /// Returns a ``TokenProvider`` backed by any token already persisted
     /// for this `(issuer, clientId)` pair, or `nil` when storage is empty.
     public func restore() async throws -> TokenProvider? {
-        _ = try await OAuthIssuer.migrateLegacyValueIfNeeded(
+        _ = try OAuthIssuer.canonicalURL(issuer)
+        _ = try await OAuthIssuer.migrateLegacyRootTokenIfNeeded(
             in: storage,
-            canonicalKey: tokensKey,
-            legacyKey: legacyTokensKey
+            issuer: issuer,
+            clientId: clientId
         )
         guard try await storage.get(for: tokensKey) != nil else { return nil }
         let endpoints = try await OAuthDiscovery.shared.endpoints(
@@ -232,6 +228,7 @@ public final class MarfaAuth {
         verifier: String,
         state: String
     ) async throws {
+        _ = try OAuthIssuer.canonicalURL(issuer)
         try await persist(PendingState(
             verifier: verifier,
             state: state,
