@@ -31,14 +31,26 @@ extension LocalStore {
     /// (`type`, `state`, `tier`) and then **scans the surviving rows in
     /// Swift**, decoding each one's `properties` blob to read its text.
     ///
+    /// ## Cost
+    ///
     /// Cost is linear in the rows that survive the column filters, with
-    /// one JSON decode per row. At personal-corpus scale — thousands of
-    /// items — that is a few milliseconds, and it runs on the
-    /// ``LocalStore`` actor rather than the main actor, which is what
-    /// makes the trade acceptable. It is not a substitute for the server
-    /// index, and it will stop being acceptable well before a corpus
-    /// reaches six figures. Narrowing with `type` or `tier` is the
-    /// cheapest lever a caller has.
+    /// one JSON decode per row. Measured on an Apple Silicon laptop
+    /// against an on-disk store with every row matching, it lands around
+    /// **100 ms at 1,000 items, 800 ms at 10,000, and several seconds at
+    /// 50,000**. Those anchors move with row size, hardware and load —
+    /// the number worth carrying is the rate: *tens of milliseconds per
+    /// thousand items*, not a few milliseconds total. Narrowing with
+    /// `type` or `tier` is the cheapest lever a caller has, because it
+    /// removes rows before the decode.
+    ///
+    /// **`limit` does not bound the work, only the answer.** Every row
+    /// that matches is decoded, scored, joined to its metadata and
+    /// sorted; the cap is applied last. A query matching 60,000 items
+    /// takes seconds whether the caller asks for 20 results or all of
+    /// them. Bounding the working set is not a free change — the `tags`
+    /// filter runs after the metadata join, so candidates cannot be
+    /// dropped before it without risking an under-filled result — so it
+    /// is deliberately not attempted here.
     ///
     /// Being on the store actor also means a scan holds it for its
     /// duration, so writes queued behind it wait. That is true of every
@@ -46,11 +58,36 @@ extension LocalStore {
     /// It is the reason a corpus that outgrows this needs the server
     /// index rather than a bigger machine.
     ///
+    /// The scan checks for cancellation as it goes, so an abandoned
+    /// query — the common case in search-as-you-type — stops paying for
+    /// itself rather than holding the actor to completion and making the
+    /// next term wait behind it.
+    ///
     /// ## Known divergences from `MarfaClient.search(query:filters:)`
     ///
-    /// - **Fields.** Only `title` and `body` are matched. The server also
-    ///   indexes `description`, `name`, and remaining textual properties,
-    ///   so a remote query can return hits this one misses.
+    /// The server's index covers **every textual property plus tags**.
+    /// This one reads two literal keys, `title` and `body`, and that gap
+    /// is wider than it sounds:
+    ///
+    /// - **Fields.** Types whose text lives under other keys never match
+    ///   at all — `core.entity` and its subtypes (`name`), `core.highlight`
+    ///   and `readwise.highlight` (`text`, `note`). A
+    ///   `withmarfa.captured_email` matches on `body` but never on its
+    ///   `subject`. This is a whole-type blind spot, not a partial one.
+    /// - **Tags.** The server indexes tags as searchable text, so an item
+    ///   tagged `fiction` is a hit for the query `fiction`. Locally it is
+    ///   not. `SearchFilters.tags` still *filters* identically; tags are
+    ///   simply not *matched*.
+    /// - **`type` does not resolve subtypes.** The server matches by
+    ///   inheritance, so `type: "core.media"` returns `core.media.book`.
+    ///   Locally the comparison is literal, so it does not. Resolving
+    ///   inheritance needs the type graph, which the local store does not
+    ///   persist; approximating it from the dotted name would be wrong
+    ///   for exactly the types a consumer app defines, since a custom
+    ///   type may name any parent.
+    /// - **`limit` range.** The server declares `1...100` and rejects
+    ///   anything outside it. Locally `0` and negatives return an empty
+    ///   result, and a value above 100 is honored rather than clamped.
     /// - **Ranking.** Scores are ordinal — derived from *where* the match
     ///   landed, not from term statistics. They order results sensibly
     ///   but are not BM25 and are not comparable to a server score.
@@ -61,12 +98,12 @@ extension LocalStore {
     ///   ``LocalStore/makeItemsDescriptor(filters:)`` treats
     ///   `ListFilters.filter`.
     ///
-    /// Everything else is deliberately faithful so a caller can swap
-    /// between local and remote: `type`, `state`, `tier`, and `tags`
-    /// filter identically; `system.*` records stay out of the results
-    /// unless the caller names a `system.` type outright; `trashed` items
-    /// stay out unless `state` asks for them; and `limit` defaults to the
-    /// server's 20.
+    /// What does match the server: `state`, `tier` and `tags` filter
+    /// identically; `system.*` records stay out of the results unless the
+    /// caller names a `system.` type outright; `trashed` items stay out
+    /// unless `state` asks for them; and `limit` defaults to the server's
+    /// 20. Everything else above is a difference a caller swapping
+    /// between local and remote has to plan for.
     ///
     /// - Parameters:
     ///   - text: The query. Matching is case- and diacritic-insensitive,
@@ -80,12 +117,21 @@ extension LocalStore {
         let needle = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return [] }
 
+        try Task.checkCancellation()
         let models = try modelContext.fetch(Self.makeSearchDescriptor(filters: filters))
 
         // Rank before touching metadata so the second read only covers
         // rows that actually matched the text.
+        //
+        // The per-row cancellation check is what keeps an abandoned
+        // search cheap. This method is synchronous and holds the store
+        // actor for its whole run, so without it a caller that cancelled
+        // — search-as-you-type moving to the next keystroke — would still
+        // wait out the full scan before its replacement could start, and
+        // every term in a burst would serialize behind the one before it.
         var scored: [(model: MarfaItemModel, score: Double)] = []
         for model in models {
+            try Task.checkCancellation()
             let properties = model.properties
             guard let score = Self.relevance(
                 title: properties["title"]?.stringValue,

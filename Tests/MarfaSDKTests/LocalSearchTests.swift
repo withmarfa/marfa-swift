@@ -19,6 +19,11 @@ struct LocalSearchTests {
 
     /// Creates one item and returns its id. `title` / `body` are the only
     /// two properties search reads.
+    ///
+    /// Pass `id` when a test asserts on the `id` ascending tiebreak:
+    /// generated ids are UUIDv7, so their lexical order tracks creation
+    /// time and would agree with recency by construction, which is
+    /// exactly what such a test needs to rule out.
     @discardableResult
     private func seed(
         _ store: LocalStore,
@@ -27,13 +32,14 @@ struct LocalSearchTests {
         type: String = "core.note",
         state: ItemState? = nil,
         tier: Tier? = nil,
-        tags: [String] = []
+        tags: [String] = [],
+        id: String? = nil
     ) async throws -> String {
         var properties: [String: JSONValue] = [:]
         if let title { properties["title"] = .string(title) }
         if let body { properties["body"] = .string(body) }
         let item = try await store.createItem(
-            CreateItemInput(type: type, properties: properties, state: state, tier: tier)
+            CreateItemInput(type: type, properties: properties, id: id, state: state, tier: tier)
         )
         if !tags.isEmpty {
             try await store.addTags(itemId: item.id, tags: tags)
@@ -210,9 +216,14 @@ struct LocalSearchTests {
 
     @Test("A tighter title hit outranks a looser one") func tighterHitOutranksLooser() async throws {
         let store = try await makeStore()
-        let substringId = try await seed(store, title: "The invoice folder")
-        let prefixId = try await seed(store, title: "Invoice folder")
+        // Seeded tightest-first, so the expected order is also the
+        // *oldest*-first order. The descriptor sorts `updatedAt`
+        // descending, so recency alone would produce exactly the reverse
+        // of the assertion — it can only hold if the score is what
+        // orders these rows.
         let wholeId = try await seed(store, title: "Invoice")
+        let prefixId = try await seed(store, title: "Invoice folder")
+        let substringId = try await seed(store, title: "The invoice folder")
 
         let results = try await store.searchItems(text: "invoice")
 
@@ -221,15 +232,54 @@ struct LocalSearchTests {
 
     @Test("Equal scores break ties by updatedAt descending") func tiesBreakByRecency() async throws {
         let store = try await makeStore()
-        let olderId = try await seed(store, title: "Invoice one")
-        let newerId = try await seed(store, title: "Invoice two")
-        // Bump `older` so it becomes the most recently touched row. Both
-        // titles are prefix matches, so relevance alone can't order them.
-        try await store.updateItem(id: olderId, properties: ["note": .string("touched")])
+        // Ids are pinned, and ascending, so the `id` fallback would order
+        // these [older, newer]. Bumping the *newer* row puts recency in
+        // direct opposition to that, which is what makes the assertion
+        // depend on the `updatedAt` comparator rather than the fallback
+        // underneath it. Both titles are prefix matches, so relevance
+        // cannot separate them either.
+        let olderId = try await seed(store, title: "Invoice one", id: "aaaa-older")
+        let newerId = try await seed(store, title: "Invoice two", id: "bbbb-newer")
+        try await store.updateItem(id: newerId, properties: ["note": .string("touched")])
 
         let results = try await store.searchItems(text: "invoice")
 
-        #expect(results.map(\.item.id) == [olderId, newerId])
+        #expect(results.map(\.item.id) == [newerId, olderId])
+    }
+
+    @Test("Rows level on score and recency break ties by id ascending") func tiesBreakByIdWhenRecencyIsLevel() async throws {
+        let store = try await makeStore()
+        // `createItem` stamps `updatedAt` from the clock, so two rows
+        // can only be made genuinely level by writing the timestamp
+        // directly. Without that, the `id` comparator is unreachable:
+        // every other fixture separates on score or recency first.
+        let stamp = "2026-01-01T00:00:00.000Z"
+        for id in ["item-b", "item-a", "item-c"] {
+            try await store.upsertItem(
+                Item(
+                    captureLatitude: nil,
+                    captureLongitude: nil,
+                    createdAt: stamp,
+                    device: nil,
+                    edges: nil,
+                    id: id,
+                    properties: ["title": .string("Invoice")],
+                    schemaVersion: 1,
+                    source: "local",
+                    sourceId: nil,
+                    state: .active,
+                    tier: .library,
+                    timestamp: stamp,
+                    type: "core.note",
+                    updatedAt: stamp,
+                    version: 1
+                )
+            )
+        }
+
+        let results = try await store.searchItems(text: "invoice")
+
+        #expect(results.map(\.item.id) == ["item-a", "item-b", "item-c"])
     }
 
     @Test("Ordering is stable across repeated calls") func orderingIsStable() async throws {
@@ -268,6 +318,63 @@ struct LocalSearchTests {
 
         #expect(try await store.searchItems(text: "invoice").count == LocalStore.defaultSearchLimit)
         #expect(try await store.searchItems(text: "invoice", filters: SearchFilters(limit: 25)).count == 25)
+    }
+
+    @Test("Limit caps results without capping the fetch") func limitDoesNotCapTheFetch() async throws {
+        let store = try await makeStore()
+        // The best match is deliberately the *oldest* row. The descriptor
+        // sorts `updatedAt` descending and carries no `fetchLimit`, so
+        // this row is still read and ranked. Sizing a `fetchLimit` to the
+        // result limit — the obvious-looking optimization the descriptor
+        // documents itself as refusing — would drop it before it was ever
+        // scored, and the top hit would silently become a weaker one.
+        let wholeId = try await seed(store, title: "Invoice")
+        for index in 0..<5 {
+            try await seed(store, title: "Invoice folder \(index)")
+        }
+
+        let results = try await store.searchItems(
+            text: "invoice",
+            filters: SearchFilters(limit: 3)
+        )
+
+        #expect(results.count == 3)
+        #expect(results.first?.item.id == wholeId)
+    }
+
+    @Test("A limit of zero or less returns nothing") func nonPositiveLimitReturnsNothing() async throws {
+        let store = try await makeStore()
+        try await seed(store, title: "Invoice")
+
+        // The server rejects these outright (`limit` is 1...100). Locally
+        // they resolve to an empty result rather than an error — see the
+        // divergence note on `searchItems`.
+        #expect(try await store.searchItems(text: "invoice", filters: SearchFilters(limit: 0)).isEmpty)
+        #expect(try await store.searchItems(text: "invoice", filters: SearchFilters(limit: -5)).isEmpty)
+    }
+
+    // MARK: - Cancellation
+
+    @Test("A cancelled search abandons the scan instead of finishing it") func cancelledSearchThrows() async throws {
+        let store = try await makeStore()
+        for index in 0..<200 {
+            try await seed(store, title: "Invoice \(index)")
+        }
+
+        let task = Task { () -> [SearchResult] in
+            // `cancel()` below lands while this sleep is pending, so the
+            // sleep throws and the search runs inside an already-cancelled
+            // task — the state the scan's checks exist to catch. Without
+            // them the scan would run to completion and return results
+            // nobody is waiting for, holding the store actor throughout.
+            try? await Task.sleep(for: .milliseconds(50))
+            return try await store.searchItems(text: "invoice")
+        }
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await task.value
+        }
     }
 
     // MARK: - Main-actor behavior
