@@ -13,7 +13,7 @@ import Foundation
 /// - SSE reconnect nudge draining mutations queued after the first cycle.
 ///
 /// Shared helpers live in ``SyncEngineTestKit`` (see SyncEngineTestSupport.swift).
-@Suite("SyncEngine replay")
+@Suite("SyncEngine replay", .timeLimit(.minutes(1)))
 struct SyncEngineReplayTests {
 
     // MARK: - Error classification
@@ -123,6 +123,39 @@ struct SyncEngineReplayTests {
         }
         await transport.releaseRequest()
         await stopTask.value
+
+        #expect(await engine.lastCleanDrainAt == nil)
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        #expect(remaining[0].localId == "server-second")
+    }
+
+    @Test("a mutation queued mid-cycle blocks the clean-drain stamp")
+    func mutationQueuedDuringReplayBlocksCleanDrain() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingSuccessfulReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-first")
+        await connManager.applyStateForTesting(.online)
+
+        // Drive the drain directly rather than starting the engine: the
+        // proactive-drain listener would pick the second record up on its own
+        // debounce and stamp a legitimate clean drain, hiding the defect.
+        let drain = Task { await engine.triggerProactiveDrainForTesting() }
+        await transport.waitUntilRequestStarted()
+
+        // Enqueued after the cycle read the queue, so the replay list this
+        // cycle is working from is already stale. The cycle succeeds on
+        // everything it knows about, which is not the same as a drained queue.
+        try await queue.enqueueDeleteItem(id: "server-second")
+        await transport.releaseRequest()
+        await drain.value
 
         #expect(await engine.lastCleanDrainAt == nil)
         let remaining = try await queue.fetchAll()

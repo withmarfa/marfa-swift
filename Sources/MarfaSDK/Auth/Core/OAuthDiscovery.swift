@@ -31,10 +31,22 @@ public actor OAuthDiscovery {
     }
 
     private let path = "/.well-known/oauth-authorization-server"
-    private var cache: [String: Endpoints] = [:]
+
+    /// A resolved well-known document: the endpoints the SDK consumes plus the
+    /// `issuer` the server published. The published issuer is retained because
+    /// the cache is keyed on the canonical issuer while RFC 8414 §3.3 requires
+    /// the published value to be identical to the issuer identifier *as the
+    /// caller asked for it*. Two spellings of one server therefore share a
+    /// fetch but are each checked on their own terms.
+    private struct ResolvedMetadata: Sendable {
+        let endpoints: Endpoints
+        let metadataIssuer: String
+    }
+
+    private var cache: [String: ResolvedMetadata] = [:]
     private struct InflightRequest {
         let id: UUID
-        let task: Task<Endpoints, Error>
+        let task: Task<ResolvedMetadata, Error>
     }
     private var inflight: [String: InflightRequest] = [:]
 
@@ -54,15 +66,19 @@ public actor OAuthDiscovery {
     ) async throws -> Endpoints {
         let key = try OAuthIssuer.canonicalURL(issuer)
         if let cached = cache[key.absoluteString] {
-            return cached
+            return try Self.verify(cached, requestedIssuer: issuer)
         }
         if let request = inflight[key.absoluteString] {
-            return try await request.task.value
+            return try Self.verify(
+                try await request.task.value,
+                requestedIssuer: issuer
+            )
         }
         let requestID = UUID()
         let task = Task { [path] in
-            try await Self.fetchEndpoints(
+            try await Self.fetchMetadata(
                 issuer: key,
+                requestedIssuer: issuer,
                 path: path,
                 httpClient: httpClient
             )
@@ -77,7 +93,7 @@ public actor OAuthDiscovery {
                 cache[key.absoluteString] = resolved
                 inflight.removeValue(forKey: key.absoluteString)
             }
-            return resolved
+            return try Self.verify(resolved, requestedIssuer: issuer)
         } catch {
             // Evict the inflight entry on failure so a later call can
             // retry — a stuck failed task would permanently break the
@@ -111,11 +127,33 @@ public actor OAuthDiscovery {
 
     // MARK: - Internals
 
-    private static func fetchEndpoints(
+    /// RFC 8414 §3.3: the published `issuer` must be identical to the issuer
+    /// identifier the caller asked for. The canonical form drives storage and
+    /// cache keys only — normalizing the comparison would both reject servers
+    /// whose issuer identifier legitimately ends in `/` and accept a document
+    /// that merely resembles the request.
+    private static func verify(
+        _ resolved: ResolvedMetadata,
+        requestedIssuer: URL
+    ) throws -> Endpoints {
+        guard resolved.metadataIssuer == requestedIssuer.absoluteString else {
+            throw OAuthDiscoveryError.malformedDoc(
+                issuer: requestedIssuer,
+                underlying: MetadataIssuerMismatch(
+                    metadataIssuer: resolved.metadataIssuer,
+                    requestedIssuer: requestedIssuer.absoluteString
+                )
+            )
+        }
+        return resolved.endpoints
+    }
+
+    private static func fetchMetadata(
         issuer: URL,
+        requestedIssuer: URL,
         path: String,
         httpClient: any DeviceFlowHTTPClient
-    ) async throws -> Endpoints {
+    ) async throws -> ResolvedMetadata {
         let discoveryURL = wellKnownURL(for: issuer, path: path)
         var request = URLRequest(url: discoveryURL)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -138,13 +176,13 @@ public actor OAuthDiscovery {
         } catch {
             throw OAuthDiscoveryError.malformedDoc(issuer: issuer, underlying: error)
         }
-        guard let metadataIssuer = URL(string: doc.issuer),
-              (try? OAuthIssuer.canonicalURL(metadataIssuer)) != nil,
-              doc.issuer == issuer.absoluteString
-        else {
+        guard doc.issuer == requestedIssuer.absoluteString else {
             throw OAuthDiscoveryError.malformedDoc(
-                issuer: issuer,
-                underlying: MetadataIssuerMismatch(metadataIssuer: doc.issuer)
+                issuer: requestedIssuer,
+                underlying: MetadataIssuerMismatch(
+                    metadataIssuer: doc.issuer,
+                    requestedIssuer: requestedIssuer.absoluteString
+                )
             )
         }
         guard
@@ -158,11 +196,14 @@ public actor OAuthDiscovery {
                 field: missingFieldName(doc)
             )
         }
-        return Endpoints(
-            token: token,
-            authorize: authorize,
-            revoke: revoke,
-            deviceAuthorize: deviceAuthorize
+        return ResolvedMetadata(
+            endpoints: Endpoints(
+                token: token,
+                authorize: authorize,
+                revoke: revoke,
+                deviceAuthorize: deviceAuthorize
+            ),
+            metadataIssuer: doc.issuer
         )
     }
 
@@ -197,9 +238,10 @@ public actor OAuthDiscovery {
 
     private struct MetadataIssuerMismatch: Error, CustomStringConvertible {
         let metadataIssuer: String
+        let requestedIssuer: String
 
         var description: String {
-            "metadata issuer \(metadataIssuer) does not match the requested issuer"
+            "metadata issuer \(metadataIssuer) does not match the requested issuer \(requestedIssuer)"
         }
     }
 }

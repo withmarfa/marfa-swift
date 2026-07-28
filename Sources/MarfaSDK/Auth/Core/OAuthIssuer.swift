@@ -72,6 +72,16 @@ enum OAuthIssuer {
         normalize(issuer).absoluteString
     }
 
+    /// Account name for a versioned credential slot.
+    ///
+    /// The `.v2` separator is load-bearing. A legacy account is always
+    /// `marfa.auth.tokens:<host>:<clientId>` — a colon directly after the
+    /// kind — and both `host` and `clientId` are attacker-influenced. A `:v2:`
+    /// prefix would therefore be reachable from a legacy account whose host is
+    /// literally `v2`, letting one account's key address another account's
+    /// slot. Separating the version with `.` instead of `:` makes the two
+    /// namespaces disjoint by construction, because a legacy key can never
+    /// carry a `.` in that position.
     static func storageKey(
         kind: String,
         issuer: URL,
@@ -79,7 +89,7 @@ enum OAuthIssuer {
     ) -> String {
         let issuerField = lengthPrefixed(identity(for: issuer))
         let clientField = lengthPrefixed(clientId)
-        return "marfa.auth.\(kind):v2:\(issuerField):\(clientField)"
+        return "marfa.auth.\(kind).v2:\(issuerField):\(clientField)"
     }
 
     static func legacyTokenStorageKey(

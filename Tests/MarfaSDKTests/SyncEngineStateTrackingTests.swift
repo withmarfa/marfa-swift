@@ -13,7 +13,7 @@ import Foundation
 ///   first access.
 ///
 /// Shared helpers live in ``SyncEngineTestKit`` (see SyncEngineTestSupport.swift).
-@Suite("SyncEngine state tracking")
+@Suite("SyncEngine state tracking", .timeLimit(.minutes(1)))
 struct SyncEngineStateTrackingTests {
 
     // MARK: - hasPendingMutations

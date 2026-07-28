@@ -11,7 +11,7 @@ import Foundation
 ///
 /// Uses ``SyncEngineTestKit.makeFixtureWithShortDebounce`` so the 20 ms
 /// debounce keeps assertions tight without sleeping for the 150 ms default.
-@Suite("SyncEngine proactive drain")
+@Suite("SyncEngine proactive drain", .timeLimit(.minutes(1)))
 struct SyncEngineProactiveDrainTests {
 
     @Test("proactive drain fires when a mutation is enqueued while online")

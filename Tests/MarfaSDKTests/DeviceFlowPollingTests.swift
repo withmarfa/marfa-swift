@@ -10,7 +10,7 @@ import Foundation
 /// All HTTP goes through ``FakeDeviceFlowHTTPClient`` and all time
 /// through ``ManualDeviceFlowClock``, so the suite runs in milliseconds
 /// with no real sleeps or network. Safe for parallel execution.
-@Suite("DeviceFlow polling", .serialized)
+@Suite("DeviceFlow polling", .serialized, .timeLimit(.minutes(1)))
 struct DeviceFlowPollingTests {
 
     // MARK: - Helpers

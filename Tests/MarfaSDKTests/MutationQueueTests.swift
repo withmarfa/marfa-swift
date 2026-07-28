@@ -7,7 +7,7 @@ import Foundation
 /// per-kind helpers / drain stream broadcast.
 ///
 /// Shared helpers live in ``SyncEngineTestKit`` (see SyncEngineTestSupport.swift).
-@Suite("MutationQueue")
+@Suite("MutationQueue", .timeLimit(.minutes(1)))
 struct MutationQueueTests {
 
     @Test("Queue starts empty") func startsEmpty() async throws {

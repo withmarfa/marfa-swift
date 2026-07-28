@@ -31,6 +31,11 @@ public actor ConnectionStateManager {
     private var started = false
     private var monitoringGeneration: UUID?
 
+    /// Counts ``markOnline()`` calls. `markOnline` is a no-op once the manager
+    /// is offline, so a caller that transitions after shutdown leaves no trace
+    /// in the state machine; the counter makes that call observable to tests.
+    private var markOnlineCallCount = 0
+
     // MARK: - Init
 
     public init() {}
@@ -77,6 +82,7 @@ public actor ConnectionStateManager {
 
     /// Called by the ``SyncEngine`` when the SSE stream is idle.
     public func markOnline() {
+        markOnlineCallCount += 1
         guard state != .offline else { return }
         applyState(.online)
     }
@@ -152,5 +158,9 @@ public actor ConnectionStateManager {
 
     internal var isStartedForTesting: Bool {
         started
+    }
+
+    internal var markOnlineCallCountForTesting: Int {
+        markOnlineCallCount
     }
 }

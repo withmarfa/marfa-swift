@@ -6,7 +6,7 @@ import SwiftData
 
 /// Tests for ``FullSyncStateQuery`` — the reactive surface over the
 /// engine's ``FullSyncState``.
-@Suite("FullSyncStateQuery")
+@Suite("FullSyncStateQuery", .timeLimit(.minutes(1)))
 @MainActor
 struct FullSyncStateQueryTests {
 

@@ -6,7 +6,7 @@ import SwiftData
 
 /// Tests for ``BlobUploadProgressQuery`` — the reactive projection of
 /// the sync engine's `blobUpload*` events.
-@Suite("BlobUploadProgressQuery")
+@Suite("BlobUploadProgressQuery", .timeLimit(.minutes(1)))
 @MainActor
 struct BlobUploadProgressQueryTests {
 

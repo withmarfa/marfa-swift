@@ -75,6 +75,35 @@ enum SyncEngineTestKit {
         if try await condition() { return }
         Issue.record("waitUntil: condition never satisfied within \(timeout)")
     }
+
+    /// The inverse of ``waitUntil``: proves something does *not* happen while
+    /// the window is open. Used for lifecycle invariants a regression breaks
+    /// immediately — a missing wait or guard publishes state within a couple
+    /// of actor hops, so a window measured in hundreds of milliseconds is
+    /// decisive rather than a timing gamble.
+    static func expectRemainsFalse(
+        for duration: Duration,
+        every: Duration = .milliseconds(10),
+        _ condition: @Sendable () async throws -> Bool
+    ) async throws {
+        let deadline = ContinuousClock.now + duration
+        while ContinuousClock.now < deadline {
+            if try await condition() {
+                Issue.record("expectRemainsFalse: condition became true within \(duration)")
+                return
+            }
+            try await Task.sleep(for: every)
+        }
+    }
+}
+
+/// One-shot flag for observing that an async consumer finished.
+actor TestLatch {
+    private(set) var isSet = false
+
+    func set() {
+        isSet = true
+    }
 }
 
 // Test-only Transport used by the concurrency-guard test. Its `request` call
@@ -157,6 +186,7 @@ actor BlockingReplayTransport: Transport {
     private var requestContinuation: CheckedContinuation<Void, Never>?
     private var requestStarted = false
     private var requestStartedWaiters: [CheckedContinuation<Void, Never>] = []
+    private var blocking = true
     private(set) var requestCallCount = 0
 
     func waitUntilRequestStarted() async {
@@ -171,6 +201,14 @@ actor BlockingReplayTransport: Transport {
         requestContinuation = nil
     }
 
+    /// Releases the in-flight request and lets every later one fail straight
+    /// through. Teardown after a restart cannot know whether the engine has
+    /// already reopened a replay, so a one-shot release would race it.
+    func stopBlocking() {
+        blocking = false
+        releaseRequest()
+    }
+
     func request<T: Decodable & Sendable>(
         method: HTTPMethod,
         path: String,
@@ -181,8 +219,10 @@ actor BlockingReplayTransport: Transport {
         requestStarted = true
         for waiter in requestStartedWaiters { waiter.resume() }
         requestStartedWaiters.removeAll()
-        await withCheckedContinuation { continuation in
-            requestContinuation = continuation
+        if blocking {
+            await withCheckedContinuation { continuation in
+                requestContinuation = continuation
+            }
         }
         throw NetworkError(
             NSError(

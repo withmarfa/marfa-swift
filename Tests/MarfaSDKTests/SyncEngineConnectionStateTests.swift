@@ -3,7 +3,7 @@ import Foundation
 @testable import MarfaSDK
 
 /// `ConnectionStateManager` lifecycle and state-transition guards.
-@Suite("ConnectionStateManager")
+@Suite("ConnectionStateManager", .timeLimit(.minutes(1)))
 struct SyncEngineConnectionStateTests {
 
     @Test("initial state is offline") func initialState() async {

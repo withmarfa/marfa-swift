@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 // MARK: - SSE event payload envelopes
 
@@ -94,6 +95,20 @@ public actor SyncEngine {
     private var shouldSuspendNextStartPublicationForTesting = false
     private var startPublicationContinuationForTesting: CheckedContinuation<Void, Never>?
 
+    // Deterministic seams for the two actor-reentry windows in `openStream`
+    // that run after the stream has closed. Both windows are microseconds wide
+    // in production, so a lifecycle regression in either is invisible to a
+    // timing-based test; the seams widen them on demand.
+    internal enum StreamSuspendPointForTesting: Sendable, Equatable {
+        /// Between the stream closing and the `.online` transition.
+        case beforeMarkOnline
+        /// Between the `.online` transition and the reconnect nudge.
+        case beforeReconnectSchedule
+    }
+
+    private var streamSuspendPointForTesting: StreamSuspendPointForTesting?
+    private var streamSuspendContinuationForTesting: CheckedContinuation<Void, Never>?
+
     /// Child task listening to `mutationQueue.drainRequests`. Feeds
     /// `drainDebounceTask` — one schedule-and-coalesce cycle per burst.
     /// Cancelled on `stop()`.
@@ -140,29 +155,43 @@ public actor SyncEngine {
     /// SwiftUI view backing a "Last synced" footer or a merge-toast surface).
     /// Past events are not replayed to late subscribers; the engine yields
     /// each event once per running consumer.
+    ///
+    /// Subscription completes before the property returns, so a caller that
+    /// takes a stream and immediately calls ``stop()`` gets a finished stream
+    /// rather than one that never yields and never ends. Every open stream
+    /// finishes when ``stop()`` reaches quiescence; a restarted engine hands
+    /// out fresh streams.
     public nonisolated var events: AsyncStream<SyncEvent> {
-        AsyncStream<SyncEvent> { continuation in
-            Task { await self.subscribe(continuation) }
-            continuation.onTermination = { @Sendable _ in
-                // Continuation finished — nothing to clean up explicitly;
-                // the actor's stored continuations are pruned when their
-                // `yield` returns `.terminated`.
+        let (stream, continuation) = AsyncStream<SyncEvent>.makeStream()
+        subscribers.withLock { $0.append(continuation) }
+        return stream
+    }
+
+    /// Held under a mutex rather than in actor state so that subscription is
+    /// synchronous with the `events` access. Registering through a detached
+    /// task instead would let a `stop()` issued right after subscribing run
+    /// first, leaving the new continuation attached to a stopped engine and
+    /// its consumer awaiting an event that can never arrive.
+    private let subscribers = Mutex<[AsyncStream<SyncEvent>.Continuation]>([])
+
+    private func emit(_ event: SyncEvent) {
+        subscribers.withLock { continuations in
+            continuations.removeAll { continuation in
+                if case .terminated = continuation.yield(event) { return true }
+                return false
             }
         }
     }
 
-    private var continuations: [AsyncStream<SyncEvent>.Continuation] = []
-
-    private func subscribe(_ continuation: AsyncStream<SyncEvent>.Continuation) {
-        continuations.append(continuation)
-    }
-
-    private func emit(_ event: SyncEvent) {
-        continuations.removeAll { c in
-            switch c.yield(event) {
-            case .terminated: return true
-            default: return false
-            }
+    /// Ends every open ``events`` stream. Called once ``stop()`` has reached
+    /// quiescence, so subscribers see the final events of the cycle first.
+    private nonisolated func finishEventSubscribers() {
+        let open = subscribers.withLock { continuations in
+            defer { continuations.removeAll() }
+            return continuations
+        }
+        for continuation in open {
+            continuation.finish()
         }
     }
 
@@ -326,9 +355,29 @@ public actor SyncEngine {
         }
     }
 
-    /// Stops the sync engine and cancels the active SSE connection. Also stops
-    /// the underlying ``ConnectionStateManager`` so `NWPathMonitor` releases
-    /// its queue and any open `stateUpdates` streams finish.
+    /// Stops the sync engine and waits for it to go quiet.
+    ///
+    /// Cancellation alone is a request, not an outcome: an in-flight mutation
+    /// replay or SSE handler observes it at its next suspension point and may
+    /// still be mid-accounting when the cancel returns. `stop()` therefore
+    /// cancels, then awaits every task the engine owns, so that when it
+    /// returns no engine-owned work is still running and nothing can write
+    /// into the stopped lifecycle. Callers that only want to signal shutdown
+    /// without waiting should call it from a task of their own.
+    ///
+    /// Also stops the underlying ``ConnectionStateManager`` so `NWPathMonitor`
+    /// releases its queue and any open `stateUpdates` streams finish, and
+    /// finishes every open ``events`` stream.
+    ///
+    /// Concurrent calls share one barrier — a second `stop()` awaits the same
+    /// quiescence point rather than starting a second teardown. A ``start()``
+    /// issued during a stop waits for that barrier before opening a new
+    /// lifecycle.
+    ///
+    /// The wait is bounded by the transport honoring cancellation on its
+    /// in-flight request. ``URLSessionTransport`` does; a custom ``Transport``
+    /// that ignores cancellation can hold `stop()` open for as long as its
+    /// request runs.
     public func stop() async {
         if let stoppingTask {
             await stoppingTask.value
@@ -362,10 +411,35 @@ public actor SyncEngine {
             await drainListenerTask?.value
             await drainDebounceTask?.value
             await reconnectTask?.value
+            await self.drainResidualLifecycleTasks()
+            self.finishEventSubscribers()
         }
         stoppingTask = barrier
         await barrier.value
         stoppingTask = nil
+    }
+
+    /// Awaits any task installed into a lifecycle slot after `stop()` took its
+    /// snapshot. A path already past its own `running` check when the snapshot
+    /// was taken can still publish one task; the snapshot cannot see it, so
+    /// awaiting only the snapshot would let `stop()` return with live work.
+    /// Terminates because `running` is already false and `stoppingTask` is
+    /// still set, so no path can install another round.
+    private func drainResidualLifecycleTasks() async {
+        while hasLifecycleTasks {
+            let residual = [streamTask, drainListenerTask, drainDebounceTask, reconnectTask]
+            streamTask = nil
+            drainListenerTask = nil
+            drainDebounceTask = nil
+            reconnectTask = nil
+            for task in residual { task?.cancel() }
+            for task in residual { await task?.value }
+        }
+    }
+
+    private var hasLifecycleTasks: Bool {
+        streamTask != nil || drainListenerTask != nil
+            || drainDebounceTask != nil || reconnectTask != nil
     }
 
     /// Performs a one-shot catch-up import: paginates through `GET
@@ -531,8 +605,16 @@ public actor SyncEngine {
         }
 
         await replayMutations()
+        await suspendStreamIfNeededForTesting(at: .beforeMarkOnline)
         guard running else { return }
         await connectionManager.markOnline()
+        await suspendStreamIfNeededForTesting(at: .beforeReconnectSchedule)
+        // `markOnline` released the actor, so a stop may have completed its
+        // synchronous teardown and snapshotted the task slots while this call
+        // was suspended. Re-check before installing anything: an unstructured
+        // reconnect task does not inherit the stream task's cancellation, so
+        // one scheduled past this point would outlive the stop barrier.
+        guard running else { return }
 
         // Reconnect nudge. Without this, a closed-but-not-errored SSE stream
         // (server-side idle timeout, catchup_too_old finalize, transport
@@ -634,8 +716,44 @@ public actor SyncEngine {
     }
 
     internal var hasLifecycleTasksForTesting: Bool {
-        streamTask != nil || drainListenerTask != nil ||
-            drainDebounceTask != nil || reconnectTask != nil
+        hasLifecycleTasks
+    }
+
+    internal var isStreamSuspendedForTesting: Bool {
+        streamSuspendContinuationForTesting != nil
+    }
+
+    internal nonisolated var eventSubscriberCountForTesting: Int {
+        subscribers.withLock { $0.count }
+    }
+
+    /// Subscribes and reports the resulting count without releasing actor
+    /// isolation in between. A registration routed through a task needs this
+    /// actor to land, so it provably cannot interleave here — which is what
+    /// makes "did `events` register before it returned?" an assertion rather
+    /// than a race the caller might win.
+    internal func subscribeAndCountForTesting() -> (AsyncStream<SyncEvent>, Int) {
+        let stream = events
+        return (stream, eventSubscriberCountForTesting)
+    }
+
+    internal func suspendStreamForTesting(at point: StreamSuspendPointForTesting) {
+        streamSuspendPointForTesting = point
+    }
+
+    internal func resumeStreamForTesting() {
+        streamSuspendContinuationForTesting?.resume()
+        streamSuspendContinuationForTesting = nil
+    }
+
+    private func suspendStreamIfNeededForTesting(
+        at point: StreamSuspendPointForTesting
+    ) async {
+        guard streamSuspendPointForTesting == point else { return }
+        streamSuspendPointForTesting = nil
+        await withCheckedContinuation { continuation in
+            streamSuspendContinuationForTesting = continuation
+        }
     }
 
     internal func suspendNextStartPublicationForTesting() {

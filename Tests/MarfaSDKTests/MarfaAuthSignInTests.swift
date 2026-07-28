@@ -118,14 +118,62 @@ private actor MigrationTrackingStorage: SecureStorage {
     private var setCounts: [String: Int] = [:]
     private var deleteCounts: [String: Int] = [:]
 
-    init(values: [String: String]) {
+    /// Rendezvous point for the single-flight migration test. A caller that
+    /// reaches a write to `rendezvousAccount` parks until `rendezvousParties`
+    /// callers have arrived, or until the window elapses.
+    ///
+    /// The window is what keeps a correctly single-flighted migration from
+    /// deadlocking: under the lock only one caller can ever arrive, so it must
+    /// be able to give up waiting and finish alone. Without the lock both
+    /// callers arrive, and pinning the first one on the far side of its
+    /// "is the canonical account still empty?" read is what forces the second
+    /// to observe an empty account and promote the same token twice.
+    private var rendezvousAccount: String?
+    private var rendezvousParties = 0
+    private var rendezvousArrivals = 0
+    private var rendezvousWaiters: [CheckedContinuation<Void, Never>] = []
+    private let rendezvousWindow: Duration = .milliseconds(250)
+
+    init(
+        values: [String: String],
+        rendezvousOnWriteTo account: String? = nil,
+        parties: Int = 2
+    ) {
         self.values = values
+        self.rendezvousAccount = account
+        self.rendezvousParties = parties
     }
 
     func set(_ value: String, for account: String) async throws {
         await Task.yield()
+        if account == rendezvousAccount {
+            await rendezvous()
+        }
         values[account] = value
         setCounts[account, default: 0] += 1
+    }
+
+    private func rendezvous() async {
+        rendezvousArrivals += 1
+        guard rendezvousArrivals < rendezvousParties else {
+            releaseRendezvous()
+            return
+        }
+        let window = rendezvousWindow
+        let timeout = Task { [weak self] in
+            try? await Task.sleep(for: window)
+            await self?.releaseRendezvous()
+        }
+        await withCheckedContinuation { continuation in
+            rendezvousWaiters.append(continuation)
+        }
+        timeout.cancel()
+    }
+
+    private func releaseRendezvous() {
+        let waiters = rendezvousWaiters
+        rendezvousWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
     }
 
     func get(for account: String) async throws -> String? {
@@ -152,7 +200,7 @@ private actor MigrationTrackingStorage: SecureStorage {
     }
 }
 
-@Suite("MarfaAuth sign-in flow", .serialized)
+@Suite("MarfaAuth sign-in flow", .serialized, .timeLimit(.minutes(1)))
 @MainActor
 struct MarfaAuthSignInTests {
 
@@ -499,7 +547,10 @@ struct MarfaAuthSignInTests {
         let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
         let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
         let token = #"{"access_token":"legacy-token","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
-        let storage = MigrationTrackingStorage(values: [legacyKey: token])
+        let storage = MigrationTrackingStorage(
+            values: [legacyKey: token],
+            rendezvousOnWriteTo: canonicalKey
+        )
         let session = makeStubbedSession()
         let firstAuth = MarfaAuth(
             issuer: rootIssuer,
@@ -530,6 +581,51 @@ struct MarfaAuthSignInTests {
         #expect(await storage.value(for: legacyKey) == nil)
         #expect(await storage.setCount(for: canonicalKey) == 1)
         #expect(await storage.deleteCount(for: legacyKey) == 1)
+    }
+
+    @Test("a legacy account can never address a versioned account")
+    func legacyAccountCannotAddressVersionedNamespace() async throws {
+        // A legacy account is `marfa.auth.tokens:<host>:<clientId>` and both
+        // fields are caller-supplied, so a host of literally "v2" plus a
+        // client id spelling out the length-prefixed body reconstructs another
+        // account's versioned key byte for byte. The victim below is
+        // `https://example.com` + `abcdef`, whose issuer identity is 19 bytes
+        // and client id 6.
+        let victimIssuer = URL(string: "https://example.com")!
+        let victimClientId = "abcdef"
+        let victimKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: victimIssuer,
+            clientId: victimClientId
+        )
+
+        let aliasIssuer = URL(string: "https://v2")!
+        let aliasClientId = "19:https://example.com:6:abcdef"
+        let aliasLegacyKey = OAuthIssuer.legacyTokenStorageKey(
+            issuer: aliasIssuer,
+            clientId: aliasClientId
+        )
+        #expect(aliasLegacyKey != victimKey)
+
+        // End to end. `https://v2` is absolute, HTTPS, portless and path-free,
+        // so it clears every migration guard — key disjointness is the only
+        // thing standing between the alias and the victim's token.
+        let storage = InMemoryKeychain()
+        try await storage.set("victim-token", for: victimKey)
+        let migrated = try await OAuthIssuer.migrateLegacyRootTokenIfNeeded(
+            in: storage,
+            issuer: aliasIssuer,
+            clientId: aliasClientId
+        )
+        let aliasKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: aliasIssuer,
+            clientId: aliasClientId
+        )
+
+        #expect(migrated == false)
+        #expect(await storage.peek(account: victimKey) == "victim-token")
+        #expect(await storage.peek(account: aliasKey) == nil)
     }
 
     @Test("length-prefixed storage accounts separate delimiter collisions")

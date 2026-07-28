@@ -75,7 +75,7 @@ private func makeStubbedSession() -> URLSession {
     return URLSession(configuration: config)
 }
 
-@Suite("MarfaAuth sign-out / revoke", .serialized)
+@Suite("MarfaAuth sign-out / revoke", .serialized, .timeLimit(.minutes(1)))
 @MainActor
 struct AuthRevokeTests {
 

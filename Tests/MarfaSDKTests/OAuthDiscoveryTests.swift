@@ -8,7 +8,7 @@ import MarfaSDKTestSupport
 /// than clearing the shared cache — see `uniqueIssuer(_:)`. A struct suite
 /// is instantiated once per test, so this stored property is a fresh
 /// origin every time.
-@Suite("OAuthDiscovery")
+@Suite("OAuthDiscovery", .timeLimit(.minutes(1)))
 struct OAuthDiscoveryTests {
 
     private let issuer = uniqueIssuer("oauth-discovery")
@@ -180,17 +180,18 @@ struct OAuthDiscoveryTests {
         }
     }
 
-    @Test("metadata issuer must exactly equal the requested canonical string")
-    func metadataIssuerRequiresCanonicalExactMatch() async throws {
-        let nonCanonicalMetadata = [
+    @Test("metadata issuer must exactly equal the requested issuer")
+    func metadataIssuerRequiresExactMatch() async throws {
+        let mismatchedMetadata = [
             "https://EXAMPLE.test",
             "https://example.test/",
+            "https://example.test:443",
             "https://user@example.test",
             "https://example.test?tenant=a",
             "https://example.test#tenant-a",
         ]
 
-        for metadataIssuer in nonCanonicalMetadata {
+        for metadataIssuer in mismatchedMetadata {
             let discovery = OAuthDiscovery()
             let http = FakeDeviceFlowHTTPClient()
             try http.enqueueJSON(DiscoveryDoc(issuer: metadataIssuer))
@@ -200,16 +201,69 @@ struct OAuthDiscoveryTests {
         }
     }
 
-    @Test("requested issuer is canonicalized before exact metadata comparison")
-    func requestedIssuerCanonicalization() async throws {
+    /// RFC 8414 §3.3 requires the published issuer to be identical to the
+    /// issuer identifier the caller asked for. Canonicalizing the caller's
+    /// side before comparing accepts a document that merely resembles the
+    /// request, so this asserts the comparison stays verbatim while the
+    /// canonical form still drives the well-known URL.
+    @Test("comparison uses the requested spelling, URL construction the canonical one")
+    func metadataComparisonUsesTheRequestedSpelling() async throws {
         let discovery = OAuthDiscovery()
         let requested = URL(string: "HTTPS://EXAMPLE.TEST/")!
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: "https://example.test"))
 
-        _ = try await discovery.endpoints(for: requested, httpClient: http)
-
+        await #expect(throws: OAuthDiscoveryError.self) {
+            _ = try await discovery.endpoints(for: requested, httpClient: http)
+        }
         #expect(http.calls.first?.url == URL(string: "https://example.test/.well-known/oauth-authorization-server"))
+
+        let matching = OAuthDiscovery()
+        let matchingHTTP = FakeDeviceFlowHTTPClient()
+        try matchingHTTP.enqueueJSON(DiscoveryDoc(issuer: "HTTPS://EXAMPLE.TEST/"))
+        _ = try await matching.endpoints(for: requested, httpClient: matchingHTTP)
+        #expect(matchingHTTP.calls.first?.url == URL(string: "https://example.test/.well-known/oauth-authorization-server"))
+    }
+
+    /// A trailing slash is a common real-world issuer identifier shape.
+    /// Canonicalizing it away on the request side made every such server
+    /// unusable, because the published issuer could never match.
+    @Test("an issuer identifier ending in a slash is usable")
+    func trailingSlashIssuerIsUsable() async throws {
+        let discovery = OAuthDiscovery()
+        let requested = URL(string: "https://trailing-slash.test/")!
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(DiscoveryDoc(
+            issuer: "https://trailing-slash.test/",
+            authorize: "https://trailing-slash.test/authorize",
+            token: "https://trailing-slash.test/token",
+            revoke: "https://trailing-slash.test/revoke",
+            deviceAuthorize: "https://trailing-slash.test/device"
+        ))
+
+        let endpoints = try await discovery.endpoints(for: requested, httpClient: http)
+        #expect(endpoints.token == URL(string: "https://trailing-slash.test/token"))
+        #expect(http.calls.first?.url == URL(string: "https://trailing-slash.test/.well-known/oauth-authorization-server"))
+    }
+
+    /// Two spellings of one server share a cache entry keyed on the canonical
+    /// issuer, so the identity check has to be re-applied per caller rather
+    /// than inherited from whoever fetched first.
+    @Test("a cached document is re-checked against each caller's spelling")
+    func cachedDocumentIsRecheckedPerCaller() async throws {
+        let discovery = OAuthDiscovery()
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(DiscoveryDoc(issuer: "https://example.test"))
+
+        _ = try await discovery.endpoints(for: issuer, httpClient: http)
+        #expect(http.calls.count == 1)
+
+        let otherSpelling = URL(string: "https://example.test/")!
+        await #expect(throws: OAuthDiscoveryError.self) {
+            _ = try await discovery.endpoints(for: otherSpelling, httpClient: http)
+        }
+        // Served from cache — the rejection is the identity check, not a refetch.
+        #expect(http.calls.count == 1)
     }
 
     @Test("evicts the cache on rejection so a later call retries")
