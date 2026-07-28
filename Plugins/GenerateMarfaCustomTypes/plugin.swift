@@ -26,18 +26,18 @@ struct GenerateMarfaCustomTypes: CommandPlugin {
 
         if runSync {
             let sync = try context.tool(named: "sync-custom-types")
-            try run(tool: sync.path.string, arguments: passthrough, workingDirectory: context.package.directory.string)
+            try run(tool: sync.url, arguments: passthrough, workingDirectory: context.package.directoryURL)
         } else {
             let codegen = try context.tool(named: "codegen-custom-types")
-            try run(tool: codegen.path.string, arguments: passthrough, workingDirectory: context.package.directory.string)
+            try run(tool: codegen.url, arguments: passthrough, workingDirectory: context.package.directoryURL)
         }
     }
 
-    private func run(tool: String, arguments: [String], workingDirectory: String) throws {
+    private func run(tool: URL, arguments: [String], workingDirectory: URL) throws {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: tool)
+        process.executableURL = tool
         process.arguments = arguments
-        process.currentDirectoryURL = URL(fileURLWithPath: workingDirectory)
+        process.currentDirectoryURL = workingDirectory
         try process.run()
         process.waitUntilExit()
         if process.terminationStatus != 0 {
