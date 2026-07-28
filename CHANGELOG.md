@@ -5,7 +5,17 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [11.4.0] — 2026-07-28
+
+### Upgrade note
+
+Tokens stored against an issuer carrying a path, an explicit port, or a
+non-HTTPS scheme are deliberately **not** migrated to the new credential
+namespace, so those users sign in once more. Migrating them is precisely the
+bug the security fix below closes: the migration read a slot it could not
+prove belonged to the caller. Signing in again re-stores the token under the
+new, disjoint namespace.
+
 
 ### Added
 
