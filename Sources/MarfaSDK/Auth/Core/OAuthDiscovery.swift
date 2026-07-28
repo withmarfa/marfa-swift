@@ -31,8 +31,24 @@ public actor OAuthDiscovery {
     }
 
     private let path = "/.well-known/oauth-authorization-server"
-    private var cache: [String: Endpoints] = [:]
-    private var inflight: [String: Task<Endpoints, Error>] = [:]
+
+    /// A resolved well-known document: the endpoints the SDK consumes plus the
+    /// `issuer` the server published. The published issuer is retained because
+    /// the cache is keyed on the canonical issuer while RFC 8414 §3.3 requires
+    /// the published value to be identical to the issuer identifier *as the
+    /// caller asked for it*. Two spellings of one server therefore share a
+    /// fetch but are each checked on their own terms.
+    private struct ResolvedMetadata: Sendable {
+        let endpoints: Endpoints
+        let metadataIssuer: String
+    }
+
+    private var cache: [String: ResolvedMetadata] = [:]
+    private struct InflightRequest {
+        let id: UUID
+        let task: Task<ResolvedMetadata, Error>
+    }
+    private var inflight: [String: InflightRequest] = [:]
 
     public init() {}
 
@@ -48,62 +64,97 @@ public actor OAuthDiscovery {
         for issuer: URL,
         httpClient: any DeviceFlowHTTPClient = URLSession.shared
     ) async throws -> Endpoints {
-        let key = Self.normalize(issuer)
+        let key = try OAuthIssuer.canonicalURL(issuer)
         if let cached = cache[key.absoluteString] {
-            return cached
+            return try Self.verify(cached, requestedIssuer: issuer)
         }
-        if let task = inflight[key.absoluteString] {
-            return try await task.value
+        if let request = inflight[key.absoluteString] {
+            return try Self.verify(
+                try await request.task.value,
+                requestedIssuer: issuer
+            )
         }
+        let requestID = UUID()
         let task = Task { [path] in
-            try await Self.fetchEndpoints(
+            try await Self.fetchMetadata(
                 issuer: key,
+                requestedIssuer: issuer,
                 path: path,
                 httpClient: httpClient
             )
         }
-        inflight[key.absoluteString] = task
+        inflight[key.absoluteString] = InflightRequest(id: requestID, task: task)
         do {
             let resolved = try await task.value
-            cache[key.absoluteString] = resolved
-            inflight.removeValue(forKey: key.absoluteString)
-            return resolved
+            // A test reset may have cancelled and replaced this request while
+            // its HTTP client ignored cancellation. Only the request that still
+            // owns the key may publish into the cache or clear the in-flight slot.
+            if inflight[key.absoluteString]?.id == requestID {
+                cache[key.absoluteString] = resolved
+                inflight.removeValue(forKey: key.absoluteString)
+            }
+            return try Self.verify(resolved, requestedIssuer: issuer)
         } catch {
             // Evict the inflight entry on failure so a later call can
             // retry — a stuck failed task would permanently break the
             // SDK after a single network blip.
-            inflight.removeValue(forKey: key.absoluteString)
+            if inflight[key.absoluteString]?.id == requestID {
+                inflight.removeValue(forKey: key.absoluteString)
+            }
             throw error
         }
     }
 
-    /// Test-only — clears the in-actor cache. Production callers never
-    /// need this; the cache is correct by construction for process
-    /// lifetime.
+    /// Test-only — clears every cached issuer while preserving the original
+    /// public symbol for source and binary compatibility.
     public func reset() {
+        for request in inflight.values {
+            request.task.cancel()
+        }
         cache.removeAll()
         inflight.removeAll()
     }
 
-    // MARK: - Internals
-
-    private static func normalize(_ url: URL) -> URL {
-        // Use the origin (scheme + host + port). Trailing-slash strip
-        // is implicit since URL absoluteString excludes path when there
-        // isn't one. For URLs with paths, fall back to the original.
-        var components = URLComponents()
-        components.scheme = url.scheme?.lowercased()
-        components.host = url.host?.lowercased()
-        components.port = url.port
-        return components.url ?? url
+    /// Issuer-scoped test seam. Internal so cache control does not expand the
+    /// SDK's public API; package tests reach it through `@testable import`.
+    internal func reset(for issuer: URL) {
+        guard let key = try? OAuthIssuer.canonicalURL(issuer).absoluteString else {
+            return
+        }
+        cache.removeValue(forKey: key)
+        inflight.removeValue(forKey: key)?.task.cancel()
     }
 
-    private static func fetchEndpoints(
+    // MARK: - Internals
+
+    /// RFC 8414 §3.3: the published `issuer` must be identical to the issuer
+    /// identifier the caller asked for. The canonical form drives storage and
+    /// cache keys only — normalizing the comparison would both reject servers
+    /// whose issuer identifier legitimately ends in `/` and accept a document
+    /// that merely resembles the request.
+    private static func verify(
+        _ resolved: ResolvedMetadata,
+        requestedIssuer: URL
+    ) throws -> Endpoints {
+        guard resolved.metadataIssuer == requestedIssuer.absoluteString else {
+            throw OAuthDiscoveryError.malformedDoc(
+                issuer: requestedIssuer,
+                underlying: MetadataIssuerMismatch(
+                    metadataIssuer: resolved.metadataIssuer,
+                    requestedIssuer: requestedIssuer.absoluteString
+                )
+            )
+        }
+        return resolved.endpoints
+    }
+
+    private static func fetchMetadata(
         issuer: URL,
+        requestedIssuer: URL,
         path: String,
         httpClient: any DeviceFlowHTTPClient
-    ) async throws -> Endpoints {
-        let discoveryURL = issuer.appendingPathComponent(path)
+    ) async throws -> ResolvedMetadata {
+        let discoveryURL = wellKnownURL(for: issuer, path: path)
         var request = URLRequest(url: discoveryURL)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let data: Data
@@ -125,6 +176,15 @@ public actor OAuthDiscovery {
         } catch {
             throw OAuthDiscoveryError.malformedDoc(issuer: issuer, underlying: error)
         }
+        guard doc.issuer == requestedIssuer.absoluteString else {
+            throw OAuthDiscoveryError.malformedDoc(
+                issuer: requestedIssuer,
+                underlying: MetadataIssuerMismatch(
+                    metadataIssuer: doc.issuer,
+                    requestedIssuer: requestedIssuer.absoluteString
+                )
+            )
+        }
         guard
             let token = doc.token_endpoint.flatMap(URL.init(string:)),
             let authorize = doc.authorization_endpoint.flatMap(URL.init(string:)),
@@ -136,19 +196,37 @@ public actor OAuthDiscovery {
                 field: missingFieldName(doc)
             )
         }
-        return Endpoints(
-            token: token,
-            authorize: authorize,
-            revoke: revoke,
-            deviceAuthorize: deviceAuthorize
+        return ResolvedMetadata(
+            endpoints: Endpoints(
+                token: token,
+                authorize: authorize,
+                revoke: revoke,
+                deviceAuthorize: deviceAuthorize
+            ),
+            metadataIssuer: doc.issuer
         )
     }
 
     private struct DiscoveryDoc: Decodable {
+        let issuer: String
         let token_endpoint: String?
         let authorization_endpoint: String?
         let revocation_endpoint: String?
         let device_authorization_endpoint: String?
+    }
+
+    /// RFC 8414 places the well-known path before an issuer path component:
+    /// `https://host/.well-known/oauth-authorization-server/tenant`.
+    private static func wellKnownURL(for issuer: URL, path: String) -> URL {
+        guard var components = URLComponents(url: issuer, resolvingAgainstBaseURL: false) else {
+            return issuer.appendingPathComponent(path)
+        }
+
+        let issuerPath = components.percentEncodedPath
+        components.percentEncodedPath = path + issuerPath
+        components.query = nil
+        components.fragment = nil
+        return components.url ?? issuer.appendingPathComponent(path)
     }
 
     private static func missingFieldName(_ doc: DiscoveryDoc) -> String {
@@ -156,6 +234,15 @@ public actor OAuthDiscovery {
         if doc.authorization_endpoint == nil { return "authorization_endpoint" }
         if doc.revocation_endpoint == nil { return "revocation_endpoint" }
         return "device_authorization_endpoint"
+    }
+
+    private struct MetadataIssuerMismatch: Error, CustomStringConvertible {
+        let metadataIssuer: String
+        let requestedIssuer: String
+
+        var description: String {
+            "metadata issuer \(metadataIssuer) does not match the requested issuer \(requestedIssuer)"
+        }
     }
 }
 
@@ -180,7 +267,7 @@ extension OAuthDiscoveryError: CustomStringConvertible {
         case .httpError(let issuer, let status):
             return "OAuth discovery returned HTTP \(status) from \(issuer.absoluteString)"
         case .malformedDoc(let issuer, let underlying):
-            return "OAuth discovery doc was not valid JSON from \(issuer.absoluteString): \(underlying)"
+            return "OAuth discovery metadata from \(issuer.absoluteString) is invalid: \(underlying)"
         case .missingField(let issuer, let field):
             return "OAuth discovery doc from \(issuer.absoluteString) is missing required field \"\(field)\""
         }

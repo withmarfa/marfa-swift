@@ -11,7 +11,7 @@ import Foundation
 ///
 /// Uses ``SyncEngineTestKit.makeFixtureWithShortDebounce`` so the 20 ms
 /// debounce keeps assertions tight without sleeping for the 150 ms default.
-@Suite("SyncEngine proactive drain")
+@Suite("SyncEngine proactive drain", .timeLimit(.minutes(1)))
 struct SyncEngineProactiveDrainTests {
 
     @Test("proactive drain fires when a mutation is enqueued while online")
@@ -26,7 +26,7 @@ struct SyncEngineProactiveDrainTests {
 
         // Wait until the stream close has landed us on .online.
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            await connManager.state == .online
+            connManager.state == .online
         }
 
         // Queue a delete. Transport replies with a 204 via EmptyResponse
@@ -50,7 +50,7 @@ struct SyncEngineProactiveDrainTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            await connManager.state == .online
+            connManager.state == .online
         }
 
         // Five mutations back-to-back. Each expects one transport round

@@ -7,7 +7,7 @@ import MarfaSDKTestSupport
 ///
 /// All tests use an in-memory SwiftData container so they leave no on-disk
 /// artifacts and run safely in parallel.
-@Suite("LocalStore")
+@Suite("LocalStore", .timeLimit(.minutes(1)))
 struct LocalStoreTests {
 
     // MARK: - Helpers
@@ -53,6 +53,44 @@ struct LocalStoreTests {
         // but exercising the default-argument path guards against
         // accidental signature regressions.
         _ = try MarfaModelContainer.make(path: ":memory:")
+    }
+
+    @Test("SDK container construction serializes behind the shared creation lock")
+    func containerConstructionSerializes() async throws {
+        // Overlapping `make(path:)` calls do not fail on their own — SwiftData
+        // container construction is racy, not crash-on-contention — so a test
+        // that only fans out and expects no throw passes with or without the
+        // lock. Holding the lock and proving a concurrent `make` cannot get
+        // past it is what actually pins the serialization down.
+
+        // Pay SwiftData's one-time setup cost first so the observation window
+        // measures the lock, not container construction.
+        _ = try MarfaModelContainer.make(path: ":memory:")
+
+        let releaseLock = DispatchSemaphore(value: 0)
+        await withCheckedContinuation { (acquired: CheckedContinuation<Void, Never>) in
+            DispatchQueue.global().async {
+                MarfaModelContainer.withCreationLock {
+                    acquired.resume()
+                    releaseLock.wait()
+                }
+            }
+        }
+
+        let completed = TestLatch()
+        DispatchQueue.global().async {
+            _ = try? MarfaModelContainer.make(path: ":memory:")
+            Task { await completed.set() }
+        }
+
+        try await SyncEngineTestKit.expectRemainsFalse(for: .milliseconds(400)) {
+            await completed.isSet
+        }
+
+        releaseLock.signal()
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(5)) {
+            await completed.isSet
+        }
     }
 
     // MARK: - Item CRUD (via LocalStore directly)

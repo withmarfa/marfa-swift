@@ -94,16 +94,17 @@ private func makeStubbedSession() -> URLSession {
 /// Stub well-known discovery doc — the SDK reads this on first OAuth
 /// operation. Tests queue it ahead of their scripted token/revoke
 /// responses.
-private func discoveryCanned() -> MarfaAuthStubURLProtocol.Canned {
-    let body = #"""
+private func discoveryCanned(for issuer: URL) -> MarfaAuthStubURLProtocol.Canned {
+    let base = issuer.absoluteString
+    let body = """
     {
-      "issuer": "https://staging.marfa.so",
-      "authorization_endpoint": "https://staging.marfa.so/auth/oauth2/authorize",
-      "token_endpoint": "https://staging.marfa.so/auth/oauth2/token",
-      "revocation_endpoint": "https://staging.marfa.so/auth/oauth2/revoke",
-      "device_authorization_endpoint": "https://staging.marfa.so/auth/device"
+      "issuer": "\(base)",
+      "authorization_endpoint": "\(base)/auth/oauth2/authorize",
+      "token_endpoint": "\(base)/auth/oauth2/token",
+      "revocation_endpoint": "\(base)/auth/oauth2/revoke",
+      "device_authorization_endpoint": "\(base)/auth/device"
     }
-    """#
+    """
     return .init(
         statusCode: 200,
         headers: ["Content-Type": "application/json"],
@@ -112,7 +113,94 @@ private func discoveryCanned() -> MarfaAuthStubURLProtocol.Canned {
     )
 }
 
-@Suite("MarfaAuth sign-in flow", .serialized)
+private actor MigrationTrackingStorage: SecureStorage {
+    private var values: [String: String]
+    private var setCounts: [String: Int] = [:]
+    private var deleteCounts: [String: Int] = [:]
+
+    /// Rendezvous point for the single-flight migration test. A caller that
+    /// reaches a write to `rendezvousAccount` parks until `rendezvousParties`
+    /// callers have arrived, or until the window elapses.
+    ///
+    /// The window is what keeps a correctly single-flighted migration from
+    /// deadlocking: under the lock only one caller can ever arrive, so it must
+    /// be able to give up waiting and finish alone. Without the lock both
+    /// callers arrive, and pinning the first one on the far side of its
+    /// "is the canonical account still empty?" read is what forces the second
+    /// to observe an empty account and promote the same token twice.
+    private var rendezvousAccount: String?
+    private var rendezvousParties = 0
+    private var rendezvousArrivals = 0
+    private var rendezvousWaiters: [CheckedContinuation<Void, Never>] = []
+    private let rendezvousWindow: Duration = .milliseconds(250)
+
+    init(
+        values: [String: String],
+        rendezvousOnWriteTo account: String? = nil,
+        parties: Int = 2
+    ) {
+        self.values = values
+        self.rendezvousAccount = account
+        self.rendezvousParties = parties
+    }
+
+    func set(_ value: String, for account: String) async throws {
+        await Task.yield()
+        if account == rendezvousAccount {
+            await rendezvous()
+        }
+        values[account] = value
+        setCounts[account, default: 0] += 1
+    }
+
+    private func rendezvous() async {
+        rendezvousArrivals += 1
+        guard rendezvousArrivals < rendezvousParties else {
+            releaseRendezvous()
+            return
+        }
+        let window = rendezvousWindow
+        let timeout = Task { [weak self] in
+            try? await Task.sleep(for: window)
+            await self?.releaseRendezvous()
+        }
+        await withCheckedContinuation { continuation in
+            rendezvousWaiters.append(continuation)
+        }
+        timeout.cancel()
+    }
+
+    private func releaseRendezvous() {
+        let waiters = rendezvousWaiters
+        rendezvousWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
+    }
+
+    func get(for account: String) async throws -> String? {
+        await Task.yield()
+        return values[account]
+    }
+
+    func delete(for account: String) async throws {
+        await Task.yield()
+        values.removeValue(forKey: account)
+        deleteCounts[account, default: 0] += 1
+    }
+
+    func value(for account: String) -> String? {
+        values[account]
+    }
+
+    func setCount(for account: String) -> Int {
+        setCounts[account, default: 0]
+    }
+
+    func deleteCount(for account: String) -> Int {
+        deleteCounts[account, default: 0]
+    }
+}
+
+@Suite("MarfaAuth sign-in flow", .serialized, .timeLimit(.minutes(1)))
 @MainActor
 struct MarfaAuthSignInTests {
 
@@ -143,13 +231,13 @@ struct MarfaAuthSignInTests {
     func authorizeURLParameters() throws {
         let auth = makeAuth(session: makeStubbedSession())
         let url = try auth.buildAuthorizeURL(
-            authorize: URL(string: "https://staging.marfa.so/auth/oauth2/authorize")!,
+            authorize: URL(string: "https://auth-sign-in.example.test/auth/oauth2/authorize")!,
             challenge: "challenge-abc",
             state: "state-xyz"
         )
 
         #expect(url.scheme == "https")
-        #expect(url.host == "staging.marfa.so")
+        #expect(url.host == "auth-sign-in.example.test")
         #expect(url.path == "/auth/oauth2/authorize")
 
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
@@ -174,7 +262,7 @@ struct MarfaAuthSignInTests {
             urlSession: makeStubbedSession()
         )
         let url = try auth.buildAuthorizeURL(
-            authorize: URL(string: "https://staging.marfa.so/auth/oauth2/authorize")!,
+            authorize: URL(string: "https://auth-sign-in.example.test/auth/oauth2/authorize")!,
             challenge: "c",
             state: "s"
         )
@@ -265,7 +353,7 @@ struct MarfaAuthSignInTests {
         let token = try await auth.exchangeCode(
             code: "auth-code-123",
             verifier: "verifier-xyz",
-            tokenEndpoint: URL(string: "https://staging.marfa.so/auth/oauth2/token")!
+            tokenEndpoint: URL(string: "https://auth-sign-in.example.test/auth/oauth2/token")!
         )
 
         #expect(token.accessToken == "marfa_at_aaa")
@@ -304,7 +392,7 @@ struct MarfaAuthSignInTests {
             _ = try await auth.exchangeCode(
                 code: "c",
                 verifier: "v",
-                tokenEndpoint: URL(string: "https://staging.marfa.so/auth/oauth2/token")!
+                tokenEndpoint: URL(string: "https://auth-sign-in.example.test/auth/oauth2/token")!
             )
             Issue.record("expected OAuthError(invalid_grant)")
         } catch let error as OAuthError {
@@ -325,13 +413,16 @@ struct MarfaAuthSignInTests {
     @Test("restore returns a StoredTokenProvider when a token is on disk")
     func restoreHasToken() async throws {
         let storage = InMemoryKeychain()
-        // Match MarfaAuth's tokensKey shape: marfa.auth.tokens:<host>:<clientId>
-        let key = "marfa.auth.tokens:\(issuer.host ?? ""):\(clientId)"
+        let key = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: issuer,
+            clientId: clientId
+        )
         let json = #"{"access_token":"a","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         try await storage.set(json, for: key)
 
         // restore() runs OAuth discovery to resolve the refresh endpoint.
-        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned()])
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: issuer)])
 
         let auth = makeAuth(session: makeStubbedSession(), storage: storage)
         let provider = try await auth.restore()
@@ -339,6 +430,243 @@ struct MarfaAuthSignInTests {
         #expect(provider != nil)
         let token = try await provider!.currentToken()
         #expect(token.accessToken == "a")
+    }
+
+    @Test("issuer identity isolates PKCE state and restored tokens")
+    func issuerIdentityIsolatesPendingAndTokens() async throws {
+        let storage = InMemoryKeychain()
+        let issuerA = URL(string: "https://tenant-auth.example.test:8443/tenant-a")!
+        let issuerB = URL(string: "http://tenant-auth.example.test:9443/tenant-b")!
+        let authA = MarfaAuth(
+            issuer: issuerA,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+        let authB = MarfaAuth(
+            issuer: issuerB,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+
+        try await authA.persistPendingForTesting(verifier: "verifier-a", state: "state-a")
+        try await authB.persistPendingForTesting(verifier: "verifier-b", state: "state-b")
+        let pendingKeyA = OAuthIssuer.storageKey(kind: "pending", issuer: issuerA, clientId: clientId)
+        let pendingKeyB = OAuthIssuer.storageKey(kind: "pending", issuer: issuerB, clientId: clientId)
+        #expect(await storage.peek(account: pendingKeyA)?.contains("verifier-a") == true)
+        #expect(await storage.peek(account: pendingKeyB)?.contains("verifier-b") == true)
+
+        let tokenA = #"{"access_token":"token-a","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        let tokenB = #"{"access_token":"token-b","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        let tokenKeyA = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerA, clientId: clientId)
+        let tokenKeyB = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerB, clientId: clientId)
+        try await storage.set(tokenA, for: tokenKeyA)
+        try await storage.set(tokenB, for: tokenKeyB)
+        await OAuthDiscovery.shared.reset(for: issuerA)
+        await OAuthDiscovery.shared.reset(for: issuerB)
+        MarfaAuthStubURLProtocol.reset(with: [
+            discoveryCanned(for: issuerA),
+            discoveryCanned(for: issuerB),
+        ])
+
+        let providerA = try #require(await authA.restore())
+        let providerB = try #require(await authB.restore())
+        #expect(try await providerA.currentToken().accessToken == "token-a")
+        #expect(try await providerB.currentToken().accessToken == "token-b")
+    }
+
+    @Test("restore migrates an origin-only token only for an HTTPS root issuer")
+    func restoreMigratesLegacyTokenKey() async throws {
+        let storage = InMemoryKeychain()
+        let rootIssuer = URL(string: "https://legacy-auth.example.test")!
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
+        let token = #"{"access_token":"legacy-token","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        try await storage.set(token, for: legacyKey)
+        await OAuthDiscovery.shared.reset(for: rootIssuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: rootIssuer)])
+        let auth = MarfaAuth(
+            issuer: rootIssuer,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+
+        let provider = try #require(await auth.restore())
+        #expect(try await provider.currentToken().accessToken == "legacy-token")
+        #expect(await storage.peek(account: canonicalKey) == token)
+        #expect(await storage.peek(account: legacyKey) == nil)
+    }
+
+    @Test("restore never promotes a host-only token into an ambiguous issuer")
+    func restoreDoesNotMigrateAmbiguousIssuer() async throws {
+        let cases = [
+            URL(string: "https://ambiguous-auth.example.test/tenant")!,
+            URL(string: "https://ambiguous-auth.example.test:8443")!,
+            URL(string: "http://ambiguous-auth.example.test")!,
+        ]
+
+        for (index, ambiguousIssuer) in cases.enumerated() {
+            let storage = InMemoryKeychain()
+            let caseClient = "client-\(index)"
+            let legacyKey = OAuthIssuer.legacyTokenStorageKey(
+                issuer: ambiguousIssuer,
+                clientId: caseClient
+            )
+            let canonicalKey = OAuthIssuer.storageKey(
+                kind: "tokens",
+                issuer: ambiguousIssuer,
+                clientId: caseClient
+            )
+            try await storage.set("legacy-token", for: legacyKey)
+            let auth = MarfaAuth(
+                issuer: ambiguousIssuer,
+                clientId: caseClient,
+                redirectURI: redirectURI,
+                scopes: scopes,
+                storage: storage,
+                urlSession: makeStubbedSession()
+            )
+
+            #expect(try await auth.restore() == nil)
+            #expect(await storage.peek(account: canonicalKey) == nil)
+            #expect(await storage.peek(account: legacyKey) == "legacy-token")
+        }
+    }
+
+    @Test("concurrent restores promote a legacy root token once")
+    func concurrentRestoreMigratesOnce() async throws {
+        let rootIssuer = URL(string: "https://concurrent-migration.example.test")!
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
+        let token = #"{"access_token":"legacy-token","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        let storage = MigrationTrackingStorage(
+            values: [legacyKey: token],
+            rendezvousOnWriteTo: canonicalKey
+        )
+        let session = makeStubbedSession()
+        let firstAuth = MarfaAuth(
+            issuer: rootIssuer,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: session
+        )
+        let secondAuth = MarfaAuth(
+            issuer: rootIssuer,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: session
+        )
+        await OAuthDiscovery.shared.reset(for: rootIssuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: rootIssuer)])
+
+        async let firstProvider = firstAuth.restore()
+        async let secondProvider = secondAuth.restore()
+        let providers = try await (firstProvider, secondProvider)
+
+        #expect(try await providers.0?.currentToken().accessToken == "legacy-token")
+        #expect(try await providers.1?.currentToken().accessToken == "legacy-token")
+        #expect(await storage.value(for: canonicalKey) == token)
+        #expect(await storage.value(for: legacyKey) == nil)
+        #expect(await storage.setCount(for: canonicalKey) == 1)
+        #expect(await storage.deleteCount(for: legacyKey) == 1)
+    }
+
+    @Test("a legacy account can never address a versioned account")
+    func legacyAccountCannotAddressVersionedNamespace() async throws {
+        // A legacy account is `marfa.auth.tokens:<host>:<clientId>` and both
+        // fields are caller-supplied, so a host of literally "v2" plus a
+        // client id spelling out the length-prefixed body reconstructs another
+        // account's versioned key byte for byte. The victim below is
+        // `https://example.com` + `abcdef`, whose issuer identity is 19 bytes
+        // and client id 6.
+        let victimIssuer = URL(string: "https://example.com")!
+        let victimClientId = "abcdef"
+        let victimKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: victimIssuer,
+            clientId: victimClientId
+        )
+
+        let aliasIssuer = URL(string: "https://v2")!
+        let aliasClientId = "19:https://example.com:6:abcdef"
+        let aliasLegacyKey = OAuthIssuer.legacyTokenStorageKey(
+            issuer: aliasIssuer,
+            clientId: aliasClientId
+        )
+        #expect(aliasLegacyKey != victimKey)
+
+        // End to end. `https://v2` is absolute, HTTPS, portless and path-free,
+        // so it clears every migration guard — key disjointness is the only
+        // thing standing between the alias and the victim's token.
+        let storage = InMemoryKeychain()
+        try await storage.set("victim-token", for: victimKey)
+        let migrated = try await OAuthIssuer.migrateLegacyRootTokenIfNeeded(
+            in: storage,
+            issuer: aliasIssuer,
+            clientId: aliasClientId
+        )
+        let aliasKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: aliasIssuer,
+            clientId: aliasClientId
+        )
+
+        #expect(migrated == false)
+        #expect(await storage.peek(account: victimKey) == "victim-token")
+        #expect(await storage.peek(account: aliasKey) == nil)
+    }
+
+    @Test("length-prefixed storage accounts separate delimiter collisions")
+    func storageKeyEncodingIsUnambiguous() {
+        let issuerA = URL(string: "https://collision.example.test/a:b")!
+        let issuerB = URL(string: "https://collision.example.test/a")!
+        let keyA = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerA, clientId: "c")
+        let keyB = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerB, clientId: "b:c")
+
+        #expect(
+            "\(OAuthIssuer.identity(for: issuerA)):c"
+                == "\(OAuthIssuer.identity(for: issuerB)):b:c"
+        )
+        #expect(keyA != keyB)
+    }
+
+    @Test("restore keeps a canonical token when a legacy key also exists")
+    func restorePrefersCanonicalTokenKey() async throws {
+        let storage = InMemoryKeychain()
+        let rootIssuer = URL(string: "https://canonical-auth.example.test")!
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
+        let legacyToken = #"{"access_token":"legacy","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        let canonicalToken = #"{"access_token":"canonical","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
+        try await storage.set(legacyToken, for: legacyKey)
+        try await storage.set(canonicalToken, for: canonicalKey)
+        await OAuthDiscovery.shared.reset(for: rootIssuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: rootIssuer)])
+        let auth = MarfaAuth(
+            issuer: rootIssuer,
+            clientId: clientId,
+            redirectURI: redirectURI,
+            scopes: scopes,
+            storage: storage,
+            urlSession: makeStubbedSession()
+        )
+
+        let provider = try #require(await auth.restore())
+        #expect(try await provider.currentToken().accessToken == "canonical")
+        #expect(await storage.peek(account: canonicalKey) == canonicalToken)
+        #expect(await storage.peek(account: legacyKey) == legacyToken)
     }
 }
 

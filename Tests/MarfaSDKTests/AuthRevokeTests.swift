@@ -45,11 +45,20 @@ final class RevokeStubURLProtocol: URLProtocol, @unchecked Sendable {
         // Return a well-known discovery doc for the OAuth discovery
         // probe; otherwise return an empty 200 (the revoke endpoint
         // returns no body on success per RFC 7009 §2.2).
+        //
+        // The document is built from the origin that was actually asked for.
+        // Discovery requires the published issuer to equal the requested one,
+        // and each test mints its own issuer, so a stub answering with a fixed
+        // origin would be rejected before any revoke request went out.
         let responseBody: Data
-        if request.url?.path == "/.well-known/oauth-authorization-server" {
-            let discovery = #"""
-            {"issuer":"https://staging.marfa.so","authorization_endpoint":"https://staging.marfa.so/auth/oauth2/authorize","token_endpoint":"https://staging.marfa.so/auth/oauth2/token","revocation_endpoint":"https://staging.marfa.so/auth/oauth2/revoke","device_authorization_endpoint":"https://staging.marfa.so/auth/device"}
-            """#
+        if let url = request.url,
+           url.path == "/.well-known/oauth-authorization-server",
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.path = ""
+            let origin = components.url?.absoluteString ?? ""
+            let discovery = """
+            {"issuer":"\(origin)","authorization_endpoint":"\(origin)/auth/oauth2/authorize","token_endpoint":"\(origin)/auth/oauth2/token","revocation_endpoint":"\(origin)/auth/oauth2/revoke","device_authorization_endpoint":"\(origin)/auth/device"}
+            """
             responseBody = Data(discovery.utf8)
         } else {
             responseBody = Data()
@@ -75,7 +84,7 @@ private func makeStubbedSession() -> URLSession {
     return URLSession(configuration: config)
 }
 
-@Suite("MarfaAuth sign-out / revoke", .serialized)
+@Suite("MarfaAuth sign-out / revoke", .serialized, .timeLimit(.minutes(1)))
 @MainActor
 struct AuthRevokeTests {
 
@@ -86,7 +95,9 @@ struct AuthRevokeTests {
     /// so no interference with suites running alongside this one.
     let issuer = uniqueIssuer("marfa-auth-revoke")
     let clientId = "test-client"
-    var tokensKey: String { "marfa.auth.tokens:\(issuer.host ?? ""):\(clientId)" }
+    var tokensKey: String {
+        OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
+    }
 
     func prepareAuth() async throws -> (MarfaAuth, InMemoryKeychain, URLSession) {
         let storage = InMemoryKeychain()
@@ -114,7 +125,7 @@ struct AuthRevokeTests {
         let provider = StoredTokenProvider(
             storage: storage,
             storageKey: tokensKey,
-            tokenEndpoint: URL(string: "https://staging.marfa.so/auth/oauth2/token")!,
+            tokenEndpoint: URL(string: "https://auth-revoke.example.test/auth/oauth2/token")!,
             clientId: clientId,
             urlSession: session
         )

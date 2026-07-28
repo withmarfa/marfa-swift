@@ -47,7 +47,7 @@ public enum DeviceFlow {
         httpClient: any DeviceFlowHTTPClient = URLSession.shared,
         clock: any DeviceFlowClock = SystemDeviceFlowClock()
     ) async throws -> DeviceFlowHandle {
-        let normalized = DeviceFlow.normalizeIssuer(issuer)
+        let normalized = try OAuthIssuer.canonicalURL(issuer)
         let endpoints = try await OAuthDiscovery.shared.endpoints(
             for: normalized,
             httpClient: httpClient
@@ -85,12 +85,6 @@ public enum DeviceFlow {
             httpClient: httpClient,
             clock: clock
         )
-    }
-
-    private static func normalizeIssuer(_ url: URL) -> URL {
-        var s = url.absoluteString
-        while s.hasSuffix("/") { s.removeLast() }
-        return URL(string: s) ?? url
     }
 
     private struct DeviceCodeResponse: Decodable {
@@ -186,7 +180,11 @@ public actor DeviceFlowHandle {
                 interval += 5
                 continue
             case .granted(let token):
-                let storageKey = "marfa.auth.tokens:\(issuer.host ?? issuer.absoluteString):\(clientId)"
+                let storageKey = OAuthIssuer.storageKey(
+                    kind: "tokens",
+                    issuer: issuer,
+                    clientId: clientId
+                )
                 let provider = StoredTokenProvider(
                     storage: storage,
                     storageKey: storageKey,
