@@ -28,6 +28,7 @@ struct DroppedMutationsQueryTests {
         )
         let store = MarfaStore(
             container: container,
+            localStore: localStore,
             syncEngine: engine,
             mutationQueue: queue
         )
@@ -107,8 +108,9 @@ struct DroppedMutationsQueryTests {
 
     @Test("queryDroppedMutations returns nil for stores without a sync engine")
     func nilForStoresWithoutEngine() async throws {
-        let (_, _, container) = try await MarfaSDKTest.makeInMemoryStorePair()
-        let store = MarfaStore(container: container) // no syncEngine, no queue
+        let (localStore, _, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        // No syncEngine, no queue.
+        let store = MarfaStore(container: container, localStore: localStore)
         #expect(store.queryDroppedMutations() == nil)
     }
 }

@@ -29,6 +29,7 @@ Four actors wire together for synced mode; `MarfaClient.local(path:)` runs pure-
 Both factories (`MarfaClient.local(path:)`, `MarfaClient.synced(url:apiKey:storePath:connectionManager:)`) are **`async throws`** — `@ModelActor` construction must run off the main actor, so every call site is `try await`. For synced clients the caller invokes `client.syncEngine?.start()`.
 
 - **Local-first reads** — `metadata.listTags()` aggregates tags by fetching metadata rows where the parent item's `stateRaw != "trashed"` and bucketing in Swift (SwiftData predicates can't reach inside the JSON `tagsData` blob). `edges.listToTargets(targetIds:edgeType:limit:)` batches inbound-edge lookup: one local fetch with `Set.contains(targetId)`, bounded `TaskGroup` fan-out remotely (cap via `ClientConfiguration.maxBackrefBatchConcurrency`, default 8).
+- **Local search** — `LocalStore.searchItems(text:filters:)` (`LocalStore/LocalStoreSearch.swift`) narrows on `type` / `stateRaw` / `tierRaw` in a predicate, then scans the survivors in Swift over `title` and `body`; `properties` is a JSON blob the predicate engine can't see, and SwiftData has no FTS index. Takes the same `SearchFilters` as the remote call and mirrors the server's `system.*` and trashed exclusions plus its default limit of 20. It diverges on matched fields (only `title` and `body`, so types keying their text elsewhere — `core.entity*`, `core.highlight` — never match), tags (indexed as text server-side, not matched locally), `type` (literal, no subtype inheritance), `limit` range (server `1...100`; locally non-positive returns empty and larger values are honored), ranking (ordinal, not BM25) and snippets (none). All are listed in the method's doc comment alongside its measured cost, which is tens of milliseconds per thousand rows — `limit` caps the answer, not the work. `client.search(query:)` resolves through it on a pure-local client; synced clients still hit the server's index.
 - **Predicate safety** — `LocalStore/Schema/PredicateConventions.swift` documents the predicate-safe subset every fetch must use; `Tests/MarfaSDKTests/PredicateSafetyTests.swift` regresses every supported shape so a predicate that compiles but crashes at runtime fails CI. Key rules: predicate against `*Raw` columns not Codable enum cases; use captured-value `&&` short-circuits not runtime `Predicate<T>` composition; use `prop != ""` for empty-string filtering (`isEmpty`/`!isEmpty` both misbehave in current SwiftData).
 - **CloudKit readiness** — `cloudKitDatabase` is consumer-set on `MarfaModelContainer.make(...)`; the schema is CloudKit-mirrored regardless. `swift run cloudkit-smoke` validates the schema against a developer's CloudKit container (see `Sources/MarfaSDK/LocalStore/README.md`). Manual run only — no CloudKit entitlements on CI runners.
 
@@ -36,7 +37,7 @@ Both factories (`MarfaClient.local(path:)`, `MarfaClient.synced(url:apiKey:store
 
 All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`. Shared listener machinery lives in `RefetchObserver` (`Reactive/MarfaStore.swift`).
 
-- **MarfaStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (`nil` for network-only clients). Factory for live query objects; holds the shared `ModelContainer` and the `ProfileNamespace` reference.
+- **MarfaStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (`nil` for network-only clients). Factory for live query objects; holds the shared `ModelContainer`, the `LocalStore` actor, and the `ProfileNamespace` reference.
 - **ItemQuery** — tracks `[Item]` for a `ListFilters`; subscribes to `ModelContext.didSave`, debounces 50 ms (`Reactive/RefreshDebounce.swift`), refetches on the `@MainActor`. Fields: `items`, `isLoading`, `error`; `stop()` cancels.
 - **TypedItemQuery<T: MarfaItem>** — like `ItemQuery` but maps records through `T.init?(from:)`. Backs `store.queryConnections(kind:state:)` (`TypedItemQuery<Connection>`) and `store.queryActivity(severity:limit:)` (`TypedItemQuery<Activity>`).
 - **SingleItemQuery** — one item by id; `item` is `nil` when purged.
@@ -44,6 +45,7 @@ All query objects are `@Observable @MainActor` — pass directly to SwiftUI view
 - **BackrefsQuery** — inbound edges for a batch of `targetIds`; `edgesByTarget: [String: [Edge]]` keyed by every requested id (unknown ids stay present with `[]`). Factory: `store.queryBackrefs(to:edgeType:limit:)`.
 - **TagsQuery** — `[TagWithCount]` sorted count desc, tag asc (same ordering as `metadata.listTags()` and the server). Factory: `store.queryTags()`. Aggregates in Swift over a relationship-prefetched fetch.
 - **ItemsWithMetadataQuery** — items + metadata composite. Two fetches per refresh, 1:1 join in Swift.
+- **SearchQuery** — `[SearchResult]` for a fixed search term. Factory: `store.querySearch(text:filters:)`. The one query that does **not** work on the main actor: it delegates the whole scan to the `LocalStore` actor and only publishes results back, because search decodes each candidate's `properties` JSON. The term is fixed per query — for search-as-you-type, build a new query per term and `stop()` the old one.
 - **PendingMutationsQuery** — `[PendingMutationRecord]` from the MutationQueue (queued writes awaiting replay). Factory: `store.queryPendingMutations()` — always returns; synced and pure-local clients both have a queue.
 - **BlobUploadProgressQuery** — per-blob upload progress for queued uploads. Factory: `store.queryBlobUploadProgress()` — `nil` in remote-only mode.
 - **FullSyncStateQuery** — running full-sync cursor + completion state. Factory: `store.queryFullSyncState()` — `nil` in remote-only mode.
@@ -88,20 +90,18 @@ swift test
 
 Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at staging via `MARFA_API_URL` and `MARFA_API_KEY`. Never run conformance or integration tests against production.
 
-## CI — tiered validation
+## CI
 
-**CI is deliberately cheap on PR and thorough on main. Do not "strengthen" PR CI beyond compile + typecheck without a deliberate decision and an update to this note.**
+Two jobs in `.github/workflows/ci.yml`.
 
-- **PR pushes** run `swift build --build-tests` only — compile + typecheck, no test run. Catches roughly the same class of breakage as the full suite at about 30% the cost.
-- **Runs on every PR, including docs-only ones.** The `pull_request` trigger carries no `paths-ignore`: the branch ruleset requires this check, and a required check that never reports (because a docs-only PR was path-filtered out) blocks the merge with no way for an agent to clear it. So a docs-only PR pays one compile + typecheck on the macOS runner — accepted as the cost of fully autonomous delivery (no human merge clicks). If those macOS minutes add up, the cost-free fix is a cheap Ubuntu gate job that greenlights docs-only PRs without compiling.
-- **Merges to `main`** run the full suite: `swift build`, `swift test --parallel`, and both codegen freshness checks (wire types, domain models).
-- **Both tiers** cache `.build/checkouts` and `.build` keyed on `Package.resolved` + source hashes, so source-only changes hit a warm cache.
+- **`validate` — build + full test suite. Runs on every PR and every merge to `main`.** `swift build` then `swift test --parallel`. This is the gate: a change is not validated until its tests have run, and a pull request is the only place that check can still stop something.
+- **`freshness` — the three codegen regens plus their diffs. Main and `workflow_dispatch` only.** It guards against drift in the vendored OpenAPI and core-type snapshots, which a source-only PR cannot introduce, and it costs three generator runs to say so. Running it per push would spend a lot to catch a class of change that arrives through a snapshot refresh, where the regen is part of the commit anyway.
+- **`validate` runs on every PR, including docs-only ones.** The `pull_request` trigger carries no `paths-ignore`: the branch ruleset requires this check, and a required check that never reports (because a docs-only PR was path-filtered out) blocks the merge with no way for an agent to clear it. So a docs-only PR pays one build + test on the macOS runner — accepted as the cost of fully autonomous delivery (no human merge clicks). If those macOS minutes add up, the cost-free fix is a cheap Ubuntu gate job that greenlights docs-only PRs without compiling.
+- **Both jobs** cache `.build/checkouts` and `.build` keyed on `Package.resolved` + source hashes, so source-only changes hit a warm cache.
 
-**Why.** macOS runners bill at 10x Ubuntu, and running the full suite on every PR push was the largest CI cost driver across the org. The project is pre-release with no auto-deploy, so main breakages are a "fix before tagging" signal, not a user-facing incident. Full rationale lives in private design notes.
+**Why tests moved onto PRs.** They were main-only, on the reasoning that macOS runners bill at 10x Ubuntu and the project is pre-release, so a broken `main` is a "fix before tagging" signal rather than an incident. That held until a release tag was cut from a commit whose tests had never run: nothing between "compiles" and "tagged" ever executed the suite, and the missing fix shipped in a version number. Test cost on a PR is small and predictable; the alternative is discovering the same thing from a release artifact.
 
-**When to revisit.** If this SDK ships to the App Store or picks up external consumers, re-evaluate the PR/main split. It's a shipping decision, not a calendar one.
-
-**Local before pushing.** Run `swift test` locally before opening a PR or after a main-breaking change. CI on main catches it, but a broken main wastes minutes for everyone.
+**Local before pushing.** Run `swift test` locally anyway. CI catching it is a slower loop than catching it yourself.
 
 **Runner routing.** Both jobs read `runs-on` from the `CI_RUNNER` Actions variable, defaulting to `macos-latest`. `CI_RUNNER=self-hosted` routes them to a self-hosted Apple Silicon pool. Reverts to hardcoded `macos-latest` before this repo goes public.
 

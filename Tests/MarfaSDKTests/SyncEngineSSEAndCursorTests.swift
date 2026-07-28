@@ -8,7 +8,7 @@ import Foundation
 /// the actor-reentry concurrency guard).
 ///
 /// Shared helpers live in ``SyncEngineTestKit`` (see SyncEngineTestSupport.swift).
-@Suite("SyncEngine SSE and cursor")
+@Suite("SyncEngine SSE and cursor", .timeLimit(.minutes(1)))
 struct SyncEngineSSEAndCursorTests {
 
     @Test("mutation queue is populated on synced-mode writes") func mutationQueueIsPopulatedOnSyncedModeWrites() async throws {
@@ -31,6 +31,204 @@ struct SyncEngineSSEAndCursorTests {
         await engine.start() // second start is a no-op
         await engine.stop()
         await engine.stop()  // second stop is a no-op
+    }
+
+    @Test("stop during start prevents stale lifecycle task publication")
+    func stopDuringStartDoesNotPublishTasks() async throws {
+        let (_, _, _, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.suspendNextStartPublicationForTesting()
+
+        let startTask = Task { await engine.start() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            let isStarting = await engine.isStartingForTesting
+            let isSuspended = await engine.isStartPublicationSuspendedForTesting
+            return isStarting && isSuspended
+        }
+
+        await engine.stop()
+        #expect(await !engine.isRunningForTesting)
+        #expect(await !engine.isStartingForTesting)
+        #expect(await !engine.hasLifecycleTasksForTesting)
+        #expect(await !connManager.isStartedForTesting)
+
+        await engine.resumeStartPublicationForTesting()
+        await startTask.value
+        #expect(await !engine.isRunningForTesting)
+        #expect(await !engine.hasLifecycleTasksForTesting)
+        #expect(await !connManager.isStartedForTesting)
+
+        await engine.start()
+        #expect(await engine.isRunningForTesting)
+        #expect(await connManager.isStartedForTesting)
+        await engine.stop()
+    }
+
+    @Test("start waits for an overlapping stop before creating a new lifecycle")
+    func startDuringStopRestartsEngine() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-restart")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        let restartTask = Task { await engine.start() }
+        await transport.releaseRequest()
+        await stopTask.value
+        await restartTask.value
+
+        #expect(await engine.isRunningForTesting)
+        await connManager.applyStateForTesting(.connecting)
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await transport.requestCallCount >= 2
+        }
+        let finalStopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        await transport.releaseRequest()
+        await finalStopTask.value
+    }
+
+    @Test("start cannot open a new lifecycle while a stop is still in flight")
+    func startWaitsForTheStopBarrier() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-barrier")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+            await engine.isStoppingForTesting
+        }
+
+        let restartTask = Task { await engine.start() }
+        // The blocked replay holds the barrier open. A start that does not
+        // wait for it opens a second lifecycle on top of a teardown that has
+        // already snapshotted the first one, so the two overlap: the barrier
+        // goes on to stop a ConnectionStateManager the restart just started.
+        try await SyncEngineTestKit.expectRemainsFalse(for: .milliseconds(300)) {
+            let isStarting = await engine.isStartingForTesting
+            let isRunning = await engine.isRunningForTesting
+            return isStarting || isRunning
+        }
+
+        await transport.releaseRequest()
+        await stopTask.value
+        await restartTask.value
+
+        #expect(await engine.isRunningForTesting)
+        #expect(await connManager.isStartedForTesting)
+
+        await transport.stopBlocking()
+        await engine.stop()
+    }
+
+    @Test("stop does not return while a reconnect nudge is being installed")
+    func stopSweepsAReconnectScheduledDuringTeardown() async throws {
+        let (_, _, _, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 0.05, max: 0.05)
+        // Widen the window between the `.online` transition and the reconnect
+        // nudge. In production it is a couple of actor hops, so a stop landing
+        // inside it is invisible to a timing-based test.
+        await engine.suspendStreamForTesting(at: .beforeReconnectSchedule)
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+            await engine.isStreamSuspendedForTesting
+        }
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+            await engine.isStoppingForTesting
+        }
+        await engine.resumeStreamForTesting()
+        await stopTask.value
+
+        // The nudge is an unstructured task: it does not inherit the stream
+        // task's cancellation, so one installed after the snapshot outlives
+        // the barrier that is supposed to have waited for it.
+        #expect(await !engine.hasLifecycleTasksForTesting)
+    }
+
+    @Test("a stream closing during teardown does not transition the manager")
+    func stoppedStreamDoesNotMarkOnline() async throws {
+        let (_, _, _, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.suspendStreamForTesting(at: .beforeMarkOnline)
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+            await engine.isStreamSuspendedForTesting
+        }
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+            await engine.isStoppingForTesting
+        }
+        await engine.resumeStreamForTesting()
+        await stopTask.value
+
+        // `markOnline` is a no-op once the manager is offline, so the state
+        // machine records nothing either way; the call count is what proves
+        // the stopped engine kept its hands off a manager it no longer owns.
+        #expect(await connManager.markOnlineCallCountForTesting == 0)
+    }
+
+    @Test("stop finishes every open event stream")
+    func stopFinishesEventStreams() async throws {
+        let (_, _, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        let events = engine.events
+        let finished = TestLatch()
+        let consumer = Task {
+            for await _ in events {}
+            await finished.set()
+        }
+
+        await engine.start()
+        await engine.stop()
+
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+            await finished.isSet
+        }
+        consumer.cancel()
+    }
+
+    @Test("subscribing to events registers before the property returns")
+    func eventSubscriptionIsSynchronous() async throws {
+        let (_, _, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        // Registering through a task instead lets a stop issued on the next
+        // line run first, leaving the new continuation attached to a stopped
+        // engine and its consumer awaiting an event that can never arrive.
+        // Subscribing from inside the actor pins the observation: a task-based
+        // registration would need this actor and so cannot slip in.
+        let (stream, count) = await engine.subscribeAndCountForTesting()
+        #expect(count == 1)
+
+        await engine.stop()
+        var iterator = stream.makeAsyncIterator()
+        #expect(await iterator.next() == nil)
     }
 
     @Test("SSE item.* events apply to local store") func ssEEventsApplyToLocalStore() async throws {

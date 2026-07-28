@@ -134,6 +134,42 @@ struct PredicateSafetyTests {
         #expect(results.allSatisfy { $0.type == "core.note" })
     }
 
+    @Test("Negated starts(with:) compiles and filters correctly") func negatedStartsWith() async throws {
+        let (context, _) = try await seededContext()
+        // Local search excludes `system.*` records this way. Negation of a
+        // supported predicate operation is its own shape — pinned here so
+        // it can't regress into a runtime crash.
+        let prefix = "core.no"
+        let predicate = #Predicate<MarfaItemModel> { !$0.type.starts(with: prefix) }
+        let descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
+        let results = try context.fetch(descriptor)
+        #expect(results.map(\.id) == ["c"])
+    }
+
+    @Test("Search descriptor composes every filter without crashing") func searchDescriptorShapes() async throws {
+        let (context, _) = try await seededContext()
+
+        // Unfiltered: `system.*` and trashed rows drop out by default.
+        let unfiltered = try context.fetch(LocalStore.makeSearchDescriptor(filters: nil))
+        #expect(Set(unfiltered.map(\.id)) == ["a", "c"])
+
+        // Explicit state overrides the trashed exclusion.
+        let trashed = try context.fetch(
+            LocalStore.makeSearchDescriptor(filters: SearchFilters(state: .trashed))
+        )
+        #expect(trashed.map(\.id) == ["b"])
+
+        // Every captured branch live at once.
+        let everything = try context.fetch(
+            LocalStore.makeSearchDescriptor(
+                filters: SearchFilters(type: "core.note", state: .active, tier: .library)
+            )
+        )
+        // The seed rows carry no tier, so a tier filter matches nothing —
+        // the point here is that the composed predicate evaluates at all.
+        #expect(everything.isEmpty)
+    }
+
     // MARK: - Range comparisons (used by since/until)
 
     @Test("String >= comparison filters correctly") func stringGreaterEqual() async throws {

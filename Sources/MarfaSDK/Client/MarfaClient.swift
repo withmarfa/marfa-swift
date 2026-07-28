@@ -77,6 +77,14 @@ public final class MarfaClient: Sendable {
     /// actor, so storing the reference is `Sendable`-safe.
     private let mutationQueue: MutationQueue?
 
+    /// The local store, non-nil whenever a container is configured.
+    /// Namespaces receive it directly; the client keeps its own
+    /// reference so ``makeStore()`` can hand it to ``MarfaStore`` and so
+    /// ``search(query:filters:)`` can resolve locally in pure-local mode.
+    /// `LocalStore` is an actor, so storing the reference is
+    /// `Sendable`-safe.
+    private let localStore: LocalStore?
+
     // MARK: - Init
 
     init(
@@ -92,6 +100,7 @@ public final class MarfaClient: Sendable {
         self.syncEngine = syncEngine
         self.container = container
         self.mutationQueue = mutationQueue
+        self.localStore = localStore
 
         let items = ItemsNamespace(
             transport: transport,
@@ -396,9 +405,12 @@ public final class MarfaClient: Sendable {
     /// stores observe the same data.
     @MainActor
     public func makeStore() -> MarfaStore? {
-        guard let container else { return nil }
+        // Container and local store are configured together by every
+        // factory, so this either yields both or neither.
+        guard let container, let localStore else { return nil }
         return MarfaStore(
             container: container,
+            localStore: localStore,
             syncEngine: syncEngine,
             mutationQueue: mutationQueue,
             profileNamespace: profile
@@ -408,7 +420,21 @@ public final class MarfaClient: Sendable {
     // MARK: - Top-Level Methods
 
     /// Full-text search across items.
+    ///
+    /// Pure-local clients (``local(path:)`` / ``local(container:)``) have
+    /// no server to ask, so the query is served from the store instead
+    /// of failing against the placeholder URL — the same local-first
+    /// shape every namespace uses. Local results are ranked and filtered
+    /// differently from the server's FTS index; the divergences are
+    /// listed on ``LocalStore/searchItems(text:filters:)``.
+    ///
+    /// Synced clients still go to the server, whose index returns better
+    /// results than a local scan can. For offline search on a synced
+    /// client, use ``MarfaStore/querySearch(text:filters:)``.
     public func search(query: String, filters: SearchFilters? = nil) async throws -> [SearchResult] {
+        if let localStore, syncEngine == nil {
+            return try await localStore.searchItems(text: query, filters: filters)
+        }
         let params = filters?.toQueryParams(query: query) ?? [("q", query)]
         let response: SearchResponse = try await transport.request(
             method: .get, path: "/search", body: nil, query: params

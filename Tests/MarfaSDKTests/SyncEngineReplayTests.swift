@@ -13,7 +13,7 @@ import Foundation
 /// - SSE reconnect nudge draining mutations queued after the first cycle.
 ///
 /// Shared helpers live in ``SyncEngineTestKit`` (see SyncEngineTestSupport.swift).
-@Suite("SyncEngine replay")
+@Suite("SyncEngine replay", .timeLimit(.minutes(1)))
 struct SyncEngineReplayTests {
 
     // MARK: - Error classification
@@ -24,34 +24,147 @@ struct SyncEngineReplayTests {
         // A single pending delete the engine will try to replay.
         try await queue.enqueueDeleteItem(id: "server-x")
 
-        // Empty SSE stream (so runLoop proceeds to replay), then the
-        // DELETE itself throws a network-class error.
-        transport.enqueueEvents([])
+        // The DELETE throws a network-class error.
         let netError = NetworkError(
             NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
         )
         transport.enqueueError(netError)
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            let all = try? await queue.fetchAll()
-            return (all?.first?.attemptCount ?? 0) >= 1
-        }
+        await connManager.applyStateForTesting(.online)
+        // One cycle, driven directly — see the note on the mixed-cycle test
+        // for why starting the engine makes a per-cycle count load-dependent.
+        await engine.triggerProactiveDrainForTesting()
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].attemptCount == 1)
-        #expect(remaining[0].lastError?.contains("offline") == true)
+        let replayCalls = transport.calls.filter {
+            $0.method == .delete && $0.path == "/items/server-x"
+        }
+        #expect(replayCalls.count == 1)
+        let record = try #require(remaining.first)
+        #expect(record.attemptCount == 1)
+        #expect(record.lastError?.contains("offline") == true)
+    }
+
+    @Test("stop waits for in-flight replay accounting to finish")
+    func stopIsQuiescenceBarrier() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-stop")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        #expect(await transport.requestCallCount == 1)
+
+        await transport.releaseRequest()
+        await stopTask.value
+
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        let record = try #require(remaining.first)
+        #expect(record.attemptCount == 1)
+        #expect(record.lastError?.contains("released failure") == true)
+        #expect(await transport.requestCallCount == 1)
+    }
+
+    @Test("cancellation before replay never stamps a clean drain")
+    func cancellationBeforeReplayDoesNotStampCleanDrain() async throws {
+        let (_, queue, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await queue.enqueueDeleteItem(id: "server-cancelled")
+
+        await engine.start()
         await engine.stop()
+        await engine.replayMutationsForTesting()
+
+        #expect(await engine.lastCleanDrainAt == nil)
+        #expect(try await queue.isEmpty == false)
+    }
+
+    @Test("successful partial replay after stop does not stamp a clean drain")
+    func partialReplayAfterStopDoesNotStampCleanDrain() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingSuccessfulReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-first")
+        try await queue.enqueueDeleteItem(id: "server-second")
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+        await transport.waitUntilRequestStarted()
+
+        let stopTask = Task { await engine.stop() }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            await engine.isStoppingForTesting
+        }
+        await transport.releaseRequest()
+        await stopTask.value
+
+        #expect(await engine.lastCleanDrainAt == nil)
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        let record = try #require(remaining.first)
+        #expect(record.localId == "server-second")
+    }
+
+    @Test("a mutation queued mid-cycle blocks the clean-drain stamp")
+    func mutationQueuedDuringReplayBlocksCleanDrain() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        let transport = BlockingSuccessfulReplayTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await queue.enqueueDeleteItem(id: "server-first")
+        await connManager.applyStateForTesting(.online)
+
+        // Drive the drain directly rather than starting the engine: the
+        // proactive-drain listener would pick the second record up on its own
+        // debounce and stamp a legitimate clean drain, hiding the defect.
+        let drain = Task { await engine.triggerProactiveDrainForTesting() }
+        await transport.waitUntilRequestStarted()
+
+        // Enqueued after the cycle read the queue, so the replay list this
+        // cycle is working from is already stale. The cycle succeeds on
+        // everything it knows about, which is not the same as a drained queue.
+        try await queue.enqueueDeleteItem(id: "server-second")
+        await transport.releaseRequest()
+        await drain.value
+
+        #expect(await engine.lastCleanDrainAt == nil)
+        let remaining = try await queue.fetchAll()
+        #expect(remaining.count == 1)
+        let record = try #require(remaining.first)
+        #expect(record.localId == "server-second")
     }
 
     @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
 
-        // Queue an update against an item the server "doesn't have"
-        // (matches the `019da086-…` pattern from the bug report).
+        // Queue an update against an item the server "doesn't have". The id is
+        // a UUIDv7, the shape the server accepts, so the 404 is about the row
+        // being absent rather than the id being rejected.
         try await queue.enqueueUpdateItem(
             id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
             properties: ["body": .string("stale")]
@@ -98,8 +211,8 @@ struct SyncEngineReplayTests {
     @Test("mutation replay drops queued record on 400 ValidationError") func mutationReplayDropsOn400() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
 
-        // Matches the `6837a0e8-…` UUIDv4 pattern from the bug report —
-        // server would reject the ID with INVALID_ID (400).
+        // A UUIDv4 rather than the UUIDv7 the server requires, so it answers
+        // INVALID_ID (400) — a permanent failure no retry can clear.
         try await queue.enqueueUpdateItem(
             id: "6837a0e8-d316-4433-ac4c-d1e40f19615f",
             properties: ["body": .string("bad id")]
@@ -126,24 +239,24 @@ struct SyncEngineReplayTests {
             properties: ["body": .string("temp fail")]
         )
 
-        transport.enqueueEvents([])
         // 500 is transient — MarfaError base class, not a permanent subclass.
         transport.enqueueError(MarfaError(
             code: "server_error", message: "boom", status: 500
         ))
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            let all = try? await queue.fetchAll()
-            return (all?.first?.attemptCount ?? 0) >= 1
-        }
+        await connManager.applyStateForTesting(.online)
+        // One cycle, driven directly — see the note on the mixed-cycle test
+        // for why starting the engine makes a per-cycle count load-dependent.
+        await engine.triggerProactiveDrainForTesting()
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].attemptCount == 1)
-        await engine.stop()
+        let replayCalls = transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/019da086-d675-7cd8-ba3f-3dc4e6e7bd42"
+        }
+        #expect(replayCalls.count == 1)
+        let record = try #require(remaining.first)
+        #expect(record.attemptCount == 1)
     }
 
     @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
@@ -161,25 +274,29 @@ struct SyncEngineReplayTests {
             properties: ["body": .string("transient")]
         )
 
-        transport.enqueueEvents([])
         transport.enqueueError(NotFoundError(message: "gone"))
         transport.enqueueError(NetworkError(
             NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
         ))
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            let all = try? await queue.fetchAll()
-            return (all?.count == 1) && ((all?.first?.attemptCount ?? 0) >= 1)
-        }
+        await connManager.applyStateForTesting(.online)
+        // Drive exactly one cycle rather than starting the engine. Starting it
+        // arms the real NWPathMonitor, whose first callback arrives after the
+        // stream has closed and the manager has moved to `.online`, flipping it
+        // back to `.connecting` and opening a second replay cycle. Whether that
+        // lands before the stop is a matter of machine load, and it is what the
+        // per-cycle counts below would otherwise be measuring.
+        await engine.triggerProactiveDrainForTesting()
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].localId == "019eb000-0000-7000-8000-000000000000")
-        #expect(remaining[0].attemptCount == 1)
-        await engine.stop()
+        let record = try #require(remaining.first)
+        #expect(record.localId == "019eb000-0000-7000-8000-000000000000")
+        let replayCalls = transport.calls.filter {
+            $0.method == .patch && $0.path == "/items/019eb000-0000-7000-8000-000000000000"
+        }
+        #expect(replayCalls.count == 1)
+        #expect(record.attemptCount == 1)
     }
 
     // MARK: - Id stamping + replay reconciliation
@@ -432,6 +549,9 @@ struct SyncEngineReplayTests {
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
             await transport.calls.filter { $0.path == "/events" }.count >= 1
         }
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+            connManager.state == .online
+        }
 
         // Now enqueue a mutation AFTER the first replay cycle has
         // already ticked. Without the reconnect nudge, this mutation
@@ -439,17 +559,21 @@ struct SyncEngineReplayTests {
         try await queue.enqueueDeleteItem(id: "019eb000-0000-7000-8000-000000000042")
         transport.enqueueError(NotFoundError(message: "server gone"))
 
-        // Assert the mutation drains without us manually re-triggering
-        // `.connecting`.
+        // Assert the reconnect nudge re-opens SSE without us manually
+        // re-triggering `.connecting`. Wait for the observable effect instead
+        // of sampling immediately after the queue drains: proactive replay can
+        // empty the queue before the reconnect delay elapses.
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+            transport.calls.filter { $0.path == "/events" }.count >= 2
+        }
+        let sseCallCount = transport.calls.filter { $0.path == "/events" }.count
+        #expect(sseCallCount >= 2)
+
+        // The mutation also drains without another reachability transition.
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
             (try? await queue.isEmpty) == true
         }
         #expect(try await queue.isEmpty)
-
-        // And assert we actually opened the SSE stream more than once —
-        // the reconnect nudge drove the re-open.
-        let sseCallCount = await transport.calls.filter { $0.path == "/events" }.count
-        #expect(sseCallCount >= 2, "expected reconnect nudge to re-open SSE at least once; got \(sseCallCount)")
 
         await engine.stop()
     }

@@ -19,8 +19,8 @@ struct PendingMutationsQueryTests {
         queue: MutationQueue,
         container: ModelContainer
     ) {
-        let (_, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
-        let store = MarfaStore(container: container)
+        let (localStore, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let store = MarfaStore(container: container, localStore: localStore)
         return (store, queue, container)
     }
 

@@ -13,6 +13,8 @@ import os
 /// mirror the store through `NSPersistentCloudKitContainer`. The SwiftData
 /// schema is CloudKit-compatible regardless of the mode chosen.
 public enum MarfaModelContainer {
+    private static let creationLock = NSLock()
+
     /// Builds a container at `path`, or an in-memory container when `path`
     /// is `:memory:` (the contract used by every test that wants an
     /// ephemeral database).
@@ -26,6 +28,23 @@ public enum MarfaModelContainer {
     public static func make(
         path: String,
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none
+    ) throws -> ModelContainer {
+        try withCreationLock {
+            try makeUnlocked(path: path, cloudKitDatabase: cloudKitDatabase)
+        }
+    }
+
+    /// Coordinates every ModelContainer constructor owned by this package.
+    /// Tests that must build an older schema use the same internal boundary.
+    /// Containers created directly by consumers are outside SDK ownership;
+    /// callers should use ``make(path:cloudKitDatabase:)`` when possible.
+    internal static func withCreationLock<T>(_ operation: () throws -> T) rethrows -> T {
+        try creationLock.withLock(operation)
+    }
+
+    private static func makeUnlocked(
+        path: String,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase
     ) throws -> ModelContainer {
         if path == ":memory:" {
             return try ModelContainer(

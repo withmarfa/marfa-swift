@@ -10,12 +10,12 @@ import Foundation
 /// All HTTP goes through ``FakeDeviceFlowHTTPClient`` and all time
 /// through ``ManualDeviceFlowClock``, so the suite runs in milliseconds
 /// with no real sleeps or network. Safe for parallel execution.
-@Suite("DeviceFlow polling", .serialized)
+@Suite("DeviceFlow polling", .serialized, .timeLimit(.minutes(1)))
 struct DeviceFlowPollingTests {
 
     // MARK: - Helpers
 
-    private static let issuer = URL(string: "https://example.test")!
+    private static let issuer = URL(string: "https://device-flow.example.test")!
 
     /// Builds a `DeviceFlowHandle` wired to per-test fakes. `expiresAt`
     /// defaults to 30 minutes ahead of the manual clock's `now()`.
@@ -31,7 +31,7 @@ struct DeviceFlowPollingTests {
             clientId: "test-client",
             deviceCode: "test-device-code",
             userCode: "ABCD-EFGH",
-            verificationURI: URL(string: "https://example.test/device")!,
+            verificationURI: URL(string: "https://device-flow.example.test/device")!,
             verificationURIComplete: nil,
             expiresAt: clock.now().addingTimeInterval(expiresIn),
             interval: initialInterval,
@@ -47,21 +47,34 @@ struct DeviceFlowPollingTests {
     /// polling tests don't need to script discovery responses for every
     /// case — discovery is exercised by the start() tests.
     private static let stubEndpoints = OAuthDiscovery.Endpoints(
-        token: URL(string: "https://example.test/auth/oauth2/token")!,
-        authorize: URL(string: "https://example.test/auth/oauth2/authorize")!,
-        revoke: URL(string: "https://example.test/auth/oauth2/revoke")!,
-        deviceAuthorize: URL(string: "https://example.test/auth/device")!
+        token: URL(string: "https://device-flow.example.test/auth/oauth2/token")!,
+        authorize: URL(string: "https://device-flow.example.test/auth/oauth2/authorize")!,
+        revoke: URL(string: "https://device-flow.example.test/auth/oauth2/revoke")!,
+        deviceAuthorize: URL(string: "https://device-flow.example.test/auth/device")!
     )
 
     /// Wire-shape discovery doc the SDK reads on first `start()` call.
     /// Tests for `DeviceFlow.start()` enqueue this ahead of their
     /// device-code response.
+    ///
+    /// Endpoints are derived from the issuer the test passes in, so a
+    /// test that takes its own origin still sees a self-consistent
+    /// document and can assert on the URLs the SDK ends up calling.
     private struct DiscoveryDoc: Encodable {
-        let issuer = "https://example.test"
-        let authorization_endpoint = "https://example.test/auth/oauth2/authorize"
-        let token_endpoint = "https://example.test/auth/oauth2/token"
-        let revocation_endpoint = "https://example.test/auth/oauth2/revoke"
-        let device_authorization_endpoint = "https://example.test/auth/device"
+        let issuer: String
+        let authorization_endpoint: String
+        let token_endpoint: String
+        let revocation_endpoint: String
+        let device_authorization_endpoint: String
+
+        init(issuer: URL) {
+            let origin = issuer.absoluteString
+            self.issuer = origin
+            self.authorization_endpoint = "\(origin)/auth/oauth2/authorize"
+            self.token_endpoint = "\(origin)/auth/oauth2/token"
+            self.revocation_endpoint = "\(origin)/auth/oauth2/revoke"
+            self.device_authorization_endpoint = "\(origin)/auth/device"
+        }
     }
 
     // MARK: - Polling loop
@@ -86,10 +99,103 @@ struct DeviceFlowPollingTests {
         #expect(http.calls.count == 2)
         // Cadence held steady — authorization_pending must not escalate.
         #expect(clock.recordedSleeps == [5, 5])
-        // Token persisted under the issuer+client storage key.
-        let stored = await storage.peek(account: "marfa.auth.tokens:example.test:test-client")
+        // Token persisted under the canonical issuer+client storage key.
+        let storageKey = OAuthIssuer.storageKey(
+            kind: "tokens",
+            issuer: Self.issuer,
+            clientId: "test-client"
+        )
+        let stored = await storage.peek(account: storageKey)
         #expect(stored != nil)
         #expect(stored?.contains("real-access-token") == true)
+    }
+
+    @Test("device-flow tokens are isolated by issuer scheme, port, and path")
+    func issuerIdentityIsolatesStoredTokens() async throws {
+        let storage = InMemoryKeychain()
+        let issuerA = URL(string: "https://device-flow.example.test:8443/tenant-a")!
+        let issuerB = URL(string: "http://device-flow.example.test:9443/tenant-b")!
+        let httpA = FakeDeviceFlowHTTPClient()
+        let httpB = FakeDeviceFlowHTTPClient()
+        let clockA = ManualDeviceFlowClock()
+        let clockB = ManualDeviceFlowClock()
+        httpA.enqueueTokenResponse(accessToken: "token-a")
+        httpB.enqueueTokenResponse(accessToken: "token-b")
+
+        let handleA = DeviceFlowHandle(
+            issuer: issuerA,
+            clientId: "test-client",
+            deviceCode: "device-a",
+            userCode: "AAAA-BBBB",
+            verificationURI: URL(string: "https://device-flow.example.test/device")!,
+            verificationURIComplete: nil,
+            expiresAt: clockA.now().addingTimeInterval(1800),
+            interval: 5,
+            endpoints: Self.stubEndpoints,
+            storage: storage,
+            httpClient: httpA,
+            clock: clockA
+        )
+        let handleB = DeviceFlowHandle(
+            issuer: issuerB,
+            clientId: "test-client",
+            deviceCode: "device-b",
+            userCode: "CCCC-DDDD",
+            verificationURI: URL(string: "https://device-flow.example.test/device")!,
+            verificationURIComplete: nil,
+            expiresAt: clockB.now().addingTimeInterval(1800),
+            interval: 5,
+            endpoints: Self.stubEndpoints,
+            storage: storage,
+            httpClient: httpB,
+            clock: clockB
+        )
+
+        let tokenA = Task { try await handleA.awaitToken() }
+        let tokenB = Task { try await handleB.awaitToken() }
+        #expect(await clockA.nextSleepRequest() == 5)
+        #expect(await clockB.nextSleepRequest() == 5)
+        clockA.advance(by: 5)
+        clockB.advance(by: 5)
+        #expect(try await tokenA.value.currentToken().accessToken == "token-a")
+        #expect(try await tokenB.value.currentToken().accessToken == "token-b")
+        let keyA = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerA, clientId: "test-client")
+        let keyB = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerB, clientId: "test-client")
+        #expect(await storage.peek(account: keyA)?.contains("token-a") == true)
+        #expect(await storage.peek(account: keyB)?.contains("token-b") == true)
+    }
+
+    @Test("start never migrates a legacy origin-only token key")
+    func startDoesNotMigrateLegacyTokenKey() async throws {
+        struct RootIssuerDiscoveryDoc: Encodable {
+            let issuer: String
+            let authorization_endpoint = "https://device-flow.example.test/auth/oauth2/authorize"
+            let token_endpoint = "https://device-flow.example.test/auth/oauth2/token"
+            let revocation_endpoint = "https://device-flow.example.test/auth/oauth2/revoke"
+            let device_authorization_endpoint = "https://device-flow.example.test/auth/device"
+        }
+
+        let issuer = URL(string: "https://device-flow.example.test")!
+        let storage = InMemoryKeychain()
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: issuer, clientId: "test-client")
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: "test-client")
+        try await storage.set("legacy-token", for: legacyKey)
+        await OAuthDiscovery.shared.reset(for: issuer)
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(RootIssuerDiscoveryDoc(issuer: issuer.absoluteString))
+        http.enqueueDeviceCodeResponse()
+
+        _ = try await DeviceFlow.start(
+            issuer: issuer,
+            clientId: "test-client",
+            scopes: ["core.note:read"],
+            storage: storage,
+            httpClient: http,
+            clock: ManualDeviceFlowClock()
+        )
+
+        #expect(await storage.peek(account: canonicalKey) == nil)
+        #expect(await storage.peek(account: legacyKey) == "legacy-token")
     }
 
     @Test("slow_down increments interval by 5 per RFC 8628")
@@ -211,7 +317,7 @@ struct DeviceFlowPollingTests {
             clientId: "test-client",
             deviceCode: "code",
             userCode: "ABCD-EFGH",
-            verificationURI: URL(string: "https://example.test/device")!,
+            verificationURI: URL(string: "https://device-flow.example.test/device")!,
             verificationURIComplete: nil,
             expiresAt: clock.now().addingTimeInterval(-1),
             interval: 5,
@@ -273,22 +379,22 @@ struct DeviceFlowPollingTests {
 
     @Test("start() decodes the device-code response into a populated handle")
     func startSuccessParsesResponse() async throws {
-        await OAuthDiscovery.shared.reset()
+        let issuer = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
         http.enqueueDeviceCodeResponse(
             deviceCode: "DC-1234",
             userCode: "WDJB-MJHT",
-            verificationURI: "https://example.test/device",
-            verificationURIComplete: "https://example.test/device?user_code=WDJB-MJHT",
+            verificationURI: "https://device-flow.example.test/device",
+            verificationURIComplete: "https://device-flow.example.test/device?user_code=WDJB-MJHT",
             expiresInSeconds: 1800,
             interval: 5
         )
 
         let handle = try await DeviceFlow.start(
-            issuer: Self.issuer,
+            issuer: issuer,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -297,8 +403,8 @@ struct DeviceFlowPollingTests {
         )
 
         #expect(handle.userCode == "WDJB-MJHT")
-        #expect(handle.verificationURI == URL(string: "https://example.test/device"))
-        #expect(handle.verificationURIComplete == URL(string: "https://example.test/device?user_code=WDJB-MJHT"))
+        #expect(handle.verificationURI == URL(string: "https://device-flow.example.test/device"))
+        #expect(handle.verificationURIComplete == URL(string: "https://device-flow.example.test/device?user_code=WDJB-MJHT"))
         #expect(handle.expiresAt == clock.now().addingTimeInterval(1800))
 
         // Request shape: discovery first, then POST /auth/device with
@@ -306,7 +412,7 @@ struct DeviceFlowPollingTests {
         #expect(http.calls.count == 2)
         let request = try #require(http.calls.last)
         #expect(request.httpMethod == "POST")
-        #expect(request.url == Self.issuer.appendingPathComponent("auth/device"))
+        #expect(request.url == issuer.appendingPathComponent("auth/device"))
         let body = try #require(request.httpBody)
         let decoded = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(decoded["client_id"] as? String == "test-client")
@@ -315,17 +421,17 @@ struct DeviceFlowPollingTests {
 
     @Test("start() throws OAuthError on a non-2xx response")
     func startOAuthErrorIsParsed() async throws {
-        await OAuthDiscovery.shared.reset()
+        let issuer = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
         http.enqueueOAuthError(code: "invalid_client", description: "no such client")
 
         let thrown: Error
         do {
             _ = try await DeviceFlow.start(
-                issuer: Self.issuer,
+                issuer: issuer,
                 clientId: "test-client",
                 scopes: ["core.note:read"],
                 storage: storage,
@@ -344,16 +450,16 @@ struct DeviceFlowPollingTests {
 
     @Test("start() defaults interval to 5 when the server omits it")
     func startDefaultsIntervalWhenMissing() async throws {
-        await OAuthDiscovery.shared.reset()
+        let issuer = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
         // RFC 8628 says `interval` is optional; SDK must default to 5s.
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
         http.enqueueDeviceCodeResponse(interval: nil)
 
         let handle = try await DeviceFlow.start(
-            issuer: Self.issuer,
+            issuer: issuer,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -371,15 +477,18 @@ struct DeviceFlowPollingTests {
 
     @Test("start() leaves verification_uri_complete nil when the server omits it")
     func startVerificationURICompleteOptional() async throws {
-        await OAuthDiscovery.shared.reset()
+        let issuer = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
-        try http.enqueueJSON(DiscoveryDoc())
-        http.enqueueDeviceCodeResponse(verificationURIComplete: nil)
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
+        http.enqueueDeviceCodeResponse(
+            verificationURI: "\(issuer.absoluteString)/device",
+            verificationURIComplete: nil
+        )
 
         let handle = try await DeviceFlow.start(
-            issuer: Self.issuer,
+            issuer: issuer,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -388,6 +497,6 @@ struct DeviceFlowPollingTests {
         )
 
         #expect(handle.verificationURIComplete == nil)
-        #expect(handle.verificationURI == URL(string: "https://example.test/device"))
+        #expect(handle.verificationURI == URL(string: "\(issuer.absoluteString)/device"))
     }
 }

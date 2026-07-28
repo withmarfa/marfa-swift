@@ -148,7 +148,7 @@ private func collectingAuthEvents(
     return collector
 }
 
-@Suite("OAuth refresh: single-flight, terminal latch, and backoff", .serialized)
+@Suite("OAuth refresh: single-flight, terminal latch, and backoff", .serialized, .timeLimit(.minutes(1)))
 struct TokenRefreshTests {
 
     // MARK: - The root cause
