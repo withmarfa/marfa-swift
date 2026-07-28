@@ -33,6 +33,23 @@ struct OAuthDiscoveryTests {
             self.revocation_endpoint = revoke
             self.device_authorization_endpoint = deviceAuthorize
         }
+
+        /// A well-formed document for `issuer`, with every endpoint hanging off
+        /// it. Discovery requires the published issuer to equal the one the
+        /// caller asked for, and each test mints its own issuer, so a fixture
+        /// pinned to a fixed origin is rejected before it can exercise
+        /// anything else. Pass `includeToken: false` to reach the
+        /// missing-field guard with the identity check already satisfied.
+        init(issuer: URL, includeToken: Bool = true) {
+            let origin = issuer.absoluteString
+            self.init(
+                issuer: origin,
+                authorize: "\(origin)/auth/oauth2/authorize",
+                token: includeToken ? "\(origin)/auth/oauth2/token" : nil,
+                revoke: "\(origin)/auth/oauth2/revoke",
+                deviceAuthorize: "\(origin)/auth/device"
+            )
+        }
     }
 
     /// Cancellation-resistant HTTP seam used to prove a pre-reset request
@@ -79,24 +96,25 @@ struct OAuthDiscoveryTests {
     @Test("fetches and parses the well-known doc")
     func happyPath() async throws {
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
 
         let endpoints = try await OAuthDiscovery.shared.endpoints(
             for: issuer,
             httpClient: http
         )
-        #expect(endpoints.token == URL(string: "https://example.test/auth/oauth2/token"))
-        #expect(endpoints.authorize == URL(string: "https://example.test/auth/oauth2/authorize"))
-        #expect(endpoints.revoke == URL(string: "https://example.test/auth/oauth2/revoke"))
-        #expect(endpoints.deviceAuthorize == URL(string: "https://example.test/auth/device"))
+        let origin = issuer.absoluteString
+        #expect(endpoints.token == URL(string: "\(origin)/auth/oauth2/token"))
+        #expect(endpoints.authorize == URL(string: "\(origin)/auth/oauth2/authorize"))
+        #expect(endpoints.revoke == URL(string: "\(origin)/auth/oauth2/revoke"))
+        #expect(endpoints.deviceAuthorize == URL(string: "\(origin)/auth/device"))
         #expect(http.calls.count == 1)
-        #expect(http.calls[0].url == URL(string: "https://example.test/.well-known/oauth-authorization-server"))
+        #expect(http.calls[0].url == URL(string: "\(origin)/.well-known/oauth-authorization-server"))
     }
 
     @Test("caches the result across sequential calls")
     func cachesAcrossCalls() async throws {
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
 
         _ = try await OAuthDiscovery.shared.endpoints(for: issuer, httpClient: http)
         _ = try await OAuthDiscovery.shared.endpoints(for: issuer, httpClient: http)
@@ -128,10 +146,15 @@ struct OAuthDiscoveryTests {
     @Test("throws DiscoveryError when token_endpoint is missing")
     func missingFieldThrows() async throws {
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(DiscoveryDoc(token: nil))
+        // The document names the requested issuer, so the identity check
+        // passes and the absent endpoint is what the error has to be about.
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer, includeToken: false))
 
-        await #expect(throws: OAuthDiscoveryError.self) {
+        do {
             _ = try await OAuthDiscovery.shared.endpoints(for: issuer, httpClient: http)
+            Issue.record("expected a missing-field error")
+        } catch let error as OAuthDiscoveryError {
+            #expect(error.description.contains("token_endpoint"))
         }
     }
 
@@ -253,12 +276,14 @@ struct OAuthDiscoveryTests {
     func cachedDocumentIsRecheckedPerCaller() async throws {
         let discovery = OAuthDiscovery()
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(DiscoveryDoc(issuer: "https://example.test"))
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
 
         _ = try await discovery.endpoints(for: issuer, httpClient: http)
         #expect(http.calls.count == 1)
 
-        let otherSpelling = URL(string: "https://example.test/")!
+        // Same server, different spelling: both canonicalize to one cache key,
+        // so this call is answered from the entry the first one stored.
+        let otherSpelling = try #require(URL(string: "\(issuer.absoluteString)/"))
         await #expect(throws: OAuthDiscoveryError.self) {
             _ = try await discovery.endpoints(for: otherSpelling, httpClient: http)
         }
@@ -270,7 +295,7 @@ struct OAuthDiscoveryTests {
     func cacheEvictedOnFailure() async throws {
         let http = FakeDeviceFlowHTTPClient()
         http.enqueue(data: Data("nope".utf8), status: 500)
-        try http.enqueueJSON(DiscoveryDoc())
+        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
 
         await #expect(throws: OAuthDiscoveryError.self) {
             _ = try await OAuthDiscovery.shared.endpoints(for: issuer, httpClient: http)
@@ -282,7 +307,7 @@ struct OAuthDiscoveryTests {
             for: issuer,
             httpClient: http
         )
-        #expect(endpoints.token.absoluteString == "https://example.test/auth/oauth2/token")
+        #expect(endpoints.token.absoluteString == "\(issuer.absoluteString)/auth/oauth2/token")
     }
 
     @Test("issuer paths have independent cache and reset scope")

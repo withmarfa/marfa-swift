@@ -482,7 +482,10 @@ struct DeviceFlowPollingTests {
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
         try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
-        http.enqueueDeviceCodeResponse(verificationURIComplete: nil)
+        http.enqueueDeviceCodeResponse(
+            verificationURI: "\(issuer.absoluteString)/device",
+            verificationURIComplete: nil
+        )
 
         let handle = try await DeviceFlow.start(
             issuer: issuer,
@@ -494,6 +497,6 @@ struct DeviceFlowPollingTests {
         )
 
         #expect(handle.verificationURIComplete == nil)
-        #expect(handle.verificationURI == URL(string: "https://device-flow.example.test/device"))
+        #expect(handle.verificationURI == URL(string: "\(issuer.absoluteString)/device"))
     }
 }
