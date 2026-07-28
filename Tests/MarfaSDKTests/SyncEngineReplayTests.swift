@@ -162,8 +162,9 @@ struct SyncEngineReplayTests {
     @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
 
-        // Queue an update against an item the server "doesn't have"
-        // (matches the `019da086-…` pattern from the bug report).
+        // Queue an update against an item the server "doesn't have". The id is
+        // a UUIDv7, the shape the server accepts, so the 404 is about the row
+        // being absent rather than the id being rejected.
         try await queue.enqueueUpdateItem(
             id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
             properties: ["body": .string("stale")]
@@ -210,8 +211,8 @@ struct SyncEngineReplayTests {
     @Test("mutation replay drops queued record on 400 ValidationError") func mutationReplayDropsOn400() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
 
-        // Matches the `6837a0e8-…` UUIDv4 pattern from the bug report —
-        // server would reject the ID with INVALID_ID (400).
+        // A UUIDv4 rather than the UUIDv7 the server requires, so it answers
+        // INVALID_ID (400) — a permanent failure no retry can clear.
         try await queue.enqueueUpdateItem(
             id: "6837a0e8-d316-4433-ac4c-d1e40f19615f",
             properties: ["body": .string("bad id")]
