@@ -506,7 +506,7 @@ public actor SyncEngine {
     // MARK: - Main run loop
 
     private func runLoop() async {
-        for await state in await connectionManager.stateUpdates {
+        for await state in connectionManager.stateUpdates {
             guard running else { break }
 
             switch state {
@@ -563,7 +563,7 @@ public actor SyncEngine {
     /// then mark online if still running.
     private func fireProactiveDrain() async {
         guard running, !draining else { return }
-        let state = await connectionManager.state
+        let state = connectionManager.state
         guard state == .online else { return }
         await replayMutations()
         if running { await connectionManager.markOnline() }

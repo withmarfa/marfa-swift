@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Synchronization
 
 /// Tracks network reachability and translates it into a ``ConnectionState``
 /// stream that the ``SyncEngine`` observes.
@@ -10,19 +11,34 @@ import Network
 /// ## Usage
 ///
 ///     let manager = ConnectionStateManager()
-///     let updates = await manager.stateUpdates
-///     for await state in updates {
+///     for await state in manager.stateUpdates {
 ///         print("connection: \(state)")
 ///     }
 public actor ConnectionStateManager {
 
+    // MARK: - Broadcast state
+
+    /// Current state and open subscribers, held under a mutex rather than in
+    /// actor storage so that subscribing is synchronous with the
+    /// ``stateUpdates`` access that hands the stream back. Registering through
+    /// a detached task instead would let a ``stop()`` issued on the next line
+    /// run first, leaving the new continuation attached to a stopped manager
+    /// and its consumer awaiting a state that can never arrive. `state` lives
+    /// alongside the subscribers because a new stream is handed the current
+    /// value at the instant it registers, and reading it through a separate
+    /// mechanism would reintroduce the gap between the two.
+    private struct Broadcast {
+        var state: ConnectionState = .offline
+        var continuations: [UUID: AsyncStream<ConnectionState>.Continuation] = [:]
+    }
+
+    private let broadcast = Mutex(Broadcast())
+
     // MARK: - State
 
-    public private(set) var state: ConnectionState = .offline
-
-    // MARK: - Broadcast subscribers
-
-    private var continuations: [UUID: AsyncStream<ConnectionState>.Continuation] = [:]
+    public nonisolated var state: ConnectionState {
+        broadcast.withLock { $0.state }
+    }
 
     // MARK: - NWPathMonitor plumbing
 
@@ -66,10 +82,16 @@ public actor ConnectionStateManager {
         monitor?.cancel()
         monitor = nil
         applyState(.offline)
-        for continuation in continuations.values {
+        // Take the subscribers out of the lock before finishing them.
+        // `finish()` can run a continuation's termination handler inline, and
+        // that handler reaches back for this same lock to deregister.
+        let open = broadcast.withLock { broadcast -> [AsyncStream<ConnectionState>.Continuation] in
+            defer { broadcast.continuations.removeAll() }
+            return Array(broadcast.continuations.values)
+        }
+        for continuation in open {
             continuation.finish()
         }
-        continuations.removeAll()
     }
 
     // MARK: - Manual transitions
@@ -106,19 +128,22 @@ public actor ConnectionStateManager {
     /// An `AsyncStream` that yields the current state immediately, then any
     /// subsequent state changes. The stream ends when ``stop()`` is called.
     ///
-    /// Actor isolation makes registration synchronous with property access:
-    /// once the caller receives the stream, an immediate ``stop()`` cannot
-    /// overtake a detached subscription task and leave the stream unfinished.
-    public var stateUpdates: AsyncStream<ConnectionState> {
+    /// Registration completes before the property returns, so a caller that
+    /// takes a stream and immediately calls ``stop()`` gets a finished stream
+    /// rather than one that never yields and never ends. `nonisolated` keeps
+    /// subscribing free of an actor hop; the mutex, not the actor, is what
+    /// makes it atomic.
+    public nonisolated var stateUpdates: AsyncStream<ConnectionState> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<ConnectionState>.makeStream()
         continuation.onTermination = { [weak self] _ in
-            Task { [weak self] in
-                await self?.removeContinuation(id: id)
-            }
+            self?.removeContinuation(id: id)
         }
-        continuations[id] = continuation
-        continuation.yield(state)
+        let current = broadcast.withLock { broadcast -> ConnectionState in
+            broadcast.continuations[id] = continuation
+            return broadcast.state
+        }
+        continuation.yield(current)
         return stream
     }
 
@@ -134,15 +159,21 @@ public actor ConnectionStateManager {
     }
 
     private func applyState(_ next: ConnectionState) {
-        guard next != state else { return }
-        state = next
-        for continuation in continuations.values {
+        // Yield outside the lock for the same reason `stop()` does: a
+        // terminated stream runs its handler inline, and that handler
+        // deregisters through this lock.
+        let subscribers = broadcast.withLock { broadcast -> [AsyncStream<ConnectionState>.Continuation] in
+            guard next != broadcast.state else { return [] }
+            broadcast.state = next
+            return Array(broadcast.continuations.values)
+        }
+        for continuation in subscribers {
             continuation.yield(next)
         }
     }
 
-    private func removeContinuation(id: UUID) {
-        continuations.removeValue(forKey: id)
+    private nonisolated func removeContinuation(id: UUID) {
+        broadcast.withLock { $0.continuations.removeValue(forKey: id) }
     }
 
     // MARK: - Test seam
@@ -158,6 +189,10 @@ public actor ConnectionStateManager {
 
     internal var isStartedForTesting: Bool {
         started
+    }
+
+    internal nonisolated var subscriberCountForTesting: Int {
+        broadcast.withLock { $0.continuations.count }
     }
 
     internal var markOnlineCallCountForTesting: Int {

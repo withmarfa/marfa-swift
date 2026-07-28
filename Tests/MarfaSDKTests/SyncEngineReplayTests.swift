@@ -549,7 +549,7 @@ struct SyncEngineReplayTests {
             await transport.calls.filter { $0.path == "/events" }.count >= 1
         }
         try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            await connManager.state == .online
+            connManager.state == .online
         }
 
         // Now enqueue a mutation AFTER the first replay cycle has
