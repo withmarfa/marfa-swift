@@ -29,7 +29,7 @@ struct FullSyncStateQueryTests {
             mutationQueue: queue,
             connectionManager: connManager
         )
-        let store = MarfaStore(container: container, syncEngine: engine)
+        let store = MarfaStore(container: container, localStore: localStore, syncEngine: engine)
         return (store, queue, transport, connManager, engine)
     }
 
@@ -191,8 +191,9 @@ struct FullSyncStateQueryTests {
 
     @Test("queryFullSyncState returns nil for stores without a sync engine")
     func nilForStoresWithoutEngine() async throws {
-        let (_, _, container) = try await MarfaSDKTest.makeInMemoryStorePair()
-        let store = MarfaStore(container: container) // no syncEngine
+        let (localStore, _, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        // No syncEngine.
+        let store = MarfaStore(container: container, localStore: localStore)
         #expect(store.queryFullSyncState() == nil)
     }
 }

@@ -3,12 +3,15 @@ import Foundation
 @testable import MarfaSDK
 import MarfaSDKTestSupport
 
-/// Unit tests for `OAuthDiscovery`. The actor cache is process-wide, so
-/// the suite is `.serialized` to prevent races between tests.
-@Suite("OAuthDiscovery", .serialized)
+/// Unit tests for `OAuthDiscovery`. The actor cache is process-wide and
+/// keyed by issuer origin, so each test takes an origin of its own rather
+/// than clearing the shared cache — see `uniqueIssuer(_:)`. A struct suite
+/// is instantiated once per test, so this stored property is a fresh
+/// origin every time.
+@Suite("OAuthDiscovery")
 struct OAuthDiscoveryTests {
 
-    private let issuer = URL(string: "https://example.test")!
+    private let issuer = uniqueIssuer("oauth-discovery")
 
     private struct DiscoveryDoc: Encodable {
         let authorization_endpoint: String?
@@ -27,10 +30,6 @@ struct OAuthDiscoveryTests {
             self.revocation_endpoint = revoke
             self.device_authorization_endpoint = deviceAuthorize
         }
-    }
-
-    init() async {
-        await OAuthDiscovery.shared.reset()
     }
 
     @Test("fetches and parses the well-known doc")

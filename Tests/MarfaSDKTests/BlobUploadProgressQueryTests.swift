@@ -20,17 +20,17 @@ struct BlobUploadProgressQueryTests {
         connManager: ConnectionStateManager,
         engine: SyncEngine
     ) {
-        let (_, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let (localStore, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         let engine = SyncEngine(
             transport: transport,
-            localStore: await Task.detached { LocalStore(modelContainer: container) }.value,
+            localStore: localStore,
             mutationQueue: queue,
             connectionManager: connManager,
             drainDebounceInterval: .milliseconds(20)
         )
-        let store = MarfaStore(container: container, syncEngine: engine)
+        let store = MarfaStore(container: container, localStore: localStore, syncEngine: engine)
         return (store, queue, transport, connManager, engine)
     }
 

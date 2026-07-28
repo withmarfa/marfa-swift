@@ -116,13 +116,14 @@ private func discoveryCanned() -> MarfaAuthStubURLProtocol.Canned {
 @MainActor
 struct MarfaAuthSignInTests {
 
-    let issuer = URL(string: "https://staging.marfa.so")!
+    /// `restore()` runs OAuth discovery, whose cache is process-wide and
+    /// keyed by origin. A struct suite is instantiated once per test, so
+    /// each test gets an origin nobody else uses and starts cold — which
+    /// is what keeps the scripted response queue aligned without clearing
+    /// the shared cache out from under other suites.
+    let issuer = uniqueIssuer("marfa-auth-signin")
     let clientId = "test-client"
     let redirectURI = URL(string: "marfa-test://auth/callback")!
-
-    init() async {
-        await OAuthDiscovery.shared.reset()
-    }
     let scopes = ["openid", "profile", "email"]
 
     func makeAuth(session: URLSession, storage: InMemoryKeychain = InMemoryKeychain()) -> MarfaAuth {
@@ -325,7 +326,7 @@ struct MarfaAuthSignInTests {
     func restoreHasToken() async throws {
         let storage = InMemoryKeychain()
         // Match MarfaAuth's tokensKey shape: marfa.auth.tokens:<host>:<clientId>
-        let key = "marfa.auth.tokens:staging.marfa.so:test-client"
+        let key = "marfa.auth.tokens:\(issuer.host ?? ""):\(clientId)"
         let json = #"{"access_token":"a","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         try await storage.set(json, for: key)
 

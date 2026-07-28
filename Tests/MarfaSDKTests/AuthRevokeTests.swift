@@ -79,9 +79,14 @@ private func makeStubbedSession() -> URLSession {
 @MainActor
 struct AuthRevokeTests {
 
-    let issuer = URL(string: "https://staging.marfa.so")!
+    /// `signOut` resolves the revoke endpoint through OAuth discovery,
+    /// whose cache is process-wide and keyed by origin. A struct suite is
+    /// instantiated once per test, so each test gets an origin nobody
+    /// else uses and starts cold — no clearing of the shared cache, and
+    /// so no interference with suites running alongside this one.
+    let issuer = uniqueIssuer("marfa-auth-revoke")
     let clientId = "test-client"
-    let tokensKey = "marfa.auth.tokens:staging.marfa.so:test-client"
+    var tokensKey: String { "marfa.auth.tokens:\(issuer.host ?? ""):\(clientId)" }
 
     func prepareAuth() async throws -> (MarfaAuth, InMemoryKeychain, URLSession) {
         let storage = InMemoryKeychain()
@@ -105,7 +110,6 @@ struct AuthRevokeTests {
     @Test("signOut posts the access and refresh tokens to the discovered revoke endpoint with client_id")
     func revokesBothTokens() async throws {
         RevokeStubURLProtocol.reset()
-        await OAuthDiscovery.shared.reset()
         let (auth, storage, session) = try await prepareAuth()
         let provider = StoredTokenProvider(
             storage: storage,

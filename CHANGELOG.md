@@ -5,6 +5,49 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Local search.** `MarfaStore.querySearch(text:filters:)` returns a live
+  `SearchQuery` over `title` and `body` in the local store, so search works
+  offline and without a round trip. It takes the same `SearchFilters` as
+  `MarfaClient.search(query:filters:)` — `type`, `state`, `tier`, `tags`,
+  `limit` — and mirrors the server's exclusion of `system.*` and trashed
+  records plus its default limit of 20, so a screen can move between the two.
+  Where they differ: only `title` and `body` are matched — so types keying
+  their text elsewhere (`core.entity` and its subtypes, `core.highlight`, and
+  a captured email's `subject`) never match at all — tags are filterable but
+  not searchable, `type` is compared literally rather than resolving
+  subtypes, `limit` accepts values the server's `1...100` would reject,
+  ranking is ordinal rather than BM25, and there are no snippets. All are
+  documented on the method, alongside its cost: tens of milliseconds per
+  thousand rows scanned, with `limit` capping the answer rather than the
+  work. An abandoned search is cancelled at the scan rather than run to
+  completion.
+- **`MarfaClient.search(query:filters:)` resolves locally on a pure-local
+  client** instead of failing against the placeholder URL, matching how every
+  namespace already behaves. Synced clients still query the server, whose
+  index beats a local scan.
+
+### Changed
+
+- **CI runs the full test suite on pull requests.** Tests were main-only, so
+  nothing between "it compiles" and "it's tagged" ever ran them. The codegen
+  freshness checks stay main-only — a source-only PR can't make a vendored
+  snapshot stale.
+
+### Fixed
+
+- **The test suite is deterministic under `swift test --parallel`.** Four
+  auth suites shared `OAuthDiscovery.shared`, a process-wide cache keyed by
+  issuer origin, and cleared it with a `reset()` that evicts every origin
+  rather than the caller's own. Running concurrently, they destroyed each
+  other's cached endpoints mid-test and left scripted HTTP responses
+  unconsumed, failing roughly a quarter of full runs. Each test now takes an
+  issuer origin of its own, so it starts cold without touching state another
+  test owns, and no test calls the process-wide reset.
+
 ## [11.3.0] — 2026-07-25
 
 Ship the 11.2.0 fix. The `v11.2.0` tag was cut one commit early, so it points
