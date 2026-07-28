@@ -48,6 +48,58 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
   issuer origin of its own, so it starts cold without touching state another
   test owns, and no test calls the process-wide reset.
 
+- **OAuth discovery accepts the issuer identifier as the caller wrote it.**
+  The published issuer was compared against a canonicalized form of the
+  request, so a server whose issuer identifier legitimately ends in a slash,
+  or a consumer who writes an explicit default port, could never match and
+  was rejected outright. RFC 8414 §3.3 requires the comparison to be verbatim;
+  the canonical form still keys the cache and builds the well-known URL, so
+  two spellings of one server share a fetch and are each checked on their own
+  terms.
+
+- **`SyncEngine.stop()` is a quiescence boundary, not a cancellation
+  request.** It now awaits work installed into a lifecycle slot after it took
+  its snapshot, so it can no longer return while an engine-owned task is
+  still running. It also finishes every open `events` stream, and `events`
+  registers its continuation before the property returns, so subscribing and
+  immediately stopping no longer strands a consumer on a stream that never
+  yields and never ends.
+
+- **A stream closing inside a teardown no longer touches the connection
+  manager** or schedules a reconnect nudge that would outlive the stop.
+  Network monitoring is rebuilt per lifecycle, so a restarted engine observes
+  path changes again instead of staying inert.
+
+- **A clean drain is only stamped after a fresh, successful empty-queue
+  read.** A mutation enqueued while a replay cycle was in flight left the
+  queue non-empty but still recorded the cycle as clean, so `fullSyncState`
+  reported `.synced` with work outstanding.
+
+- **SDK `ModelContainer` construction is serialized.** Overlapping
+  `MarfaModelContainer.make(path:)` calls raced inside SwiftData.
+
+### Security
+
+- **A crafted issuer and client id could read and destroy another account's
+  stored token.** Credential accounts are namespaced by version, and the
+  version was separated with a colon — the same delimiter a legacy
+  host-keyed account uses. Both the host and the client id come from the
+  caller, so an issuer whose host is literally `v2`, plus a client id
+  spelling out another account's field encoding, reconstructed that
+  account's Keychain key byte for byte. The legacy-token migration then read
+  the victim's slot as its own legacy value, copied it into the attacker's
+  account and deleted the original. The version is now separated with `.`,
+  which a legacy key can never carry in that position, making the two
+  namespaces disjoint by construction. Account fields are also
+  length-prefixed, so a delimiter inside an issuer or client id cannot shift
+  the boundary between them.
+
+- **Discovery documents must name the issuer they were fetched for.** The
+  SDK did not check the `issuer` an authorization server published, so a
+  server reachable at one issuer could hand back endpoints belonging to
+  another. The check is applied per caller rather than once per cached
+  document.
+
 ## [11.3.0] — 2026-07-25
 
 Ship the 11.2.0 fix. The `v11.2.0` tag was cut one commit early, so it points

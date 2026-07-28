@@ -425,6 +425,14 @@ public actor SyncEngine {
     /// awaiting only the snapshot would let `stop()` return with live work.
     /// Terminates because `running` is already false and `stoppingTask` is
     /// still set, so no path can install another round.
+    ///
+    /// This is the single mechanism enforcing that contract, deliberately.
+    /// Each install site could instead re-check `running` immediately before
+    /// publishing, and one that does makes this sweep find nothing — but then
+    /// neither the sweep nor the re-check is falsifiable, because either one
+    /// alone produces a quiet teardown and removing either leaves the suite
+    /// green. Concentrating the guarantee here keeps it provable, and covers
+    /// every slot rather than the one path that happened to be noticed.
     private func drainResidualLifecycleTasks() async {
         while hasLifecycleTasks {
             let residual = [streamTask, drainListenerTask, drainDebounceTask, reconnectTask]
@@ -609,12 +617,6 @@ public actor SyncEngine {
         guard running else { return }
         await connectionManager.markOnline()
         await suspendStreamIfNeededForTesting(at: .beforeReconnectSchedule)
-        // `markOnline` released the actor, so a stop may have completed its
-        // synchronous teardown and snapshotted the task slots while this call
-        // was suspended. Re-check before installing anything: an unstructured
-        // reconnect task does not inherit the stream task's cancellation, so
-        // one scheduled past this point would outlive the stop barrier.
-        guard running else { return }
 
         // Reconnect nudge. Without this, a closed-but-not-errored SSE stream
         // (server-side idle timeout, catchup_too_old finalize, transport
@@ -622,8 +624,8 @@ public actor SyncEngine {
         // `runLoop` only re-enters `openStream` on a `.connecting` transition
         // from `NWPathMonitor`. After a brief back-off we flip
         // ConnectionStateManager back to `.connecting`, which runLoop picks
-        // up and re-opens the stream. See Bug C in the v3.2.0 PR for the
-        // "last synced 31 seconds ago" symptom this closes.
+        // up and re-opens the stream. Without it the symptom is a "last
+        // synced" footer frozen at the moment the stream quietly closed.
         //
         // A fast-fail (no events consumed AND an error thrown) stacks
         // exponential back-off to avoid hammering an unreachable server.
