@@ -269,6 +269,26 @@ struct OAuthDiscoveryTests {
         #expect(http.calls.first?.url == URL(string: "https://trailing-slash.test/.well-known/oauth-authorization-server"))
     }
 
+    /// An issuer identifier written with an explicit default port is usable.
+    /// Canonicalization lowercases and strips a trailing slash but leaves the
+    /// port alone, so this shape is unaffected by which side of the comparison
+    /// is canonicalized — it is pinned because a future normalization that
+    /// dropped `:443` would silently merge two distinct issuers onto one cache
+    /// key and one credential slot.
+    @Test("an issuer identifier carrying an explicit default port is usable")
+    func explicitDefaultPortIssuerIsUsable() async throws {
+        let discovery = OAuthDiscovery()
+        let requested = try #require(URL(string: "https://explicit-port.test:443"))
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(DiscoveryDoc(issuer: requested))
+
+        let endpoints = try await discovery.endpoints(for: requested, httpClient: http)
+        #expect(endpoints.token == URL(string: "https://explicit-port.test:443/auth/oauth2/token"))
+        #expect(http.calls.first?.url == URL(
+            string: "https://explicit-port.test:443/.well-known/oauth-authorization-server"
+        ))
+    }
+
     /// Two spellings of one server share a cache entry keyed on the canonical
     /// issuer, so the identity check has to be re-applied per caller rather
     /// than inherited from whoever fetched first.

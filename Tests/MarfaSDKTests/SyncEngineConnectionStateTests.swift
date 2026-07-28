@@ -47,17 +47,20 @@ struct SyncEngineConnectionStateTests {
         #expect(await iterator.next() == nil)
     }
 
-    @Test("subscribing to stateUpdates registers before the property returns")
-    func stateSubscriptionIsSynchronous() async throws {
+    /// Pins that taking a stream attaches a subscriber, which is what lets a
+    /// stop issued straight afterwards finish it.
+    ///
+    /// It does **not** prove the attachment is synchronous. Routing the
+    /// registration through a detached task instead still satisfies this, and
+    /// still satisfies the subscribe-then-stop test above: `stateUpdates` is
+    /// `nonisolated`, so a task created inside it runs on the global executor
+    /// rather than queueing behind this actor, and it lands before either
+    /// assertion can look. The mutex is therefore a correct-by-construction
+    /// choice rather than a fix this suite can falsify — see the note on
+    /// `Broadcast`. What this does catch is a registration dropped entirely.
+    @Test("taking a stateUpdates stream attaches a subscriber")
+    func stateSubscriptionAttaches() async throws {
         let manager = ConnectionStateManager()
-        // Registering through a task instead lets a stop issued on the next
-        // line run first, leaving the new continuation attached to a stopped
-        // manager and its consumer awaiting a state that can never arrive.
-        // The `await manager.stop()` in the test above hands such a task
-        // exactly the scheduling turn it needs, so that test passes either
-        // way. These two statements are both synchronous and nonisolated with
-        // no suspension between them, which is what makes the registration
-        // observable rather than merely likely.
         let stream = manager.stateUpdates
         #expect(manager.subscriberCountForTesting == 1)
 
