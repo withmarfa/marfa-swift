@@ -20,28 +20,20 @@ struct SyncEngineReplayTests {
 
     @Test("mutation replay records failure when transport throws") func mutationReplayRecordsFailure() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
-        await engine.setReconnectDelaysForTesting(base: 5, max: 5)
 
         // A single pending delete the engine will try to replay.
         try await queue.enqueueDeleteItem(id: "server-x")
 
-        // Empty SSE stream (so runLoop proceeds to replay), then the
-        // DELETE itself throws a network-class error.
-        transport.enqueueEvents([])
+        // The DELETE throws a network-class error.
         let netError = NetworkError(
             NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
         )
         transport.enqueueError(netError)
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            let all = try? await queue.fetchAll()
-            return (all?.first?.attemptCount ?? 0) >= 1
-        }
-
-        await engine.stop()
+        await connManager.applyStateForTesting(.online)
+        // One cycle, driven directly — see the note on the mixed-cycle test
+        // for why starting the engine makes a per-cycle count load-dependent.
+        await engine.triggerProactiveDrainForTesting()
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
@@ -49,8 +41,9 @@ struct SyncEngineReplayTests {
             $0.method == .delete && $0.path == "/items/server-x"
         }
         #expect(replayCalls.count == 1)
-        #expect(remaining[0].attemptCount == 1)
-        #expect(remaining[0].lastError?.contains("offline") == true)
+        let record = try #require(remaining.first)
+        #expect(record.attemptCount == 1)
+        #expect(record.lastError?.contains("offline") == true)
     }
 
     @Test("stop waits for in-flight replay accounting to finish")
@@ -81,8 +74,9 @@ struct SyncEngineReplayTests {
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].attemptCount == 1)
-        #expect(remaining[0].lastError?.contains("released failure") == true)
+        let record = try #require(remaining.first)
+        #expect(record.attemptCount == 1)
+        #expect(record.lastError?.contains("released failure") == true)
         #expect(await transport.requestCallCount == 1)
     }
 
@@ -127,7 +121,8 @@ struct SyncEngineReplayTests {
         #expect(await engine.lastCleanDrainAt == nil)
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].localId == "server-second")
+        let record = try #require(remaining.first)
+        #expect(record.localId == "server-second")
     }
 
     @Test("a mutation queued mid-cycle blocks the clean-drain stamp")
@@ -160,7 +155,8 @@ struct SyncEngineReplayTests {
         #expect(await engine.lastCleanDrainAt == nil)
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].localId == "server-second")
+        let record = try #require(remaining.first)
+        #expect(record.localId == "server-second")
     }
 
     @Test("mutation replay drops queued record on 404 NotFoundError") func mutationReplayDropsOn404() async throws {
@@ -236,31 +232,21 @@ struct SyncEngineReplayTests {
 
     @Test("mutation replay retains queued record on transient 5xx") func mutationReplayRetainsOn5xx() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
-        await engine.setReconnectDelaysForTesting(base: 5, max: 5)
 
         try await queue.enqueueUpdateItem(
             id: "019da086-d675-7cd8-ba3f-3dc4e6e7bd42",
             properties: ["body": .string("temp fail")]
         )
 
-        transport.enqueueEvents([])
         // 500 is transient — MarfaError base class, not a permanent subclass.
         transport.enqueueError(MarfaError(
             code: "server_error", message: "boom", status: 500
         ))
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            let all = try? await queue.fetchAll()
-            return (all?.first?.attemptCount ?? 0) >= 1
-        }
-
-        // Stop before taking the accounting snapshot. The engine reconnects
-        // automatically, so another legitimate replay can begin between the
-        // polling condition and the assertions below.
-        await engine.stop()
+        await connManager.applyStateForTesting(.online)
+        // One cycle, driven directly — see the note on the mixed-cycle test
+        // for why starting the engine makes a per-cycle count load-dependent.
+        await engine.triggerProactiveDrainForTesting()
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
@@ -268,12 +254,12 @@ struct SyncEngineReplayTests {
             $0.method == .patch && $0.path == "/items/019da086-d675-7cd8-ba3f-3dc4e6e7bd42"
         }
         #expect(replayCalls.count == 1)
-        #expect(remaining[0].attemptCount == 1)
+        let record = try #require(remaining.first)
+        #expect(record.attemptCount == 1)
     }
 
     @Test("mixed queue drops permanent + retains transient in one cycle") func mutationReplayMixedCycle() async throws {
         let (_, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
-        await engine.setReconnectDelaysForTesting(base: 5, max: 5)
 
         // Two mutations: first fails permanently (404), second fails
         // transiently (network). First should be dropped, second should
@@ -287,30 +273,29 @@ struct SyncEngineReplayTests {
             properties: ["body": .string("transient")]
         )
 
-        transport.enqueueEvents([])
         transport.enqueueError(NotFoundError(message: "gone"))
         transport.enqueueError(NetworkError(
             NSError(domain: "test", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"])
         ))
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
-            let all = try? await queue.fetchAll()
-            return (all?.count == 1) && ((all?.first?.attemptCount ?? 0) >= 1)
-        }
-
-        await engine.stop()
+        await connManager.applyStateForTesting(.online)
+        // Drive exactly one cycle rather than starting the engine. Starting it
+        // arms the real NWPathMonitor, whose first callback arrives after the
+        // stream has closed and the manager has moved to `.online`, flipping it
+        // back to `.connecting` and opening a second replay cycle. Whether that
+        // lands before the stop is a matter of machine load, and it is what the
+        // per-cycle counts below would otherwise be measuring.
+        await engine.triggerProactiveDrainForTesting()
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
-        #expect(remaining[0].localId == "019eb000-0000-7000-8000-000000000000")
+        let record = try #require(remaining.first)
+        #expect(record.localId == "019eb000-0000-7000-8000-000000000000")
         let replayCalls = transport.calls.filter {
             $0.method == .patch && $0.path == "/items/019eb000-0000-7000-8000-000000000000"
         }
         #expect(replayCalls.count == 1)
-        #expect(remaining[0].attemptCount == 1)
+        #expect(record.attemptCount == 1)
     }
 
     // MARK: - Id stamping + replay reconciliation
