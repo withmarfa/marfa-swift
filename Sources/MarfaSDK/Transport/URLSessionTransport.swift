@@ -13,6 +13,9 @@ final class URLSessionTransport: Transport {
     private let debugLogging: Bool
     private let retryPolicy: RetryPolicy
     let rateLimitState: RateLimitState
+    /// Shared by every path that can force a renewal, so they cannot each
+    /// keep their own idea of whether the mechanism is standing.
+    private let forcedRefreshLatch: ForcedRefreshLatch
 
     convenience init(configuration: ClientConfiguration) {
         let urlConfig = URLSessionConfiguration.default
@@ -33,6 +36,7 @@ final class URLSessionTransport: Transport {
         self.debugLogging = configuration.debugLogging
         self.retryPolicy = configuration.retryPolicy
         self.rateLimitState = RateLimitState()
+        self.forcedRefreshLatch = ForcedRefreshLatch()
     }
 
     // MARK: - Transport Protocol
@@ -146,6 +150,50 @@ final class URLSessionTransport: Transport {
         return token
     }
 
+    /// Send, and on a 401 a renewal could plausibly fix, name the refused
+    /// credential to the provider, re-mint the header, and send exactly once
+    /// more.
+    ///
+    /// This exists as one helper because the three transport paths drifted.
+    /// `rawRequest` grew the recovery and the other two never got it, so an
+    /// attachment upload or a live subscription signed the user out on a 401
+    /// the very same client recovered from on any other call. A shared helper
+    /// is what makes "symmetric across every path" a property of the code
+    /// rather than of whoever edits it next.
+    ///
+    /// Not used by `rawRequest`, which has a retry loop of its own and folds
+    /// the same two rules into it; `TransportForcedRefreshParityTests` pins
+    /// the three against each other.
+    private func sendWithForcedRefreshOn401<R: Sendable>(
+        request: URLRequest,
+        sentToken: Token,
+        statusCode: @Sendable (R) -> Int?,
+        send: (URLRequest) async throws -> R
+    ) async throws -> R {
+        let first = try await send(request)
+        let firstStatus = statusCode(first)
+        guard firstStatus == 401, await forcedRefreshLatch.allowsForcedRefresh
+        else {
+            if let firstStatus {
+                await forcedRefreshLatch.record(
+                    statusCode: firstStatus, afterForcedRefresh: false
+                )
+            }
+            return first
+        }
+
+        await tokenProvider.invalidate(sentToken)
+        var retried = request
+        try await applyAuthHeader(to: &retried)
+        let second = try await send(retried)
+        if let secondStatus = statusCode(second) {
+            await forcedRefreshLatch.record(
+                statusCode: secondStatus, afterForcedRefresh: true
+            )
+        }
+        return second
+    }
+
     func rawUpload(
         method: HTTPMethod,
         path: String,
@@ -157,7 +205,7 @@ final class URLSessionTransport: Transport {
         let url = try buildURL(path: path, query: query)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-        try await applyAuthHeader(to: &request)
+        let sentToken = try await applyAuthHeader(to: &request)
         let requestId = UUIDv7.generateString()
         request.setValue(requestId, forHTTPHeaderField: "X-Request-ID")
         if let contentType {
@@ -179,16 +227,27 @@ final class URLSessionTransport: Transport {
         let delegate = UploadProgressDelegate(onBytesSent: onBytesSent)
 
         do {
-            let (data, response) = try await session.upload(
-                for: request, from: body, delegate: delegate
-            )
-            guard let httpResponse = response as? HTTPURLResponse else {
-                logger.log.error(
-                    "http.error request_id=\(requestId, privacy: .public) reason=not_http"
+            // A 401 here is recoverable exactly as it is on any other call,
+            // and this is the attachment path: it backs blob upload and the
+            // sync engine, so a refused credential used to end an upload in a
+            // sign-out rather than a retry.
+            let (data, httpResponse) = try await sendWithForcedRefreshOn401(
+                request: request,
+                sentToken: sentToken,
+                statusCode: { $0.1.statusCode }
+            ) { attemptRequest in
+                let (data, response) = try await self.session.upload(
+                    for: attemptRequest, from: body, delegate: delegate
                 )
-                throw NetworkError(URLError(.badServerResponse))
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.logger.log.error(
+                        "http.error request_id=\(requestId, privacy: .public) reason=not_http"
+                    )
+                    throw NetworkError(URLError(.badServerResponse))
+                }
+                await self.rateLimitState.update(from: httpResponse.allHeaderFields)
+                return (data, httpResponse)
             }
-            await rateLimitState.update(from: httpResponse.allHeaderFields)
             logger.log.info(
                 "http.upload.response request_id=\(requestId, privacy: .public) status=\(httpResponse.statusCode, privacy: .public)"
             )
@@ -255,7 +314,21 @@ final class URLSessionTransport: Transport {
 
         var lastError: Error?
         var didRefreshOn401 = false
-        for attempt in 1...retryPolicy.maxAttempts {
+        // `attempt` counts transient-failure retries and is advanced by hand,
+        // because the one 401 recovery must not spend from that budget. A
+        // credential correction is a different thing from "the network
+        // flaked, try again": it re-sends the same call with a credential the
+        // server has not refused, and it is bounded by `didRefreshOn401`
+        // rather than by the policy.
+        //
+        // Under `for attempt in 1...maxAttempts` it did spend one, and with
+        // the public `RetryPolicy.none` (`maxAttempts == 1`) there was none to
+        // spend: the `continue` left the loop, so the refresh token had been
+        // burned, the retry never fired, and the caller got a `NetworkError`
+        // for what was an auth failure. Strictly worse than having no recovery
+        // at all, and invisible because no test drove `RetryPolicy.none`.
+        var attempt = 1
+        while attempt <= retryPolicy.maxAttempts {
             try Task.checkCancellation()
 
             if attempt > 1 {
@@ -292,15 +365,27 @@ final class URLSessionTransport: Transport {
                 // every request that was in flight when the renewal landed,
                 // and renewing for each of those is a storm. Subsequent 401s
                 // surface as ``UnauthorizedError`` to the caller.
-                if httpResponse.statusCode == 401 && !didRefreshOn401 {
+                if httpResponse.statusCode == 401,
+                    !didRefreshOn401,
+                    await forcedRefreshLatch.allowsForcedRefresh
+                {
                     didRefreshOn401 = true
                     await tokenProvider.invalidate(sentToken)
                     try await applyAuthHeader(to: &request)
                     logger.log.info(
                         "http.retry.refresh request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) attempt=\(attempt, privacy: .public)"
                     )
+                    // Deliberately not advancing `attempt`: see the loop
+                    // header. Not delaying either — backing off before
+                    // presenting a corrected credential would slow every
+                    // recovery down for no reason.
                     continue
                 }
+
+                await forcedRefreshLatch.record(
+                    statusCode: httpResponse.statusCode,
+                    afterForcedRefresh: didRefreshOn401
+                )
 
                 let shouldRetry = attempt < retryPolicy.maxAttempts && retryPolicy.shouldRetry(
                     method: method,
@@ -312,6 +397,7 @@ final class URLSessionTransport: Transport {
                     logger.log.info(
                         "http.retry request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) status=\(httpResponse.statusCode, privacy: .public) attempt=\(attempt, privacy: .public)"
                     )
+                    attempt += 1
                     continue
                 }
 
@@ -337,6 +423,7 @@ final class URLSessionTransport: Transport {
                     logger.log.info(
                         "http.retry request_id=\(requestId, privacy: .public) method=\(method.rawValue, privacy: .public) path=\(path, privacy: .public) url_error=\(error.code.rawValue, privacy: .public) attempt=\(attempt, privacy: .public)"
                     )
+                    attempt += 1
                     continue
                 }
                 logger.log.error(
@@ -385,7 +472,7 @@ final class URLSessionTransport: Transport {
                     let url = try buildURL(path: path, query: query)
                     var request = URLRequest(url: url)
                     request.httpMethod = HTTPMethod.get.rawValue
-                    try await self.applyAuthHeader(to: &request)
+                    let sentToken = try await self.applyAuthHeader(to: &request)
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     if let lastEventID {
                         request.setValue(lastEventID, forHTTPHeaderField: "Last-Event-ID")
@@ -396,10 +483,26 @@ final class URLSessionTransport: Transport {
                         "sse.open path=\(path, privacy: .public) last_event_id=\(lastEventID ?? "-", privacy: .public)"
                     )
 
-                    let (bytes, response) = try await session.bytes(for: request)
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw NetworkError(URLError(.badServerResponse))
-                    }
+                    // The 401 recovery applies to opening the stream, not to
+                    // bytes already flowing: a stream that dies mid-flight is
+                    // the reconnect path's problem, and the caller owns that
+                    // decision because it also owns `Last-Event-ID`. Without
+                    // this a subscription was the one call in the SDK where a
+                    // rotated credential meant a sign-out.
+                    let (bytes, httpResponse) =
+                        try await self.sendWithForcedRefreshOn401(
+                            request: request,
+                            sentToken: sentToken,
+                            statusCode: { $0.1.statusCode }
+                        ) { attemptRequest in
+                            let (bytes, response) =
+                                try await self.session.bytes(for: attemptRequest)
+                            guard let httpResponse = response as? HTTPURLResponse
+                            else {
+                                throw NetworkError(URLError(.badServerResponse))
+                            }
+                            return (bytes, httpResponse)
+                        }
                     guard (200..<300).contains(httpResponse.statusCode) else {
                         // Drain the bytes to assemble the error body.
                         var data = Data()
