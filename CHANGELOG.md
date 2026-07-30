@@ -5,6 +5,57 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [12.0.0] — 2026-07-30
+
+### Upgrade note
+
+**One word changed, and it is in the public API.** The platform now calls a
+space a space, everywhere, with no aliases and no compatibility shims. Consumers
+rename at the call site:
+
+| Before | After |
+| --- | --- |
+| `client.tenants` | `client.spaces` |
+| `TenantsNamespace` | `SpacesNamespace` |
+| `TenantConfig`, `TenantQuota` | `SpaceConfig`, `SpaceQuota` |
+| `tenantId` on wire and domain types | `spaceId` |
+
+Two consequences are not search-and-replace. The generated memberwise
+initialiser lists properties alphabetically, so `spaceId` sorts ahead of
+`targetId` where `tenantId` sat behind it: call sites passing arguments
+positionally have to follow. And a persisted `Codable` carrying `tenantId`
+will not decode into the new shape, so anything stored under the old key is
+re-established rather than migrated.
+
+### Changed
+
+- **BREAKING:** the space rename, above. The wire types come from the synced
+  spec, so it arrives through codegen rather than by hand.
+- Surface the vendored snapshot had fallen behind on reaches the Swift client
+  for the first time: `ConnectionUninstallResult` gains `schedulesDisarmed` and
+  `scheduleDisarmError`, `ApiKey` gains `expiresAt`, and `Profile` gains
+  fields. Real API changes, not rename fallout.
+
+### Fixed
+
+- **A 401 is recovered on every path, not just one.** `rawRequest` had the
+  refresh-on-401 recovery and the other two paths did not. `rawUpload` had no
+  401 handling at all, which is the attachment path behind blob upload and the
+  sync engine, and `eventStream` had none either, making a live subscription
+  the one call in the SDK where a rotated credential meant a sign-out rather
+  than a retry.
+- **`RetryPolicy.none` no longer breaks recovery outright.** The recovery ran
+  inside the retry loop and reached its retry with `continue`, so at
+  `maxAttempts == 1` the continue left the loop: the refresh token was spent,
+  the retry never fired, and the caller got a `NetworkError` for an auth
+  failure. Strictly worse than having no recovery, and invisible because no
+  test drove the public no-retry policy. A credential correction is now
+  bounded by having happened once rather than by the retry budget.
+- **A refused credential no longer produces a storm.** Against a server that
+  refuses every token, ten requests produced ten token exchanges and twenty API
+  calls. A forced refresh that fails now stands the mechanism down until a
+  non-401 proves the credential works again, matching the TypeScript SDK.
+
 ## [11.4.0] — 2026-07-28
 
 ### Upgrade note
