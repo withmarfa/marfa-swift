@@ -9,7 +9,7 @@ import Foundation
 /// ``ConnectionsNamespace/install(_:)`` so multiple integrations of the
 /// same upstream share one credential row.
 ///
-/// Both creation routes are tenant-admin gated server-side.
+/// Both creation routes are space-admin gated server-side.
 ///
 /// Available in remote and synced modes. In **pure-local mode** every
 /// method throws ``LocalModeUnsupportedError``.
@@ -37,7 +37,7 @@ public struct CredentialsNamespace: Sendable {
     /// `google.contacts`, `google.gmail`, `google.youtube` — all sharing
     /// one Google OAuth provider row).
     ///
-    /// Tenant-admin only.
+    /// Space-admin only.
     public func createOAuthProvider(
         _ input: CreateOAuthProviderCredentialInput
     ) async throws -> CreatedCredential {
@@ -58,7 +58,7 @@ public struct CredentialsNamespace: Sendable {
     /// `authScheme`-controlled `Authorization` header on every outbound
     /// call.
     ///
-    /// Tenant-admin only.
+    /// Space-admin only.
     public func createApiToken(
         _ input: CreateApiTokenCredentialInput
     ) async throws -> CreatedCredential {

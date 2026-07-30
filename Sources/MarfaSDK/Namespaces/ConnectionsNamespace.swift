@@ -87,8 +87,8 @@ public struct ConnectionsNamespace: Sendable {
     /// `POST /connections/install`.
     ///
     /// Skips the HTML consent screen — operators and tooling use this
-    /// path to install connections programmatically. Admin-only; tenant
-    /// admins install into their own tenant scope.
+    /// path to install connections programmatically. Admin-only; space
+    /// admins install into their own space scope.
     ///
     /// `integrationId` references a `system.integration` item registered
     /// via ``IntegrationsNamespace/register(manifest:)``. `label` is
@@ -137,12 +137,12 @@ public struct ConnectionsNamespace: Sendable {
     /// Cloudflare Queues for a synthetic item event, without dispatching
     /// anything. Operator debugging surface for reproducing reactive
     /// scenarios and inspecting `dispatch_reason` skips
-    /// (`self_event`, `cross_tenant`, `hop_budget_exceeded`,
+    /// (`self_event`, `cross_space`, `hop_budget_exceeded`,
     /// `subscription_inactive`).
     ///
-    /// Defaults to every subscriber in the caller's tenant; pass
+    /// Defaults to every subscriber in the caller's space; pass
     /// ``PreviewEventRequest/connectionId`` to filter to one.
-    /// Tenant-admin only.
+    /// Space-admin only.
     public func previewEvent(_ input: PreviewEventRequest) async throws -> PreviewEventResult {
         try ensureRemote("connections.previewEvent")
         return try await transport.request(

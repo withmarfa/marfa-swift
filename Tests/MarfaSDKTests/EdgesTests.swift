@@ -26,8 +26,8 @@ struct EdgesTests {
             id: id,
             properties: properties,
             sourceId: sourceId,
+            spaceId: nil,
             targetId: targetId,
-            tenantId: nil,
             updatedAt: "2026-04-15T00:00:00Z"
         )
     }

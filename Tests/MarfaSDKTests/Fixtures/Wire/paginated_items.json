@@ -16,7 +16,7 @@
               "properties": {},
               "source_id": "itm_01JABCXYZ",
               "target_id": "itm_01PARENT",
-              "tenant_id": "tnt_01",
+              "space_id": "tnt_01",
               "updated_at": "2026-04-14T10:01:00Z"
             }
           ],

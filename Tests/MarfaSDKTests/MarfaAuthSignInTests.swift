@@ -435,8 +435,8 @@ struct MarfaAuthSignInTests {
     @Test("issuer identity isolates PKCE state and restored tokens")
     func issuerIdentityIsolatesPendingAndTokens() async throws {
         let storage = InMemoryKeychain()
-        let issuerA = URL(string: "https://tenant-auth.example.test:8443/tenant-a")!
-        let issuerB = URL(string: "http://tenant-auth.example.test:9443/tenant-b")!
+        let issuerA = URL(string: "https://space-auth.example.test:8443/space-a")!
+        let issuerB = URL(string: "http://space-auth.example.test:9443/space-b")!
         let authA = MarfaAuth(
             issuer: issuerA,
             clientId: clientId,
@@ -508,7 +508,7 @@ struct MarfaAuthSignInTests {
     @Test("restore never promotes a host-only token into an ambiguous issuer")
     func restoreDoesNotMigrateAmbiguousIssuer() async throws {
         let cases = [
-            URL(string: "https://ambiguous-auth.example.test/tenant")!,
+            URL(string: "https://ambiguous-auth.example.test/space")!,
             URL(string: "https://ambiguous-auth.example.test:8443")!,
             URL(string: "http://ambiguous-auth.example.test")!,
         ]

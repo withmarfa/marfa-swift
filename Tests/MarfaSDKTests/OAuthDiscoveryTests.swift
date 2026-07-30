@@ -187,10 +187,10 @@ struct OAuthDiscoveryTests {
     @Test("rejects non-absolute and decorated requested issuers before HTTP")
     func invalidRequestedIssuerShapesThrow() async throws {
         let invalidIssuers = [
-            URL(string: "tenant")!,
+            URL(string: "space")!,
             URL(string: "https://user@example.test")!,
-            URL(string: "https://example.test?tenant=a")!,
-            URL(string: "https://example.test#tenant-a")!,
+            URL(string: "https://example.test?space=a")!,
+            URL(string: "https://example.test#space-a")!,
         ]
 
         for invalidIssuer in invalidIssuers {
@@ -210,8 +210,8 @@ struct OAuthDiscoveryTests {
             "https://example.test/",
             "https://example.test:443",
             "https://user@example.test",
-            "https://example.test?tenant=a",
-            "https://example.test#tenant-a",
+            "https://example.test?space=a",
+            "https://example.test#space-a",
         ]
 
         for metadataIssuer in mismatchedMetadata {
@@ -333,31 +333,31 @@ struct OAuthDiscoveryTests {
     @Test("issuer paths have independent cache and reset scope")
     func issuerPathIsolation() async throws {
         let discovery = OAuthDiscovery()
-        let issuerA = URL(string: "https://multi-issuer.test/tenant-a")!
-        let issuerB = URL(string: "https://multi-issuer.test/tenant-b")!
+        let issuerA = URL(string: "https://multi-issuer.test/space-a")!
+        let issuerB = URL(string: "https://multi-issuer.test/space-b")!
         let httpA = FakeDeviceFlowHTTPClient()
         let httpB = FakeDeviceFlowHTTPClient()
         try httpA.enqueueJSON(DiscoveryDoc(
-            issuer: "https://multi-issuer.test/tenant-a",
-            authorize: "https://multi-issuer.test/tenant-a/authorize",
-            token: "https://multi-issuer.test/tenant-a/token",
-            revoke: "https://multi-issuer.test/tenant-a/revoke",
-            deviceAuthorize: "https://multi-issuer.test/tenant-a/device"
+            issuer: "https://multi-issuer.test/space-a",
+            authorize: "https://multi-issuer.test/space-a/authorize",
+            token: "https://multi-issuer.test/space-a/token",
+            revoke: "https://multi-issuer.test/space-a/revoke",
+            deviceAuthorize: "https://multi-issuer.test/space-a/device"
         ))
         try httpB.enqueueJSON(DiscoveryDoc(
-            issuer: "https://multi-issuer.test/tenant-b",
-            authorize: "https://multi-issuer.test/tenant-b/authorize",
-            token: "https://multi-issuer.test/tenant-b/token",
-            revoke: "https://multi-issuer.test/tenant-b/revoke",
-            deviceAuthorize: "https://multi-issuer.test/tenant-b/device"
+            issuer: "https://multi-issuer.test/space-b",
+            authorize: "https://multi-issuer.test/space-b/authorize",
+            token: "https://multi-issuer.test/space-b/token",
+            revoke: "https://multi-issuer.test/space-b/revoke",
+            deviceAuthorize: "https://multi-issuer.test/space-b/device"
         ))
 
         let endpointsA = try await discovery.endpoints(for: issuerA, httpClient: httpA)
         let endpointsB = try await discovery.endpoints(for: issuerB, httpClient: httpB)
-        #expect(endpointsA.token.path == "/tenant-a/token")
-        #expect(endpointsB.token.path == "/tenant-b/token")
-        #expect(httpA.calls.first?.url == URL(string: "https://multi-issuer.test/.well-known/oauth-authorization-server/tenant-a"))
-        #expect(httpB.calls.first?.url == URL(string: "https://multi-issuer.test/.well-known/oauth-authorization-server/tenant-b"))
+        #expect(endpointsA.token.path == "/space-a/token")
+        #expect(endpointsB.token.path == "/space-b/token")
+        #expect(httpA.calls.first?.url == URL(string: "https://multi-issuer.test/.well-known/oauth-authorization-server/space-a"))
+        #expect(httpB.calls.first?.url == URL(string: "https://multi-issuer.test/.well-known/oauth-authorization-server/space-b"))
 
         await discovery.reset(for: issuerA)
         let unusedHTTP = FakeDeviceFlowHTTPClient()
@@ -369,9 +369,9 @@ struct OAuthDiscoveryTests {
     @Test("reset prevents an old in-flight request from replacing fresh cache")
     func resetDuringInflightFetch() async throws {
         let discovery = OAuthDiscovery()
-        let issuer = URL(string: "https://oauth-reset.test/tenant")!
+        let issuer = URL(string: "https://oauth-reset.test/space")!
         let staleHTTP = try SuspendedDiscoveryHTTPClient(DiscoveryDoc(
-            issuer: "https://oauth-reset.test/tenant",
+            issuer: "https://oauth-reset.test/space",
             authorize: "https://stale.test/authorize",
             token: "https://stale.test/token",
             revoke: "https://stale.test/revoke",
@@ -385,7 +385,7 @@ struct OAuthDiscoveryTests {
         await discovery.reset(for: issuer)
         let freshHTTP = FakeDeviceFlowHTTPClient()
         try freshHTTP.enqueueJSON(DiscoveryDoc(
-            issuer: "https://oauth-reset.test/tenant",
+            issuer: "https://oauth-reset.test/space",
             authorize: "https://fresh.test/authorize",
             token: "https://fresh.test/token",
             revoke: "https://fresh.test/revoke",

@@ -44,13 +44,13 @@ public final class MarfaClient: Sendable {
 
     public let integrations: IntegrationsNamespace
 
-    /// `client.tenants.{getConfig, setConfig}` are tenant-admin-gated;
-    /// `client.tenants.quotas.{getOwn, getById, set}` mixes tenant and platform
+    /// `client.spaces.{getConfig, setConfig}` are space-admin-gated;
+    /// `client.spaces.quotas.{getOwn, getById, set}` mixes space and platform
     /// admin per method. The server enforces the role split.
-    public let tenants: TenantsNamespace
+    public let spaces: SpacesNamespace
 
     /// Platform-admin-only operator surface.
-    /// Tenant quota read/write lives on ``tenants`` (`client.tenants.quotas.*`),
+    /// Space quota read/write lives on ``spaces`` (`client.spaces.quotas.*`),
     /// not here.
     public let admin: AdminNamespace
 
@@ -151,7 +151,7 @@ public final class MarfaClient: Sendable {
         )
         self.credentials = CredentialsNamespace(transport: transport, isLocalMode: isLocalMode)
         self.integrations = IntegrationsNamespace(transport: transport, isLocalMode: isLocalMode)
-        self.tenants = TenantsNamespace(transport: transport, isLocalMode: isLocalMode)
+        self.spaces = SpacesNamespace(transport: transport, isLocalMode: isLocalMode)
         self.admin = AdminNamespace(transport: transport, isLocalMode: isLocalMode)
         self.auth = AuthNamespace(transport: transport, isLocalMode: isLocalMode)
     }

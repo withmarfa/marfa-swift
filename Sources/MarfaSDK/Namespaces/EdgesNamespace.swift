@@ -6,7 +6,7 @@ import Foundation
 /// are item IDs and `edge_type` is one of the registered edge types — eight
 /// core types (`parent-of`, `in-thread`, `about`, `authored-by`,
 /// `derived-from`, `supersedes`, `attached-to`, `references`) plus any custom
-/// types the tenant has registered via ``edgeTypes``.
+/// types the space has registered via ``edgeTypes``.
 public struct EdgesNamespace: Sendable {
 
     let transport: any Transport
@@ -158,7 +158,7 @@ public struct EdgesNamespace: Sendable {
 
     // MARK: - Reads
 
-    /// Global tenant-scoped edge listing, optionally filtered by type.
+    /// Global space-scoped edge listing, optionally filtered by type.
     /// Use this when you need "all edges of type X" (thread-root counting,
     /// taxonomy traversal) — replaces the walk-every-item N+1 pattern.
     /// Per-target filters live on ``listFromSource`` / ``listToTarget``.
@@ -354,7 +354,7 @@ public struct EdgeTypesAPI: Sendable {
     }
 
     /// Lists all registered edge types — the eight core types plus any
-    /// custom types registered by the tenant.
+    /// custom types registered by the space.
     public func list() async throws -> [EdgeType] {
         let response: EdgeTypesListResponse = try await transport.request(
             method: .get, path: "/edge-types", body: nil, query: nil

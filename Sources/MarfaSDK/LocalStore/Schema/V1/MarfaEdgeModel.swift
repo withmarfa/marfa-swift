@@ -28,7 +28,7 @@ final class MarfaEdgeModel {
     /// JSON-encoded `[String: JSONValue]`. See `properties` accessor.
     var propertiesData: Data = Data("{}".utf8)
 
-    var tenantId: String?
+    var spaceId: String?
 
     /// ISO 8601 with fractional seconds.
     var createdAt: String = ""

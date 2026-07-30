@@ -10,7 +10,7 @@ public extension EdgesNamespace {
     ///
     /// Same batching shape as ``ItemsNamespace/bulkAll(_:batchSize:mode:atomic:emitEvents:progressHandler:)`` —
     /// the server caps `/edges/bulk` at 5000 edges per call; `bulkAll`
-    /// exists so mode-transition flows on larger tenants don't need to
+    /// exists so mode-transition flows on larger spaces don't need to
     /// reinvent batch iteration.
     ///
     /// Cross-batch atomicity does NOT hold. Each batch's `atomic`

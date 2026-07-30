@@ -66,7 +66,7 @@ public struct MetadataNamespace: Sendable {
     ///   network round-trip. An empty local store returns `[]`; synced
     ///   mode does not fall back to the network, matching the
     ///   eventual-consistency contract of every other synced read.
-    /// - **Remote-only** — hits `GET /metadata/tags`. Tenant-scoped and
+    /// - **Remote-only** — hits `GET /metadata/tags`. Space-scoped and
     ///   type-permission scoped server-side.
     ///
     /// In synced mode type-permission scoping is enforced naturally:

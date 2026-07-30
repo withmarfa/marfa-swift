@@ -24,7 +24,7 @@ enum OAuthIssuerValidationError: Error, Sendable, CustomStringConvertible {
 ///
 /// Issuer paths and ports identify distinct authorization servers. Keeping the
 /// full normalized URL in storage and cache keys prevents credentials from one
-/// tenant or local development server being reused by another.
+/// space or local development server being reused by another.
 enum OAuthIssuer {
 
     static func normalize(_ url: URL) -> URL {

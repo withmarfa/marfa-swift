@@ -17,7 +17,7 @@ import SwiftData
 /// - **Outbound**: ``MarfaStore/queryEdges(from:edgeType:limit:)`` — all
 ///   edges where `sourceId` matches.
 /// - **By type only**: ``MarfaStore/queryEdges(ofType:limit:)`` —
-///   tenant-scoped, every edge of a given type.
+///   space-scoped, every edge of a given type.
 ///
 /// Sorted by `createdAt` ascending. Updated on every applicable
 /// `ModelContext.didSave`.

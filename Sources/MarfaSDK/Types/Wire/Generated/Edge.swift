@@ -11,8 +11,8 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let properties: [String: JSONValue]
     public let sourceId: String
+    public let spaceId: String?
     public let targetId: String
-    public let tenantId: String?
     public let updatedAt: String
 
     public init(
@@ -21,8 +21,8 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
         id: String,
         properties: [String: JSONValue],
         sourceId: String,
+        spaceId: String? = nil,
         targetId: String,
-        tenantId: String? = nil,
         updatedAt: String
     ) {
         self.createdAt = createdAt
@@ -30,8 +30,8 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
         self.id = id
         self.properties = properties
         self.sourceId = sourceId
+        self.spaceId = spaceId
         self.targetId = targetId
-        self.tenantId = tenantId
         self.updatedAt = updatedAt
     }
 
@@ -41,8 +41,8 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
         case id
         case properties
         case sourceId = "source_id"
+        case spaceId = "space_id"
         case targetId = "target_id"
-        case tenantId = "tenant_id"
         case updatedAt = "updated_at"
     }
 }

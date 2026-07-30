@@ -5,6 +5,6 @@
   "properties": { "note": "first child", "weight": 1 },
   "source_id": "itm_01CHILD",
   "target_id": "itm_01PARENT",
-  "tenant_id": "tnt_01",
+  "space_id": "tnt_01",
   "updated_at": "2026-04-14T10:05:00Z"
 }
