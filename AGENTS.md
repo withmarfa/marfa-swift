@@ -11,7 +11,7 @@ Before re-deriving documented surfaces (types, edges, runtime substrates, connec
 - **Swift 6** language mode, complete strict concurrency.
 - **Two products:** `MarfaSDK` (client library) and `MarfaSDKTestSupport` (public test scaffolding: MockTransport, InMemoryKeychain, SwiftDataHelpers). Test support has no semver stability across SDK minor versions.
 - **`Transport` protocol** abstracts HTTP. `URLSessionTransport` is the production impl; `MockTransport` is in test-support.
-- **Namespaced API:** `client.items.create()`, `client.metadata.get()`, etc. Full set: `items`, `metadata`, `extensions`, `edges`, `blobs`, `types`, `keys`, `webhooks`, `profile`, `connections` (with nested `leaseTokens` and `inboundWebhooks`), `integrations`, `tenants`, `admin`, `auth`.
+- **Namespaced API:** `client.items.create()`, `client.metadata.get()`, etc. Full set: `items`, `metadata`, `extensions`, `edges`, `blobs`, `types`, `keys`, `credentials`, `webhooks`, `profile`, `connections` (with nested `leaseTokens` and `inboundWebhooks`), `integrations`, `spaces`, `admin`, `auth`.
 - **`JSONValue`** enum for arbitrary JSON (Codable, Sendable, Hashable).
 - **Dates as ISO 8601 strings**, not `Date` — apps parse as needed.
 - **Error hierarchy:** `open class MarfaError` base with `final class` subclasses (`NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ValidationError`, `ConflictError`, `NetworkError`, `ResponseDecodingError`). Pattern-match on subclasses: `catch let error as NotFoundError`.
@@ -41,7 +41,7 @@ All query objects are `@Observable @MainActor` — pass directly to SwiftUI view
 - **ItemQuery** — tracks `[Item]` for a `ListFilters`; subscribes to `ModelContext.didSave`, debounces 50 ms (`Reactive/RefreshDebounce.swift`), refetches on the `@MainActor`. Fields: `items`, `isLoading`, `error`; `stop()` cancels.
 - **TypedItemQuery<T: MarfaItem>** — like `ItemQuery` but maps records through `T.init?(from:)`. Backs `store.queryConnections(kind:state:)` (`TypedItemQuery<Connection>`) and `store.queryActivity(severity:limit:)` (`TypedItemQuery<Activity>`).
 - **SingleItemQuery** — one item by id; `item` is `nil` when purged.
-- **EdgesQuery** — outbound edges for a `sourceId`; optional `edgeType` and `limit`. Second initializer tracks every edge of a type tenant-wide.
+- **EdgesQuery** — outbound edges for a `sourceId`; optional `edgeType` and `limit`. Second initializer tracks every edge of a type space-wide.
 - **BackrefsQuery** — inbound edges for a batch of `targetIds`; `edgesByTarget: [String: [Edge]]` keyed by every requested id (unknown ids stay present with `[]`). Factory: `store.queryBackrefs(to:edgeType:limit:)`.
 - **TagsQuery** — `[TagWithCount]` sorted count desc, tag asc (same ordering as `metadata.listTags()` and the server). Factory: `store.queryTags()`. Aggregates in Swift over a relationship-prefetched fetch.
 - **ItemsWithMetadataQuery** — items + metadata composite. Two fetches per refresh, 1:1 join in Swift.
