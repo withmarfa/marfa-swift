@@ -286,8 +286,8 @@ public actor LocalStore {
             id: newId(),
             properties: properties ?? [:],
             sourceId: source,
+            spaceId: nil,
             targetId: target,
-            tenantId: nil,
             updatedAt: now
         )
         let model = MarfaEdgeModel.make(from: edge)

@@ -216,7 +216,7 @@ public actor OAuthDiscovery {
     }
 
     /// RFC 8414 places the well-known path before an issuer path component:
-    /// `https://host/.well-known/oauth-authorization-server/tenant`.
+    /// `https://host/.well-known/oauth-authorization-server/space`.
     private static func wellKnownURL(for issuer: URL, path: String) -> URL {
         guard var components = URLComponents(url: issuer, resolvingAgainstBaseURL: false) else {
             return issuer.appendingPathComponent(path)

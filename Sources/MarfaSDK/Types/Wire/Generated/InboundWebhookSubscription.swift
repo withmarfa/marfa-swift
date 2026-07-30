@@ -13,7 +13,7 @@ public struct InboundWebhookSubscription: Codable, Sendable, Hashable, Identifia
     public let externalServiceId: String?
     public let id: String
     public let secretRedacted: String
-    public let tenantId: String?
+    public let spaceId: String?
     public let updatedAt: String
     public let verificationAdapterId: String?
     public let verificationMethod: InboundWebhookSubscriptionVerificationMethod
@@ -26,7 +26,7 @@ public struct InboundWebhookSubscription: Codable, Sendable, Hashable, Identifia
         externalServiceId: String? = nil,
         id: String,
         secretRedacted: String,
-        tenantId: String? = nil,
+        spaceId: String? = nil,
         updatedAt: String,
         verificationAdapterId: String? = nil,
         verificationMethod: InboundWebhookSubscriptionVerificationMethod
@@ -38,7 +38,7 @@ public struct InboundWebhookSubscription: Codable, Sendable, Hashable, Identifia
         self.externalServiceId = externalServiceId
         self.id = id
         self.secretRedacted = secretRedacted
-        self.tenantId = tenantId
+        self.spaceId = spaceId
         self.updatedAt = updatedAt
         self.verificationAdapterId = verificationAdapterId
         self.verificationMethod = verificationMethod
@@ -52,7 +52,7 @@ public struct InboundWebhookSubscription: Codable, Sendable, Hashable, Identifia
         case externalServiceId = "external_service_id"
         case id
         case secretRedacted = "secret_redacted"
-        case tenantId = "tenant_id"
+        case spaceId = "space_id"
         case updatedAt = "updated_at"
         case verificationAdapterId = "verification_adapter_id"
         case verificationMethod = "verification_method"

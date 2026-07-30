@@ -7,7 +7,7 @@ import Foundation
 /// Apps that need a third-party-OAuth-style read should use the standard
 /// OIDC `profile` / `email` scopes via `/auth/oauth2/userinfo` instead — this
 /// surface is for first-party callers (CLI, MCP, the user themselves)
-/// holding a tenant-scoped bearer.
+/// holding a space-scoped bearer.
 ///
 /// In **pure-local mode** every method throws
 /// ``LocalModeUnsupportedError`` — Profile lives on the server only.
@@ -26,7 +26,7 @@ public struct ProfileNamespace: Sendable {
 
     /// Reads the calling user's profile from `GET /profile/me`.
     ///
-    /// The server resolves "me" from the API key's tenant_id; no id is
+    /// The server resolves "me" from the API key's space_id; no id is
     /// passed on the wire.
     public func get() async throws -> Profile {
         try ensureRemote("profile.get")

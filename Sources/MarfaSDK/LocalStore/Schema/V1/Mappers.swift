@@ -66,8 +66,8 @@ extension MarfaEdgeModel {
             id: id,
             properties: properties,
             sourceId: sourceId,
+            spaceId: spaceId,
             targetId: targetId,
-            tenantId: tenantId,
             updatedAt: updatedAt
         )
     }
@@ -84,7 +84,7 @@ extension MarfaEdgeModel {
         targetId = edge.targetId
         edgeType = edge.edgeType
         properties = edge.properties
-        tenantId = edge.tenantId
+        spaceId = edge.spaceId
         createdAt = edge.createdAt
         updatedAt = edge.updatedAt
     }

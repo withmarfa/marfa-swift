@@ -29,7 +29,7 @@ public struct CreateKeyInput: Codable, Sendable {
 /// API key role.
 public enum KeyRole: String, Codable, Sendable {
     case admin
-    case tenantAdmin = "tenant_admin"
+    case spaceAdmin = "space_admin"
     case member
 }
 

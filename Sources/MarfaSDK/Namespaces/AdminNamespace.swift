@@ -18,10 +18,10 @@ public struct AdminNamespace: Sendable {
         }
     }
 
-    /// Tenant quota read/write lives on ``MarfaClient/tenants``
-    /// (`client.tenants.quotas.*`), not here.
-    public var tenants: AdminTenantsNamespace {
-        AdminTenantsNamespace(transport: transport, isLocalMode: isLocalMode)
+    /// Space quota read/write lives on ``MarfaClient/spaces``
+    /// (`client.spaces.quotas.*`), not here.
+    public var spaces: AdminSpacesNamespace {
+        AdminSpacesNamespace(transport: transport, isLocalMode: isLocalMode)
     }
 
     public var accountDeletion: AdminAccountDeletionNamespace {
@@ -29,10 +29,10 @@ public struct AdminNamespace: Sendable {
     }
 }
 
-// MARK: - Tenants
+// MARK: - Spaces
 
-/// Per-tenant operator-surface for platform admins.
-public struct AdminTenantsNamespace: Sendable {
+/// Per-space operator-surface for platform admins.
+public struct AdminSpacesNamespace: Sendable {
 
     let transport: any Transport
     let isLocalMode: Bool
@@ -43,69 +43,69 @@ public struct AdminTenantsNamespace: Sendable {
         }
     }
 
-    public func list() async throws -> [TenantSummary] {
-        try ensureRemote("admin.tenants.list")
-        let response: TenantListResponse = try await transport.request(
-            method: .get, path: "/admin/tenants", body: nil, query: nil
+    public func list() async throws -> [SpaceSummary] {
+        try ensureRemote("admin.spaces.list")
+        let response: SpaceListResponse = try await transport.request(
+            method: .get, path: "/admin/spaces", body: nil, query: nil
         )
         return response.data
     }
 
-    /// Single tenant + per-tenant quota overrides + the most-recent
-    /// `system.activity` items for the tenant. `quotas` is `nil` when no
+    /// Single space + per-space quota overrides + the most-recent
+    /// `system.activity` items for the space. `quotas` is `nil` when no
     /// override is configured (env defaults apply per-field). Platform-
     /// admin only.
-    public func get(id: String) async throws -> TenantDetail {
-        try ensureRemote("admin.tenants.get")
+    public func get(id: String) async throws -> SpaceDetail {
+        try ensureRemote("admin.spaces.get")
         return try await transport.request(
             method: .get,
-            path: "/admin/tenants/\(id)",
+            path: "/admin/spaces/\(id)",
             body: nil,
             query: nil
         )
     }
 
-    /// Flip the tenant's status to `suspended`. Future non-GET requests
-    /// from credentials in the tenant return HTTP 403 `tenant_suspended`;
+    /// Flip the space's status to `suspended`. Future non-GET requests
+    /// from credentials in the space return HTTP 403 `space_suspended`;
     /// reads pass through; platform-admin keys bypass. Idempotent.
-    public func suspend(id: String) async throws -> TenantSummary {
-        try ensureRemote("admin.tenants.suspend")
+    public func suspend(id: String) async throws -> SpaceSummary {
+        try ensureRemote("admin.spaces.suspend")
         return try await transport.request(
             method: .post,
-            path: "/admin/tenants/\(id)/suspend",
+            path: "/admin/spaces/\(id)/suspend",
             body: nil,
             query: nil
         )
     }
 
     /// Reverse of ``suspend(id:)``. Idempotent.
-    public func unsuspend(id: String) async throws -> TenantSummary {
-        try ensureRemote("admin.tenants.unsuspend")
+    public func unsuspend(id: String) async throws -> SpaceSummary {
+        try ensureRemote("admin.spaces.unsuspend")
         return try await transport.request(
             method: .post,
-            path: "/admin/tenants/\(id)/unsuspend",
+            path: "/admin/spaces/\(id)/unsuspend",
             body: nil,
             query: nil
         )
     }
 
-    public func metrics(id: String) async throws -> TenantMetrics {
-        try ensureRemote("admin.tenants.metrics")
+    public func metrics(id: String) async throws -> SpaceMetrics {
+        try ensureRemote("admin.spaces.metrics")
         return try await transport.request(
             method: .get,
-            path: "/admin/tenants/\(id)/metrics",
+            path: "/admin/spaces/\(id)/metrics",
             body: nil,
             query: nil
         )
     }
 
-    /// Active (non-revoked) API-key listing for the named tenant.
+    /// Active (non-revoked) API-key listing for the named space.
     /// Pair with ``KeysNamespace/revoke(id:)`` for emergency revocation.
-    public func keys(id: String) async throws -> [TenantApiKeySummary] {
-        try ensureRemote("admin.tenants.keys")
-        let response: TenantApiKeysResponse = try await transport.request(
+    public func keys(id: String) async throws -> [SpaceApiKeySummary] {
+        try ensureRemote("admin.spaces.keys")
+        let response: SpaceApiKeysResponse = try await transport.request(
             method: .get,
-            path: "/admin/tenants/\(id)/keys",
+            path: "/admin/spaces/\(id)/keys",
             body: nil,
             query: nil
         )
@@ -150,13 +150,13 @@ public struct AdminAccountDeletionNamespace: Sendable {
 
 // MARK: - Wire-adjacent input/output shapes
 
-public struct TenantSummary: Codable, Sendable, Hashable, Identifiable {
+public struct SpaceSummary: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let name: String?
     public let createdAt: String
-    public let status: TenantStatus
+    public let status: SpaceStatus
 
-    public init(id: String, name: String?, createdAt: String, status: TenantStatus) {
+    public init(id: String, name: String?, createdAt: String, status: SpaceStatus) {
         self.id = id
         self.name = name
         self.createdAt = createdAt
@@ -169,35 +169,35 @@ public struct TenantSummary: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
-/// Bounded status enum for tenants. Mirrors the server's
+/// Bounded status enum for spaces. Mirrors the server's
 /// `status: 'active' | 'suspended'` discriminator.
-public enum TenantStatus: String, Codable, Sendable, Hashable {
+public enum SpaceStatus: String, Codable, Sendable, Hashable {
     case active
     case suspended
 }
 
-public struct TenantDetail: Codable, Sendable {
-    public let tenant: TenantSummary
-    public let quotas: TenantQuota?
-    public let recentActivity: [TenantActivityEntry]
+public struct SpaceDetail: Codable, Sendable {
+    public let space: SpaceSummary
+    public let quotas: SpaceQuota?
+    public let recentActivity: [SpaceActivityEntry]
 
     public init(
-        tenant: TenantSummary,
-        quotas: TenantQuota?,
-        recentActivity: [TenantActivityEntry]
+        space: SpaceSummary,
+        quotas: SpaceQuota?,
+        recentActivity: [SpaceActivityEntry]
     ) {
-        self.tenant = tenant
+        self.space = space
         self.quotas = quotas
         self.recentActivity = recentActivity
     }
 
     enum CodingKeys: String, CodingKey {
-        case tenant, quotas
+        case space, quotas
         case recentActivity = "recent_activity"
     }
 }
 
-public struct TenantActivityEntry: Codable, Sendable, Hashable {
+public struct SpaceActivityEntry: Codable, Sendable, Hashable {
     public let id: String
     public let severity: String
     public let summary: String
@@ -216,21 +216,21 @@ public struct TenantActivityEntry: Codable, Sendable, Hashable {
     }
 }
 
-public struct TenantMetrics: Codable, Sendable {
-    public let tenantId: String
-    public let items: TenantItemCounts
-    public let blobs: TenantBlobCounts
-    public let recentActivity: [TenantActivityEntry]
+public struct SpaceMetrics: Codable, Sendable {
+    public let spaceId: String
+    public let items: SpaceItemCounts
+    public let blobs: SpaceBlobCounts
+    public let recentActivity: [SpaceActivityEntry]
     public let generatedAt: String
 
     public init(
-        tenantId: String,
-        items: TenantItemCounts,
-        blobs: TenantBlobCounts,
-        recentActivity: [TenantActivityEntry],
+        spaceId: String,
+        items: SpaceItemCounts,
+        blobs: SpaceBlobCounts,
+        recentActivity: [SpaceActivityEntry],
         generatedAt: String
     ) {
-        self.tenantId = tenantId
+        self.spaceId = spaceId
         self.items = items
         self.blobs = blobs
         self.recentActivity = recentActivity
@@ -239,13 +239,13 @@ public struct TenantMetrics: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case items, blobs
-        case tenantId = "tenant_id"
+        case spaceId = "space_id"
         case recentActivity = "recent_activity"
         case generatedAt = "generated_at"
     }
 }
 
-public struct TenantItemCounts: Codable, Sendable, Hashable {
+public struct SpaceItemCounts: Codable, Sendable, Hashable {
     public let total: Int
     public let active: Int
     public let archived: Int
@@ -259,7 +259,7 @@ public struct TenantItemCounts: Codable, Sendable, Hashable {
     }
 }
 
-public struct TenantBlobCounts: Codable, Sendable, Hashable {
+public struct SpaceBlobCounts: Codable, Sendable, Hashable {
     public let count: Int
     public let totalSize: Int
 
@@ -274,7 +274,7 @@ public struct TenantBlobCounts: Codable, Sendable, Hashable {
     }
 }
 
-public struct TenantApiKeySummary: Codable, Sendable, Hashable, Identifiable {
+public struct SpaceApiKeySummary: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let label: String
     public let source: String
@@ -326,11 +326,11 @@ public struct PurgeNowResult: Codable, Sendable, Hashable {
 
 // MARK: - Internal response envelopes (unwrapped by namespace methods above)
 
-struct TenantListResponse: Codable, Sendable {
-    let data: [TenantSummary]
+struct SpaceListResponse: Codable, Sendable {
+    let data: [SpaceSummary]
 }
 
-struct TenantApiKeysResponse: Codable, Sendable {
-    let data: [TenantApiKeySummary]
+struct SpaceApiKeysResponse: Codable, Sendable {
+    let data: [SpaceApiKeySummary]
 }
 

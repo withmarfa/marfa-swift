@@ -12,7 +12,7 @@ public extension ItemsNamespace {
     /// exists so callers don't have to reinvent batch-iteration for
     /// migrations or imports larger than the cap — common in
     /// mode-transition flows (Local → Marfa, iCloud → Marfa) on
-    /// larger tenants.
+    /// larger spaces.
     ///
     /// Failure model mirrors ``bulk(_:)`` with the same `atomic` flag
     /// passed through:

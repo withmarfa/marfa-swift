@@ -9,6 +9,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
     public let createdAt: String
     public let defaultTier: Tier
     public let edgePermissions: [String: EdgePermission]?
+    public let expiresAt: String?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
     public let isPlatform: Bool
@@ -23,6 +24,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         createdAt: String,
         defaultTier: Tier,
         edgePermissions: [String: EdgePermission]? = nil,
+        expiresAt: String? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
         isPlatform: Bool,
@@ -36,6 +38,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.defaultTier = defaultTier
         self.edgePermissions = edgePermissions
+        self.expiresAt = expiresAt
         self.extensionPermissions = extensionPermissions
         self.id = id
         self.isPlatform = isPlatform
@@ -51,6 +54,7 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         case createdAt = "created_at"
         case defaultTier = "default_tier"
         case edgePermissions = "edge_permissions"
+        case expiresAt = "expires_at"
         case extensionPermissions = "extension_permissions"
         case id
         case isPlatform = "is_platform"

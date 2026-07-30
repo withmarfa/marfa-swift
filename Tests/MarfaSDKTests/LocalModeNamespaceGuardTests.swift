@@ -48,24 +48,24 @@ struct LocalModeNamespaceGuardTests {
         }
     }
 
-    @Test("tenants.getConfig throws LocalModeUnsupportedError on local client") func tenantsGetConfigThrowsOnLocalClient() async throws {
+    @Test("spaces.getConfig throws LocalModeUnsupportedError on local client") func spacesGetConfigThrowsOnLocalClient() async throws {
         let client = try await MarfaSDKTest.makeInMemoryClient()
         do {
-            _ = try await client.tenants.getConfig()
+            _ = try await client.spaces.getConfig()
             Issue.record("expected LocalModeUnsupportedError")
         } catch let e as LocalModeUnsupportedError {
-            #expect(e.operation == "tenants.getConfig")
+            #expect(e.operation == "spaces.getConfig")
             #expect(e.status == 501)
         }
     }
 
-    @Test("tenants.quotas.getOwn throws LocalModeUnsupportedError on local client") func tenantsQuotasGetOwnThrowsOnLocalClient() async throws {
+    @Test("spaces.quotas.getOwn throws LocalModeUnsupportedError on local client") func spacesQuotasGetOwnThrowsOnLocalClient() async throws {
         let client = try await MarfaSDKTest.makeInMemoryClient()
         do {
-            _ = try await client.tenants.quotas.getOwn()
+            _ = try await client.spaces.quotas.getOwn()
             Issue.record("expected LocalModeUnsupportedError")
         } catch let e as LocalModeUnsupportedError {
-            #expect(e.operation == "tenants.quotas.getOwn")
+            #expect(e.operation == "spaces.quotas.getOwn")
             #expect(e.status == 501)
         }
     }

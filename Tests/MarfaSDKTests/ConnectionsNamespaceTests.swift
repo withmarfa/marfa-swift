@@ -43,7 +43,9 @@ struct ConnectionsNamespaceTests {
             inboundWebhooksDisabled: 0,
             leasedTokensRevoked: 1,
             oauthTokensDeleted: true,
-            revokedCredentialIds: ["cred-1"]
+            revokedCredentialIds: ["cred-1"],
+            scheduleDisarmError: nil,
+            schedulesDisarmed: true
         ))
 
         let result = try await client.connections.uninstall("conn-1")
@@ -65,7 +67,7 @@ struct ConnectionsNamespaceTests {
             leaseToken: "secret-token-value",
             revokedAt: nil,
             scopes: ["read"],
-            tenantId: "tenant-1"
+            spaceId: "space-1"
         ))
 
         let result = try await client.connections.leaseTokens.create(
@@ -94,7 +96,7 @@ struct ConnectionsNamespaceTests {
                 id: "lease-1",
                 revokedAt: nil,
                 scopes: ["read"],
-                tenantId: "tenant-1"
+                spaceId: "space-1"
             )
         ]))
 
@@ -134,7 +136,7 @@ struct ConnectionsNamespaceTests {
                         kind: "item-event",
                         integrationName: "demo.publisher",
                         connectionId: "conn-1",
-                        tenantId: "tenant-1",
+                        spaceId: "space-1",
                         eventType: "created",
                         itemId: "item-1",
                         cycle: PreviewEventQueueCycle(

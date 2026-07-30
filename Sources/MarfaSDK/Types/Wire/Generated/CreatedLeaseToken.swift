@@ -14,7 +14,7 @@ public struct CreatedLeaseToken: Codable, Sendable, Identifiable {
     public let leaseToken: String
     public let revokedAt: String?
     public let scopes: [String]
-    public let tenantId: String?
+    public let spaceId: String?
 
     public init(
         capabilityId: String,
@@ -25,7 +25,7 @@ public struct CreatedLeaseToken: Codable, Sendable, Identifiable {
         leaseToken: String,
         revokedAt: String? = nil,
         scopes: [String],
-        tenantId: String? = nil
+        spaceId: String? = nil
     ) {
         self.capabilityId = capabilityId
         self.connectionId = connectionId
@@ -35,7 +35,7 @@ public struct CreatedLeaseToken: Codable, Sendable, Identifiable {
         self.leaseToken = leaseToken
         self.revokedAt = revokedAt
         self.scopes = scopes
-        self.tenantId = tenantId
+        self.spaceId = spaceId
     }
 
     enum CodingKeys: String, CodingKey {
@@ -47,6 +47,6 @@ public struct CreatedLeaseToken: Codable, Sendable, Identifiable {
         case leaseToken = "lease_token"
         case revokedAt = "revoked_at"
         case scopes
-        case tenantId = "tenant_id"
+        case spaceId = "space_id"
     }
 }

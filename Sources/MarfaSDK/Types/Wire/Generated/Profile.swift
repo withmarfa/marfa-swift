@@ -6,6 +6,7 @@
 import Foundation
 
 public struct Profile: Codable, Sendable, Hashable {
+    public let accountHolderItemId: String?
     public let avatarUrl: String
     public let bio: String?
     public let createdAt: String
@@ -17,6 +18,7 @@ public struct Profile: Codable, Sendable, Hashable {
     public let username: String?
 
     public init(
+        accountHolderItemId: String? = nil,
         avatarUrl: String,
         bio: String? = nil,
         createdAt: String,
@@ -27,6 +29,7 @@ public struct Profile: Codable, Sendable, Hashable {
         updatedAt: String,
         username: String? = nil
     ) {
+        self.accountHolderItemId = accountHolderItemId
         self.avatarUrl = avatarUrl
         self.bio = bio
         self.createdAt = createdAt
@@ -39,6 +42,7 @@ public struct Profile: Codable, Sendable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case accountHolderItemId = "account_holder_item_id"
         case avatarUrl = "avatar_url"
         case bio
         case createdAt = "created_at"

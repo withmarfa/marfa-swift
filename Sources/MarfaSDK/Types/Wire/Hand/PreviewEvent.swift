@@ -22,11 +22,11 @@ public enum PreviewEventDispatchReason: String, Codable, Sendable, Hashable, Cas
     /// self-feedback.
     case selfEvent = "self_event"
 
-    /// Subscriber lives in a different tenant. Items never fan out
-    /// across tenants.
-    case crossTenant = "cross_tenant"
+    /// Subscriber lives in a different space. Items never fan out
+    /// across spaces.
+    case crossSpace = "cross_space"
 
-    /// Cycle hop count has reached the tenant's hop budget. The bridge
+    /// Cycle hop count has reached the space's hop budget. The bridge
     /// stops here to prevent runaway reactive cycles.
     case hopBudgetExceeded = "hop_budget_exceeded"
 
@@ -42,7 +42,7 @@ public struct PreviewEventCycle: Codable, Sendable, Hashable {
     /// Connection id that originated the cycle, when known.
     public var originatingConnectionId: String?
 
-    /// Current hop count. Bounded by the tenant's hop budget.
+    /// Current hop count. Bounded by the space's hop budget.
     public var hopCount: Int?
 
     public init(
@@ -69,7 +69,7 @@ public struct PreviewEventRequest: Codable, Sendable, Hashable {
 
     /// Limits the preview to one subscribing connection. When omitted,
     /// the response contains one entry per subscriber in the caller's
-    /// tenant.
+    /// space.
     public var connectionId: String?
 
     /// Cycle metadata override. Useful for reproducing
@@ -125,7 +125,7 @@ public struct PreviewEventQueueBody: Codable, Sendable, Hashable {
 
     public let integrationName: String
     public let connectionId: String
-    public let tenantId: String?
+    public let spaceId: String?
     public let eventType: String
     public let itemId: String
     public let cycle: PreviewEventQueueCycle
@@ -138,7 +138,7 @@ public struct PreviewEventQueueBody: Codable, Sendable, Hashable {
         kind: String,
         integrationName: String,
         connectionId: String,
-        tenantId: String?,
+        spaceId: String?,
         eventType: String,
         itemId: String,
         cycle: PreviewEventQueueCycle,
@@ -147,7 +147,7 @@ public struct PreviewEventQueueBody: Codable, Sendable, Hashable {
         self.kind = kind
         self.integrationName = integrationName
         self.connectionId = connectionId
-        self.tenantId = tenantId
+        self.spaceId = spaceId
         self.eventType = eventType
         self.itemId = itemId
         self.cycle = cycle
@@ -158,7 +158,7 @@ public struct PreviewEventQueueBody: Codable, Sendable, Hashable {
         case kind
         case integrationName = "integration_name"
         case connectionId = "connection_id"
-        case tenantId = "tenant_id"
+        case spaceId = "space_id"
         case eventType = "event_type"
         case itemId = "item_id"
         case cycle
@@ -201,7 +201,7 @@ public struct PreviewEventEnvelope: Codable, Sendable, Hashable {
 
 /// Hop-budget snapshot returned alongside the envelopes.
 public struct PreviewEventHopBudget: Codable, Sendable, Hashable {
-    /// Configured hop ceiling for the caller's tenant.
+    /// Configured hop ceiling for the caller's space.
     public let max: Int
 
     /// Hop count consumed by the cycle the preview was rendered against.
@@ -219,7 +219,7 @@ public struct PreviewEventResult: Codable, Sendable, Hashable {
     /// when no subscribers exist for the event's type.
     public let envelopes: [PreviewEventEnvelope]
 
-    /// The tenant's hop budget at the moment of the call.
+    /// The space's hop budget at the moment of the call.
     public let hopBudget: PreviewEventHopBudget
 
     public init(

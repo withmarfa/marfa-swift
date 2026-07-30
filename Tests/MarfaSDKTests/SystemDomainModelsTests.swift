@@ -112,10 +112,10 @@ struct SystemDomainModelsTests {
         #expect(integration == .integration)
     }
 
-    @Test("ConnectionKind rejects the removed `tenant` value")
-    func connectionKindRejectsTenant() {
+    @Test("ConnectionKind rejects the removed `space` value")
+    func connectionKindRejectsSpace() {
         #expect(throws: DecodingError.self) {
-            try JSONDecoder().decode(ConnectionKind.self, from: Data(#""tenant""#.utf8))
+            try JSONDecoder().decode(ConnectionKind.self, from: Data(#""space""#.utf8))
         }
     }
 

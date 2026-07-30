@@ -77,7 +77,7 @@ struct ErrorTypeAssertionsTests {
 
         do {
             _ = try await transport.request(
-                method: .get, path: "/admin/tenants", body: nil, query: nil
+                method: .get, path: "/admin/spaces", body: nil, query: nil
             ) as EmptyResponse
             Issue.record("expected ForbiddenError")
         } catch let error as ForbiddenError {
@@ -93,7 +93,7 @@ struct ErrorTypeAssertionsTests {
 
         do {
             _ = try await transport.request(
-                method: .get, path: "/admin/tenants", body: nil, query: nil
+                method: .get, path: "/admin/spaces", body: nil, query: nil
             ) as EmptyResponse
             Issue.record("expected ForbiddenError")
         } catch is ForbiddenError {

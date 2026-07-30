@@ -3,8 +3,8 @@ import Foundation
 @testable import MarfaSDK
 import MarfaSDKTestSupport
 
-@Suite("TenantsNamespace")
-struct TenantsNamespaceTests {
+@Suite("SpacesNamespace")
+struct SpacesNamespaceTests {
 
     func makeClient() -> (MarfaClient, MockTransport) {
         let mock = MockTransport()
@@ -15,11 +15,11 @@ struct TenantsNamespaceTests {
 
     // MARK: - getConfig / setConfig
 
-    @Test("getConfig sends GET /tenants/me/config and decodes nested enforcement")
+    @Test("getConfig sends GET /spaces/me/config and decodes nested enforcement")
     func getConfig() async throws {
         let (client, mock) = makeClient()
-        mock.enqueue(TenantConfig(
-            enforcement: TenantConfig.Enforcement(
+        mock.enqueue(SpaceConfig(
+            enforcement: SpaceConfig.Enforcement(
                 strictMode: .init(types: ["core.note"]),
                 sourceAllowlist: .init(types: ["core.task"], sources: ["sync-agent"]),
                 sourceFilter: nil
@@ -29,7 +29,7 @@ struct TenantsNamespaceTests {
             trashRetentionDays: 14
         ))
 
-        let config = try await client.tenants.getConfig()
+        let config = try await client.spaces.getConfig()
 
         #expect(config.enforcement?.strictMode?.types == ["core.note"])
         #expect(config.enforcement?.sourceAllowlist?.sources == ["sync-agent"])
@@ -38,18 +38,18 @@ struct TenantsNamespaceTests {
         #expect(config.eventLogRetentionHours == 72)
         #expect(config.trashRetentionDays == 14)
         #expect(mock.calls[0].method == .get)
-        #expect(mock.calls[0].path == "/tenants/me/config")
+        #expect(mock.calls[0].path == "/spaces/me/config")
     }
 
     @Test("getConfig decodes empty payload as empty config")
     func getConfigEmpty() async throws {
         let (client, mock) = makeClient()
         // The server returns `{}` when nothing is configured. A fresh
-        // TenantConfig() encodes to that exact shape (all fields nil,
+        // SpaceConfig() encodes to that exact shape (all fields nil,
         // omitted by JSONEncoder).
-        mock.enqueue(TenantConfig())
+        mock.enqueue(SpaceConfig())
 
-        let config = try await client.tenants.getConfig()
+        let config = try await client.spaces.getConfig()
 
         #expect(config.enforcement == nil)
         #expect(config.auditRetentionDays == nil)
@@ -57,11 +57,11 @@ struct TenantsNamespaceTests {
         #expect(config.trashRetentionDays == nil)
     }
 
-    @Test("setConfig sends PUT /tenants/me/config with snake_case body")
+    @Test("setConfig sends PUT /spaces/me/config with snake_case body")
     func setConfig() async throws {
         let (client, mock) = makeClient()
-        let payload = TenantConfig(
-            enforcement: TenantConfig.Enforcement(
+        let payload = SpaceConfig(
+            enforcement: SpaceConfig.Enforcement(
                 strictMode: .init(types: ["core.note", "core.task"]),
                 sourceAllowlist: nil,
                 sourceFilter: .init(types: ["core.bookmark"], sources: ["bulk-importer"])
@@ -72,12 +72,12 @@ struct TenantsNamespaceTests {
         )
         mock.enqueue(payload)
 
-        let result = try await client.tenants.setConfig(payload)
+        let result = try await client.spaces.setConfig(payload)
 
         #expect(result.auditRetentionDays == 90)
         #expect(result.enforcement?.sourceFilter?.types == ["core.bookmark"])
         #expect(mock.calls[0].method == .put)
-        #expect(mock.calls[0].path == "/tenants/me/config")
+        #expect(mock.calls[0].path == "/spaces/me/config")
 
         let body = mock.calls[0].body!
         let json = try JSONSerialization.jsonObject(with: body) as! [String: Any]
@@ -92,11 +92,11 @@ struct TenantsNamespaceTests {
 
     // MARK: - quotas.getOwn
 
-    @Test("quotas.getOwn sends GET /tenants/me/quotas with no tenant id in path")
+    @Test("quotas.getOwn sends GET /spaces/me/quotas with no space id in path")
     func getOwnQuotas() async throws {
         let (client, mock) = makeClient()
-        mock.enqueue(TenantQuota(
-            tenantId: "tenant-abc",
+        mock.enqueue(SpaceQuota(
+            spaceId: "space-abc",
             itemsLimit: 50_000,
             webhooksLimit: nil,
             blobsLimit: 1_000,
@@ -105,23 +105,23 @@ struct TenantsNamespaceTests {
             updatedAt: "2026-05-17T10:00:00Z"
         ))
 
-        let quota = try await client.tenants.quotas.getOwn()
+        let quota = try await client.spaces.quotas.getOwn()
 
-        #expect(quota.tenantId == "tenant-abc")
+        #expect(quota.spaceId == "space-abc")
         #expect(quota.itemsLimit == 50_000)
         #expect(quota.webhooksLimit == nil)
         #expect(quota.blobsLimit == 1_000)
         #expect(mock.calls[0].method == .get)
-        #expect(mock.calls[0].path == "/tenants/me/quotas")
+        #expect(mock.calls[0].path == "/spaces/me/quotas")
     }
 
     // MARK: - quotas.getById
 
-    @Test("quotas.getById sends GET /tenants/{id}/quotas with id in path")
+    @Test("quotas.getById sends GET /spaces/{id}/quotas with id in path")
     func getByIdQuotas() async throws {
         let (client, mock) = makeClient()
-        mock.enqueue(TenantQuota(
-            tenantId: "tenant-xyz",
+        mock.enqueue(SpaceQuota(
+            spaceId: "space-xyz",
             itemsLimit: nil,
             webhooksLimit: nil,
             blobsLimit: nil,
@@ -130,22 +130,22 @@ struct TenantsNamespaceTests {
             updatedAt: nil
         ))
 
-        let quota = try await client.tenants.quotas.getById("tenant-xyz")
+        let quota = try await client.spaces.quotas.getById("space-xyz")
 
-        #expect(quota.tenantId == "tenant-xyz")
+        #expect(quota.spaceId == "space-xyz")
         // No override row — every limit nil, updated_at nil.
         #expect(quota.updatedAt == nil)
         #expect(mock.calls[0].method == .get)
-        #expect(mock.calls[0].path == "/tenants/tenant-xyz/quotas")
+        #expect(mock.calls[0].path == "/spaces/space-xyz/quotas")
     }
 
     // MARK: - quotas.set
 
-    @Test("quotas.set sends PUT /tenants/{id}/quotas with snake_case body")
+    @Test("quotas.set sends PUT /spaces/{id}/quotas with snake_case body")
     func setQuotas() async throws {
         let (client, mock) = makeClient()
-        mock.enqueue(TenantQuota(
-            tenantId: "tenant-xyz",
+        mock.enqueue(SpaceQuota(
+            spaceId: "space-xyz",
             itemsLimit: 100_000,
             webhooksLimit: 50,
             blobsLimit: nil,
@@ -154,9 +154,9 @@ struct TenantsNamespaceTests {
             updatedAt: "2026-05-17T12:00:00Z"
         ))
 
-        let result = try await client.tenants.quotas.set(
-            "tenant-xyz",
-            TenantQuotaInput(
+        let result = try await client.spaces.quotas.set(
+            "space-xyz",
+            SpaceQuotaInput(
                 itemsLimit: 100_000,
                 webhooksLimit: 50,
                 storageBytesLimit: 1_073_741_824
@@ -167,7 +167,7 @@ struct TenantsNamespaceTests {
         #expect(result.webhooksLimit == 50)
         #expect(result.storageBytesLimit == 1_073_741_824)
         #expect(mock.calls[0].method == .put)
-        #expect(mock.calls[0].path == "/tenants/tenant-xyz/quotas")
+        #expect(mock.calls[0].path == "/spaces/space-xyz/quotas")
 
         let body = mock.calls[0].body!
         let json = try JSONSerialization.jsonObject(with: body) as! [String: Any]
@@ -181,24 +181,24 @@ struct TenantsNamespaceTests {
 
     // MARK: - Pure-local rejection
 
-    @Test("Pure-local rejects every tenants method")
+    @Test("Pure-local rejects every spaces method")
     func localModeRejects() async throws {
         let client = try await MarfaClient.local(path: ":memory:")
 
         await #expect(throws: LocalModeUnsupportedError.self) {
-            _ = try await client.tenants.getConfig()
+            _ = try await client.spaces.getConfig()
         }
         await #expect(throws: LocalModeUnsupportedError.self) {
-            _ = try await client.tenants.setConfig(TenantConfig())
+            _ = try await client.spaces.setConfig(SpaceConfig())
         }
         await #expect(throws: LocalModeUnsupportedError.self) {
-            _ = try await client.tenants.quotas.getOwn()
+            _ = try await client.spaces.quotas.getOwn()
         }
         await #expect(throws: LocalModeUnsupportedError.self) {
-            _ = try await client.tenants.quotas.getById("tenant-1")
+            _ = try await client.spaces.quotas.getById("space-1")
         }
         await #expect(throws: LocalModeUnsupportedError.self) {
-            _ = try await client.tenants.quotas.set("tenant-1", TenantQuotaInput())
+            _ = try await client.spaces.quotas.set("space-1", SpaceQuotaInput())
         }
     }
 }

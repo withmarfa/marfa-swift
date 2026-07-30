@@ -11,7 +11,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "API Key or OAuth Token",
-        "description": "Pass an API key (marfa_k1_...) or OAuth access token (marfa_at_...)"
+        "description": "Authenticate with an API key (`marfa_k1_…`) or an OAuth access token (`marfa_at_…`)."
       }
     },
     "schemas": {},
@@ -102,7 +102,7 @@
         },
         "responses": {
           "200": {
-            "description": "Item updated via natural-key upsert. Returned when both `source` (stamped from the credential) and request `source_id` resolve a non-trashed item in the caller's tenant — the request is treated as an idempotent re-sync of the upstream entry.",
+            "description": "Item updated via natural-key upsert. Returned when both `source` (stamped from the credential) and request `source_id` resolve a non-trashed item in the caller's space — the request is treated as an idempotent re-sync of the upstream entry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -139,7 +139,7 @@
                             "feed"
                           ]
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -186,7 +186,7 @@
                                     "id": {
                                       "type": "string"
                                     },
-                                    "tenant_id": {
+                                    "space_id": {
                                       "type": "string",
                                       "nullable": true
                                     },
@@ -331,7 +331,7 @@
                             "feed"
                           ]
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -378,7 +378,7 @@
                                     "id": {
                                       "type": "string"
                                     },
-                                    "tenant_id": {
+                                    "space_id": {
                                       "type": "string",
                                       "nullable": true
                                     },
@@ -501,6 +501,7 @@
                             "validation_error",
                             "missing_required_field",
                             "invalid_type",
+                            "unknown_type",
                             "invalid_id",
                             "invalid_properties",
                             "edge_constraint_violation",
@@ -618,7 +619,7 @@
           "Items"
         ],
         "summary": "List items",
-        "description": "Returns a paginated list of items in the tenant, narrowed by the query parameters; a `type` filter matches subtypes via inheritance. Lists are lean by default — use `include` to hydrate edges, metadata, or extensions inline and avoid an N+1.",
+        "description": "Returns a paginated list of items in the space, narrowed by the query parameters; a `type` filter matches subtypes via inheritance. Lists are lean by default — use `include` to hydrate edges, metadata, or extensions inline and avoid an N+1.",
         "security": [
           {
             "bearerAuth": []
@@ -693,15 +694,11 @@
           {
             "schema": {
               "type": "string",
-              "enum": [
-                "created_at",
-                "updated_at",
-                "timestamp"
-              ],
-              "description": "Field to sort by"
+              "pattern": "^(created_at|updated_at|timestamp|properties\\.[a-z0-9_]+)$",
+              "description": "Field to sort by: a system column (created_at, updated_at, timestamp) or a naturally-orderable custom field via properties.<field> (e.g. properties.due_at). Enum fields like status/priority are not sortable here — their order is semantic, not lexical."
             },
             "required": false,
-            "description": "Field to sort by",
+            "description": "Field to sort by: a system column (created_at, updated_at, timestamp) or a naturally-orderable custom field via properties.<field> (e.g. properties.due_at). Enum fields like status/priority are not sortable here — their order is semantic, not lexical.",
             "name": "sort",
             "in": "query"
           },
@@ -816,7 +813,7 @@
                                   "feed"
                                 ]
                               },
-                              "tenant_id": {
+                              "space_id": {
                                 "type": "string",
                                 "nullable": true
                               },
@@ -863,7 +860,7 @@
                                           "id": {
                                             "type": "string"
                                           },
-                                          "tenant_id": {
+                                          "space_id": {
                                             "type": "string",
                                             "nullable": true
                                           },
@@ -990,7 +987,7 @@
                                       "feed"
                                     ]
                                   },
-                                  "tenant_id": {
+                                  "space_id": {
                                     "type": "string",
                                     "nullable": true
                                   },
@@ -1037,7 +1034,7 @@
                                               "id": {
                                                 "type": "string"
                                               },
-                                              "tenant_id": {
+                                              "space_id": {
                                                 "type": "string",
                                                 "nullable": true
                                               },
@@ -1250,7 +1247,7 @@
           "Items"
         ],
         "summary": "Get item counts by state",
-        "description": "Returns a count of items per lifecycle state for the tenant. The counts are scoped to the caller's type permissions, so a credential sees only the types it can read.",
+        "description": "Returns a count of items per lifecycle state for the space. The counts are scoped to the caller's type permissions, so a credential sees only the types it can read.",
         "security": [
           {
             "bearerAuth": []
@@ -1319,7 +1316,7 @@
           "Items"
         ],
         "summary": "Get an item",
-        "description": "Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. An item the caller cannot see returns 404 rather than 403, so the server never leaks existence.",
+        "description": "Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. An item the caller cannot see returns 404 rather than 403, so the server never leaks existence.\n\n`?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots newest-first. Tokens are comma-separated and compose.",
         "security": [
           {
             "bearerAuth": []
@@ -1335,11 +1332,21 @@
             "description": "Item id",
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated extras to hydrate inline: backrefs, neighbors, versions."
+            },
+            "required": false,
+            "description": "Comma-separated extras to hydrate inline: backrefs, neighbors, versions.",
+            "name": "include",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "Item with metadata",
+            "description": "Item with metadata, and any requested neighborhood blocks",
             "content": {
               "application/json": {
                 "schema": {
@@ -1376,7 +1383,7 @@
                             "feed"
                           ]
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -1423,7 +1430,7 @@
                                     "id": {
                                       "type": "string"
                                     },
-                                    "tenant_id": {
+                                    "space_id": {
                                       "type": "string",
                                       "nullable": true
                                     },
@@ -1520,6 +1527,296 @@
                         "tags",
                         "extensions"
                       ]
+                    },
+                    "backrefs": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "edges": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "space_id": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "source_id": {
+                                  "type": "string"
+                                },
+                                "target_id": {
+                                  "type": "string"
+                                },
+                                "edge_type": {
+                                  "type": "string"
+                                },
+                                "properties": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                },
+                                "created_at": {
+                                  "type": "string"
+                                },
+                                "updated_at": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source_id",
+                                "target_id",
+                                "edge_type",
+                                "properties",
+                                "created_at",
+                                "updated_at"
+                              ]
+                            }
+                          },
+                          "has_more": {
+                            "type": "boolean"
+                          },
+                          "next_cursor": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "edges",
+                          "has_more"
+                        ]
+                      }
+                    },
+                    "neighbors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "item": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "properties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "archived",
+                                  "trashed",
+                                  "revoked"
+                                ]
+                              },
+                              "tier": {
+                                "type": "string",
+                                "enum": [
+                                  "library",
+                                  "feed"
+                                ]
+                              },
+                              "space_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "version": {
+                                "type": "number"
+                              },
+                              "schema_version": {
+                                "type": "integer"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "source_id": {
+                                "type": "string"
+                              },
+                              "device": {
+                                "type": "string"
+                              },
+                              "capture_latitude": {
+                                "type": "number"
+                              },
+                              "capture_longitude": {
+                                "type": "number"
+                              },
+                              "timestamp": {
+                                "type": "string"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "updated_at": {
+                                "type": "string"
+                              },
+                              "edges": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "edges": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "space_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                          },
+                                          "source_id": {
+                                            "type": "string"
+                                          },
+                                          "target_id": {
+                                            "type": "string"
+                                          },
+                                          "edge_type": {
+                                            "type": "string"
+                                          },
+                                          "properties": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "nullable": true
+                                            }
+                                          },
+                                          "created_at": {
+                                            "type": "string"
+                                          },
+                                          "updated_at": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "source_id",
+                                          "target_id",
+                                          "edge_type",
+                                          "properties",
+                                          "created_at",
+                                          "updated_at"
+                                        ]
+                                      }
+                                    },
+                                    "has_more": {
+                                      "type": "boolean"
+                                    },
+                                    "next_cursor": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "edges",
+                                    "has_more"
+                                  ]
+                                }
+                              },
+                              "extensions": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "properties",
+                              "state",
+                              "version",
+                              "schema_version",
+                              "source",
+                              "timestamp",
+                              "created_at",
+                              "updated_at"
+                            ]
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "item_id": {
+                                "type": "string"
+                              },
+                              "tags": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "extensions": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "item_id",
+                              "tags",
+                              "extensions"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "item",
+                          "metadata"
+                        ]
+                      }
+                    },
+                    "neighbors_truncated": {
+                      "type": "boolean"
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "item_id": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "device": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "item_id",
+                          "version",
+                          "properties",
+                          "created_at"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -1719,7 +2016,7 @@
                             "feed"
                           ]
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -1766,7 +2063,7 @@
                                     "id": {
                                       "type": "string"
                                     },
-                                    "tenant_id": {
+                                    "space_id": {
                                       "type": "string",
                                       "nullable": true
                                     },
@@ -2290,7 +2587,7 @@
                             "feed"
                           ]
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -2337,7 +2634,7 @@
                                     "id": {
                                       "type": "string"
                                     },
-                                    "tenant_id": {
+                                    "space_id": {
                                       "type": "string",
                                       "nullable": true
                                     },
@@ -2611,7 +2908,7 @@
                             "feed"
                           ]
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -2658,7 +2955,7 @@
                                     "id": {
                                       "type": "string"
                                     },
-                                    "tenant_id": {
+                                    "space_id": {
                                       "type": "string",
                                       "nullable": true
                                     },
@@ -4101,7 +4398,7 @@
           "Items"
         ],
         "summary": "Bulk upsert items",
-        "description": "Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`. Admin-only and atomic by default; `source` is server-stamped from the credential, so any caller-supplied value is overwritten.",
+        "description": "Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`. Atomic by default; `source` is server-stamped from the credential, so any caller-supplied value is overwritten. Requires write access to each item's type (admin / space_admin bypass; members need the per-type permission), and operates only within the caller's space.",
         "security": [
           {
             "bearerAuth": []
@@ -4365,7 +4662,7 @@
             }
           },
           "403": {
-            "description": "Admin required",
+            "description": "Write access denied for one of the item types",
             "content": {
               "application/json": {
                 "schema": {
@@ -4377,7 +4674,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "forbidden"
+                            "forbidden",
+                            "type_not_permitted"
                           ]
                         },
                         "message": {
@@ -5183,7 +5481,7 @@
           "Items"
         ],
         "summary": "Get a bulk-action job",
-        "description": "Returns the current state of an asynchronous bulk-action job; once terminal, `result` carries the outcome envelope. Only the credential that created the job or an admin can read it.",
+        "description": "Returns the current state of an asynchronous bulk-action job; once terminal, `result` carries the outcome envelope. Readable by the credential that created it, by an admin within the same space, and by a platform credential. A job in another space reads as absent.",
         "security": [
           {
             "bearerAuth": []
@@ -5358,7 +5656,7 @@
             }
           },
           "403": {
-            "description": "Not the originating credential and not an admin",
+            "description": "Not the originating credential, and not an admin for this space",
             "content": {
               "application/json": {
                 "schema": {
@@ -5618,7 +5916,7 @@
             }
           },
           "403": {
-            "description": "Not the originating credential and not an admin",
+            "description": "Not the originating credential, and not an admin for this space",
             "content": {
               "application/json": {
                 "schema": {
@@ -5670,6 +5968,333 @@
                           "type": "string",
                           "enum": [
                             "bulk_job_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/items/bulk-get": {
+      "post": {
+        "operationId": "bulkGetItems",
+        "tags": [
+          "Items"
+        ],
+        "summary": "Bulk get items by id",
+        "description": "Reads up to 100 items by id in one round-trip. Space-scoped and permission-filtered exactly like the single-item GET: ids the caller cannot read (other space, type not permitted, trashed, or missing) are silently omitted rather than erroring the whole request. Optional `include` hydrates edges, metadata, extensions, or system items inline.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Item ids to fetch (max 100)."
+                  },
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "edges",
+                        "metadata",
+                        "extensions",
+                        "system"
+                      ]
+                    },
+                    "description": "Extras to hydrate inline: edges, metadata, extensions, system. Mirrors the GET /items `include` tokens."
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The readable subset of the requested items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "archived",
+                              "trashed",
+                              "revoked"
+                            ]
+                          },
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "library",
+                              "feed"
+                            ]
+                          },
+                          "space_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "version": {
+                            "type": "number"
+                          },
+                          "schema_version": {
+                            "type": "integer"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "source_id": {
+                            "type": "string"
+                          },
+                          "device": {
+                            "type": "string"
+                          },
+                          "capture_latitude": {
+                            "type": "number"
+                          },
+                          "capture_longitude": {
+                            "type": "number"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "edges": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "edges": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "space_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "source_id": {
+                                        "type": "string"
+                                      },
+                                      "target_id": {
+                                        "type": "string"
+                                      },
+                                      "edge_type": {
+                                        "type": "string"
+                                      },
+                                      "properties": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "nullable": true
+                                        }
+                                      },
+                                      "created_at": {
+                                        "type": "string"
+                                      },
+                                      "updated_at": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "source_id",
+                                      "target_id",
+                                      "edge_type",
+                                      "properties",
+                                      "created_at",
+                                      "updated_at"
+                                    ]
+                                  }
+                                },
+                                "has_more": {
+                                  "type": "boolean"
+                                },
+                                "next_cursor": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "edges",
+                                "has_more"
+                              ]
+                            }
+                          },
+                          "extensions": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "nullable": true
+                              }
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "properties",
+                          "state",
+                          "version",
+                          "schema_version",
+                          "source",
+                          "timestamp",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    },
+                    "metadata": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "item_id": {
+                            "type": "string"
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "extensions": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            }
+                          }
+                        },
+                        "required": [
+                          "item_id",
+                          "tags",
+                          "extensions"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (too many ids, or a malformed id)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error",
+                            "invalid_id"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
                           ]
                         },
                         "message": {
@@ -6610,7 +7235,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "tenant_id": {
+                          "space_id": {
                             "type": "string",
                             "nullable": true
                           },
@@ -6818,7 +7443,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "tenant_id": {
+                          "space_id": {
                             "type": "string",
                             "nullable": true
                           },
@@ -6960,7 +7585,7 @@
           "Edges"
         ],
         "summary": "List edges",
-        "description": "Returns a paginated list of edges across the tenant, optionally filtered by edge type. Pass `edge_type` as a comma-separated list (up to 10 entries) to scope, or omit it to list every edge.",
+        "description": "Returns a paginated list of edges across the space, optionally filtered by edge type. Pass `edge_type` as a comma-separated list (up to 10 entries) to scope, or omit it to list every edge.",
         "security": [
           {
             "bearerAuth": []
@@ -7016,7 +7641,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "tenant_id": {
+                          "space_id": {
                             "type": "string",
                             "nullable": true
                           },
@@ -7156,7 +7781,7 @@
           "Edges"
         ],
         "summary": "Create an edge",
-        "description": "Creates a single typed edge between two existing items in the tenant. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time.",
+        "description": "Creates a single typed edge between two existing items in the space. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time.",
         "security": [
           {
             "bearerAuth": []
@@ -7207,7 +7832,7 @@
                         "id": {
                           "type": "string"
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -7435,7 +8060,7 @@
                         "id": {
                           "type": "string"
                         },
-                        "tenant_id": {
+                        "space_id": {
                           "type": "string",
                           "nullable": true
                         },
@@ -7655,7 +8280,7 @@
           "Edges"
         ],
         "summary": "Bulk upsert edges",
-        "description": "Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. Admin-only and atomic by default; both endpoints must already hold the items being wired together.",
+        "description": "Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and edge type (admin / space_admin bypass; members need both per-type permissions), and operates only within the caller's space.",
         "security": [
           {
             "bearerAuth": []
@@ -7885,7 +8510,7 @@
             }
           },
           "403": {
-            "description": "Admin required",
+            "description": "Write access denied for a source type or edge type",
             "content": {
               "application/json": {
                 "schema": {
@@ -7897,7 +8522,9 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "forbidden"
+                            "forbidden",
+                            "type_not_permitted",
+                            "edge_permission_denied"
                           ]
                         },
                         "message": {
@@ -7933,7 +8560,7 @@
           "Edge Types"
         ],
         "summary": "Register an edge type",
-        "description": "Registers a custom edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Admin-only; the eight core edge-type names are reserved and reject with a conflict, and custom types are flat with no inheritance.",
+        "description": "Registers a custom edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Space-admin or platform-admin; the registration is scoped to the caller's space and is invisible to other spaces. The eight core edge-type names are reserved and reject with a conflict, and custom types are flat with no inheritance.",
         "security": [
           {
             "bearerAuth": []
@@ -8136,7 +8763,7 @@
             }
           },
           "403": {
-            "description": "Admin required",
+            "description": "Space-admin required",
             "content": {
               "application/json": {
                 "schema": {
@@ -8221,7 +8848,7 @@
           "Edge Types"
         ],
         "summary": "List edge types",
-        "description": "Returns every edge type registered in the tenant — the eight core types plus any custom registrations — each with its cardinality, cascade behavior, and source/target type constraints.",
+        "description": "Returns every edge type registered in the space — the eight core types plus any custom registrations — each with its cardinality, cascade behavior, and source/target type constraints.",
         "security": [
           {
             "bearerAuth": []
@@ -8313,7 +8940,7 @@
           "Edge Types"
         ],
         "summary": "Delete an edge type",
-        "description": "Removes a custom edge type registration. Admin-only; core edge types are rejected, and the request fails while any edges of this type still exist, so delete or migrate them first.",
+        "description": "Removes a custom edge type registration scoped to the caller's space. Space-admin or platform-admin; core edge types are rejected, another space's edge type resolves as not-found, and the request fails while any edges of this type still exist, so delete or migrate them first.",
         "security": [
           {
             "bearerAuth": []
@@ -8441,7 +9068,7 @@
           "Types"
         ],
         "summary": "List types",
-        "description": "Returns every type registered in the tenant — the core type catalog plus any custom types registered via `POST /types`. Use as the schema manifest a type-aware client reads at startup.",
+        "description": "Returns every type registered in the space — the core type catalog plus any custom types registered via `POST /types`. Use as the schema manifest a type-aware client reads at startup.",
         "security": [
           {
             "bearerAuth": []
@@ -8828,7 +9455,7 @@
           "Types"
         ],
         "summary": "Get a type",
-        "description": "Returns the full schema for a single type, resolving inheritance so the response reflects the effective fields and policies. Works for both core and tenant-registered custom types.",
+        "description": "Returns the full schema for a single type, resolving inheritance so the response reflects the effective fields and policies. Works for both core and space-registered custom types.",
         "security": [
           {
             "bearerAuth": []
@@ -9021,7 +9648,7 @@
           "Types"
         ],
         "summary": "Update a custom type",
-        "description": "Replaces a custom type's schema, re-running the registration-time correctness rails. Admin-only — core types are immutable and return 400; the structural diff between versions sets the required version bump, and a mismatch rejects with `400 version_bump_mismatch`.",
+        "description": "Replaces a custom type's schema, re-running the registration-time correctness rails. Admin-only — core types are immutable and return 403; the structural diff between versions sets the required version bump, and a mismatch rejects with `422 version_bump_mismatch`.",
         "security": [
           {
             "bearerAuth": []
@@ -9415,7 +10042,7 @@
           "Search"
         ],
         "summary": "Search items",
-        "description": "Full-text search across the tenant's items, indexing textual properties and tags, ranked by relevance with a configurable recency boost. Accepts the same filters as `GET /items` and uses `limit` / `offset` paging; absolute scores aren't stable across index rebuilds.",
+        "description": "Full-text search across the space's items, indexing textual properties and tags, ranked by relevance with a configurable recency boost. Accepts the same filters as `GET /items` and uses `limit` / `offset` paging; absolute scores aren't stable across index rebuilds.",
         "security": [
           {
             "bearerAuth": []
@@ -9576,7 +10203,7 @@
                                   "feed"
                                 ]
                               },
-                              "tenant_id": {
+                              "space_id": {
                                 "type": "string",
                                 "nullable": true
                               },
@@ -9623,7 +10250,7 @@
                                           "id": {
                                             "type": "string"
                                           },
-                                          "tenant_id": {
+                                          "space_id": {
                                             "type": "string",
                                             "nullable": true
                                           },
@@ -9732,9 +10359,6 @@
                           },
                           "snippet_html": {
                             "type": "string"
-                          },
-                          "snippet": {
-                            "type": "string"
                           }
                         },
                         "required": [
@@ -9801,7 +10425,7 @@
           "Metadata"
         ],
         "summary": "List distinct tags in use",
-        "description": "Returns every distinct tag in use across items the caller can read, each with a usage count, sorted by count descending then tag ascending. Scoped to the caller's tenant and type permissions; trashed items are excluded.",
+        "description": "Returns every distinct tag in use across items the caller can read, each with a usage count, sorted by count descending then tag ascending. Scoped to the caller's space and type permissions; trashed items are excluded.",
         "security": [
           {
             "bearerAuth": []
@@ -9809,7 +10433,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Distinct tags with usage counts, sorted by count descending then tag ascending. Tenant-scoped; type-permission scoped; trashed items excluded.",
+            "description": "Distinct tags with usage counts, sorted by count descending then tag ascending. Space-scoped; type-permission scoped; trashed items excluded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10026,7 +10650,7 @@
           "Blobs"
         ],
         "summary": "Download blob binary",
-        "description": "Streams the raw bytes for a previously-uploaded blob as `application/octet-stream`. Tenant-scoped — a hash uploaded in one tenant is invisible to another, so cross-tenant probes return 404.",
+        "description": "Streams the raw bytes for a previously-uploaded blob as `application/octet-stream`. Space-scoped — a hash uploaded in one space is invisible to another, so cross-space probes return 404.",
         "security": [
           {
             "bearerAuth": []
@@ -10362,7 +10986,7 @@
           "Profile"
         ],
         "summary": "Get the calling user's profile",
-        "description": "Returns the profile for the user who owns the caller's tenant. `avatar_url` resolves to the uploaded avatar when present, otherwise to a deterministic placeholder generated from the username; for OIDC-shaped userinfo, use `GET /auth/userinfo` instead.",
+        "description": "Returns the profile for the user who owns the caller's space. `avatar_url` resolves to the uploaded avatar when present, otherwise to a deterministic placeholder generated from the username; for OIDC-shaped userinfo, use `GET /auth/userinfo` instead. `account_holder_item_id` names the `system.account_holder` item that represents the account holder in the item graph, so an edge such as `authored-by` can target them directly.",
         "security": [
           {
             "bearerAuth": []
@@ -10405,6 +11029,9 @@
                       "type": "string"
                     },
                     "updated_at": {
+                      "type": "string"
+                    },
+                    "account_holder_item_id": {
                       "type": "string"
                     }
                   },
@@ -10581,6 +11208,9 @@
                       "type": "string"
                     },
                     "updated_at": {
+                      "type": "string"
+                    },
+                    "account_holder_item_id": {
                       "type": "string"
                     }
                   },
@@ -10767,7 +11397,7 @@
           "Profile"
         ],
         "summary": "Upload an avatar",
-        "description": "Uploads an image as the user's avatar, stored as a content-addressed blob. Subject to the standard blob size cap and the tenant's `blobs` and `storage_bytes` quotas — an over-size payload returns `413`.",
+        "description": "Uploads an image as the user's avatar, stored as a content-addressed blob. Subject to the standard blob size cap and the space's `blobs` and `storage_bytes` quotas — an over-size payload returns `413`.",
         "security": [
           {
             "bearerAuth": []
@@ -10819,6 +11449,9 @@
                       "type": "string"
                     },
                     "updated_at": {
+                      "type": "string"
+                    },
+                    "account_holder_item_id": {
                       "type": "string"
                     }
                   },
@@ -11007,6 +11640,9 @@
                     },
                     "updated_at": {
                       "type": "string"
+                    },
+                    "account_holder_item_id": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -11112,7 +11748,7 @@
           "Keys"
         ],
         "summary": "Create an API key",
-        "description": "Creates a new API key in the caller's tenant. The plaintext `key` is returned only in this response and never shown again, so store it securely. On a fresh server with zero keys, this runs in bootstrap mode (no auth, minted key is always admin); once any key exists, creation requires an admin or tenant_admin token.",
+        "description": "Creates a new API key in the caller's space. The plaintext `key` is returned only in this response and never shown again, so store it securely. The new key's space is always the caller's: a `space_id` in the body is rejected, and a caller that has no space cannot mint `role: \"space_admin\"` (the key would inherit no space, so its authority would not stop at the boundary its role names). Use `POST /admin/spaces/{id}/keys` to mint into a specific space. `role` may not exceed the caller's own role (admin > space_admin > member); asking for a higher one returns 403, and `is_platform` is granted only when the caller is itself a platform credential. On a fresh server with zero keys, this runs in bootstrap mode (no auth, minted key is always admin); once any key exists, creation requires an admin or space_admin token.",
         "security": [
           {
             "bearerAuth": []
@@ -11137,7 +11773,7 @@
                     "type": "string",
                     "enum": [
                       "admin",
-                      "tenant_admin",
+                      "space_admin",
                       "member"
                     ]
                   },
@@ -11150,6 +11786,10 @@
                   },
                   "is_platform": {
                     "type": "boolean"
+                  },
+                  "space_id": {
+                    "nullable": true,
+                    "description": "Rejected with 400. The key is always minted into the caller's space; use POST /admin/spaces/{id}/keys to target another space."
                   },
                   "type_permissions": {
                     "type": "object",
@@ -11225,7 +11865,7 @@
                       "type": "string",
                       "enum": [
                         "admin",
-                        "tenant_admin",
+                        "space_admin",
                         "member"
                       ]
                     },
@@ -11283,6 +11923,11 @@
                     "created_at": {
                       "type": "string"
                     },
+                    "expires_at": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Hard lifetime bound. NULL for human-minted keys, which never expire. Runtime credentials are always stamped; a key past this instant is refused exactly like a revoked one."
+                    },
                     "last_used_at": {
                       "type": "string",
                       "nullable": true
@@ -11299,6 +11944,45 @@
                     "type_permissions",
                     "created_at",
                     "last_used_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body carried a `space_id`, or the mint would produce a `space_admin` key with no space",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }
@@ -11342,6 +12026,45 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Caller is not an admin or space_admin, is an OAuth access token, or requested a role above its own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       },
@@ -11351,7 +12074,7 @@
           "Keys"
         ],
         "summary": "List API keys",
-        "description": "Returns every API key in the caller's tenant without plaintext, which is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Admin or tenant_admin only.",
+        "description": "Returns every API key in the caller's space without plaintext, which is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Admin or space_admin only.",
         "security": [
           {
             "bearerAuth": []
@@ -11436,6 +12159,11 @@
                           "created_at": {
                             "type": "string"
                           },
+                          "expires_at": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Hard lifetime bound. NULL for human-minted keys, which never expire. Runtime credentials are always stamped; a key past this instant is refused exactly like a revoked one."
+                          },
                           "last_used_at": {
                             "type": "string",
                             "nullable": true
@@ -11511,7 +12239,7 @@
           "Keys"
         ],
         "summary": "Revoke an API key",
-        "description": "Revokes the key immediately; the next request bearing it returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. Admin or tenant_admin only.",
+        "description": "Revokes the key immediately; the next request bearing it returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. Admin or space_admin only.",
         "security": [
           {
             "bearerAuth": []
@@ -11598,7 +12326,7 @@
           "Keys"
         ],
         "summary": "Update an API key",
-        "description": "Updates a key's label, default tier, or permission maps in place. `source` and `role` are immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change them. Admin or tenant_admin only.",
+        "description": "Updates a key's label, default tier, or permission maps in place. `source` and `role` are immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change them. Admin or space_admin only.",
         "security": [
           {
             "bearerAuth": []
@@ -11706,7 +12434,7 @@
                       "type": "string",
                       "enum": [
                         "admin",
-                        "tenant_admin",
+                        "space_admin",
                         "member"
                       ]
                     },
@@ -11763,6 +12491,11 @@
                     },
                     "created_at": {
                       "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Hard lifetime bound. NULL for human-minted keys, which never expire. Runtime credentials are always stamped; a key past this instant is refused exactly like a revoked one."
                     },
                     "last_used_at": {
                       "type": "string",
@@ -11951,7 +12684,7 @@
           "Credentials"
         ],
         "summary": "Create an OAuth provider credential",
-        "description": "Creates a `system.credential` of `kind: oauth_token` holding an upstream service's OAuth client config, with the client secret encrypted at rest. The returned credential id is passed as `credential_ref` on subsequent `POST /connections/install` calls; the credential is tenant-scoped and cannot be reused across tenants.",
+        "description": "Creates a `system.credential` of `kind: oauth_token` holding an upstream service's OAuth client config, with the client secret encrypted at rest. The returned credential id is passed as `credential_ref` on subsequent `POST /connections/install` calls; the credential is space-scoped and cannot be reused across spaces.",
         "security": [
           {
             "bearerAuth": []
@@ -12116,7 +12849,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or tenant_admin.",
+            "description": "Caller is not an admin or space_admin.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12164,7 +12897,7 @@
           "Credentials"
         ],
         "summary": "Create a static API-token credential",
-        "description": "Creates a tenant-scoped `system.credential` of `kind: api_token` holding an upstream's base URL plus a static bearer token (encrypted at rest), for integrations that use a static token rather than OAuth. There is no refresh primitive — when the upstream rejects the token, the proxy surfaces the 401 and emits an `action_required` activity prompting reinstall with a fresh token.",
+        "description": "Creates a space-scoped `system.credential` of `kind: api_token` holding an upstream's base URL plus a static bearer token (encrypted at rest), for integrations that use a static token rather than OAuth. There is no refresh primitive — when the upstream rejects the token, the proxy surfaces the 401 and emits an `action_required` activity prompting reinstall with a fresh token.",
         "security": [
           {
             "bearerAuth": []
@@ -12308,7 +13041,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or tenant_admin.",
+            "description": "Caller is not an admin or space_admin.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12920,14 +13653,14 @@
         }
       }
     },
-    "/tenants/me/config": {
+    "/spaces/me/config": {
       "get": {
-        "operationId": "getTenantConfig",
+        "operationId": "getSpaceConfig",
         "tags": [
-          "Tenants"
+          "Spaces"
         ],
-        "summary": "Get the current tenant's configuration",
-        "description": "Returns the calling tenant's configuration — the optional `enforcement` levers plus the per-tenant cleanup-job retention overrides. Returns an empty object when nothing is configured. Admin or tenant_admin.",
+        "summary": "Get the current space's configuration",
+        "description": "Returns the calling space's configuration — the optional `enforcement` levers plus the per-space cleanup-job retention overrides. Returns an empty object when nothing is configured. Admin or space_admin.",
         "security": [
           {
             "bearerAuth": []
@@ -12935,7 +13668,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Tenant config",
+            "description": "Space config",
             "content": {
               "application/json": {
                 "schema": {
@@ -13100,12 +13833,12 @@
         }
       },
       "put": {
-        "operationId": "replaceTenantConfig",
+        "operationId": "replaceSpaceConfig",
         "tags": [
-          "Tenants"
+          "Spaces"
         ],
-        "summary": "Replace the current tenant's configuration",
-        "description": "Overwrites the tenant's config with the supplied object — full replacement, not a merge. Cleanup-job retention overrides must be non-negative, where `0` disables the corresponding job for this tenant. Admin or tenant_admin.",
+        "summary": "Replace the current space's configuration",
+        "description": "Overwrites the space's config with the supplied object — full replacement, not a merge. Cleanup-job retention overrides must be non-negative, where `0` disables the corresponding job for this space. Admin or space_admin.",
         "security": [
           {
             "bearerAuth": []
@@ -13197,7 +13930,7 @@
         },
         "responses": {
           "200": {
-            "description": "Tenant config updated",
+            "description": "Space config updated",
             "content": {
               "application/json": {
                 "schema": {
@@ -13402,14 +14135,14 @@
         }
       }
     },
-    "/tenants/me/quotas": {
+    "/spaces/me/quotas": {
       "get": {
         "operationId": "getOwnQuotas",
         "tags": [
-          "Tenants"
+          "Spaces"
         ],
-        "summary": "Get current tenant quotas",
-        "description": "Returns the calling tenant's quota ceilings, resolved from the credential so the caller doesn't need to know its own tenant id. A platform-admin key with no tenant id receives `400` — use `GET /tenants/{id}/quotas` with an explicit id instead. Admin or tenant_admin.",
+        "summary": "Get current space quotas",
+        "description": "Returns the calling space's quota ceilings, resolved from the credential so the caller doesn't need to know its own space id. A platform-admin key with no space id receives `400` — use `GET /spaces/{id}/quotas` with an explicit id instead. Admin or space_admin.",
         "security": [
           {
             "bearerAuth": []
@@ -13417,13 +14150,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Quota row for the calling tenant.",
+            "description": "Quota row for the calling space.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "tenant_id": {
+                    "space_id": {
                       "type": "string"
                     },
                     "items_limit": {
@@ -13452,7 +14185,7 @@
                     }
                   },
                   "required": [
-                    "tenant_id",
+                    "space_id",
                     "items_limit",
                     "webhooks_limit",
                     "blobs_limit",
@@ -13465,7 +14198,7 @@
             }
           },
           "400": {
-            "description": "Caller has no tenant_id (platform admin).",
+            "description": "Caller has no space_id (platform admin).",
             "content": {
               "application/json": {
                 "schema": {
@@ -13586,12 +14319,12 @@
     },
     "/export": {
       "get": {
-        "operationId": "exportTenantData",
+        "operationId": "exportSpaceData",
         "tags": [
           "Export"
         ],
-        "summary": "Export tenant data",
-        "description": "Streams the tenant's items, edges, metadata, extensions, and blob references as NDJSON (default) or, with `format=archive`, a `marfa-archive-v1.tar.gz` that `POST /admin/restore-archive` can ingest. Tenant-scoped, exporting only what the caller can read; the response streams until the filter is exhausted.",
+        "summary": "Export space data",
+        "description": "Streams the space's items, edges, metadata, extensions, and blob references as NDJSON (default) or, with `format=archive`, a `marfa-archive-v1.tar.gz` that `POST /admin/restore-archive` can ingest. Space-scoped, exporting only what the caller can read; the response streams until the filter is exhausted.",
         "security": [
           {
             "bearerAuth": []
@@ -13661,11 +14394,11 @@
           {
             "schema": {
               "type": "string",
-              "description": "Platform admins scope the export to a specific tenant"
+              "description": "Platform admins scope the export to a specific space"
             },
             "required": false,
-            "description": "Platform admins scope the export to a specific tenant",
-            "name": "target_tenant_id",
+            "description": "Platform admins scope the export to a specific space",
+            "name": "target_space_id",
             "in": "query"
           }
         ],
@@ -13821,7 +14554,7 @@
                     "id": {
                       "type": "string"
                     },
-                    "tenant_id": {
+                    "space_id": {
                       "type": "string"
                     },
                     "connection_id": {
@@ -14078,7 +14811,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "tenant_id": {
+                          "space_id": {
                             "type": "string"
                           },
                           "connection_id": {
@@ -14753,7 +15486,7 @@
                     "connection_id": {
                       "type": "string"
                     },
-                    "tenant_id": {
+                    "space_id": {
                       "type": "string",
                       "nullable": true
                     },
@@ -14783,7 +15516,7 @@
                   "required": [
                     "id",
                     "connection_id",
-                    "tenant_id",
+                    "space_id",
                     "capability_id",
                     "scopes",
                     "expires_at",
@@ -15037,7 +15770,7 @@
                           "connection_id": {
                             "type": "string"
                           },
-                          "tenant_id": {
+                          "space_id": {
                             "type": "string",
                             "nullable": true
                           },
@@ -15064,7 +15797,7 @@
                         "required": [
                           "id",
                           "connection_id",
-                          "tenant_id",
+                          "space_id",
                           "capability_id",
                           "scopes",
                           "expires_at",
@@ -15615,7 +16348,7 @@
           "Connections"
         ],
         "summary": "Preview event dispatch envelopes",
-        "description": "Renders the dispatch envelopes the reactive-run bridge would emit for a synthetic item-event, without dispatching anything. Returns one entry per subscribing connection in the caller's tenant, each flagged with whether it would dispatch and why not when skipped.",
+        "description": "Renders the dispatch envelopes the reactive-run bridge would emit for a synthetic item-event, without dispatching anything. Returns one entry per subscribing connection in the caller's space, each flagged with whether it would dispatch and why not when skipped.",
         "security": [
           {
             "bearerAuth": []
@@ -15669,7 +16402,7 @@
         },
         "responses": {
           "200": {
-            "description": "One entry per subscriber the operator asked about, plus the tenant's hop budget.",
+            "description": "One entry per subscriber the operator asked about, plus the space's hop budget.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15694,7 +16427,7 @@
                             "enum": [
                               "ok",
                               "self_event",
-                              "cross_tenant",
+                              "cross_space",
                               "hop_budget_exceeded",
                               "subscription_inactive"
                             ]
@@ -15714,7 +16447,7 @@
                               "connection_id": {
                                 "type": "string"
                               },
-                              "tenant_id": {
+                              "space_id": {
                                 "type": "string"
                               },
                               "event_type": {
@@ -15868,7 +16601,7 @@
             }
           },
           "403": {
-            "description": "Caller is not a tenant admin or platform admin.",
+            "description": "Caller is not a space admin or platform admin.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15907,7 +16640,7 @@
             }
           },
           "404": {
-            "description": "`item_id` does not resolve in the caller's tenant scope, or the filtered `connection_id` does not exist.",
+            "description": "`item_id` does not resolve in the caller's space scope, or the filtered `connection_id` does not exist.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15920,6 +16653,454 @@
                           "type": "string",
                           "enum": [
                             "item_not_found",
+                            "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{id}/pause": {
+      "post": {
+        "operationId": "pauseConnection",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Pause an integration connection",
+        "description": "Stops a connection without tearing it down: sets `runtime_status` to `paused` and disarms its schedule, so scheduled runs and item-event dispatches both stop. Credentials and the upstream OAuth grant are left intact, so `resume` restores it without a fresh consent round trip. Pausing an already-paused connection returns 400.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Id of the connection to uninstall."
+            },
+            "required": true,
+            "description": "Id of the connection to uninstall.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime status updated and the schedule changed to match.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "runtime_status": {
+                      "type": "string",
+                      "enum": [
+                        "paused",
+                        "healthy"
+                      ]
+                    },
+                    "schedule_changed": {
+                      "type": "boolean",
+                      "description": "Whether a schedule alarm actually changed state. False when there was nothing to change — a deployment with no runtime control plane, or an integration that deploys no Worker — and false on a failed call; check `schedule_error` to tell those apart."
+                    },
+                    "schedule_error": {
+                      "type": "string",
+                      "description": "Present only when the schedule call ran and failed. The status write still happened, so the connection reads as paused with its alarm possibly still armed. Retry."
+                    },
+                    "activity_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "runtime_status",
+                    "schedule_changed",
+                    "activity_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Connection is not an integration, is revoked, or is already in the requested state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{id}/resume": {
+      "post": {
+        "operationId": "resumeConnection",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Resume a paused integration connection",
+        "description": "Reverses `pause`: sets `runtime_status` back to `healthy` and re-arms the schedule. Resuming a connection that is not paused returns 400, and a revoked connection cannot be resumed — that is what reinstalling is for.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Id of the connection to uninstall."
+            },
+            "required": true,
+            "description": "Id of the connection to uninstall.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Runtime status updated and the schedule changed to match.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "runtime_status": {
+                      "type": "string",
+                      "enum": [
+                        "paused",
+                        "healthy"
+                      ]
+                    },
+                    "schedule_changed": {
+                      "type": "boolean",
+                      "description": "Whether a schedule alarm actually changed state. False when there was nothing to change — a deployment with no runtime control plane, or an integration that deploys no Worker — and false on a failed call; check `schedule_error` to tell those apart."
+                    },
+                    "schedule_error": {
+                      "type": "string",
+                      "description": "Present only when the schedule call ran and failed. The status write still happened, so the connection reads as paused with its alarm possibly still armed. Retry."
+                    },
+                    "activity_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "runtime_status",
+                    "schedule_changed",
+                    "activity_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Connection is not an integration, is revoked, or is already in the requested state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
                             "connection_not_found"
                           ]
                         },
@@ -16002,6 +17183,14 @@
                       "type": "integer",
                       "minimum": 0
                     },
+                    "schedules_disarmed": {
+                      "type": "boolean",
+                      "description": "Whether a schedule alarm was actually cancelled for this connection. False when there was nothing to cancel — a deployment with no runtime control plane, or an integration that deploys no Worker — and false on a failed disarm; check `schedule_disarm_error` to tell those apart."
+                    },
+                    "schedule_disarm_error": {
+                      "type": "string",
+                      "description": "Why the schedule disarm failed, when one was attempted. The uninstall still completed; re-run the disarm to clear the residual alarm."
+                    },
                     "activity_id": {
                       "type": "string"
                     }
@@ -16012,6 +17201,7 @@
                     "oauth_tokens_deleted",
                     "leased_tokens_revoked",
                     "inbound_webhooks_disabled",
+                    "schedules_disarmed",
                     "activity_id"
                   ]
                 }
@@ -16136,7 +17326,7 @@
             }
           },
           "404": {
-            "description": "Connection not found in this tenant scope.",
+            "description": "Connection not found in this space scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16625,7 +17815,7 @@
           "Webhooks"
         ],
         "summary": "List webhooks",
-        "description": "Returns every outbound webhook subscription in the caller's tenant. Secrets are redacted here — the plaintext is only returned at create time.",
+        "description": "Returns every outbound webhook subscription in the caller's space. Secrets are redacted here — the plaintext is only returned at create time.",
         "security": [
           {
             "bearerAuth": []
@@ -17424,7 +18614,7 @@
           "Audit"
         ],
         "summary": "List audit log entries",
-        "description": "Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads — item/edge reads, SSE, and search are not logged.",
+        "description": "Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads — item/edge reads, SSE, and search are not logged. Admin or space_admin: a space-scoped caller sees only its own space's entries, a platform admin sees every entry.",
         "security": [
           {
             "bearerAuth": []
@@ -17528,7 +18718,7 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "tenant_id": {
+                          "space_id": {
                             "type": "string",
                             "nullable": true
                           },
@@ -17557,7 +18747,7 @@
                           "id",
                           "timestamp",
                           "key_id",
-                          "tenant_id",
+                          "space_id",
                           "action",
                           "resource_type",
                           "resource_id",
@@ -17621,6 +18811,598 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Caller is not an admin or space_admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/spaces": {
+      "post": {
+        "operationId": "adminCreateSpace",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Create a space",
+        "description": "Creates an empty space and returns it. Platform-admin only. Pair with `POST /admin/spaces/{id}/keys` to issue a credential scoped to it.\n\nEvery other operator verb on a space already existed, so before this a space could only come into being through a hosted sign-up. That left an operator unable to provision a space for someone, and left anything that needs a space-scoped credential — a conformance suite, a test harness, a self-hoster seeding an instance — with no supported path to one.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "Human-readable label. Optional; the space is identified by its id."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Space created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "suspended"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "created_at",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance is not multi-space",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/spaces/{id}/keys": {
+      "post": {
+        "operationId": "adminCreateSpaceKey",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Create a space-bound API key",
+        "description": "Creates an API key bound to the specified space. Platform-admin only. The plaintext key is returned only in this response.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Space id."
+            },
+            "required": true,
+            "description": "Space id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "space_admin",
+                      "member"
+                    ]
+                  },
+                  "default_tier": {
+                    "type": "string",
+                    "enum": [
+                      "library",
+                      "feed"
+                    ]
+                  },
+                  "type_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "none"
+                      ]
+                    }
+                  },
+                  "extension_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
+                  },
+                  "edge_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
+                  },
+                  "metadata_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "label",
+                  "source"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Space-bound API key created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "space_admin",
+                        "member"
+                      ]
+                    },
+                    "default_tier": {
+                      "type": "string",
+                      "enum": [
+                        "library",
+                        "feed"
+                      ]
+                    },
+                    "is_platform": {
+                      "type": "boolean"
+                    },
+                    "type_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write",
+                          "none"
+                        ]
+                      }
+                    },
+                    "extension_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
+                    "edge_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
+                    "metadata_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "last_used_at": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "key",
+                    "label",
+                    "source",
+                    "role",
+                    "default_tier",
+                    "is_platform",
+                    "type_permissions",
+                    "created_at",
+                    "last_used_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Space not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -17632,7 +19414,7 @@
           "Events"
         ],
         "summary": "Stream change events",
-        "description": "Opens a Server-Sent Events stream of item and edge changes for the caller's tenant. Send `Last-Event-ID` to replay events missed across a reconnect.",
+        "description": "Opens a Server-Sent Events stream of item and edge changes for the caller's space. Send `Last-Event-ID` to replay events missed across a reconnect.",
         "security": [
           {
             "bearerAuth": []
@@ -17770,6 +19552,444 @@
           }
         }
       }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get the current user",
+        "description": "Returns the user record and the space the calling API key belongs to. Use to render account state (handle, name, space id) once a session is established. For the richer profile shape (avatar, bio), use `GET /profile/me`. See [Profile](/guides/identity/profile).\n\n**Auth mode:** served only by deployments running `AUTH_MODE=hosted`. Instances in any other auth mode do not expose this endpoint.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile and space info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "first_name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "last_name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "bio": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "avatar_blob_hash": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "provider": {
+                          "type": "string"
+                        },
+                        "provider_id": {
+                          "type": "string"
+                        },
+                        "space_id": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "auth_user_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "first_name",
+                        "last_name",
+                        "bio",
+                        "avatar_blob_hash",
+                        "provider",
+                        "provider_id",
+                        "space_id",
+                        "handle",
+                        "auth_user_id",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    },
+                    "space": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "created_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "created_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "user",
+                    "space"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Space not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-marfa-auth-modes": [
+          "hosted"
+        ]
+      }
+    },
+    "/auth/me/handle": {
+      "put": {
+        "operationId": "setUserHandle",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update the current user's handle",
+        "description": "Claims or changes the handle on the authenticated user. The handle is the user's public identifier — the same string that namespaces published types as `<handle>.<type>`. Lowercase alphanumeric and hyphens, 3–32 characters, no leading/trailing hyphens, no consecutive hyphens.\n\nReserved roots (`core`, `system`, `app`, `user`, `marfa`) and a list of structural words (`admin`, `api`, etc.) are rejected with `400 handle_reserved`. Case-insensitive collision with another user returns `409 conflict`. See [Handles and publishers](/guides/identity/handles-and-publishers).\n\n**Auth mode:** served only by deployments running `AUTH_MODE=hosted`. Instances in any other auth mode do not expose this endpoint.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "handle"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Handle claimed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "first_name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "last_name": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "bio": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "avatar_blob_hash": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "provider": {
+                          "type": "string"
+                        },
+                        "provider_id": {
+                          "type": "string"
+                        },
+                        "space_id": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "auth_user_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "first_name",
+                        "last_name",
+                        "bio",
+                        "avatar_blob_hash",
+                        "provider",
+                        "provider_id",
+                        "space_id",
+                        "handle",
+                        "auth_user_id",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid handle format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error",
+                            "missing_required_field",
+                            "handle_reserved"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handle already claimed by another user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-marfa-auth-modes": [
+          "hosted"
+        ]
+      }
     }
   },
   "tags": [
@@ -17779,7 +19999,7 @@
     },
     {
       "name": "Metadata",
-      "description": "An item's metadata document and the tenant's tag vocabulary."
+      "description": "An item's metadata document and the space's tag vocabulary."
     },
     {
       "name": "Edges",
@@ -17814,8 +20034,8 @@
       "description": "The calling user's profile."
     },
     {
-      "name": "Tenants",
-      "description": "Configuration and quotas for the calling tenant."
+      "name": "Spaces",
+      "description": "Configuration and quotas for the calling space."
     },
     {
       "name": "Connections",
@@ -17843,11 +20063,11 @@
     },
     {
       "name": "Export",
-      "description": "Bulk export of a tenant's data."
+      "description": "Bulk export of a space's data."
     },
     {
       "name": "Audit",
-      "description": "The tenant's audit log."
+      "description": "The space's audit log."
     },
     {
       "name": "Events",
@@ -17855,7 +20075,7 @@
     },
     {
       "name": "Auth",
-      "description": "OAuth dynamic client registration."
+      "description": "The signed-in user's account and OAuth dynamic client registration."
     }
   ]
 }

@@ -1,16 +1,16 @@
 import Foundation
 
-/// Tenant-level configuration. Carries the three optional
+/// Space-level configuration. Carries the three optional
 /// schema-enforcement levers under ``enforcement`` plus the optional
-/// per-tenant cleanup-job overrides that take precedence over the
+/// per-space cleanup-job overrides that take precedence over the
 /// instance env defaults.
 ///
 /// PUT semantics are full-replacement: send the entire shape you want
 /// persisted. An empty payload (`{}`) clears every override and reverts
 /// to env defaults. The same shape is returned by `GET` and written by
 /// `PUT`.
-public struct TenantConfig: Codable, Sendable, Hashable {
-    /// Schema-enforcement levers. See ``TenantConfig/Enforcement``.
+public struct SpaceConfig: Codable, Sendable, Hashable {
+    /// Schema-enforcement levers. See ``SpaceConfig/Enforcement``.
     public var enforcement: Enforcement?
 
     /// Override for the audit-log retention window. `nil` falls back to

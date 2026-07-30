@@ -13,7 +13,7 @@ public struct AuditEntry: Codable, Sendable, Identifiable {
     public let keyId: String?
     public let resourceId: String?
     public let resourceType: String
-    public let tenantId: String?
+    public let spaceId: String?
     public let timestamp: String
 
     public init(
@@ -24,7 +24,7 @@ public struct AuditEntry: Codable, Sendable, Identifiable {
         keyId: String? = nil,
         resourceId: String? = nil,
         resourceType: String,
-        tenantId: String? = nil,
+        spaceId: String? = nil,
         timestamp: String
     ) {
         self.action = action
@@ -34,7 +34,7 @@ public struct AuditEntry: Codable, Sendable, Identifiable {
         self.keyId = keyId
         self.resourceId = resourceId
         self.resourceType = resourceType
-        self.tenantId = tenantId
+        self.spaceId = spaceId
         self.timestamp = timestamp
     }
 
@@ -46,7 +46,7 @@ public struct AuditEntry: Codable, Sendable, Identifiable {
         case keyId = "key_id"
         case resourceId = "resource_id"
         case resourceType = "resource_type"
-        case tenantId = "tenant_id"
+        case spaceId = "space_id"
         case timestamp
     }
 }

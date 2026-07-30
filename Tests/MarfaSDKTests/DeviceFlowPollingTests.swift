@@ -113,8 +113,8 @@ struct DeviceFlowPollingTests {
     @Test("device-flow tokens are isolated by issuer scheme, port, and path")
     func issuerIdentityIsolatesStoredTokens() async throws {
         let storage = InMemoryKeychain()
-        let issuerA = URL(string: "https://device-flow.example.test:8443/tenant-a")!
-        let issuerB = URL(string: "http://device-flow.example.test:9443/tenant-b")!
+        let issuerA = URL(string: "https://device-flow.example.test:8443/space-a")!
+        let issuerB = URL(string: "http://device-flow.example.test:9443/space-b")!
         let httpA = FakeDeviceFlowHTTPClient()
         let httpB = FakeDeviceFlowHTTPClient()
         let clockA = ManualDeviceFlowClock()

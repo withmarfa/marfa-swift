@@ -1,7 +1,7 @@
 import Foundation
 
 /// Typed wrapper for `system.connection` items — an approved relationship
-/// between this Marfa tenant and an external authority.
+/// between this Marfa space and an external authority.
 ///
 /// ``kind`` discriminates between two variants:
 /// - ``ConnectionKind/app``: an OAuth client this user has authorized
