@@ -48,16 +48,24 @@ struct ClearStoredCredentialsTests {
         // credential under the old key, because the migration that moves it
         // runs on restore.
         let storage = InMemoryKeychain()
-        let legacyKey = OAuthIssuer.legacyTokenStorageKey(
-            issuer: issuer, clientId: clientId
+        let legacyTokens = OAuthIssuer.legacyStorageKey(
+            kind: "tokens", issuer: issuer, clientId: clientId
         )
-        try await storage.set("live-token", for: legacyKey)
+        let legacyPending = OAuthIssuer.legacyStorageKey(
+            kind: "pending", issuer: issuer, clientId: clientId
+        )
+        try await storage.set("live-token", for: legacyTokens)
+        try await storage.set("half-finished", for: legacyPending)
 
         try await MarfaAuth.clearStoredCredentials(
             issuer: issuer, clientId: clientId, storage: storage
         )
 
-        #expect(try await storage.get(for: legacyKey) == nil)
+        #expect(try await storage.get(for: legacyTokens) == nil)
+        // The pending account too. Only the token account is migrated on
+        // restore, so a half-finished authorization can still be sitting under
+        // the old spelling when the user signs out.
+        #expect(try await storage.get(for: legacyPending) == nil)
     }
 
     @Test("leaves another account's credential alone")
