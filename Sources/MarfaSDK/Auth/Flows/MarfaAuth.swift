@@ -221,7 +221,12 @@ public final class MarfaAuth {
         for key in [
             OAuthIssuer.storageKey(kind: "tokens", issuer: canonical, clientId: clientId),
             OAuthIssuer.storageKey(kind: "pending", issuer: canonical, clientId: clientId),
-            OAuthIssuer.legacyTokenStorageKey(issuer: canonical, clientId: clientId),
+            OAuthIssuer.legacyStorageKey(
+                kind: "tokens", issuer: canonical, clientId: clientId
+            ),
+            OAuthIssuer.legacyStorageKey(
+                kind: "pending", issuer: canonical, clientId: clientId
+            ),
         ] {
             try await storage.delete(for: key)
         }

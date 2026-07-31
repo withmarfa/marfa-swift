@@ -5,6 +5,12 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [12.1.1] — 2026-07-31
+
+### Fixed
+
+- `MarfaAuth.clearStoredCredentials` now clears the pre-11.4.0 **pending** account as well as the token one. Only the token account is migrated on restore, so a half-finished authorization can still be sitting under the old spelling when the user signs out — state they asked to be rid of, left behind.
+
 ## [12.1.0] — 2026-07-31
 
 ### Added

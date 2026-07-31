@@ -96,7 +96,21 @@ enum OAuthIssuer {
         issuer: URL,
         clientId: String
     ) -> String {
-        "marfa.auth.tokens:\(issuer.host ?? issuer.absoluteString):\(clientId)"
+        legacyStorageKey(kind: "tokens", issuer: issuer, clientId: clientId)
+    }
+
+    /// The pre-11.4.0 spelling: host-only, no length prefix, no version.
+    ///
+    /// Only the token account is migrated on restore, because that is the one
+    /// carrying a credential. Clearing a session has to reach the others too —
+    /// a half-finished authorization left behind under the old spelling is
+    /// state the user asked to be rid of.
+    static func legacyStorageKey(
+        kind: String,
+        issuer: URL,
+        clientId: String
+    ) -> String {
+        "marfa.auth.\(kind):\(issuer.host ?? issuer.absoluteString):\(clientId)"
     }
 
     /// Promotes the old host-only token account only for an unambiguous issuer.
