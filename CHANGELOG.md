@@ -5,6 +5,12 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [12.1.2] — 2026-07-31
+
+### Fixed
+
+- **Two metadata rows for one item crashed the readers that index them.** `MarfaMetadataModel` is indexed on `itemId` but carries no `#Unique`, because CloudKit mirroring forbids one, and writes are serialised only within a single `LocalStore` — so two devices setting metadata on the same item leave two rows. `fetchItemsWithMetadata` and `ItemsWithMetadataQuery` both built an `itemId`-keyed dictionary with `uniqueKeysWithValues`, which traps on the duplicate. Local search was fixed in 12.1.0; these two were the same defect and were missed. Last write wins, matching what a later fetch would have returned.
+
 ## [12.1.1] — 2026-07-31
 
 ### Fixed
