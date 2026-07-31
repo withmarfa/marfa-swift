@@ -47,9 +47,15 @@ public enum DeviceFlow {
         httpClient: any DeviceFlowHTTPClient = URLSession.shared,
         clock: any DeviceFlowClock = SystemDeviceFlowClock()
     ) async throws -> DeviceFlowHandle {
-        let normalized = try OAuthIssuer.canonicalURL(issuer)
+        // Validated, not substituted. Discovery compares the published
+        // `issuer` against what the caller asked for, so handing it the
+        // canonical form made a server whose identifier legitimately ends in a
+        // slash impossible to reach: the slash had already been dropped, and
+        // the document could never match. Canonicalization is for storage
+        // keys, further down.
+        let canonicalIssuer = try OAuthIssuer.canonicalURL(issuer)
         let endpoints = try await OAuthDiscovery.shared.endpoints(
-            for: normalized,
+            for: issuer,
             httpClient: httpClient
         )
         var request = URLRequest(url: endpoints.deviceAuthorize)
@@ -71,12 +77,22 @@ public enum DeviceFlow {
         }
 
         let envelope = try JSONDecoder().decode(DeviceCodeResponse.self, from: data)
+        // Force-unwrapping a server-supplied string would crash the app on a
+        // malformed response, which is a server's mistake to make and not a
+        // reason to trap. The safe form is already used one line below for the
+        // optional sibling.
+        guard let verificationURI = URL(string: envelope.verificationURI) else {
+            throw DeviceFlowError(
+                rawCode: "invalid_response",
+                message: "verification_uri is not a URL: \(envelope.verificationURI)"
+            )
+        }
         return DeviceFlowHandle(
-            issuer: normalized,
+            issuer: canonicalIssuer,
             clientId: clientId,
             deviceCode: envelope.deviceCode,
             userCode: envelope.userCode,
-            verificationURI: URL(string: envelope.verificationURI)!,
+            verificationURI: verificationURI,
             verificationURIComplete: envelope.verificationURIComplete.flatMap(URL.init(string:)),
             expiresAt: clock.now().addingTimeInterval(TimeInterval(envelope.expiresIn)),
             interval: envelope.interval ?? 5,

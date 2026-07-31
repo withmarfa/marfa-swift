@@ -117,6 +117,14 @@ extension LocalStore {
         let needle = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return [] }
 
+        // Checked here rather than after the work. A non-positive limit means
+        // an empty answer whatever the store holds, and the guard used to sit
+        // past the fetch, the decode, the metadata join and the sort — so
+        // `limit: 0` held the actor for seconds over a large store to return
+        // nothing.
+        let requestedLimit = filters?.limit ?? Self.defaultSearchLimit
+        guard requestedLimit > 0 else { return [] }
+
         try Task.checkCancellation()
         let models = try modelContext.fetch(Self.makeSearchDescriptor(filters: filters))
 
@@ -147,8 +155,17 @@ extension LocalStore {
         let metaModels = try modelContext.fetch(
             FetchDescriptor<MarfaMetadataModel>(predicate: metaPredicate)
         )
+        // `uniqueKeysWithValues` traps on a duplicate key, and a duplicate is
+        // constructible here: `MarfaMetadataModel` carries an index on
+        // `itemId` but deliberately no `#Unique`, because CloudKit mirroring
+        // forbids one, and writes are serialised only within a single
+        // `LocalStore`. Two devices setting metadata on the same item can
+        // therefore leave two rows, and this sits on the search path — so the
+        // crash would land on every keystroke. Last write wins, which matches
+        // what a later fetch would have returned anyway.
         let metadataById = Dictionary(
-            uniqueKeysWithValues: metaModels.map { ($0.itemId, $0) }
+            metaModels.map { ($0.itemId, $0) },
+            uniquingKeysWith: { _, newer in newer }
         )
 
         // `tags` is an AND filter on the server — an item must carry every
@@ -184,9 +201,9 @@ extension LocalStore {
             return lhs.item.id < rhs.item.id
         }
 
-        let limit = filters?.limit ?? Self.defaultSearchLimit
-        guard limit > 0 else { return [] }
-        return results.count > limit ? Array(results.prefix(limit)) : results
+        return results.count > requestedLimit
+            ? Array(results.prefix(requestedLimit))
+            : results
     }
 
     // MARK: - Descriptor

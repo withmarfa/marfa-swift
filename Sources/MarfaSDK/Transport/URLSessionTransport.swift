@@ -261,6 +261,18 @@ final class URLSessionTransport: Transport {
             throw NetworkError(error)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let error as MarfaError {
+            // Same clause `rawRequest` carries, and for the same reason: this
+            // is most often an ``OAuthError`` from re-minting the header after
+            // a 401 found the grant gone. Wrapping it in a NetworkError buries
+            // the code callers branch on, so an upload against a dead session
+            // reads as a connectivity blip and gets retried instead of signing
+            // the user out. The parity suite asserted the recovery and never
+            // the error shape, so the gap survived the commit named for it.
+            logger.log.error(
+                "http.error request_id=\(requestId, privacy: .public) code=\(error.code, privacy: .public)"
+            )
+            throw error
         } catch {
             logger.log.error(
                 "http.error request_id=\(requestId, privacy: .public) reason=\(String(describing: error), privacy: .public)"

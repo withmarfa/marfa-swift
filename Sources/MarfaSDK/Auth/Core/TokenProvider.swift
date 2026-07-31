@@ -150,7 +150,12 @@ public actor StoredTokenProvider: TokenProvider {
     /// The exchange every concurrent caller awaits.
     private var inflightRefresh: Task<Token, Error>?
 
-    private var continuations: [AsyncStream<AuthEvent>.Continuation] = []
+    /// Auth-event subscribers.
+    ///
+    /// Held outside the actor so `authEvents` can register a caller
+    /// synchronously; an actor hop between asking for the stream and being on
+    /// it is a window in which an event is emitted to nobody.
+    private let subscribers = AuthEventSubscribers()
 
     public init(
         storage: any SecureStorage,
@@ -179,21 +184,18 @@ public actor StoredTokenProvider: TokenProvider {
     /// replayed to late subscribers.
     public nonisolated var authEvents: AsyncStream<AuthEvent> {
         AsyncStream<AuthEvent> { continuation in
-            Task { await self.subscribe(continuation) }
+            // Registered synchronously. Deferring this onto a `Task` meant a
+            // caller that asked for the stream and then read a token could
+            // miss the `signedOut` that read produced: the emit ran before the
+            // subscribe landed, and past events are not replayed. An app then
+            // sits showing a signed-in session, syncing nothing, with no route
+            // back — the exact failure a consumer subscribes to avoid.
+            subscribers.register(continuation)
         }
-    }
-
-    private func subscribe(_ continuation: AsyncStream<AuthEvent>.Continuation) {
-        continuations.append(continuation)
     }
 
     private func emit(_ event: AuthEvent) {
-        continuations.removeAll { continuation in
-            switch continuation.yield(event) {
-            case .terminated: return true
-            default: return false
-            }
-        }
+        subscribers.emit(event)
     }
 
     // MARK: - Storage
@@ -300,7 +302,12 @@ public actor StoredTokenProvider: TokenProvider {
         }
         let task = Task<Token, Error> { try await self.performRefresh() }
         inflightRefresh = task
-        defer { inflightRefresh = nil }
+        // Only if the slot still holds *this* task. Clearing it unconditionally
+        // let a caller whose task had already been replaced — by `clear()`
+        // nilling the slot and a later caller installing its own — wipe the
+        // successor's registration on the way out, leaving the caller after
+        // that to start a second exchange against one refresh token.
+        defer { if inflightRefresh == task { inflightRefresh = nil } }
         return try await task.value
     }
 
@@ -324,6 +331,13 @@ public actor StoredTokenProvider: TokenProvider {
         var attempt = 1
         while true {
             let (data, http) = try await exchange(refreshToken: refreshToken)
+
+            // A sign-out landing while this exchange was in flight cancelled
+            // the task. URLSession usually surfaces that as a cancelled
+            // request, but not once the response has already been received, so
+            // without this a late 200 writes the rotated pair back over the
+            // credential `clear()` just deleted.
+            try Task.checkCancellation()
 
             if (200..<300).contains(http.statusCode) {
                 let fresh = try JSONDecoder.iso8601.decode(Token.self, from: data)
@@ -483,4 +497,36 @@ private extension JSONEncoder {
         e.dateEncodingStrategy = .iso8601
         return e
     }()
+}
+
+/// Thread-safe registry of auth-event subscribers.
+///
+/// Exists so registration can be synchronous. `authEvents` builds its
+/// `AsyncStream` on the caller's thread, and hopping to the actor there costs a
+/// scheduling gap: a consumer that takes the stream and immediately reads a
+/// token can have the resulting `signedOut` emitted before it is registered,
+/// and past events are not replayed. The app is then signed out with nothing
+/// listening. A lock rather than an actor for the same reason — an actor would
+/// reintroduce the hop this removes.
+final class AuthEventSubscribers: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuations: [AsyncStream<AuthEvent>.Continuation] = []
+
+    func register(_ continuation: AsyncStream<AuthEvent>.Continuation) {
+        lock.lock()
+        defer { lock.unlock() }
+        continuations.append(continuation)
+    }
+
+    func emit(_ event: AuthEvent) {
+        lock.lock()
+        defer { lock.unlock() }
+        // `yield` buffers or drops per the stream's policy and never blocks on
+        // a consumer, so holding the lock across it costs nothing — and it is
+        // what the actor-isolated version did before this moved out.
+        continuations.removeAll { continuation in
+            if case .terminated = continuation.yield(event) { return true }
+            return false
+        }
+    }
 }

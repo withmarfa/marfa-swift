@@ -57,7 +57,18 @@ import Foundation
 @MainActor
 public final class MarfaAuth {
 
+    /// The issuer as the caller spelled it.
+    ///
+    /// Discovery compares the published `issuer` against this, not against the
+    /// canonical form: an identifier that legitimately ends in a slash is the
+    /// server's to declare, and normalizing before the comparison made every
+    /// such provider unusable — the flow had already dropped the slash, so the
+    /// document could never match. Canonicalization belongs to storage keys,
+    /// where it stops two spellings of one issuer owning separate credentials.
     public let issuer: URL
+
+    /// The canonical form, used for storage keys only.
+    private let canonicalIssuer: URL
     public let clientId: String
     public let redirectURI: URL
     public let scopes: [String]
@@ -75,7 +86,8 @@ public final class MarfaAuth {
         storage: any SecureStorage,
         urlSession: URLSession = .shared
     ) {
-        self.issuer = OAuthIssuer.normalize(issuer)
+        self.issuer = issuer
+        self.canonicalIssuer = OAuthIssuer.normalize(issuer)
         self.clientId = clientId
         self.redirectURI = redirectURI
         self.scopes = scopes
@@ -83,12 +95,12 @@ public final class MarfaAuth {
         self.urlSession = urlSession
         self.pendingKey = OAuthIssuer.storageKey(
             kind: "pending",
-            issuer: self.issuer,
+            issuer: self.canonicalIssuer,
             clientId: clientId
         )
         self.tokensKey = OAuthIssuer.storageKey(
             kind: "tokens",
-            issuer: self.issuer,
+            issuer: self.canonicalIssuer,
             clientId: clientId
         )
     }
@@ -181,6 +193,40 @@ public final class MarfaAuth {
     /// the persisted bundle. The provider is unusable after this call;
     /// callers should drop their reference and rebuild the client when
     /// the user signs in again.
+    /// Remove every credential this SDK stores for one issuer and client,
+    /// without needing a token provider.
+    ///
+    /// The path taken when discovery is unreachable, so ``restore()`` cannot
+    /// build a provider and ``signOut(_:)`` has nothing to act on — and the
+    /// only correct way for a consumer to clear that state.
+    ///
+    /// It exists because the alternative is a consumer rebuilding the storage
+    /// key by hand. `OAuthIssuer` is internal, so a hand-built key can only be
+    /// the spelling that happened to be right when it was written, and this
+    /// SDK has changed that spelling: `marfa.auth.tokens.v2:<len>:<issuer>:` —
+    /// with a length prefix, so no two issuers can produce one key — replaced
+    /// `marfa.auth.tokens:<host>:`. An app still deleting the old one deletes
+    /// a row the SDK's own migration has already emptied, reports success, and
+    /// leaves a working credential on a device the user believes is signed
+    /// out. Nothing fails, which is what makes it worth a supported call.
+    ///
+    /// Clears the legacy spelling too, so an install that never restored a
+    /// session after upgrading is covered as well.
+    public static func clearStoredCredentials(
+        issuer: URL,
+        clientId: String,
+        storage: any SecureStorage
+    ) async throws {
+        let canonical = OAuthIssuer.normalize(issuer)
+        for key in [
+            OAuthIssuer.storageKey(kind: "tokens", issuer: canonical, clientId: clientId),
+            OAuthIssuer.storageKey(kind: "pending", issuer: canonical, clientId: clientId),
+            OAuthIssuer.legacyTokenStorageKey(issuer: canonical, clientId: clientId),
+        ] {
+            try await storage.delete(for: key)
+        }
+    }
+
     public func signOut(_ provider: TokenProvider) async throws {
         if let stored = provider as? StoredTokenProvider {
             do {
