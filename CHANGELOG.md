@@ -5,6 +5,23 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [12.1.0] — 2026-07-31
+
+### Added
+
+- `MarfaAuth.clearStoredCredentials(issuer:clientId:storage:)` — removes every credential the SDK stores for an issuer and client without needing a token provider, which is the path taken when discovery is unreachable. It exists because the alternative is a consumer rebuilding the storage key by hand: `OAuthIssuer` is internal, the key spelling changed in 11.4.0, and an app still deleting the old one deletes a row the SDK's own migration has already emptied. Nothing fails, and a working credential is left on a device the user believes is signed out. The legacy spelling is cleared too.
+
+### Fixed
+
+- **A sign-out landing during a token refresh could be undone.** `performRefresh` had no cancellation check before it stored, so a 200 arriving after `clear()` wrote the rotated pair back over the credential that had just been deleted, and the next launch came up signed in.
+- **The single-flight slot was cleared unconditionally.** A caller whose task had already been replaced wiped its successor's registration on the way out, leaving the next caller to start a second exchange against one refresh token — the reuse the single flight exists to prevent.
+- **Auth-event subscribers now register synchronously.** Registration was deferred onto a `Task`, so an event emitted in that gap reached nobody and past events are not replayed. A consumer that took the stream and then read a token could miss the `signedOut` that read produced and sit signed-in with nothing listening.
+- **An issuer identifier ending in a slash is usable again.** Both flows canonicalized before calling discovery, and discovery compares the published `issuer` against what the caller asked for — so the slash had been dropped and the document could never match, failing sign-in, restore, revoke and the device flow alike. Canonicalization now applies to storage keys only, which is what it was for.
+- **`rawUpload` surfaces auth failures as auth failures.** It lacked the clause `rawRequest` carries, so an `OAuthError` from re-minting the header after a 401 was wrapped in a `NetworkError` — an upload against a dead session read as a connectivity blip and was retried instead of signing the user out.
+- **Local search no longer traps on duplicate metadata.** `Dictionary(uniqueKeysWithValues:)` over a table that deliberately carries no `#Unique`, because CloudKit forbids one, crashed on every keystroke once two devices had written metadata for one item concurrently.
+- **`Retry-After` is no longer sticky.** One 429 made every later retry on that client sleep at least that long for the rest of its life, including retries that had nothing to do with the rate limit.
+- **The device flow no longer force-unwraps a server-supplied `verification_uri`**, and local search checks its limit before doing the work rather than after.
+
 ## [12.0.0] — 2026-07-30
 
 ### Upgrade note

@@ -32,9 +32,12 @@ public actor RateLimitState {
                 reset = now.addingTimeInterval(resetValue)
             }
         }
-        if let retryAfter = Self.headerDouble(headers, key: "Retry-After") {
-            lastRetryAfter = retryAfter
-        }
+        // Cleared when a response carries no `Retry-After`, not left standing.
+        // It was only ever assigned, so one 429 with `Retry-After: 60` made
+        // every later retry on that client sleep at least a minute for the
+        // rest of its life — including the retry that follows a corrected
+        // credential, which has nothing to do with the rate limit that set it.
+        lastRetryAfter = Self.headerDouble(headers, key: "Retry-After")
     }
 
     /// Clears all state. Useful for tests and manual resets.

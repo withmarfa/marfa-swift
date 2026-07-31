@@ -132,20 +132,21 @@ private func oauthErrorBody(_ code: String) -> Data {
     Data(#"{"error":"\#(code)","error_description":"nope"}"#.utf8)
 }
 
-/// Collects auth events, giving the actor-hop subscription time to register
-/// before the caller triggers whatever should emit.
+/// Collects auth events.
+///
+/// No sleep. `authEvents` registers the subscriber synchronously, so taking
+/// the stream is enough — the pause here used to exist because registration
+/// was deferred onto a `Task`, which is the very window that lost a
+/// `signedOut` to a caller who subscribed and then read a token.
 private func collectingAuthEvents(
     _ provider: StoredTokenProvider
 ) async -> Task<[AuthEvent], Never> {
     let stream = provider.authEvents
-    let collector = Task { () -> [AuthEvent] in
+    return Task { () -> [AuthEvent] in
         var seen: [AuthEvent] = []
         for await event in stream { seen.append(event) }
         return seen
     }
-    // Let the `Task { await subscribe(...) }` inside `authEvents` land.
-    try? await Task.sleep(for: .milliseconds(50))
-    return collector
 }
 
 @Suite("OAuth refresh: single-flight, terminal latch, and backoff", .serialized, .timeLimit(.minutes(1)))
