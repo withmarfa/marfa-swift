@@ -58,7 +58,15 @@ public final class ItemsWithMetadataQuery {
                 let metaPredicate = #Predicate<MarfaMetadataModel> { ids.contains($0.itemId) }
                 let metaDescriptor = FetchDescriptor<MarfaMetadataModel>(predicate: metaPredicate)
                 let metaModels = try context.fetch(metaDescriptor)
-                metadataById = Dictionary(uniqueKeysWithValues: metaModels.map { ($0.itemId, $0) })
+                // Duplicate `itemId` rows are constructible: the model is
+                // indexed on it but carries no `#Unique`, which CloudKit
+                // mirroring forbids, and two devices setting metadata on the
+                // same item leave two rows. `uniqueKeysWithValues` would trap.
+                // Last write wins, matching what a later fetch returns anyway.
+                metadataById = Dictionary(
+                    metaModels.map { ($0.itemId, $0) },
+                    uniquingKeysWith: { _, newer in newer }
+                )
             }
             self.items = itemModels.map { model in
                 let item = model.toWireItem()

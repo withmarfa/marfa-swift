@@ -130,8 +130,14 @@ public actor LocalStore {
         let metaPredicate = #Predicate<MarfaMetadataModel> { ids.contains($0.itemId) }
         let metaDescriptor = FetchDescriptor<MarfaMetadataModel>(predicate: metaPredicate)
         let metaModels = try modelContext.fetch(metaDescriptor)
+        // Duplicate `itemId` rows are constructible: the model is indexed on
+        // it but carries no `#Unique`, which CloudKit mirroring forbids, and
+        // two devices setting metadata on the same item leave two rows.
+        // `uniqueKeysWithValues` would trap. Last write wins, matching what a
+        // later fetch returns anyway.
         let metadataById = Dictionary(
-            uniqueKeysWithValues: metaModels.map { ($0.itemId, $0) }
+            metaModels.map { ($0.itemId, $0) },
+            uniquingKeysWith: { _, newer in newer }
         )
 
         return itemModels.map { model in
