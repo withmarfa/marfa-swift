@@ -12,6 +12,11 @@ import Foundation
 ///     } catch let error as MarfaError {
 ///         print("API error \(error.status): \(error.message)")
 ///     }
+// `@unchecked` is load-bearing on an `open` class: an external subclass
+// can add mutable state the compiler cannot see from here, so checked
+// `Sendable` is unavailable even though every stored property below is
+// immutable. Subclasses inherit the conformance and add only `let`s;
+// a subclass introducing mutable state must revisit this.
 open class MarfaError: Error, @unchecked Sendable {
     /// Server error code (e.g. `"not_found"`, `"validation_error"`).
     public let code: String
@@ -58,35 +63,35 @@ extension MarfaError: LocalizedError {
 // MARK: - Specific Error Types
 
 /// 404 — resource does not exist.
-public final class NotFoundError: MarfaError, @unchecked Sendable {
+public final class NotFoundError: MarfaError {
     public init(message: String, details: [String: JSONValue]? = nil) {
         super.init(code: "not_found", message: message, status: 404, details: details)
     }
 }
 
 /// 400 — request failed validation.
-public final class ValidationError: MarfaError, @unchecked Sendable {
+public final class ValidationError: MarfaError {
     public init(message: String, details: [String: JSONValue]? = nil) {
         super.init(code: "validation_error", message: message, status: 400, details: details)
     }
 }
 
 /// 401 — invalid or expired credentials.
-public final class UnauthorizedError: MarfaError, @unchecked Sendable {
+public final class UnauthorizedError: MarfaError {
     public init(message: String, details: [String: JSONValue]? = nil) {
         super.init(code: "unauthorized", message: message, status: 401, details: details)
     }
 }
 
 /// 403 — valid credentials but insufficient permissions.
-public final class ForbiddenError: MarfaError, @unchecked Sendable {
+public final class ForbiddenError: MarfaError {
     public init(message: String, details: [String: JSONValue]? = nil) {
         super.init(code: "forbidden", message: message, status: 403, details: details)
     }
 }
 
 /// 409 — version conflict with resolution data.
-public final class ConflictError: MarfaError, @unchecked Sendable {
+public final class ConflictError: MarfaError {
     public let current: ConflictSnapshot
     public let ancestor: ConflictSnapshot
     public let conflictingFields: [String]
@@ -141,7 +146,7 @@ public final class ConflictError: MarfaError, @unchecked Sendable {
 /// The server emits this as `code: "version_bump_mismatch"`. Permanent —
 /// the SyncEngine drops queued type-registration mutations carrying this
 /// error rather than replaying them.
-public final class SchemaVersionMismatchError: MarfaError, @unchecked Sendable {
+public final class SchemaVersionMismatchError: MarfaError {
     public init(message: String, details: [String: JSONValue]? = nil) {
         super.init(
             code: "version_bump_mismatch",
@@ -157,7 +162,7 @@ public final class SchemaVersionMismatchError: MarfaError, @unchecked Sendable {
 /// 501 — Operation requires a live server connection and is not available on a
 /// pure-local ``MarfaClient`` created with ``MarfaClient/local(path:)``.
 /// Blob uploads and downloads throw this when called on a local-only client.
-public final class LocalModeUnsupportedError: MarfaError, @unchecked Sendable {
+public final class LocalModeUnsupportedError: MarfaError {
     public let operation: String
 
     public init(operation: String) {
@@ -174,7 +179,7 @@ public final class LocalModeUnsupportedError: MarfaError, @unchecked Sendable {
 // MARK: - Network Error
 
 /// Transport-level failure (no connectivity, timeout, DNS, etc.).
-public final class NetworkError: MarfaError, @unchecked Sendable {
+public final class NetworkError: MarfaError {
     public let underlyingError: Error
 
     public init(_ error: Error) {
@@ -188,7 +193,7 @@ public final class NetworkError: MarfaError, @unchecked Sendable {
 }
 
 /// Response body could not be decoded into the expected type.
-public final class ResponseDecodingError: MarfaError, @unchecked Sendable {
+public final class ResponseDecodingError: MarfaError {
     public let underlyingError: Error
 
     public init(_ error: Error) {

@@ -35,23 +35,6 @@ struct DroppedMutationsQueryTests {
         return (store, queue, container)
     }
 
-    /// Reactive queries refresh via `ModelContext.didSave` + a 50 ms
-    /// debounce. Default timeout matches the rest of the reactive
-    /// suite — generous to absorb CI variance.
-    private func waitUntil(
-        timeout: Duration = .seconds(5),
-        every: Duration = .milliseconds(10),
-        _ condition: @MainActor () async throws -> Bool
-    ) async throws {
-        let start = ContinuousClock.now
-        while ContinuousClock.now - start < timeout {
-            if try await condition() { return }
-            try await Task.sleep(for: every)
-        }
-        if try await condition() { return }
-        Issue.record("waitUntil: condition never satisfied within \(timeout)")
-    }
-
     @Test("initial state is empty")
     func initialStateIsEmpty() async throws {
         let (store, _, _) = try await makeSyncedFixture()

@@ -34,24 +34,6 @@ struct BlobUploadProgressQueryTests {
         return (store, queue, transport, connManager, engine)
     }
 
-    // Default bumped to 5s for CI headroom — see PendingMutationsQueryTests
-    // for the rationale. Existing call sites that pass an explicit
-    // `timeout: .milliseconds(500)` keep their tighter bound and have
-    // not flaked on CI.
-    private func waitUntil(
-        timeout: Duration = .seconds(5),
-        every: Duration = .milliseconds(10),
-        _ condition: @MainActor () async throws -> Bool
-    ) async throws {
-        let start = ContinuousClock.now
-        while ContinuousClock.now - start < timeout {
-            if try await condition() { return }
-            try await Task.sleep(for: every)
-        }
-        if try await condition() { return }
-        Issue.record("waitUntil: condition never satisfied within \(timeout)")
-    }
-
     @Test("successful upload progresses from started through completion, then evicts")
     func successfulUploadEvicts() async throws {
         let (store, queue, transport, connManager, engine) = try await makeFixture()

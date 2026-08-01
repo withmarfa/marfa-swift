@@ -33,24 +33,6 @@ struct FullSyncStateQueryTests {
         return (store, queue, transport, connManager, engine)
     }
 
-    /// Polling helper — the query updates from event streams and the
-    /// initial-load Task; assertions need to poll rather than assume
-    /// immediate visibility. Default timeout matches the other reactive
-    /// query tests in this suite — generous to absorb CI variance.
-    private func waitUntil(
-        timeout: Duration = .seconds(5),
-        every: Duration = .milliseconds(10),
-        _ condition: @MainActor () async throws -> Bool
-    ) async throws {
-        let start = ContinuousClock.now
-        while ContinuousClock.now - start < timeout {
-            if try await condition() { return }
-            try await Task.sleep(for: every)
-        }
-        if try await condition() { return }
-        Issue.record("waitUntil: condition never satisfied within \(timeout)")
-    }
-
     @Test("initial state is .notYetSynced when no timestamp persisted")
     func initialStateIsNotYetSynced() async throws {
         let (store, _, _, _, _) = try await makeFixture()
