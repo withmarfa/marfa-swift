@@ -11,7 +11,7 @@ import Foundation
 ///     } catch let error as OAuthError where error.code == .invalidGrant {
 ///         // ask the user to sign in again
 ///     }
-public final class OAuthError: MarfaError, @unchecked Sendable {
+public final class OAuthError: MarfaError {
     /// RFC 6749 §5.2 error code, e.g. `invalid_grant`, `invalid_client`,
     /// `unauthorized_client`. Unknown values are preserved as
     /// ``Code/unknown`` and the raw string is available via
@@ -40,7 +40,7 @@ public final class OAuthError: MarfaError, @unchecked Sendable {
 
 /// RFC 8628 Device Authorization Grant errors raised during the polling
 /// loop on the device-flow polling endpoint.
-public final class DeviceFlowError: MarfaError, @unchecked Sendable {
+public final class DeviceFlowError: MarfaError {
     public enum Code: String, Sendable {
         /// The user has not yet completed the verification step. The
         /// polling loop should keep going.
@@ -65,7 +65,7 @@ public final class DeviceFlowError: MarfaError, @unchecked Sendable {
 }
 
 /// Failures raised by the WebAuthn / passkey flow.
-public final class PasskeyError: MarfaError, @unchecked Sendable {
+public final class PasskeyError: MarfaError {
     public enum Code: String, Sendable {
         /// The platform authenticator returned no credential — the user
         /// likely cancelled the system sheet.

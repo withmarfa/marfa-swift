@@ -5,6 +5,13 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The package enables Swift 6.2's `NonisolatedNonsendingByDefault` upcoming feature on every non-plugin target, so nonisolated async functions run on the caller's actor instead of hopping to the global executor. Tools-version 6.2 alone does not turn this on; the flag does, ahead of it becoming the language-mode default. No API change; the full suite passes under the new semantics.
+- The error hierarchy's `@unchecked Sendable` now carries its justification once, at the `open` base class, where it is load-bearing — an external subclass can add mutable state the compiler cannot see. The redundant redeclarations on the `final` subclasses are gone; they inherit the conformance.
+
 ## [12.1.3] — 2026-08-01
 
 ### Fixed

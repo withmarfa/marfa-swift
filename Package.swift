@@ -126,3 +126,15 @@ let package = Package(
     ],
     swiftLanguageModes: [.v6]
 )
+
+// `NonisolatedNonsendingByDefault` is the Swift 6.2 concurrency-
+// ergonomics change — nonisolated async functions run on the caller's
+// actor instead of hopping to the global executor — and it becomes the
+// default in a future language mode. Tools-version 6.2 alone does not
+// enable it; the flag has to be set per target. Applied to every
+// non-plugin target (plugin targets accept no build settings).
+for target in package.targets where target.type != .plugin {
+    var settings = target.swiftSettings ?? []
+    settings.append(.enableUpcomingFeature("NonisolatedNonsendingByDefault"))
+    target.swiftSettings = settings
+}
