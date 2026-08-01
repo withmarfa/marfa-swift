@@ -5,11 +5,17 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [12.1.3] — 2026-08-01
+
+### Fixed
+
+- **The duplicate-metadata fix made every reader disagree with the writer.** 12.1.2 resolved a duplicate `itemId` to the last row in fetch order, while `fetchMetadata` and `writeMetadata` both take the first under a `fetchLimit` of 1. With a duplicate present, `setMetadata` wrote one row, a detail read returned it, and a list, a search or an `ItemsWithMetadataQuery` rendered the other — permanently, since nothing deduplicates. Fetch order is not recency either: none of these descriptors sorts, so "newest" was a guess. All three readers now take the first row, which is what the writer already did.
+
 ## [12.1.2] — 2026-07-31
 
 ### Fixed
 
-- **Two metadata rows for one item crashed the readers that index them.** `MarfaMetadataModel` is indexed on `itemId` but carries no `#Unique`, because CloudKit mirroring forbids one, and writes are serialised only within a single `LocalStore` — so two devices setting metadata on the same item leave two rows. `fetchItemsWithMetadata` and `ItemsWithMetadataQuery` both built an `itemId`-keyed dictionary with `uniqueKeysWithValues`, which traps on the duplicate. Local search was fixed in 12.1.0; these two were the same defect and were missed. Last write wins, matching what a later fetch would have returned.
+- **Two metadata rows for one item crashed the readers that index them.** `MarfaMetadataModel` is indexed on `itemId` but carries no `#Unique`, because CloudKit mirroring forbids one, and writes are serialised only within a single `LocalStore` — so two devices setting metadata on the same item leave two rows. `fetchItemsWithMetadata` and `ItemsWithMetadataQuery` both built an `itemId`-keyed dictionary with `uniqueKeysWithValues`, which traps on the duplicate. Local search was fixed in 12.1.0; these two were the same defect and were missed.
 
 ## [12.1.1] — 2026-07-31
 

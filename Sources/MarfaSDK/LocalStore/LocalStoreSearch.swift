@@ -163,9 +163,15 @@ extension LocalStore {
         // therefore leave two rows, and this sits on the search path — so the
         // crash would land on every keystroke. Last write wins, which matches
         // what a later fetch would have returned anyway.
+        // Resolved to the FIRST row, not the newest, because `fetchMetadata`
+        // and `writeMetadata` both take `.first` under a `fetchLimit` of 1.
+        // Picking differently here would not crash — it would render one row
+        // in a list and a different one in the detail view of the same item,
+        // permanently, since nothing deduplicates. Fetch order is also not
+        // recency: no descriptor here sorts, so "newest" would be a guess.
         let metadataById = Dictionary(
             metaModels.map { ($0.itemId, $0) },
-            uniquingKeysWith: { _, newer in newer }
+            uniquingKeysWith: { first, _ in first }
         )
 
         // `tags` is an AND filter on the server — an item must carry every
