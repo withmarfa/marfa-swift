@@ -133,11 +133,16 @@ public actor LocalStore {
         // Duplicate `itemId` rows are constructible: the model is indexed on
         // it but carries no `#Unique`, which CloudKit mirroring forbids, and
         // two devices setting metadata on the same item leave two rows.
-        // `uniqueKeysWithValues` would trap. Last write wins, matching what a
-        // later fetch returns anyway.
+        // `uniqueKeysWithValues` would trap.
+        // Resolved to the FIRST row, not the newest, because `fetchMetadata`
+        // and `writeMetadata` both take `.first` under a `fetchLimit` of 1.
+        // Picking differently here would not crash — it would render one row
+        // in a list and a different one in the detail view of the same item,
+        // permanently, since nothing deduplicates. Fetch order is also not
+        // recency: no descriptor here sorts, so "newest" would be a guess.
         let metadataById = Dictionary(
             metaModels.map { ($0.itemId, $0) },
-            uniquingKeysWith: { _, newer in newer }
+            uniquingKeysWith: { first, _ in first }
         )
 
         return itemModels.map { model in

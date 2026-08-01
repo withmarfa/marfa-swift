@@ -61,6 +61,28 @@ struct DuplicateMetadataRowTests {
         #expect(results.contains { $0.item.id == itemId })
     }
 
+    @Test("every reader resolves a duplicate to the same row as the writer")
+    func readersAgreeWithWriter() async throws {
+        let (container, itemId) = try await makeContainerWithDuplicate()
+        let store = await Task.detached { LocalStore(modelContainer: container) }.value
+
+        // The writer's own view. `setMetadata` and `fetchMetadata` both take
+        // the first matching row, so this is the tag a detail view shows.
+        try await store.setMetadata(itemId: itemId, input: MetadataInput(tags: ["authoritative"]))
+        let detail = try await store.fetchMetadata(itemId: itemId)
+        #expect(detail.tags == ["authoritative"])
+
+        // A list and a search of the same item must not show something else.
+        // Resolving to a different duplicate is not a crash — it is one row in
+        // the list and another in the detail view, for good.
+        let paired = try await store.fetchItemsWithMetadata(filters: nil)
+        let listed = try #require(paired.first { $0.item.id == itemId })
+        #expect(listed.metadata.tags == detail.tags)
+
+        let results = try await store.searchItems(text: "findable", filters: nil)
+        #expect(results.contains { $0.item.id == itemId })
+    }
+
     @MainActor
     @Test("ItemsWithMetadataQuery survives a duplicate")
     func querySurvives() async throws {

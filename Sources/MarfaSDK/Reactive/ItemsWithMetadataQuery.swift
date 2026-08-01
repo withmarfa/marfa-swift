@@ -63,9 +63,13 @@ public final class ItemsWithMetadataQuery {
                 // mirroring forbids, and two devices setting metadata on the
                 // same item leave two rows. `uniqueKeysWithValues` would trap.
                 // Last write wins, matching what a later fetch returns anyway.
+                // First row, matching `fetchMetadata` and `writeMetadata`,
+                // which both take `.first` under a `fetchLimit` of 1. A
+                // different choice renders one row here and another in the
+                // detail view of the same item, permanently.
                 metadataById = Dictionary(
                     metaModels.map { ($0.itemId, $0) },
-                    uniquingKeysWith: { _, newer in newer }
+                    uniquingKeysWith: { first, _ in first }
                 )
             }
             self.items = itemModels.map { model in
