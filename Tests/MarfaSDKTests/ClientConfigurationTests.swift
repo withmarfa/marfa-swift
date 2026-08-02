@@ -5,17 +5,45 @@ import Foundation
 @Suite("ClientConfiguration")
 struct ClientConfigurationTests {
 
-    @Test("fromEnvironment returns nil when variables unset")
-    func fromEnvironmentReturnsNilWhenUnset() {
-        // This test relies on MARFA_API_URL / MARFA_API_KEY not being set in the
-        // test process environment. CI runs without them by default.
-        let env = ProcessInfo.processInfo.environment
-        guard env["MARFA_API_URL"] == nil || env["MARFA_API_URL"]?.isEmpty == true,
-              env["MARFA_API_KEY"] == nil || env["MARFA_API_KEY"]?.isEmpty == true else {
-            return
-        }
+    // Resolved against a supplied environment rather than the process one.
+    // The previous test read `ProcessInfo` directly and returned early when
+    // the variables happened to be set, reporting a pass having asserted
+    // nothing — and those two variables are the pair the CLI and the MCP
+    // server export, so the machine most likely to run this suite is the
+    // machine most likely to silence it. The success path had no test at all.
 
-        #expect(ClientConfiguration.fromEnvironment() == nil)
-        #expect(MarfaClient.fromEnvironment() == nil)
+    @Test("resolves a configuration when both variables are present")
+    func resolvesWhenBothPresent() {
+        let config = ClientConfiguration.fromEnvironment([
+            "MARFA_API_URL": "https://example.test",
+            "MARFA_API_KEY": "marfa_k1_example",
+        ])
+        #expect(config?.url.absoluteString == "https://example.test")
+        #expect(config?.apiKey == "marfa_k1_example")
+    }
+
+    @Test("returns nil when either variable is missing")
+    func returnsNilWhenMissing() {
+        #expect(ClientConfiguration.fromEnvironment([:]) == nil)
+        #expect(
+            ClientConfiguration.fromEnvironment(["MARFA_API_URL": "https://example.test"]) == nil
+        )
+        #expect(ClientConfiguration.fromEnvironment(["MARFA_API_KEY": "marfa_k1_example"]) == nil)
+    }
+
+    @Test("treats an empty value as missing rather than as a credential")
+    func treatsEmptyAsMissing() {
+        #expect(
+            ClientConfiguration.fromEnvironment([
+                "MARFA_API_URL": "",
+                "MARFA_API_KEY": "marfa_k1_example",
+            ]) == nil
+        )
+        #expect(
+            ClientConfiguration.fromEnvironment([
+                "MARFA_API_URL": "https://example.test",
+                "MARFA_API_KEY": "",
+            ]) == nil
+        )
     }
 }
