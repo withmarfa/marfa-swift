@@ -109,7 +109,17 @@ public struct ClientConfiguration: Sendable {
     /// Reads `MARFA_API_URL` and `MARFA_API_KEY` from the process environment.
     /// Returns `nil` if either is missing or empty.
     public static func fromEnvironment() -> ClientConfiguration? {
-        let env = ProcessInfo.processInfo.environment
+        fromEnvironment(ProcessInfo.processInfo.environment)
+    }
+
+    /// The resolution itself, over a supplied environment.
+    ///
+    /// Split from the public entry point because the process environment is
+    /// ambient: a developer with `MARFA_API_URL` and `MARFA_API_KEY`
+    /// exported — the pair the CLI and MCP server read — changes what the
+    /// public overload returns, so a test written against it either depends
+    /// on the machine it runs on or asserts nothing at all.
+    static func fromEnvironment(_ env: [String: String]) -> ClientConfiguration? {
         guard let urlString = env["MARFA_API_URL"], !urlString.isEmpty,
               let url = URL(string: urlString),
               let key = env["MARFA_API_KEY"], !key.isEmpty else {
