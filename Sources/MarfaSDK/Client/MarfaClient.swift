@@ -421,20 +421,35 @@ public final class MarfaClient: Sendable {
 
     /// Full-text search across items.
     ///
-    /// Pure-local clients (``local(path:)`` / ``local(container:)``) have
-    /// no server to ask, so the query is served from the store instead
-    /// of failing against the placeholder URL — the same local-first
-    /// shape every namespace uses. Local results are ranked and filtered
-    /// differently from the server's FTS index; the divergences are
-    /// listed on ``LocalStore/searchItems(text:filters:)``.
+    /// **Served locally whenever this client has a store**, synced or
+    /// not. One interface, local baseline: a search on a synced client
+    /// used to become a network round trip while a working local path
+    /// sat switched off beside it, which made the same call mean two
+    /// different things depending on a setting the caller had set once
+    /// and forgotten.
     ///
-    /// Synced clients still go to the server, whose index returns better
-    /// results than a local scan can. For offline search on a synced
-    /// client, use ``MarfaStore/querySearch(text:filters:)``.
+    /// Local results are ranked and filtered differently from the
+    /// server's FTS index, and the divergences are listed in full on
+    /// ``LocalStore/searchItems(text:filters:)``. The short version: the
+    /// local path matches substrings rather than terms, has no BM25
+    /// ranking and no snippets, and can only see what has synced. Ask
+    /// the server explicitly with ``searchRemote(query:filters:)`` when
+    /// a query needs the index rather than the baseline — a ranked feed,
+    /// say, or a corpus larger than the device holds.
     public func search(query: String, filters: SearchFilters? = nil) async throws -> [SearchResult] {
-        if let localStore, syncEngine == nil {
+        if let localStore {
             return try await localStore.searchItems(text: query, filters: filters)
         }
+        return try await searchRemote(query: query, filters: filters)
+    }
+
+    /// Search through the server's index, bypassing the local store.
+    ///
+    /// The escape hatch for the cases the local baseline cannot answer:
+    /// BM25 ranking, `<mark>` snippets, and a corpus wider than what has
+    /// synced to this device. Requires a server — a pure-local client
+    /// has none to ask.
+    public func searchRemote(query: String, filters: SearchFilters? = nil) async throws -> [SearchResult] {
         let params = filters?.toQueryParams(query: query) ?? [("q", query)]
         let response: SearchResponse = try await transport.request(
             method: .get, path: "/search", body: nil, query: params
