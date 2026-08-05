@@ -6,6 +6,7 @@
 import Foundation
 
 public struct TypeSchema: Codable, Sendable {
+    public let compatibleWith: [String]?
     public let description: String?
     public let displayHints: TypeSchemaDisplayHints?
     public let fields: [String: JSONValue]
@@ -17,6 +18,7 @@ public struct TypeSchema: Codable, Sendable {
     public let versionPolicy: TypeSchemaVersionPolicy?
 
     public init(
+        compatibleWith: [String]? = nil,
         description: String? = nil,
         displayHints: TypeSchemaDisplayHints? = nil,
         fields: [String: JSONValue],
@@ -27,6 +29,7 @@ public struct TypeSchema: Codable, Sendable {
         version: Int,
         versionPolicy: TypeSchemaVersionPolicy? = nil
     ) {
+        self.compatibleWith = compatibleWith
         self.description = description
         self.displayHints = displayHints
         self.fields = fields
@@ -39,6 +42,7 @@ public struct TypeSchema: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
+        case compatibleWith = "compatible_with"
         case description
         case displayHints = "display_hints"
         case fields
