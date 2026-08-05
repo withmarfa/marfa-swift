@@ -427,10 +427,8 @@ struct DomainModelTests {
         #expect(CoreMediaArticle(from: impostorNote) == nil)
         #expect(CoreMediaBook(from: impostorNote) == nil)
         #expect(CoreMediaFilm(from: impostorNote) == nil)
-        #expect(CoreMediaPodcast(from: impostorNote) == nil)
         #expect(CoreMediaSeries(from: impostorNote) == nil)
         #expect(CoreMediaSong(from: impostorNote) == nil)
-        #expect(CoreMediaTvEpisode(from: impostorNote) == nil)
         #expect(CoreTask(from: impostorNote) == nil)
         #expect(CoreNote(from: impostorTask) == nil)
     }
@@ -486,10 +484,9 @@ struct DomainModelTests {
         #expect(CoreMediaArticle.typeIdentifier == "core.media.article")
         #expect(CoreMediaBook.typeIdentifier == "core.media.book")
         #expect(CoreMediaFilm.typeIdentifier == "core.media.film")
-        #expect(CoreMediaPodcast.typeIdentifier == "core.media.podcast")
+        #expect(CoreMediaEpisode.typeIdentifier == "core.media.episode")
         #expect(CoreMediaSeries.typeIdentifier == "core.media.series")
         #expect(CoreMediaSong.typeIdentifier == "core.media.song")
-        #expect(CoreMediaTvEpisode.typeIdentifier == "core.media.tv_episode")
         #expect(CoreNote.typeIdentifier == "core.note")
         #expect(CoreTask.typeIdentifier == "core.task")
     }

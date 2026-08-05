@@ -13,7 +13,7 @@ import Testing
 
     @Test func snakeCaseWithinSegmentBecomesPascalCase() throws {
         #expect(try NameMapper.structName(for: "foo.bar_baz") == "FooBarBaz")
-        #expect(try NameMapper.structName(for: "core.media.tv_episode") == "CoreMediaTvEpisode")
+        #expect(try NameMapper.structName(for: "acme.field_note") == "AcmeFieldNote")
         #expect(try NameMapper.structName(for: "myapp.3d_model") == "Myapp3dModel")
     }
 

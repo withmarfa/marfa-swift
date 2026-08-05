@@ -40,6 +40,9 @@ public struct CoreFileImage: MarfaItem {
     /// What the file contains
     public var description: String? { item.properties["description"]?.stringValue }
 
+    /// Machine-extracted text content of the referenced blob (server enrichment: document text or image OCR)
+    public var extractedText: String? { item.properties["extracted_text"]?.stringValue }
+
     /// BCP 47 language code
     public var language: String? { item.properties["language"]?.stringValue }
 
@@ -85,6 +88,7 @@ public struct CoreFileImage: MarfaItem {
         if let v = altitude { props["altitude"] = .double(v) }
         if let v = author { props["author"] = .string(v) }
         if let v = description { props["description"] = .string(v) }
+        if let v = extractedText { props["extracted_text"] = .string(v) }
         if let v = language { props["language"] = .string(v) }
         if let v = latitude { props["latitude"] = .double(v) }
         if let v = longitude { props["longitude"] = .double(v) }
