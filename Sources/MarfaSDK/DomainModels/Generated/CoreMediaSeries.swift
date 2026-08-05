@@ -6,7 +6,7 @@
 import Foundation
 /// ``CoreMediaSeries`` — typed wrapper for `core.media.series` items.
 ///
-/// A TV show or series. Inherits all core.media fields.
+/// Any ongoing media container: a TV show, a podcast, a radio serial, a video series. Inherits all core.media fields. Episodes join it through the in-collection edge; containment is never part of a type name.
 ///
 /// Inherits all fields from ``CoreMedia``.
 ///
@@ -31,17 +31,14 @@ public struct CoreMediaSeries: MarfaItem {
     /// Summary or blurb
     public var description: String? { item.properties["description"]?.stringValue }
 
-    /// Total episodes across all seasons
-    public var episodeCount: Int? { item.properties["episode_count"]?.intValue }
-
     /// Cover art, poster, or thumbnail
     public var imageUrl: String? { item.properties["image_url"]?.stringValue }
 
     /// BCP 47 language code
     public var language: String? { item.properties["language"]?.stringValue }
 
-    /// Broadcasting network or streaming service
-    public var network: String? { item.properties["network"]?.stringValue }
+    /// What the series is made of. Recommended values: tv, podcast, radio, video, mixed
+    public var medium: String? { item.properties["medium"]?.stringValue }
 
     /// Personal annotations
     public var notes: String? { item.properties["notes"]?.stringValue }
@@ -51,9 +48,6 @@ public struct CoreMediaSeries: MarfaItem {
 
     /// Who published the work
     public var publisher: String? { item.properties["publisher"]?.stringValue }
-
-    /// Number of seasons
-    public var seasonCount: Int? { item.properties["season_count"]?.intValue }
 
     /// Recommended values: ongoing, ended, cancelled
     public var status: String? { item.properties["status"]?.stringValue }
@@ -79,14 +73,12 @@ public struct CoreMediaSeries: MarfaItem {
         if let v = author { props["author"] = .string(v) }
         if let v = body { props["body"] = .string(v) }
         if let v = description { props["description"] = .string(v) }
-        if let v = episodeCount { props["episode_count"] = .int(v) }
         if let v = imageUrl { props["image_url"] = .string(v) }
         if let v = language { props["language"] = .string(v) }
-        if let v = network { props["network"] = .string(v) }
+        if let v = medium { props["medium"] = .string(v) }
         if let v = notes { props["notes"] = .string(v) }
         if let v = publishedAt { props["published_at"] = .string(v) }
         if let v = publisher { props["publisher"] = .string(v) }
-        if let v = seasonCount { props["season_count"] = .int(v) }
         if let v = status { props["status"] = .string(v) }
         if let v = url { props["url"] = .string(v) }
         return props

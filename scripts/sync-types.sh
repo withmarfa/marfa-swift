@@ -16,6 +16,10 @@ if [[ ! -d "$MARFA_TYPES" ]]; then
 fi
 
 echo "syncing types from $MARFA_TYPES → $DEST"
+# Remove before copying so a type deleted upstream disappears from the
+# snapshot too — a bare copy carries deletions never and stale structs
+# survive every regen.
+rm -f "$DEST"/*.json
 cp "$MARFA_TYPES"/*.json "$DEST/"
 mkdir -p "$DEST/edges"
 cp "$MARFA_TYPES/edges"/*.json "$DEST/edges/"
