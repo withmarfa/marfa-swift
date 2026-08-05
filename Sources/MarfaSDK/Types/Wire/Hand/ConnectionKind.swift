@@ -4,7 +4,7 @@
 /// - ``app``: an OAuth client this user has authorized to act on their behalf
 ///   (e.g. Notes signing in via Auth Code + PKCE). Carries `client_id`,
 ///   `scopes`, and lifecycle bookkeeping.
-/// - ``integration``: a hosted or local connector the user has installed to
+/// - ``integration``: a hosted or local integration the user has installed to
 ///   read or write Marfa items on their behalf (e.g. a calendar sync).
 ///   Carries `integration_ref`, `credential_ref`, and runtime status.
 ///
