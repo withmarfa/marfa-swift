@@ -14324,7 +14324,7 @@
           "Export"
         ],
         "summary": "Export space data",
-        "description": "Streams the space's items, edges, metadata, extensions, and blob references as NDJSON (default) or, with `format=archive`, a `marfa-archive-v1.tar.gz` that `POST /admin/restore-archive` can ingest. Space-scoped, exporting only what the caller can read; the response streams until the filter is exhausted.",
+        "description": "Streams the space's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v1.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the space's custom type and edge-type registrations, so a restore into an empty space can write the items that use them), and blob bytes that `POST /admin/restore-archive` can ingest. Space-scoped, exporting only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry.",
         "security": [
           {
             "bearerAuth": []
@@ -14998,7 +14998,7 @@
           "Inbound Webhooks"
         ],
         "summary": "List recent receipts for an inbound webhook subscription",
-        "description": "Returns recent inbound deliveries received on this subscription, newest first, recording each receipt's verification and dispatch outcome. Use to debug a failing connector or audit what the upstream service has sent.",
+        "description": "Returns recent inbound deliveries received on this subscription, newest first, recording each receipt's verification and dispatch outcome. Use to debug a failing integration or audit what the upstream service has sent.",
         "security": [
           {
             "bearerAuth": []
@@ -15425,7 +15425,7 @@
           "Connection Leased Tokens"
         ],
         "summary": "Issue a leased token",
-        "description": "Mints a short-TTL bearer token an external service can use to call back into Marfa directly, without holding the connection's full runtime credential. The capability must be declared as `leased` in the connection manifest's `oauth_requirements`, otherwise the request rejects with 422; the `lease_token` is returned only once, in this response.",
+        "description": "Mints a short-TTL bearer token an external service can use to call back into Marfa directly, without holding the connection's full runtime credential. The capability must be declared as `leased` in the connection manifest's `oauth_requirements`, otherwise the request rejects with 422; the `lease_token` is returned only once, in this response. `scopes` are capability claims in the upstream service's own vocabulary, relayed verbatim on introspection — a lease grants no Marfa data-plane authority of its own.",
         "security": [
           {
             "bearerAuth": []
@@ -15461,8 +15461,11 @@
                   "scopes": {
                     "type": "array",
                     "items": {
-                      "type": "string"
-                    }
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "maxItems": 32
                   }
                 },
                 "required": [

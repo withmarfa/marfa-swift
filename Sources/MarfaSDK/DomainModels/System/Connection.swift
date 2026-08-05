@@ -6,7 +6,7 @@ import Foundation
 /// ``kind`` discriminates between two variants:
 /// - ``ConnectionKind/app``: an OAuth client this user has authorized
 ///   (e.g. Notes signing in via the Authorization Code + PKCE flow).
-/// - ``ConnectionKind/integration``: a hosted or local connector that
+/// - ``ConnectionKind/integration``: a hosted or local integration that
 ///   reads or writes Marfa on the user's behalf.
 ///
 /// Lifecycle is bounded to ``ItemState/active`` and ``ItemState/revoked``

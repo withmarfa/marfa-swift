@@ -4,7 +4,7 @@
 ///   attention required.
 /// - ``warning``: non-blocking concern (a single record skipped, transient
 ///   rate limit). Surfaced in feed-style views but not in inboxes.
-/// - ``error``: recoverable failure that the connector itself will retry.
+/// - ``error``: recoverable failure that the integration itself will retry.
 ///   Surfaced for visibility, not for action.
 /// - ``actionRequired``: the user has to do something — re-authorize a
 ///   connection, resolve a tombstone conflict, etc. Surfaced as a
