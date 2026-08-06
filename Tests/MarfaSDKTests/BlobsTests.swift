@@ -255,6 +255,11 @@ struct BlobsTests {
 
         // SSE stream closes immediately.
         mock.enqueueEvents([])
+        // The server does not hold this blob either, so the bytes are
+        // genuinely gone. An absent local row on its own is not evidence of
+        // loss — a completed upload also clears it — so the drop is only
+        // correct once the server has confirmed it never received them.
+        mock.enqueueRaw(data: Data(), statusCode: 404)
 
         let engine = SyncEngine(
             transport: mock, localStore: store, mutationQueue: queue,

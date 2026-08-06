@@ -1298,14 +1298,63 @@ public actor SyncEngine {
         case .uploadBlob:
             let p = try decoder.decode(UploadBlobPayload.self, from: data)
 
-            guard let blobData = try? await mutationQueue.fetchPendingBlob(hash: p.hash) else {
-                // Blob data is gone — this can happen if the database was
-                // partially corrupted or the row was manually deleted. The
-                // upload can never succeed without the original bytes, so
-                // treat it as a permanent validation failure and let the
-                // engine drop it.
+            // A read that fails and a row that is absent are different
+            // answers, and collapsing them costs the only copy of the bytes.
+            // The queue holds the sole record of a blob that has not reached
+            // the server, so dropping on a transient store error strands the
+            // reference the item already carries: it points at a blob that
+            // can now never arrive, and nothing reports it.
+            let storedBlob: Data?
+            do {
+                storedBlob = try await mutationQueue.fetchPendingBlob(hash: p.hash)
+            } catch {
+                let err = MarfaError(
+                    code: "pending_blob_read_failed",
+                    message: "Could not read pending blob data for hash \(p.hash): \(error.localizedDescription)",
+                    status: 0
+                )
+                emit(.blobUploadFailed(hash: p.hash, error: err))
+                throw err
+            }
+
+            guard let blobData = storedBlob else {
+                // The store answered, and the answer was nothing. Two very
+                // different situations produce that, and they are
+                // indistinguishable from here, so ask the server which one
+                // this is rather than guessing.
+                //
+                // The common one is benign: a pending blob row is deleted in
+                // exactly one place, after the server accepts the bytes, so
+                // enqueuing the same hash twice while offline leaves a second
+                // mutation whose bytes the first drain already uploaded and
+                // cleared. Treating that as a failure told applications a blob
+                // was lost when it had in fact landed.
+                //
+                // The rare one is real loss: bytes gone from the local store
+                // without ever reaching the server. Treating that as success
+                // would strand a reference silently, which is worse than the
+                // false alarm it replaces.
+                let alreadyOnServer: Bool
+                do {
+                    let (_, response) = try await transport.rawRequest(
+                        method: .head, path: "/blobs/\(p.hash)",
+                        body: nil, contentType: nil, query: nil
+                    )
+                    alreadyOnServer = response.statusCode == 200
+                } catch {
+                    // Could not ask. Retry rather than decide.
+                    let err = NetworkError(error)
+                    emit(.blobUploadFailed(hash: p.hash, error: err))
+                    throw err
+                }
+
+                if alreadyOnServer {
+                    emit(.blobUploadCompleted(hash: p.hash))
+                    return false
+                }
+
                 let err = ValidationError(
-                    message: "Pending blob data missing for hash \(p.hash); upload cannot be replayed"
+                    message: "Pending blob data missing for hash \(p.hash) and the server does not hold it; upload cannot be replayed"
                 )
                 emit(.blobUploadFailed(hash: p.hash, error: err))
                 throw err
