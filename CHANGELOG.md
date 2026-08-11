@@ -7,10 +7,20 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [12.2.0] — 2026-08-11
+
+### Added
+
+- **A protocol seam over the local store's writes.** `LocalStoreWriting` covers the five writes the sync engine performs (`upsertItem`, `upsertEdge`, `deleteEdge`, `setMetadata`, `purgeItem`), `SyncEngine` now depends on `any LocalStoreWriting`, and `LocalStore` conforms as the only production implementation. The protocol is public so it sits beside `any Transport` in the same initializer, which also widens those five `LocalStore` methods to `public`. It exists so a test — or a consumer hardening its own sync error handling — can substitute a store whose apply fails on command.
+
 ### Changed
 
 - The package enables Swift 6.2's `NonisolatedNonsendingByDefault` upcoming feature on every non-plugin target, so nonisolated async functions run on the caller's actor instead of hopping to the global executor. Tools-version 6.2 alone does not turn this on; the flag does, ahead of it becoming the language-mode default. No API change; the full suite passes under the new semantics.
 - The error hierarchy's `@unchecked Sendable` now carries its justification once, at the `open` base class, where it is load-bearing — an external subclass can add mutable state the compiler cannot see. The redundant redeclarations on the `final` subclasses are gone; they inherit the conformance.
+
+### Fixed
+
+- **A refused apply no longer loses the event.** The sync engine stamped its cursor before the local write landed and swallowed apply failures, so an event the store refused was gone for good — the cursor was already past it, and a reconnect would not replay it. The engine now applies first and advances the cursor only on a write that landed. A refused write also ends the stream rather than parking the cursor in front of one event while later events carry it past: the failure surfaces as a `.failed` state plus a structured log line, and a first-event refusal counts toward the reconnect back-off so a wedged store is not met with a fresh stream every second.
 
 ## [12.1.3] — 2026-08-01
 
