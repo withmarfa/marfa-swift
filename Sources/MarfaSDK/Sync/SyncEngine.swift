@@ -51,9 +51,12 @@ private struct MetadataEventPayload: Decodable {
 ///    `item.state_changed`, `edge.created`, `edge.deleted`,
 ///    `metadata.changed`.
 ///
-/// 3. **Persists the Last-Event-ID cursor** — after every applied event the
-///    cursor is saved in the `sync_state` table so reconnection resumes from
-///    the correct position.
+/// 3. **Persists the Last-Event-ID cursor** — after, and only after, the
+///    event has been written to the local store. Reconnection resumes strictly
+///    after the cursor, so an event the cursor has passed is never sent again;
+///    recording progress first would mean a failed write loses the event for
+///    good. A write the store refuses ends the stream, because a later event
+///    would otherwise carry the cursor past the one that never landed.
 ///
 /// 4. **Replays the mutation queue** — once the catch-up SSE stream reaches
 ///    idle (no events received for a short interval, or the stream signals
@@ -602,10 +605,18 @@ public actor SyncEngine {
 
         var eventsConsumed = 0
         var errored = false
+        var storeRefusedEvent = false
         do {
             for try await event in stream {
                 guard running else { break }
-                await applyEvent(event)
+                if await applyEvent(event) == .storeRefused {
+                    // Stop consuming. The cursor is parked in front of this
+                    // event, and every event behind it would carry the cursor
+                    // past the one that never landed — the same loss, a few
+                    // events later. The reconnect reopens from here.
+                    storeRefusedEvent = true
+                    break
+                }
                 eventsConsumed += 1
             }
         } catch {
@@ -627,8 +638,10 @@ public actor SyncEngine {
         // up and re-opens the stream. Without it the symptom is a "last
         // synced" footer frozen at the moment the stream quietly closed.
         //
-        // A fast-fail (no events consumed AND an error thrown) stacks
-        // exponential back-off to avoid hammering an unreachable server.
+        // A fast-fail (no events consumed AND either an error thrown or the
+        // very first event refused by the store) stacks exponential back-off
+        // to avoid hammering an unreachable server — or reopening a stream
+        // once a second against a local store that cannot accept anything.
         // A healthy close (any event consumed, or clean finish) resets to
         // the base delay so SSE idle-reconnects stay snappy.
         //
@@ -636,7 +649,7 @@ public actor SyncEngine {
         // return until the back-off elapsed, blocking `runLoop` from
         // observing state transitions (a real network drop, a manual
         // offline → connecting flip) that arrive during the wait.
-        let fastFail = (eventsConsumed == 0 && errored)
+        let fastFail = (eventsConsumed == 0 && (errored || storeRefusedEvent))
         if fastFail {
             consecutiveFastFailures += 1
         } else {
@@ -788,16 +801,61 @@ public actor SyncEngine {
     /// concurrency guard) that the serial SSE for-await loop can't reproduce.
     /// Not part of the public API.
     internal func _applyEventForTesting(_ event: SSEEvent) async {
-        await applyEvent(event)
+        _ = await applyEvent(event)
     }
 
-    private func applyEvent(_ event: SSEEvent) async {
-        // Persist Last-Event-ID cursor before applying so we don't reprocess
-        // on reconnect even if applying fails (events are idempotent upserts).
-        if let id = event.id {
-            try? await mutationQueue.saveSyncState(key: cursorKey, value: id)
+    /// What one event left behind, for ``openStream`` to act on.
+    private enum EventOutcome {
+        /// The cursor now covers this event. Either it was written to the
+        /// local store, or there was nothing to write: an event type this
+        /// version doesn't handle, or a payload that failed to decode. The
+        /// latter two can never apply, so holding the cursor in front of one
+        /// would wedge sync on an event that is never going to land.
+        case settled
+
+        /// The local store refused the write. The cursor still points in
+        /// front of this event, so the next connection receives it again.
+        case storeRefused
+    }
+
+    /// Applies one event, then records the cursor — in that order, and only
+    /// if the apply succeeded.
+    ///
+    /// The cursor is the only durable record of how far the store has been
+    /// brought forward, and a reconnect resumes strictly after it. So an event
+    /// the cursor has passed is never re-sent, and stamping the cursor before
+    /// the write turns any store-side failure into permanent data loss: the
+    /// event is gone, and nothing is left that could ask for it again.
+    private func applyEvent(_ event: SSEEvent) async -> EventOutcome {
+        do {
+            try await applyToLocalStore(event)
+        } catch {
+            logger.log.error(
+                "sync.sse.apply_failed event=\(event.event ?? "-", privacy: .public) id=\(event.id ?? "-", privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
+            )
+            emit(.failed(error: error))
+            return .storeRefused
         }
 
+        if let id = event.id {
+            do {
+                try await mutationQueue.saveSyncState(key: cursorKey, value: id)
+            } catch {
+                // Failing in this direction is safe and deliberately not
+                // escalated: the write landed, and every apply is an
+                // idempotent upsert, so an unrecorded cursor costs one replay
+                // of work already done rather than an event nobody re-sends.
+                logger.log.error(
+                    "sync.cursor.save_failed id=\(id, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
+                )
+            }
+        }
+        return .settled
+    }
+
+    /// Writes a single decoded event into the local store. Throws whatever the
+    /// store threw, which is what keeps the cursor behind the event.
+    private func applyToLocalStore(_ event: SSEEvent) async throws {
         guard let eventType = event.event else { return }
         let data = event.data.data(using: .utf8) ?? Data()
         let decoder = JSONDecoder()
@@ -805,40 +863,40 @@ public actor SyncEngine {
         switch eventType {
         case "item.created":
             if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try? await localStore.upsertItem(payload.item)
+                try await localStore.upsertItem(payload.item)
                 emit(.itemCreated(id: payload.item.id))
             }
 
         case "item.updated", "item.restored", "item.state_changed":
             if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try? await localStore.upsertItem(payload.item)
+                try await localStore.upsertItem(payload.item)
                 emit(.itemUpdated(id: payload.item.id))
             }
 
         case "item.deleted":
             // Server sends the deleted item with state = trashed/purged.
             if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try? await localStore.upsertItem(payload.item)
+                try await localStore.upsertItem(payload.item)
                 emit(.itemDeleted(id: payload.item.id))
             }
 
         case "edge.created":
             if let payload = decodeOrLog(EdgeEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try? await localStore.upsertEdge(payload.edge)
+                try await localStore.upsertEdge(payload.edge)
                 emit(.edgeCreated(id: payload.edge.id))
             }
 
         case "edge.deleted":
             // Edge deletes carry just the edge ID in the data envelope.
             if let payload = decodeOrLog(EdgeEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try? await localStore.deleteEdge(id: payload.edge.id)
+                try await localStore.deleteEdge(id: payload.edge.id)
                 emit(.edgeDeleted(id: payload.edge.id))
             }
 
         case "metadata.changed":
             if let payload = decodeOrLog(MetadataEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 let input = MetadataInput(tags: payload.metadata.tags)
-                _ = try? await localStore.setMetadata(itemId: payload.itemId, input: input)
+                _ = try await localStore.setMetadata(itemId: payload.itemId, input: input)
                 emit(.itemUpdated(id: payload.itemId))
             }
 
