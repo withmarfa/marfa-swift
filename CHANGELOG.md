@@ -7,6 +7,19 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [12.3.0] — 2026-08-12
+
+Minor, not major: the platform refresh this stamps is additive throughout. No generated struct or member was removed, and every new memberwise-init parameter is defaulted, so existing call sites compile unchanged. The media restructure that would have removed domain models — `core.media.tv_episode` renamed to `core.media.episode`, `core.media.podcast` dropped — was already vendored and released in 12.x, so nothing breaks here.
+
+### Added
+
+- **`CoreEvent` carries the scheduling fields `core.event` grew at schema version 2.** `allDay` for an event that occupies whole days and therefore has no instant, `timezone` for the zone its schedule keeps its wall-clock hour in, `endTimezone` for the case where an event ends somewhere it did not start, `recurrence` for RFC 5545 property lines on a series, and `originalStartsAt` for an event that replaces one occurrence of one. All optional, all round-tripped by `toProperties()`.
+- **The account timezone on the profile.** `Profile` and `UpdateProfileInput` both carry `timezone`. Reading it needs nothing new, and setting it needs nothing new either: `ProfileNamespace.update` takes the generated input struct directly, so the field is reachable the moment it exists.
+
+### Changed
+
+- The `startsAt`, `endsAt` and `precision` doc comments on `CoreEvent` follow the upstream schema in separating an instant from the zone that anchors its wall-clock hour, and in saying what `precision` does not mean: it narrows an instant that exists rather than declaring the event has none, which is `allDay`'s job.
+
 ## [12.2.0] — 2026-08-11
 
 ### Added
