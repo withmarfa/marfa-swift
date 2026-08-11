@@ -70,7 +70,7 @@ public actor SyncEngine {
     // MARK: - Dependencies
 
     private let transport: any Transport
-    private let localStore: LocalStore
+    private let localStore: any LocalStoreWriting
     private let mutationQueue: MutationQueue
     private let connectionManager: ConnectionStateManager
     private let logger = MarfaLogger(category: "sync")
@@ -311,7 +311,7 @@ public actor SyncEngine {
 
     public init(
         transport: any Transport,
-        localStore: LocalStore,
+        localStore: any LocalStoreWriting,
         mutationQueue: MutationQueue,
         connectionManager: ConnectionStateManager,
         drainDebounceInterval: Duration = .milliseconds(150)

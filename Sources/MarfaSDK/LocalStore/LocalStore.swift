@@ -247,7 +247,7 @@ public actor LocalStore {
     /// Permanently removes the item. The cascade rule on
     /// `MarfaItemModel.metadata` removes the metadata row in the same
     /// `save()`, so this is one delete + one save end-to-end.
-    func purgeItem(id: String) throws {
+    public func purgeItem(id: String) throws {
         let predicate = #Predicate<MarfaItemModel> { $0.id == id }
         var descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
         descriptor.fetchLimit = 1
@@ -267,7 +267,7 @@ public actor LocalStore {
     /// in-place mutation, falling through to insert when the row doesn't
     /// exist. Cascade-owned `metadata` is preserved across upserts (we
     /// only mutate the item's own columns).
-    func upsertItem(_ item: Item) throws {
+    public func upsertItem(_ item: Item) throws {
         let id = item.id
         let predicate = #Predicate<MarfaItemModel> { $0.id == id }
         var descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
@@ -441,7 +441,7 @@ public actor LocalStore {
     /// Deletes an edge by ID. Idempotent — a delete against a missing
     /// row is a no-op so the sync engine can replay an `edge.deleted`
     /// SSE event without first checking whether the row still exists.
-    func deleteEdge(id: String) throws {
+    public func deleteEdge(id: String) throws {
         let predicate = #Predicate<MarfaEdgeModel> { $0.id == id }
         var descriptor = FetchDescriptor<MarfaEdgeModel>(predicate: predicate)
         descriptor.fetchLimit = 1
@@ -453,7 +453,7 @@ public actor LocalStore {
     }
 
     /// Stores (insert or replace) a raw edge — used by the sync engine.
-    func upsertEdge(_ edge: Edge) throws {
+    public func upsertEdge(_ edge: Edge) throws {
         let id = edge.id
         let predicate = #Predicate<MarfaEdgeModel> { $0.id == id }
         var descriptor = FetchDescriptor<MarfaEdgeModel>(predicate: predicate)
@@ -485,7 +485,7 @@ public actor LocalStore {
     /// Replaces all metadata for an item (tags only — `extensions` is
     /// reset to empty; the `setMetadata` contract is replace, not merge).
     @discardableResult
-    func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
+    public func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
         let metadata = Metadata(
             extensions: [:],
             itemId: itemId,
