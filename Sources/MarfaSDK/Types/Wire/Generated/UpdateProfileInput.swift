@@ -9,17 +9,20 @@ public struct UpdateProfileInput: Codable, Sendable, Hashable {
     public let bio: String?
     public let firstName: String?
     public let lastName: String?
+    public let timezone: String?
     public let username: String?
 
     public init(
         bio: String? = nil,
         firstName: String? = nil,
         lastName: String? = nil,
+        timezone: String? = nil,
         username: String? = nil
     ) {
         self.bio = bio
         self.firstName = firstName
         self.lastName = lastName
+        self.timezone = timezone
         self.username = username
     }
 
@@ -27,6 +30,7 @@ public struct UpdateProfileInput: Codable, Sendable, Hashable {
         case bio
         case firstName = "first_name"
         case lastName = "last_name"
+        case timezone
         case username
     }
 }

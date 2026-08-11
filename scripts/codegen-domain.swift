@@ -126,7 +126,8 @@ func camelCase(_ snake: String) -> String {
     return escapeIfReserved(raw)
 }
 
-/// Converts a type ID like "core.media.tv_episode" to a Swift struct name "CoreMediaTvEpisode".
+/// Converts a type ID to a Swift struct name: "core.entity.person" → "CoreEntityPerson".
+/// Underscores split like dots do, which custom type ids can carry.
 func structName(for typeId: String) -> String {
     typeId
         .split(separator: ".")

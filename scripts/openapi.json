@@ -102,7 +102,7 @@
         },
         "responses": {
           "200": {
-            "description": "Item updated via natural-key upsert. Returned when both `source` (stamped from the credential) and request `source_id` resolve a non-trashed item in the caller's space — the request is treated as an idempotent re-sync of the upstream entry.",
+            "description": "Item updated via natural-key upsert. Returned when both `source` (stamped from the credential) and request `source_id` resolve an item in the caller's space — the request is treated as an idempotent re-sync of the upstream entry. When the resolved item has been trashed the response carries `acknowledged: true` and nothing is written: the deletion stands, and the re-sync is accepted rather than refused forever.",
             "content": {
               "application/json": {
                 "schema": {
@@ -283,6 +283,9 @@
                         "tags",
                         "extensions"
                       ]
+                    },
+                    "acknowledged": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -475,6 +478,9 @@
                         "tags",
                         "extensions"
                       ]
+                    },
+                    "acknowledged": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -1131,6 +1137,9 @@
                                   "tags",
                                   "extensions"
                                 ]
+                              },
+                              "acknowledged": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -1212,6 +1221,313 @@
                           "type": "string",
                           "enum": [
                             "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}/promote": {
+      "post": {
+        "operationId": "promoteItem",
+        "tags": [
+          "Items"
+        ],
+        "summary": "Promote an integration's copy into your own item",
+        "description": "Mints a new item you own from an integration's mirror of an external record, joined back to the mirror by a `derived-from` edge. The mirror stays a faithful copy the integration keeps re-syncing; the promoted item is yours to edit and is never touched by a re-sync. Only items an integration owns can be promoted.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Item id"
+            },
+            "required": true,
+            "description": "Item id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Promoted item created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "item"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The item is not an integration's copy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "item_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/items/{id}/reconcile": {
+      "get": {
+        "operationId": "reconcileItem",
+        "tags": [
+          "Items"
+        ],
+        "summary": "Compare your item against the mirror it was promoted from",
+        "description": "Reports, field by field, where your item and the integration's mirror now differ. Promotion forks a copy; the mirror keeps re-syncing, so this is how you see what moved upstream since. Accepting a field is an ordinary `PATCH` on your own item, so nothing here writes. Reports against every mirror the item is joined to by `derived-from`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Item id"
+            },
+            "required": true,
+            "description": "Item id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Field-by-field comparison against each mirror",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mirrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "mirror_id": {
+                            "type": "string"
+                          },
+                          "mirror_type": {
+                            "type": "string"
+                          },
+                          "mirror_source": {
+                            "type": "string"
+                          },
+                          "mirror_updated_at": {
+                            "type": "string"
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "same",
+                                    "diverged",
+                                    "only_yours",
+                                    "only_mirror"
+                                  ]
+                                },
+                                "yours": {
+                                  "nullable": true
+                                },
+                                "mirror": {
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "state"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "mirror_id",
+                          "mirror_type",
+                          "mirror_source",
+                          "mirror_updated_at",
+                          "fields"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "mirrors"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The item was not promoted from an integration's copy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "item_not_found"
                           ]
                         },
                         "message": {
@@ -1771,6 +2087,9 @@
                               "tags",
                               "extensions"
                             ]
+                          },
+                          "acknowledged": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -1781,6 +2100,9 @@
                     },
                     "neighbors_truncated": {
                       "type": "boolean"
+                    },
+                    "neighbors_omitted": {
+                      "type": "integer"
                     },
                     "versions": {
                       "type": "array",
@@ -2160,6 +2482,9 @@
                         "tags",
                         "extensions"
                       ]
+                    },
+                    "acknowledged": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -2731,6 +3056,9 @@
                         "tags",
                         "extensions"
                       ]
+                    },
+                    "acknowledged": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -3052,6 +3380,9 @@
                         "tags",
                         "extensions"
                       ]
+                    },
+                    "acknowledged": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -10442,6 +10773,357 @@
         }
       }
     },
+    "/occurrences": {
+      "get": {
+        "operationId": "listOccurrences",
+        "tags": [
+          "Items"
+        ],
+        "summary": "List event occurrences in a window",
+        "description": "Returns the events that fall inside a time window, expanding recurring series from their rules at read time rather than storing occurrences. Single events appear by their own times; a series contributes one entry per occurrence in the window, carrying `series_id`; a stored exception replaces the occurrence it was recorded against and carries `replaces`. The window is required and bounded — a request wider than the cap is refused rather than silently trimmed. A series that cannot expand (a malformed rule, or one that floods the window) is reported in `series_errors` while the rest of the calendar still returns.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Window start, ISO 8601. Inclusive."
+            },
+            "required": true,
+            "description": "Window start, ISO 8601. Inclusive.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Window end, ISO 8601. Exclusive."
+            },
+            "required": true,
+            "description": "Window end, ISO 8601. Exclusive.",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Restrict to one event type. Defaults to every event type the caller can read."
+            },
+            "required": false,
+            "description": "Restrict to one event type. Defaults to every event type the caller can read.",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Occurrences in the window, ordered by start time",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "starts_at": {
+                            "type": "string"
+                          },
+                          "ends_at": {
+                            "type": "string"
+                          },
+                          "item": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "properties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "archived",
+                                  "trashed",
+                                  "revoked"
+                                ]
+                              },
+                              "tier": {
+                                "type": "string",
+                                "enum": [
+                                  "library",
+                                  "feed"
+                                ]
+                              },
+                              "space_id": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "version": {
+                                "type": "number"
+                              },
+                              "schema_version": {
+                                "type": "integer"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "source_id": {
+                                "type": "string"
+                              },
+                              "device": {
+                                "type": "string"
+                              },
+                              "capture_latitude": {
+                                "type": "number"
+                              },
+                              "capture_longitude": {
+                                "type": "number"
+                              },
+                              "timestamp": {
+                                "type": "string"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "updated_at": {
+                                "type": "string"
+                              },
+                              "edges": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "edges": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "space_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                          },
+                                          "source_id": {
+                                            "type": "string"
+                                          },
+                                          "target_id": {
+                                            "type": "string"
+                                          },
+                                          "edge_type": {
+                                            "type": "string"
+                                          },
+                                          "properties": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "nullable": true
+                                            }
+                                          },
+                                          "created_at": {
+                                            "type": "string"
+                                          },
+                                          "updated_at": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "source_id",
+                                          "target_id",
+                                          "edge_type",
+                                          "properties",
+                                          "created_at",
+                                          "updated_at"
+                                        ]
+                                      }
+                                    },
+                                    "has_more": {
+                                      "type": "boolean"
+                                    },
+                                    "next_cursor": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "edges",
+                                    "has_more"
+                                  ]
+                                }
+                              },
+                              "extensions": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "properties",
+                              "state",
+                              "version",
+                              "schema_version",
+                              "source",
+                              "timestamp",
+                              "created_at",
+                              "updated_at"
+                            ]
+                          },
+                          "series_id": {
+                            "type": "string"
+                          },
+                          "replaces": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "starts_at",
+                          "item"
+                        ]
+                      }
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ]
+                    },
+                    "series_errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "item_id": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "item_id",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "window"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing, unreadable, inverted, or over-long window",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/metadata/tags": {
       "get": {
         "operationId": "listTags",
@@ -11049,6 +11731,10 @@
                     "email_verified": {
                       "type": "boolean"
                     },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "created_at": {
                       "type": "string"
                     },
@@ -11067,6 +11753,7 @@
                     "avatar_url",
                     "email",
                     "email_verified",
+                    "timezone",
                     "created_at",
                     "updated_at"
                   ]
@@ -11189,6 +11876,10 @@
                     "type": "string",
                     "nullable": true,
                     "maxLength": 280
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "nullable": true
                   }
                 }
               }
@@ -11228,6 +11919,10 @@
                     "email_verified": {
                       "type": "boolean"
                     },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "created_at": {
                       "type": "string"
                     },
@@ -11246,6 +11941,7 @@
                     "avatar_url",
                     "email",
                     "email_verified",
+                    "timezone",
                     "created_at",
                     "updated_at"
                   ]
@@ -11469,6 +12165,10 @@
                     "email_verified": {
                       "type": "boolean"
                     },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "created_at": {
                       "type": "string"
                     },
@@ -11487,6 +12187,7 @@
                     "avatar_url",
                     "email",
                     "email_verified",
+                    "timezone",
                     "created_at",
                     "updated_at"
                   ]
@@ -11659,6 +12360,10 @@
                     "email_verified": {
                       "type": "boolean"
                     },
+                    "timezone": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "created_at": {
                       "type": "string"
                     },
@@ -11677,6 +12382,7 @@
                     "avatar_url",
                     "email",
                     "email_verified",
+                    "timezone",
                     "created_at",
                     "updated_at"
                   ]
@@ -19406,6 +20112,231 @@
                           "type": "string",
                           "enum": [
                             "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/accounts/{id}/delete": {
+      "post": {
+        "operationId": "adminDeleteAccount",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Delete an account and everything it owns, immediately",
+        "description": "Operator-initiated account deletion. Runs the same cascade the grace-window purger runs — space rows, credentials, sessions, grants, and the audit-trail redaction — but now, with no grace window. The body's `confirm` must be the account's email address, spelled exactly; the mismatch refusal is the fat-finger gate on an action with no undo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The account's auth user id."
+            },
+            "required": true,
+            "description": "The account's auth user id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The account's email address, exactly. Refused otherwise."
+                  }
+                },
+                "required": [
+                  "confirm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account and everything it owned are gone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`confirm` does not name this account's email address, or this deployment has no user accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another deletion of this account is in progress, or the account changed state mid-delete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
                           ]
                         },
                         "message": {
