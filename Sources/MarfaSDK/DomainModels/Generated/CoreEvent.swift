@@ -20,13 +20,19 @@ public struct CoreEvent: MarfaItem {
     /// Event name
     public var title: String { item.properties["title"]?.stringValue ?? "" }
 
+    /// True when the event occupies whole days rather than a span of time. A whole day has no instant, so a reader must take the calendar date from starts_at read in timezone and never re-derive it in the reader's own zone, which is how an all-day event ends up on the wrong day for anyone further west. Absent or false means the event has real start and end instants.
+    public var allDay: Bool? { item.properties["all_day"]?.boolValue }
+
     /// Event details
     public var description: String? { item.properties["description"]?.stringValue }
 
     /// Duration in seconds
     public var duration: Double? { item.properties["duration"]?.doubleValue }
 
-    /// End time
+    /// IANA time zone the event ends in, when that differs from timezone — a flight lands in a zone it did not depart from, and both ends are wall-clock facts a person reads off a ticket. Absent means the event ends in the zone it started in. Recurrence expands in timezone only; this field never anchors a rule.
+    public var endTimezone: String? { item.properties["end_timezone"]?.stringValue }
+
+    /// The instant the event ends, ISO 8601.
     public var endsAt: String? { item.properties["ends_at"]?.stringValue }
 
     /// Venue latitude
@@ -38,18 +44,28 @@ public struct CoreEvent: MarfaItem {
     /// Personal annotations
     public var notes: String? { item.properties["notes"]?.stringValue }
 
+    /// For an event that replaces one occurrence of a series, the start instant of the occurrence it replaces. Its series is named by a parent-of edge.
+    public var originalStartsAt: String? { item.properties["original_starts_at"]?.stringValue }
+
     /// Location
     public var place: String? { item.properties["place"]?.stringValue }
 
-    /// Temporal precision
+    /// How much of the start instant is actually known, for an event dated from memory or from a source that gave only a year. Narrows an instant that exists; it does not say the event has no instant, which is what all_day says.
     /// Allowed values: `year`, `month`, `day`, `time`.
     public var precision: String? { item.properties["precision"]?.stringValue }
 
-    /// Start time
+    /// RFC 5545 recurrence property lines (RRULE, RDATE, EXDATE). Present on the series itself; occurrences are computed from it at read time rather than stored.
+    /// Element type: `string`.
+    public var recurrence: [String]? { item.properties["recurrence"]?.arrayValue?.compactMap { $0.stringValue } }
+
+    /// The instant the event starts, ISO 8601. An instant carries no zone of its own however it is written; the timezone field is what anchors the event's wall-clock hour.
     public var startsAt: String? { item.properties["starts_at"]?.stringValue }
 
     /// Recommended values: tentative, confirmed, cancelled, rescheduled
     public var status: String? { item.properties["status"]?.stringValue }
+
+    /// IANA time zone the event's schedule keeps its wall-clock hour in, e.g. Europe/Berlin. Stored times stay instants; a recurring series expands in this zone so occurrences keep their local hour across a daylight-saving transition. Absent means the rule advances in UTC. This is the start zone: an event that ends somewhere else states that in end_timezone.
+    public var timezone: String? { item.properties["timezone"]?.stringValue }
 
     /// Event link
     public var url: String? { item.properties["url"]?.stringValue }
@@ -69,16 +85,21 @@ public struct CoreEvent: MarfaItem {
     public func toProperties() -> [String: JSONValue] {
         var props: [String: JSONValue] = [:]
         props["title"] = .string(title)
+        if let v = allDay { props["all_day"] = .bool(v) }
         if let v = description { props["description"] = .string(v) }
         if let v = duration { props["duration"] = .double(v) }
+        if let v = endTimezone { props["end_timezone"] = .string(v) }
         if let v = endsAt { props["ends_at"] = .string(v) }
         if let v = latitude { props["latitude"] = .double(v) }
         if let v = longitude { props["longitude"] = .double(v) }
         if let v = notes { props["notes"] = .string(v) }
+        if let v = originalStartsAt { props["original_starts_at"] = .string(v) }
         if let v = place { props["place"] = .string(v) }
         if let v = precision { props["precision"] = .string(v) }
+        if let v = recurrence, !v.isEmpty { props["recurrence"] = .array(v.map { .string($0) }) }
         if let v = startsAt { props["starts_at"] = .string(v) }
         if let v = status { props["status"] = .string(v) }
+        if let v = timezone { props["timezone"] = .string(v) }
         if let v = url { props["url"] = .string(v) }
         return props
     }

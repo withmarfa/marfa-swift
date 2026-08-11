@@ -14,6 +14,7 @@ public struct Profile: Codable, Sendable, Hashable {
     public let emailVerified: Bool
     public let firstName: String?
     public let lastName: String?
+    public let timezone: String?
     public let updatedAt: String
     public let username: String?
 
@@ -26,6 +27,7 @@ public struct Profile: Codable, Sendable, Hashable {
         emailVerified: Bool,
         firstName: String? = nil,
         lastName: String? = nil,
+        timezone: String? = nil,
         updatedAt: String,
         username: String? = nil
     ) {
@@ -37,6 +39,7 @@ public struct Profile: Codable, Sendable, Hashable {
         self.emailVerified = emailVerified
         self.firstName = firstName
         self.lastName = lastName
+        self.timezone = timezone
         self.updatedAt = updatedAt
         self.username = username
     }
@@ -50,6 +53,7 @@ public struct Profile: Codable, Sendable, Hashable {
         case emailVerified = "email_verified"
         case firstName = "first_name"
         case lastName = "last_name"
+        case timezone
         case updatedAt = "updated_at"
         case username
     }
