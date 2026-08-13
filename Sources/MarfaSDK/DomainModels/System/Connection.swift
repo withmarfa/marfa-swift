@@ -33,6 +33,24 @@ public struct Connection: MarfaItem {
         return value
     }
 
+    /// Lifecycle status, universal across every kind of connection.
+    ///
+    /// Distinct from ``runtimeStatus``, which reports operational health and
+    /// applies only to an integration. A connection can be `active` while its
+    /// runtime is failing, and a revoked one stops mattering either way.
+    ///
+    /// Falls back to `.active` on an unreadable value, matching how ``kind``
+    /// handles the same case: a connection the server returned exists, and
+    /// treating it as revoked because a string did not parse would hide it
+    /// from every surface that lists connections.
+    public var status: ConnectionStatus {
+        guard let raw = item.properties["status"]?.stringValue,
+              let value = ConnectionStatus(rawValue: raw) else {
+            return .active
+        }
+        return value
+    }
+
     /// When the grant was approved.
     public var grantedAt: String { item.properties["granted_at"]?.stringValue ?? "" }
 

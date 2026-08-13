@@ -16,3 +16,16 @@ public enum ConnectionKind: String, Codable, Sendable, Hashable, CaseIterable {
     case app
     case integration
 }
+
+/// Lifecycle status of a connection, universal across every kind.
+///
+/// The `system.*` namespace uses a bounded two-state lifecycle rather than
+/// the three-state one ordinary items carry: a connection is either live or
+/// it has been revoked, and there is no archived middle.
+///
+/// Not to be confused with an integration's operational health, which is a
+/// separate axis and a wider set of values.
+public enum ConnectionStatus: String, Codable, Sendable, Hashable, CaseIterable {
+    case active
+    case revoked
+}

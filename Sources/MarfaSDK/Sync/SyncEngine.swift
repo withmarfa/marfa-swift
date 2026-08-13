@@ -75,6 +75,10 @@ public actor SyncEngine {
     private let transport: any Transport
     private let localStore: any LocalStoreWriting
     private let mutationQueue: MutationQueue
+    /// The app's live conflict resolver, looked up when replaying a mutation
+    /// queued with `.callback`. Held by the client so registration survives
+    /// the closure that could not be.
+    private let conflictResolvers: ConflictResolverRegistry?
     private let connectionManager: ConnectionStateManager
     private let logger = MarfaLogger(category: "sync")
 
@@ -317,13 +321,15 @@ public actor SyncEngine {
         localStore: any LocalStoreWriting,
         mutationQueue: MutationQueue,
         connectionManager: ConnectionStateManager,
-        drainDebounceInterval: Duration = .milliseconds(150)
+        drainDebounceInterval: Duration = .milliseconds(150),
+        conflictResolvers: ConflictResolverRegistry? = nil
     ) {
         self.transport = transport
         self.localStore = localStore
         self.mutationQueue = mutationQueue
         self.connectionManager = connectionManager
         self.drainDebounceInterval = drainDebounceInterval
+        self.conflictResolvers = conflictResolvers
     }
 
     // MARK: - Lifecycle
@@ -1226,22 +1232,37 @@ public actor SyncEngine {
             // If the call site recorded a `version`, the queued mutation
             // wants conflict-aware replay — go through `handleConflictUpdate`
             // so the captured strategy is applied against any 409 the server
-            // returns. `.callback` degrades to `.auto` because the resolver
-            // closure isn't serializable.
+            // returns.
             if let v = p.version {
-                let strategy: ConflictStrategy = {
-                    switch p.conflict ?? .auto {
-                    case .callback: return .auto
-                    case let other: return other
+                let strategy = p.conflict ?? .auto
+                // The per-call closure could not be written to the queue, so a
+                // `.callback` replay resolves through the resolver the app
+                // registered on the client. This is the write that most needs
+                // it: the raced edit in synced mode is almost never the online
+                // one, it is this replay against a server the app could not
+                // reach at the time.
+                var resolver: ConflictResolver?
+                if strategy == .callback {
+                    resolver = await conflictResolvers?.current()
+                    guard resolver != nil else {
+                        // Deliberately not `.auto`. Resolving under a strategy
+                        // the caller did not choose is the defect; keeping the
+                        // mutation queued costs a delay and loses nothing,
+                        // and the error is non-permanent so the next drain
+                        // carries it once a resolver is registered.
+                        throw ConflictResolverMissingError(
+                            message:
+                                "Replaying an update queued with the .callback conflict strategy, but no resolver is registered on the client. The mutation stays queued; register one with client.registerConflictResolver(_:) and it replays on the next drain."
+                        )
                     }
-                }()
+                }
                 let result = try await handleConflictUpdateWithStats(
                     transport: transport,
                     itemId: p.id,
                     clientPatch: p.properties,
                     version: v,
                     strategy: strategy,
-                    resolver: nil,
+                    resolver: resolver,
                     tier: p.tier,
                     sourceId: p.sourceId
                 )

@@ -12,19 +12,25 @@ public struct ItemsNamespace: Sendable {
     /// pure-local clients still build an `ItemsNamespace` and have no
     /// server URL.
     let apiBaseURL: URL?
+    /// Where a synced-mode `.callback` update finds the app's resolver. The
+    /// per-call closure cannot survive the mutation queue, so in synced mode
+    /// the registry is the only thing a replay can reach.
+    let conflictResolvers: ConflictResolverRegistry?
 
     init(
         transport: any Transport,
         defaultConflictStrategy: ConflictStrategy,
         localStore: LocalStore? = nil,
         mutationQueue: MutationQueue? = nil,
-        apiBaseURL: URL? = nil
+        apiBaseURL: URL? = nil,
+        conflictResolvers: ConflictResolverRegistry? = nil
     ) {
         self.transport = transport
         self.defaultConflictStrategy = defaultConflictStrategy
         self.localStore = localStore
         self.mutationQueue = mutationQueue
         self.apiBaseURL = apiBaseURL
+        self.conflictResolvers = conflictResolvers
     }
 
     /// Creates a new item.
@@ -100,18 +106,43 @@ public struct ItemsNamespace: Sendable {
 
     /// Updates an item's properties with conflict resolution.
     ///
+    /// **Send only the fields you changed, and the version you read.**
+    /// Conflict detection counts every submitted key as a client change, so a
+    /// patch that echoes untouched fields manufactures conflicts against edits
+    /// nobody made — under `keep_both_copies` each one spawns a sibling item
+    /// holding text the user never typed, which reads as corruption. Omitted
+    /// fields keep their server values: properties merge shallowly, so a
+    /// partial patch is safe by construction. Pass ``UpdateOptions/version``
+    /// from the item the edit was based on; an update without one opts out of
+    /// detection entirely and reports nothing when it overwrites.
+    ///
     /// In local mode the update is applied directly (no conflict resolution
     /// needed). In synced mode the local store is updated immediately and the
     /// mutation enqueued for replay; the per-call conflict strategy is
-    /// captured with the queued mutation so replay can apply it on a 409
-    /// (note: the `.callback` resolver closure is not persisted — on replay,
-    /// `.callback` degrades to `.auto`).
+    /// captured with the queued mutation so replay applies the strategy the
+    /// caller chose.
+    ///
+    /// A `.callback` strategy in synced mode resolves through the resolver
+    /// registered on the client rather than the per-call closure, because a
+    /// closure cannot be written to the mutation queue. Calling it with no
+    /// resolver registered throws ``ConflictResolverMissingError`` here, at
+    /// the point of the mistake, instead of silently resolving as `.auto`
+    /// during a replay nobody is watching.
     public func update(
         id: String,
         properties: [String: JSONValue],
         options: UpdateOptions? = nil
     ) async throws -> Item {
         if let store = localStore {
+            let queuedStrategy = options?.conflict ?? defaultConflictStrategy
+            if queuedStrategy == .callback,
+                await conflictResolvers?.current() == nil
+            {
+                throw ConflictResolverMissingError(
+                    message:
+                        "A synced-mode update asked for the .callback conflict strategy, but no resolver is registered on the client. The per-call closure cannot survive the mutation queue, so replay would have nothing to call. Register one with client.registerConflictResolver(_:) before the first write."
+                )
+            }
             let item = try await store.updateItem(
                 id: id,
                 properties: properties,
@@ -226,6 +257,78 @@ public struct ItemsNamespace: Sendable {
         return try await transport.request(
             method: .get, path: "/items/stats", body: nil, query: nil
         )
+    }
+
+    /// Promotes an item from the feed tier into the library.
+    ///
+    /// The tier axis is orthogonal to lifecycle state: promoting says the
+    /// item is worth keeping, and says nothing about whether it is active or
+    /// archived. Promoting an item already in the library is a no-op that
+    /// still returns it, so a caller need not check first.
+    ///
+    /// - Parameter id: The item id.
+    /// - Returns: The item at its new tier.
+    public func promote(id: String) async throws -> Item {
+        guard localStore == nil || mutationQueue != nil else {
+            throw LocalModeUnsupportedError(operation: "items.promote")
+        }
+        let response: ItemResponse = try await transport.request(
+            method: .post, path: "/items/\(id)/promote", body: nil, query: nil
+        )
+        return response.item
+    }
+
+    /// Compares an item against the upstream records that mirror it.
+    ///
+    /// An item synced from a connected service has a counterpart upstream,
+    /// and the two drift: a field edited in Marfa, a field edited in the
+    /// other application, a field only one side has ever had. This reports
+    /// that comparison per field rather than resolving it — nothing is
+    /// written, and deciding what to do with a divergence is the caller's.
+    ///
+    /// - Parameter id: The item id.
+    /// - Returns: One entry per mirroring record, each with its field-level
+    ///   comparison. Empty when the item mirrors nothing.
+    public func reconcile(id: String) async throws -> [ReconcileMirror] {
+        guard localStore == nil || mutationQueue != nil else {
+            throw LocalModeUnsupportedError(operation: "items.reconcile")
+        }
+        let response: ReconcileResponse = try await transport.request(
+            method: .get, path: "/items/\(id)/reconcile", body: nil, query: nil
+        )
+        return response.mirrors
+    }
+
+    /// Expands recurring events into dated occurrences across a window.
+    ///
+    /// A recurring event is stored once, as a rule; the dates it lands on are
+    /// derived rather than stored, so a calendar cannot be built by listing
+    /// items. This returns one entry per date in the window, with exceptions
+    /// applied — an occurrence the user moved or cancelled reflects that
+    /// rather than the rule.
+    ///
+    /// The window is required in both directions, because an unbounded
+    /// expansion of an open-ended rule does not terminate.
+    ///
+    /// - Parameters:
+    ///   - from: Start of the window, as an instant.
+    ///   - to: End of the window, as an instant.
+    ///   - type: Narrow to one event type. All event types when omitted.
+    /// - Returns: Occurrences in the window, ascending by start.
+    public func occurrences(
+        from: String,
+        to: String,
+        type: String? = nil
+    ) async throws -> [Occurrence] {
+        guard localStore == nil || mutationQueue != nil else {
+            throw LocalModeUnsupportedError(operation: "items.occurrences")
+        }
+        var query: [(String, String)] = [("from", from), ("to", to)]
+        if let type { query.append(("type", type)) }
+        let response: OccurrencesResponse = try await transport.request(
+            method: .get, path: "/occurrences", body: nil, query: query
+        )
+        return response.data
     }
 
     /// Permanently removes a trashed item. Irreversible.
