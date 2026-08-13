@@ -7,6 +7,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [12.4.1] — 2026-08-13
+
+### Fixed
+
+- **A per-call `resolve:` closure satisfies a synced-mode `.callback` update again.** 12.4.0 refused the call unless a resolver was registered on the client, which broke the documented way of resolving conflicts per call and, in a consumer app, turned every save into a thrown error. The refusal now fires only when there is nothing to call anywhere — no per-call closure and no registered resolver. Registering one is still what a replay needs, and that is what the registry is for.
+
+
 ## [12.4.0] — 2026-08-13
 
 ### Added

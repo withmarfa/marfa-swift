@@ -155,7 +155,36 @@ struct ConflictResolverReplayTests {
         #expect(try await queue.isEmpty)
     }
 
-    @Test("a synced-mode callback update with no resolver is refused at the call site")
+    @Test("a per-call resolver satisfies the call site, and replay still needs a registered one")
+    func perCallResolverIsAccepted() async throws {
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let transport = MockTransport()
+        let resolvers = ConflictResolverRegistry()
+        let items = ItemsNamespace(
+            transport: transport,
+            defaultConflictStrategy: .auto,
+            localStore: store,
+            mutationQueue: queue,
+            conflictResolvers: resolvers
+        )
+        try await store.upsertItem(item(id: "server-4", version: 1, body: "original"))
+
+        // The immediate write uses this closure, so the call is ordinary —
+        // refusing it would break every app that resolves per call, which is
+        // the documented way to do it.
+        _ = try await items.update(
+            id: "server-4",
+            properties: ["body": .string("edit")],
+            options: UpdateOptions(
+                version: 1,
+                conflict: .callback,
+                resolve: { _ in ["body": .string("resolved inline")] }
+            )
+        )
+        #expect(try await queue.fetchAll().count == 1)
+    }
+
+    @Test("a synced-mode callback update with no resolver at all is refused at the call site")
     func callSiteRefusesUnreachableCallback() async throws {
         let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
         let transport = MockTransport()

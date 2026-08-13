@@ -136,11 +136,22 @@ public struct ItemsNamespace: Sendable {
         if let store = localStore {
             let queuedStrategy = options?.conflict ?? defaultConflictStrategy
             if queuedStrategy == .callback,
+                options?.resolve == nil,
                 await conflictResolvers?.current() == nil
             {
+                // Nothing to call, anywhere: no per-call closure and no
+                // registered resolver. Refusing here is the alternative to
+                // resolving under a strategy the caller did not choose.
+                //
+                // A per-call closure alone is accepted, because it is what
+                // the immediate write uses. It cannot survive the mutation
+                // queue, so a replay of that write looks the resolver up on
+                // the client instead — register one with
+                // `registerConflictResolver(_:)` and the replay resolves the
+                // way the call site did.
                 throw ConflictResolverMissingError(
                     message:
-                        "A synced-mode update asked for the .callback conflict strategy, but no resolver is registered on the client. The per-call closure cannot survive the mutation queue, so replay would have nothing to call. Register one with client.registerConflictResolver(_:) before the first write."
+                        "A synced-mode update asked for the .callback conflict strategy with no resolver to call: none was passed to this call and none is registered on the client. Pass `resolve:`, or register one with client.registerConflictResolver(_:)."
                 )
             }
             let item = try await store.updateItem(
