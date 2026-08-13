@@ -65,6 +65,25 @@ public final class MarfaClient: Sendable {
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
+    /// Where a synced-mode `.callback` conflict strategy finds its resolver.
+    /// Non-nil in synced mode; `nil` for a direct (server-only) client, where
+    /// the per-call closure is reached directly and nothing is queued.
+    private let conflictResolvers: ConflictResolverRegistry?
+
+    /// Installs the resolver that replayed `.callback` updates run through.
+    ///
+    /// A resolver closure cannot be written to the mutation queue, so in
+    /// synced mode it is registered on the client instead of passed per call.
+    /// Register before the first write and before starting the sync engine:
+    /// a `.callback` update with no resolver registered is refused at the call
+    /// site rather than quietly resolving under a different strategy.
+    ///
+    /// No-op on a direct client, which has no queue and calls the per-call
+    /// closure directly.
+    public func registerConflictResolver(_ resolver: @escaping ConflictResolver) async {
+        await conflictResolvers?.register(resolver)
+    }
+
     /// The underlying ``ModelContainer``, non-nil when a local store is
     /// configured. Used by ``makeStore()`` to create ``MarfaStore``
     /// instances. `ModelContainer` is `Sendable` and safe to store on
@@ -93,7 +112,8 @@ public final class MarfaClient: Sendable {
         localStore: LocalStore? = nil,
         mutationQueue: MutationQueue? = nil,
         syncEngine: SyncEngine? = nil,
-        container: ModelContainer? = nil
+        container: ModelContainer? = nil,
+        conflictResolvers: ConflictResolverRegistry? = nil
     ) {
         self.configuration = configuration
         self.transport = transport
@@ -101,13 +121,15 @@ public final class MarfaClient: Sendable {
         self.container = container
         self.mutationQueue = mutationQueue
         self.localStore = localStore
+        self.conflictResolvers = conflictResolvers
 
         let items = ItemsNamespace(
             transport: transport,
             defaultConflictStrategy: configuration.conflictStrategy,
             localStore: localStore,
             mutationQueue: mutationQueue,
-            apiBaseURL: configuration.url
+            apiBaseURL: configuration.url,
+            conflictResolvers: conflictResolvers
         )
         let edges = EdgesNamespace(
             transport: transport,
@@ -318,11 +340,16 @@ public final class MarfaClient: Sendable {
         let container = try MarfaModelContainer.make(path: storePath)
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
         let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
+        // One registry, shared by the write path and the replay path. The
+        // write path checks a `.callback` update can reach a resolver before
+        // queueing it; the replay path is what actually calls it.
+        let resolvers = ConflictResolverRegistry()
         let engine = SyncEngine(
             transport: transport,
             localStore: store,
             mutationQueue: queue,
-            connectionManager: connectionManager
+            connectionManager: connectionManager,
+            conflictResolvers: resolvers
         )
         return MarfaClient(
             configuration: config,
@@ -330,7 +357,8 @@ public final class MarfaClient: Sendable {
             localStore: store,
             mutationQueue: queue,
             syncEngine: engine,
-            container: container
+            container: container,
+            conflictResolvers: resolvers
         )
     }
 

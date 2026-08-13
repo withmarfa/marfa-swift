@@ -22,8 +22,18 @@ echo "syncing types from $MARFA_TYPES → $DEST"
 rm -f "$DEST"/*.json
 cp "$MARFA_TYPES"/*.json "$DEST/"
 mkdir -p "$DEST/edges"
+rm -f "$DEST/edges"/*.json
 cp "$MARFA_TYPES/edges"/*.json "$DEST/edges/"
-echo "synced $(ls "$DEST"/*.json | wc -l | tr -d ' ') type files and $(ls "$DEST/edges"/*.json | wc -l | tr -d ' ') edge type files"
+# The system namespace is vendored but not generated from. Its models are
+# hand-written, because the generator emits an enum-typed schema field as a
+# bare String and those two models exist for their closed enums. Vendoring
+# them anyway is what makes drift visible: SystemSchemaDriftTests compares
+# each hand-written model against the schema here, so a field added upstream
+# fails a test instead of going unnoticed until somebody reads both files.
+mkdir -p "$DEST/system"
+rm -f "$DEST/system"/*.json
+cp "$MARFA_TYPES/system"/*.json "$DEST/system/"
+echo "synced $(ls "$DEST"/*.json | wc -l | tr -d ' ') type files, $(ls "$DEST/edges"/*.json | wc -l | tr -d ' ') edge type files and $(ls "$DEST/system"/*.json | wc -l | tr -d ' ') system type files"
 
 echo "regenerating domain models…"
 swift run codegen-domain

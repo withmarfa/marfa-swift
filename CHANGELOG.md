@@ -7,6 +7,22 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [12.4.0] — 2026-08-13
+
+### Added
+
+- **`items.promote(id:)`, `items.reconcile(id:)` and `items.occurrences(from:to:type:)`.** Three server routes had no Swift surface at all, so an Apple app could not promote an item into the library, ask how an item differs from the upstream record mirroring it, or expand a recurring event into dated occurrences. `Occurrence`, `ReconcileMirror`, `ReconcileField` and `ReconcileFieldState` come with them. Occurrences is the one that had become a real gap rather than a theoretical one: `CoreEvent` models recurrence as of 12.3.0, and nothing here could read what it expanded to.
+- **`MarfaClient.registerConflictResolver(_:)`.** Installs the resolver a replayed `.callback` conflict runs through. See below for why it exists.
+- **`ConnectionStatus` on `Connection`.** The lifecycle status the schema has always declared, and the model never read.
+
+### Fixed
+
+- **A replayed edit reaches the app's conflict resolver.** The `.callback` strategy is a closure, a closure cannot be written to the mutation queue, and replay used to resolve as `.auto` instead — silently, with the app's merge logic never called. In synced mode that is the write where it matters most: the edit that races is almost never the online one, it is the replay against a server the app could not reach at the time. The resolver is now registered on the client, so replay can find it. Nothing substitutes one strategy for another any more: a `.callback` update with no resolver registered is refused at the call site, and a replay that finds none keeps the mutation queued rather than merging it under different rules.
+
+### Changed
+
+- **`system.*` schemas are vendored, and the two hand-written models are checked against them.** They stay hand-written on purpose — the generator emits an enum-typed field as a bare `String?`, and `ConnectionKind`, `ConnectionStatus` and `ActivitySeverity` being closed enums is why these models exist. What was missing is any way to notice drift, since the freshness job cannot see a namespace absent from the snapshot. The schemas are now synced and a test compares each model against the one it mirrors. It found a drift on its first run, which is the `ConnectionStatus` addition above.
+
 ## [12.3.0] — 2026-08-12
 
 Minor, not major: the platform refresh this stamps is additive throughout. No generated struct or member was removed, and every new memberwise-init parameter is defaulted, so existing call sites compile unchanged. The media restructure that would have removed domain models — `core.media.tv_episode` renamed to `core.media.episode`, `core.media.podcast` dropped — was already vendored and released in 12.x, so nothing breaks here.
