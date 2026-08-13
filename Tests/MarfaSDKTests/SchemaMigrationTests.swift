@@ -20,20 +20,30 @@ import SwiftData
 @Suite("SchemaMigration")
 struct SchemaMigrationTests {
 
-    /// Allocates a unique on-disk path under the system temp directory
-    /// and returns it. Caller is responsible for tearing the file down
-    /// (`removeStoreFiles`) after they're done with the container.
+    /// Allocates a directory of this test's own and returns a store path
+    /// inside it. Caller tears down the whole directory with
+    /// ``removeStoreDirectory(of:)``.
+    ///
+    /// A directory rather than a bare path in the system temp root,
+    /// because the store is not the only thing that lands on disk. Opening
+    /// a SwiftData container on a file URL makes Foundation create
+    /// item-replacement directories beside the target, and nothing removes
+    /// those — measured at six per run of this suite alone, and ten
+    /// thousand accumulated in user temp before anybody looked. Removing
+    /// the sqlite file and its siblings, which is all this used to do,
+    /// left every one of them behind.
     private func makeTempStorePath() -> String {
-        NSTemporaryDirectory() + "marfa-migration-\(UUID().uuidString).sqlite"
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("marfa-migration-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root.appendingPathComponent("store.sqlite").path
     }
 
-    /// Removes the SQLite file plus its `-wal` / `-shm` siblings.
-    /// Mirrors ``MarfaModelContainer/removeStoreFiles(at:)``.
-    private func removeStoreFiles(at path: String) {
-        let fm = FileManager.default
-        for suffix in ["", "-wal", "-shm"] {
-            try? fm.removeItem(atPath: path + suffix)
-        }
+    /// Removes the directory the store and everything created beside it
+    /// live in. One call, every exit path, whatever the framework put there.
+    private func removeStoreDirectory(of path: String) {
+        let root = URL(fileURLWithPath: path).deletingLastPathComponent()
+        try? FileManager.default.removeItem(at: root)
     }
 
     /// Builds a V1-only container at `path` (no migration plan,
@@ -58,7 +68,7 @@ struct SchemaMigrationTests {
     @Test("V1 store opens cleanly under the V2 migration plan and rows survive")
     func v1StoreMigratesToV2() async throws {
         let path = makeTempStorePath()
-        defer { removeStoreFiles(at: path) }
+        defer { removeStoreDirectory(of: path) }
 
         // Phase 1 — seed a V1 store on disk.
         do {
