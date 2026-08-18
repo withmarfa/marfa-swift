@@ -43,8 +43,15 @@ public struct CoreMediaEpisode: MarfaItem {
     /// BCP 47 language code
     public var language: String? { item.properties["language"]?.stringValue }
 
-    /// What the episode is made of. Recommended values: tv, podcast, radio, video, mixed
+    /// Direct address of the media file itself: an episode's audio or video enclosure, a track's audio file, a film's stream. Distinct from url, which is the web page about the work.
+    public var mediaUrl: String? { item.properties["media_url"]?.stringValue }
+
+    /// What the episode is made of.
+    /// Allowed values: `tv`, `podcast`, `radio`, `video`, `mixed`.
     public var medium: String? { item.properties["medium"]?.stringValue }
+
+    /// MIME type of the resource at media_url, such as audio/mpeg or video/mp4. Describes what media_url points at, not what this item is.
+    public var mimeType: String? { item.properties["mime_type"]?.stringValue }
 
     /// Personal annotations
     public var notes: String? { item.properties["notes"]?.stringValue }
@@ -83,7 +90,9 @@ public struct CoreMediaEpisode: MarfaItem {
         if let v = episodeNumber { props["episode_number"] = .int(v) }
         if let v = imageUrl { props["image_url"] = .string(v) }
         if let v = language { props["language"] = .string(v) }
+        if let v = mediaUrl { props["media_url"] = .string(v) }
         if let v = medium { props["medium"] = .string(v) }
+        if let v = mimeType { props["mime_type"] = .string(v) }
         if let v = notes { props["notes"] = .string(v) }
         if let v = publishedAt { props["published_at"] = .string(v) }
         if let v = publisher { props["publisher"] = .string(v) }

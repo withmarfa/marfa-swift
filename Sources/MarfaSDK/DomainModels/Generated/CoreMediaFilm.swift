@@ -46,6 +46,12 @@ public struct CoreMediaFilm: MarfaItem {
     /// BCP 47 language code
     public var language: String? { item.properties["language"]?.stringValue }
 
+    /// Direct address of the media file itself: an episode's audio or video enclosure, a track's audio file, a film's stream. Distinct from url, which is the web page about the work.
+    public var mediaUrl: String? { item.properties["media_url"]?.stringValue }
+
+    /// MIME type of the resource at media_url, such as audio/mpeg or video/mp4. Describes what media_url points at, not what this item is.
+    public var mimeType: String? { item.properties["mime_type"]?.stringValue }
+
     /// Personal annotations
     public var notes: String? { item.properties["notes"]?.stringValue }
 
@@ -81,6 +87,8 @@ public struct CoreMediaFilm: MarfaItem {
         if let v = duration { props["duration"] = .double(v) }
         if let v = imageUrl { props["image_url"] = .string(v) }
         if let v = language { props["language"] = .string(v) }
+        if let v = mediaUrl { props["media_url"] = .string(v) }
+        if let v = mimeType { props["mime_type"] = .string(v) }
         if let v = notes { props["notes"] = .string(v) }
         if let v = publishedAt { props["published_at"] = .string(v) }
         if let v = publisher { props["publisher"] = .string(v) }

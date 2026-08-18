@@ -7,6 +7,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Added
+
+- **`mediaUrl` and `mimeType` on `CoreMediaEpisode`, `CoreMediaFilm` and `CoreMediaSong`.** The media types could describe everything about an episode except the episode: the only addresses were `url`, which is the web page about the work, and `imageUrl`. `mediaUrl` is the file itself, and `mimeType` says what it is. Marfa stores the address rather than the bytes; `CoreFileAudio` remains the model for content actually uploaded.
+
+### Changed
+
+- **`medium` and `status` carry a closed set of values.** They were free text where the documentation described a fixed list, so nothing stopped two writers spelling `podcast` differently and splitting a query. The server now rejects a value outside the set, and the generated doc comments name the permitted ones. The Swift property stays `String?` — the domain generator does not emit Swift enums — so this is a server-side tightening a client should be aware of rather than a source change.
+
 ## [12.4.1] — 2026-08-13
 
 ### Fixed
