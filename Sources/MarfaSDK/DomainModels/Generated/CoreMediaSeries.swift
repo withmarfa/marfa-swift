@@ -37,7 +37,8 @@ public struct CoreMediaSeries: MarfaItem {
     /// BCP 47 language code
     public var language: String? { item.properties["language"]?.stringValue }
 
-    /// What the series is made of. Recommended values: tv, podcast, radio, video, mixed
+    /// What the series is made of.
+    /// Allowed values: `tv`, `podcast`, `radio`, `video`, `mixed`.
     public var medium: String? { item.properties["medium"]?.stringValue }
 
     /// Personal annotations
@@ -49,7 +50,8 @@ public struct CoreMediaSeries: MarfaItem {
     /// Who published the work
     public var publisher: String? { item.properties["publisher"]?.stringValue }
 
-    /// Recommended values: ongoing, ended, cancelled
+    /// Whether the series is still producing new members.
+    /// Allowed values: `ongoing`, `ended`, `cancelled`.
     public var status: String? { item.properties["status"]?.stringValue }
 
     /// Web address
