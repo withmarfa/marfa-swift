@@ -7,6 +7,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [12.5.0] — 2026-08-19
+
 ### Added
 
 - **`ConflictData.itemId`.** The payload a conflict resolver receives described the collision and nothing about what collided. A per-call resolver did not need it, because the call site had just passed the id; a registered one has no call site, and a registered one is the only kind a replayed `.callback` update can reach. So the resolver that most needs to report was the one that could not: it could merge, but an app had nothing to name in a message to a person. The id is now on both the immediate and the replay path. Additive on a struct the SDK constructs and an app only reads.
