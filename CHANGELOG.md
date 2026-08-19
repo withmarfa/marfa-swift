@@ -9,6 +9,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **`ConflictData.itemId`.** The payload a conflict resolver receives described the collision and nothing about what collided. A per-call resolver did not need it, because the call site had just passed the id; a registered one has no call site, and a registered one is the only kind a replayed `.callback` update can reach. So the resolver that most needs to report was the one that could not: it could merge, but an app had nothing to name in a message to a person. The id is now on both the immediate and the replay path. Additive on a struct the SDK constructs and an app only reads.
+- **`MarfaSDKTest.makeConflictData(...)`** in `MarfaSDKTestSupport`. A registered resolver is the app's own code, and the only way to run it was to make a real server conflict on demand — so the resolver an app installs was the piece nobody could test. This builds the payload directly.
 - **`mediaUrl` and `mimeType` on `CoreMediaEpisode`, `CoreMediaFilm` and `CoreMediaSong`.** The media types could describe everything about an episode except the episode: the only addresses were `url`, which is the web page about the work, and `imageUrl`. `mediaUrl` is the file itself, and `mimeType` says what it is. Marfa stores the address rather than the bytes; `CoreFileAudio` remains the model for content actually uploaded.
 
 ### Changed

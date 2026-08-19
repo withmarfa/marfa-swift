@@ -97,6 +97,12 @@ struct ConflictResolverReplayTests {
         #expect(captured.clientPatch["body"] == .string("offline edit"))
         #expect(captured.current.properties["body"] == .string("server edit"))
 
+        // And it can say which item conflicted. A registered resolver is the
+        // only kind a replay can use, and it has no call site to learn the id
+        // from: without this it can merge but cannot report, so an app has
+        // nothing to name in a message to a person.
+        #expect(captured.itemId == "server-1")
+
         // And the merge the resolver produced is what went to the server.
         let patches = transport.calls.filter {
             $0.method == .patch && $0.path == "/items/server-1"
@@ -182,6 +188,38 @@ struct ConflictResolverReplayTests {
             )
         )
         #expect(try await queue.fetchAll().count == 1)
+    }
+
+    @Test("the immediate path names the item too")
+    func immediateResolverSeesTheItemId() async throws {
+        // The same payload reaches a per-call resolver on the network path,
+        // and it carries the id there as well. A per-call closure usually
+        // knows the item already, so the point is that one shape of
+        // `ConflictData` serves both paths: an app can register the resolver
+        // it wrote for a call site without rewriting it.
+        let transport = MockTransport()
+        let items = ItemsNamespace(transport: transport, defaultConflictStrategy: .auto)
+
+        transport.enqueue(ItemResponse(item: item(id: "server-5", version: 1, body: "original")))
+        transport.enqueue(conflictResponse())
+        transport.enqueue(
+            ItemResponse(item: item(id: "server-5", version: 3, body: "resolved inline")))
+
+        let sawConflict = ResolverProbe()
+        _ = try await items.update(
+            id: "server-5",
+            properties: ["body": .string("edit")],
+            options: UpdateOptions(
+                conflict: .callback,
+                resolve: { conflict in
+                    await sawConflict.record(conflict)
+                    return ["body": .string("resolved inline")]
+                }
+            )
+        )
+
+        let captured = try #require(await sawConflict.captured)
+        #expect(captured.itemId == "server-5")
     }
 
     @Test("a synced-mode callback update with no resolver at all is refused at the call site")

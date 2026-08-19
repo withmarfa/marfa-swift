@@ -10,21 +10,21 @@ struct ConflictTests {
 
     @Test("Auto-merge keeps client changes for non-conflicting fields")
     func autoMergeNonConflicting() {
-        let conflict = ConflictData(
-            current: ConflictSnapshot(properties: [
-                "title": .string("Server Title"),
-                "body": .string("Server Body"),
-            ], version: 2),
-            ancestor: ConflictSnapshot(properties: [
-                "title": .string("Original Title"),
-                "body": .string("Original Body"),
-            ], version: 1),
+        let conflict = MarfaSDKTest.makeConflictData(
+            itemId: "item-1",
             conflictingFields: ["title"],
             clientPatch: [
                 "title": .string("Client Title"),
                 "body": .string("Client Body"),
             ],
-            mergePolicy: nil
+            serverProperties: [
+                "title": .string("Server Title"),
+                "body": .string("Server Body"),
+            ],
+            ancestor: ConflictSnapshot(properties: [
+                "title": .string("Original Title"),
+                "body": .string("Original Body"),
+            ], version: 1)
         )
 
         let merged = autoMergeLastWriterWins(conflict: conflict)
@@ -37,17 +37,16 @@ struct ConflictTests {
 
     @Test("Auto-merge with no conflicts applies all client changes")
     func autoMergeNoConflicts() {
-        let conflict = ConflictData(
-            current: ConflictSnapshot(properties: [
-                "title": .string("Server Title"),
-            ], version: 2),
-            ancestor: ConflictSnapshot(properties: [:], version: 1),
+        let conflict = MarfaSDKTest.makeConflictData(
+            itemId: "item-1",
             conflictingFields: [],
             clientPatch: [
                 "title": .string("Client Title"),
                 "body": .string("New Body"),
             ],
-            mergePolicy: nil
+            serverProperties: [
+                "title": .string("Server Title"),
+            ]
         )
 
         let merged = autoMergeLastWriterWins(conflict: conflict)
@@ -58,18 +57,17 @@ struct ConflictTests {
 
     @Test("Auto-merge with all fields conflicting keeps server values")
     func autoMergeAllConflicting() {
-        let conflict = ConflictData(
-            current: ConflictSnapshot(properties: [
-                "title": .string("Server Title"),
-                "body": .string("Server Body"),
-            ], version: 2),
-            ancestor: ConflictSnapshot(properties: [:], version: 1),
+        let conflict = MarfaSDKTest.makeConflictData(
+            itemId: "item-1",
             conflictingFields: ["title", "body"],
             clientPatch: [
                 "title": .string("Client Title"),
                 "body": .string("Client Body"),
             ],
-            mergePolicy: nil
+            serverProperties: [
+                "title": .string("Server Title"),
+                "body": .string("Server Body"),
+            ]
         )
 
         let merged = autoMergeLastWriterWins(conflict: conflict)

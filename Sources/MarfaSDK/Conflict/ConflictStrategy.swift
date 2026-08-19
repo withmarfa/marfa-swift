@@ -22,6 +22,15 @@ public enum ConflictStrategy: String, Codable, Sendable {
 
 /// Data provided to a conflict resolver.
 public struct ConflictData: Sendable {
+    /// The item being resolved.
+    ///
+    /// A per-call resolver already knows this, because the call site just
+    /// passed the id. A registered one does not, and a registered one is the
+    /// only kind a replayed `.callback` update can reach. Without it such a
+    /// resolver can merge but cannot report, so an app has nothing to name in
+    /// a message to a person.
+    public let itemId: String
+
     /// The server's current state.
     public let current: ConflictSnapshot
 
@@ -37,6 +46,29 @@ public struct ConflictData: Sendable {
     /// The type's resolved merge policy, as emitted by the server in the 409
     /// response. The SDK falls back to last-writer-wins per field when absent.
     public let mergePolicy: MergePolicy?
+
+    /// The SDK builds these; an app only reads them. Exposed to test support
+    /// so a consumer can exercise the resolver it registers without standing
+    /// up a server that will conflict on demand — which is otherwise the only
+    /// way to obtain one, and so the reason a registered resolver goes
+    /// untested. Not public: an app that constructed one would be pinned by
+    /// every field added here.
+    @_spi(MarfaSDKTestSupport)
+    public init(
+        itemId: String,
+        current: ConflictSnapshot,
+        ancestor: ConflictSnapshot,
+        conflictingFields: [String],
+        clientPatch: [String: JSONValue],
+        mergePolicy: MergePolicy?
+    ) {
+        self.itemId = itemId
+        self.current = current
+        self.ancestor = ancestor
+        self.conflictingFields = conflictingFields
+        self.clientPatch = clientPatch
+        self.mergePolicy = mergePolicy
+    }
 }
 
 /// A function that resolves a version conflict by producing merged properties.

@@ -132,6 +132,7 @@ func handleConflictUpdateWithStats(
             }
 
             let conflict = ConflictData(
+                itemId: itemId,
                 current: conflictResponse.current,
                 ancestor: conflictResponse.ancestor,
                 conflictingFields: conflictResponse.conflictingFields,
