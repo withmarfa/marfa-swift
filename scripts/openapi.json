@@ -14,7 +14,55 @@
         "description": "Authenticate with an API key (`marfa_k1_…`) or an OAuth access token (`marfa_at_…`)."
       }
     },
-    "schemas": {},
+    "schemas": {
+      "ConnectionMappingResponse": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "string"
+          },
+          "mapping": {
+            "nullable": true
+          }
+        },
+        "required": [
+          "connection_id"
+        ]
+      },
+      "ConnectionMappingDocument": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "minItems": 1
+          },
+          "otherwise": {
+            "type": "string",
+            "enum": [
+              "family",
+              "skip"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "rules"
+        ],
+        "additionalProperties": {
+          "nullable": true
+        },
+        "description": "The mapping document. Validated wholesale against the connection's space registry; each refusal names the offending field."
+      }
+    },
     "parameters": {}
   },
   "paths": {
@@ -8925,13 +8973,15 @@
                   "source_type_constraints": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "target_type_constraints": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "cascade_on_delete": {
@@ -9433,6 +9483,15 @@
                           "type": "string"
                         }
                       },
+                      "roles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "container"
+                          ]
+                        }
+                      },
                       "fields": {
                         "type": "object",
                         "additionalProperties": {
@@ -9597,6 +9656,15 @@
                             "type": "string"
                           }
                         },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "container"
+                            ]
+                          }
+                        },
                         "fields": {
                           "type": "object",
                           "additionalProperties": {
@@ -9711,7 +9779,7 @@
             }
           },
           "403": {
-            "description": "Missing metadata.types:write permission",
+            "description": "Missing metadata.types:write permission, a reserved namespace, or a publisher namespace whose handle the caller's user has not claimed",
             "content": {
               "application/json": {
                 "schema": {
@@ -9840,6 +9908,15 @@
                       "type": "array",
                       "items": {
                         "type": "string"
+                      }
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "container"
+                        ]
                       }
                     },
                     "fields": {
@@ -10054,6 +10131,15 @@
                           "type": "array",
                           "items": {
                             "type": "string"
+                          }
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "container"
+                            ]
                           }
                         },
                         "fields": {
@@ -13812,6 +13898,253 @@
         }
       }
     },
+    "/credentials/{id}": {
+      "delete": {
+        "operationId": "deleteCredential",
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Delete a credential",
+        "description": "Removes a `system.credential` and the secret it holds. This is a hard delete: the encrypted secret is gone, not orphaned. Refuses with `credential_in_use` while any connection that is not revoked still references the credential — uninstall those connections first. `system.*` types carry the bounded `active | revoked` lifecycle, which the generic transition endpoint cannot express, so credential removal has its own route rather than going through `POST /items/{id}/transition`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential removed along with the secret it held.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "credential_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "credential_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed credential id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "invalid_id"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin or space_admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No credential with that id in the caller's space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "item_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A live connection still references this credential. The response names them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "credential_in_use"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/integrations": {
       "post": {
         "operationId": "registerIntegration",
@@ -13876,12 +14209,6 @@
                         "both"
                       ]
                     },
-                    "runtime_compatibility": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
                     "registered_at": {
                       "type": "string"
                     },
@@ -13898,7 +14225,6 @@
                     "manifest_version",
                     "publisher",
                     "direction",
-                    "runtime_compatibility",
                     "registered_at",
                     "manifest"
                   ]
@@ -14137,12 +14463,6 @@
                               "both"
                             ]
                           },
-                          "runtime_compatibility": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
                           "registered_at": {
                             "type": "string"
                           },
@@ -14159,7 +14479,6 @@
                           "manifest_version",
                           "publisher",
                           "direction",
-                          "runtime_compatibility",
                           "registered_at",
                           "manifest"
                         ]
@@ -14272,12 +14591,6 @@
                         "both"
                       ]
                     },
-                    "runtime_compatibility": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
                     "registered_at": {
                       "type": "string"
                     },
@@ -14294,7 +14607,6 @@
                     "manifest_version",
                     "publisher",
                     "direction",
-                    "runtime_compatibility",
                     "registered_at",
                     "manifest"
                   ]
@@ -15019,6 +15331,463 @@
                           "type": "string",
                           "enum": [
                             "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/runtime/dead-letters": {
+      "get": {
+        "operationId": "adminListDeadLetters",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List dead-lettered integration dispatches",
+        "description": "Dispatches on the local integration substrate that exhausted their retry ladder, newest failure first. Each row carries the integration and connection the dispatch belonged to, the recorded failure reason, the delivery attempts consumed, and when the job was created and finally failed. Rows age out with the queue's own retention. Platform-admin only. Deployments without the local substrate answer 503.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Maximum rows to return (newest failures first)."
+            },
+            "required": false,
+            "description": "Maximum rows to return (newest failures first).",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dead-lettered dispatches, newest failure first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "integration": {
+                            "type": "string"
+                          },
+                          "connection_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "attempts": {
+                            "type": "number"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "failed_at": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "integration",
+                          "connection_id",
+                          "kind",
+                          "reason",
+                          "attempts",
+                          "created_at",
+                          "failed_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "jobs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a platform admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "This deployment runs no local integration substrate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "local_runtime_not_available"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/runtime/dead-letters/{id}/replay": {
+      "post": {
+        "operationId": "adminReplayDeadLetter",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replay one dead-lettered dispatch",
+        "description": "Re-queues exactly one named dead-lettered dispatch for one more delivery attempt. Only a job currently in the failed state can be replayed; replaying a job that was already replayed, is running, or has completed is refused with a 409 naming its actual state. A replayed job that fails again returns to the listing and can be replayed again. Platform-admin only. Deployments without the local substrate answer 503.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Job id from the dead-letter listing."
+            },
+            "required": true,
+            "description": "Job id from the dead-letter listing.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job was re-queued for one more attempt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "replayed": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "replayed",
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a platform admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No job with this id on the dispatch queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The job is not in the failed state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "This deployment runs no local integration substrate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "local_runtime_not_available"
                           ]
                         },
                         "message": {
@@ -16845,6 +17614,403 @@
         }
       }
     },
+    "/connections/{id}/mapping": {
+      "get": {
+        "operationId": "getConnectionMapping",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Read a connection's user mapping",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Connection item id"
+            },
+            "required": true,
+            "description": "Connection item id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored mapping, or null when none is configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionMappingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found in the caller's space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setConnectionMapping",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Set a connection's user mapping",
+        "description": "Stores the user's routing for this connection: conditions on the incoming record choose the target type, and fields are assigned onto that type's schema. The document is validated wholesale — target types must resolve in the space (reserved namespaces refused), every assigned field must exist on its target, and required target fields must be covered. Shipped write families stay the default for records no rule matches.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Connection item id"
+            },
+            "required": true,
+            "description": "Connection item id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionMappingDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mapping stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionMappingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The mapping failed validation, or this integration does not consult user mappings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found in the caller's space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "clearConnectionMapping",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Clear a connection's user mapping",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Connection item id"
+            },
+            "required": true,
+            "description": "Connection item id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mapping cleared; the shipped write families apply again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionMappingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found in the caller's space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/connections/install": {
       "post": {
         "operationId": "installConnection",
@@ -17161,8 +18327,11 @@
                               "ok",
                               "self_event",
                               "cross_space",
+                              "system_type",
+                              "type_not_targeted",
                               "hop_budget_exceeded",
-                              "subscription_inactive"
+                              "subscription_inactive",
+                              "subscription_paused"
                             ]
                           },
                           "envelope": {
@@ -17422,7 +18591,7 @@
           "Connections"
         ],
         "summary": "Pause an integration connection",
-        "description": "Stops a connection without tearing it down: sets `runtime_status` to `paused` and disarms its schedule, so scheduled runs and item-event dispatches both stop. Credentials and the upstream OAuth grant are left intact, so `resume` restores it without a fresh consent round trip. Pausing an already-paused connection returns 400.",
+        "description": "Stops a connection without tearing it down: sets `runtime_status` to `paused` — the scheduler skips it, reactive fan-out drops it, and new inbound webhook deliveries are refused with a retryable 503 so the sender redelivers after resume. Queued schedule and item-event work is discarded without running; a queued webhook dispatch retries and dead-letters if the pause outlasts it. Credentials and the upstream OAuth grant are left intact, so `resume` restores everything without a fresh consent round trip. Pausing an already-paused connection returns 400.",
         "security": [
           {
             "bearerAuth": []
@@ -17442,7 +18611,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Runtime status updated and the schedule changed to match.",
+            "description": "Runtime status updated. The scheduler, reactive fan-out, and inbound webhook receipt all gate on it; queued schedule and item-event work is discarded, and a queued webhook dispatch retries toward the dead-letter surface.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17458,14 +18627,6 @@
                         "healthy"
                       ]
                     },
-                    "schedule_changed": {
-                      "type": "boolean",
-                      "description": "Whether a schedule alarm actually changed state. False when there was nothing to change — a deployment with no runtime control plane, or an integration that deploys no Worker — and false on a failed call; check `schedule_error` to tell those apart."
-                    },
-                    "schedule_error": {
-                      "type": "string",
-                      "description": "Present only when the schedule call ran and failed. The status write still happened, so the connection reads as paused with its alarm possibly still armed. Retry."
-                    },
                     "activity_id": {
                       "type": "string"
                     }
@@ -17473,7 +18634,6 @@
                   "required": [
                     "connection_id",
                     "runtime_status",
-                    "schedule_changed",
                     "activity_id"
                   ]
                 }
@@ -17481,7 +18641,7 @@
             }
           },
           "400": {
-            "description": "Connection is not an integration, is revoked, or is already in the requested state.",
+            "description": "Connection is not an integration, is revoked, is already in the requested state, or (for resume) is not paused.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17646,7 +18806,7 @@
           "Connections"
         ],
         "summary": "Resume a paused integration connection",
-        "description": "Reverses `pause`: sets `runtime_status` back to `healthy` and re-arms the schedule. Resuming a connection that is not paused returns 400, and a revoked connection cannot be resumed — that is what reinstalling is for.",
+        "description": "Reverses `pause`: sets `runtime_status` back to `healthy`, and the scheduler, reactive fan-out, and inbound webhook receipt all pick the connection up again with nothing to re-arm. Resuming a connection that is not paused returns 400, and a revoked connection cannot be resumed — that is what reinstalling is for.",
         "security": [
           {
             "bearerAuth": []
@@ -17666,7 +18826,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Runtime status updated and the schedule changed to match.",
+            "description": "Runtime status updated. The scheduler, reactive fan-out, and inbound webhook receipt all gate on it; queued schedule and item-event work is discarded, and a queued webhook dispatch retries toward the dead-letter surface.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17682,14 +18842,6 @@
                         "healthy"
                       ]
                     },
-                    "schedule_changed": {
-                      "type": "boolean",
-                      "description": "Whether a schedule alarm actually changed state. False when there was nothing to change — a deployment with no runtime control plane, or an integration that deploys no Worker — and false on a failed call; check `schedule_error` to tell those apart."
-                    },
-                    "schedule_error": {
-                      "type": "string",
-                      "description": "Present only when the schedule call ran and failed. The status write still happened, so the connection reads as paused with its alarm possibly still armed. Retry."
-                    },
                     "activity_id": {
                       "type": "string"
                     }
@@ -17697,7 +18849,6 @@
                   "required": [
                     "connection_id",
                     "runtime_status",
-                    "schedule_changed",
                     "activity_id"
                   ]
                 }
@@ -17705,7 +18856,7 @@
             }
           },
           "400": {
-            "description": "Connection is not an integration, is revoked, or is already in the requested state.",
+            "description": "Connection is not an integration, is revoked, is already in the requested state, or (for resume) is not paused.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17916,14 +19067,6 @@
                       "type": "integer",
                       "minimum": 0
                     },
-                    "schedules_disarmed": {
-                      "type": "boolean",
-                      "description": "Whether a schedule alarm was actually cancelled for this connection. False when there was nothing to cancel — a deployment with no runtime control plane, or an integration that deploys no Worker — and false on a failed disarm; check `schedule_disarm_error` to tell those apart."
-                    },
-                    "schedule_disarm_error": {
-                      "type": "string",
-                      "description": "Why the schedule disarm failed, when one was attempted. The uninstall still completed; re-run the disarm to clear the residual alarm."
-                    },
                     "activity_id": {
                       "type": "string"
                     }
@@ -17934,7 +19077,6 @@
                     "oauth_tokens_deleted",
                     "leased_tokens_revoked",
                     "inbound_webhooks_disabled",
-                    "schedules_disarmed",
                     "activity_id"
                   ]
                 }
@@ -18060,6 +19202,867 @@
           },
           "404": {
             "description": "Connection not found in this space scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{id}/run": {
+      "post": {
+        "operationId": "runConnection",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Run an integration connection now",
+        "description": "Dispatches the connection's sweep immediately instead of waiting for its next scheduled tick. Only connections whose manifest declares the `manual` trigger may be run this way, and only where this deployment can actually dispatch the integration: an integration whose code runs somewhere else is refused rather than silently accepted. A paused connection is refused. The run is queued the same way a cron tick is, so it takes the same per-connection lock and cannot overlap a run already in flight.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Id of the connection to uninstall."
+            },
+            "required": true,
+            "description": "Id of the connection to uninstall.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The run is queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "integration_name": {
+                      "type": "string"
+                    },
+                    "queued": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "integration_name",
+                    "queued"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not an integration connection, revoked, paused, the manifest does not declare `manual`, or this deployment does not run the integration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No integration runtime is available on this instance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "local_runtime_not_available"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{id}/upgrade": {
+      "get": {
+        "operationId": "previewConnectionUpgrade",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "See what moving a connection to a newer manifest would change",
+        "description": "A connection resolves the manifest it was installed against, frozen on its catalog row, so a newer version of the same integration does not reach it until somebody moves it. This reports whether a newer version is registered and exactly what it would newly be allowed to do, computed as a permission diff rather than a version comparison. `consent_lines` is empty when the move takes no more than the connection already has.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Id of the connection to uninstall."
+            },
+            "required": true,
+            "description": "Id of the connection to uninstall.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What an upgrade would change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "manifest_name": {
+                          "type": "string"
+                        },
+                        "manifest_version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "manifest_name",
+                        "manifest_version"
+                      ]
+                    },
+                    "candidate": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "manifest_name": {
+                          "type": "string"
+                        },
+                        "manifest_version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "manifest_name",
+                        "manifest_version"
+                      ]
+                    },
+                    "candidate_integration_ref": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "delta": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "widens": {
+                          "type": "boolean"
+                        },
+                        "types": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "from": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write"
+                                ]
+                              },
+                              "to": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "to"
+                            ]
+                          }
+                        },
+                        "extensions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "from": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write"
+                                ]
+                              },
+                              "to": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "to"
+                            ]
+                          }
+                        },
+                        "edges": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "from": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write"
+                                ]
+                              },
+                              "to": {
+                                "type": "string",
+                                "enum": [
+                                  "read",
+                                  "write"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "to"
+                            ]
+                          }
+                        },
+                        "oauth": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "from": {
+                                "type": "string"
+                              },
+                              "to": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "to"
+                            ]
+                          }
+                        },
+                        "tokens": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "to": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "to"
+                            ]
+                          }
+                        },
+                        "configurationRequired": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "widens",
+                        "types",
+                        "extensions",
+                        "edges",
+                        "oauth",
+                        "tokens",
+                        "configurationRequired"
+                      ]
+                    },
+                    "consent_lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "current",
+                    "candidate",
+                    "candidate_integration_ref",
+                    "delta",
+                    "consent_lines"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "upgradeConnection",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Move a connection to a newer version of its integration",
+        "description": "Re-binds the connection to a newer registered version of the same integration, keeping its cursor state, and revokes its runtime credentials so the next mint projects permissions from the manifest it now resolves. Refuses with 403 when the newer manifest would grant more than the connection was installed with, naming exactly what is new: that move needs a space admin's approval through the install consent screen. Returns 400 when the connection already resolves the newest registered version, or when its stored settings do not satisfy the new manifest.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Id of the connection to uninstall."
+            },
+            "required": true,
+            "description": "Id of the connection to uninstall.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The connection now resolves the newer manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "object",
+                      "properties": {
+                        "manifest_name": {
+                          "type": "string"
+                        },
+                        "manifest_version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "manifest_name",
+                        "manifest_version"
+                      ]
+                    },
+                    "to": {
+                      "type": "object",
+                      "properties": {
+                        "manifest_name": {
+                          "type": "string"
+                        },
+                        "manifest_version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "manifest_name",
+                        "manifest_version"
+                      ]
+                    },
+                    "integration_ref": {
+                      "type": "string"
+                    },
+                    "revoked_credential_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "activity_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "from",
+                    "to",
+                    "integration_ref",
+                    "revoked_credential_ids",
+                    "activity_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not an integration connection, revoked, already current, or its settings do not satisfy the newer manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin, or the newer manifest widens what the connection may do and needs consent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
             "content": {
               "application/json": {
                 "schema": {

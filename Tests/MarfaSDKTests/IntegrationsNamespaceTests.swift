@@ -22,7 +22,6 @@ struct IntegrationsNamespaceTests {
             manifestVersion: "1.0.0",
             publisher: "Acme Inc.",
             registeredAt: "2026-05-01T00:00:00Z",
-            runtimeCompatibility: ["hosted"],
             summary: "Calendar sync"
         )
     }

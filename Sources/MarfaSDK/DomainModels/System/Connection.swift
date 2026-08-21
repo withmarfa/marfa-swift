@@ -79,6 +79,16 @@ public struct Connection: MarfaItem {
         item.properties["configuration"]?.dictionaryValue
     }
 
+    /// Per-connection user mapping: conditions on the incoming record
+    /// choose the target type, and fields are assigned onto its schema.
+    /// Opaque here for the same reason `configuration` is — the platform
+    /// validates it as a whole document at `PUT /connections/{id}/mapping`
+    /// and its shape belongs to the shared mapping module rather than to
+    /// this type's schema.
+    public var mapping: [String: JSONValue]? {
+        item.properties["mapping"]?.dictionaryValue
+    }
+
     /// Read/write/both direction declared by the manifest.
     public var direction: String? { item.properties["direction"]?.stringValue }
 

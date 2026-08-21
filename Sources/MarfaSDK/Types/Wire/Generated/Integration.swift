@@ -13,7 +13,6 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
     public let manifestVersion: String
     public let publisher: String
     public let registeredAt: String
-    public let runtimeCompatibility: [String]
     public let summary: String?
 
     public init(
@@ -24,7 +23,6 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
         manifestVersion: String,
         publisher: String,
         registeredAt: String,
-        runtimeCompatibility: [String],
         summary: String? = nil
     ) {
         self.direction = direction
@@ -34,7 +32,6 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
         self.manifestVersion = manifestVersion
         self.publisher = publisher
         self.registeredAt = registeredAt
-        self.runtimeCompatibility = runtimeCompatibility
         self.summary = summary
     }
 
@@ -46,7 +43,6 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
         case manifestVersion = "manifest_version"
         case publisher
         case registeredAt = "registered_at"
-        case runtimeCompatibility = "runtime_compatibility"
         case summary
     }
 }
