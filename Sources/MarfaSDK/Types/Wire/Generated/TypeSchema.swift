@@ -14,6 +14,7 @@ public struct TypeSchema: Codable, Sendable {
     public let label: String?
     public let mergePolicy: MergePolicy?
     public let parent: String?
+    public let roles: [TypeSchemaRolesitem]?
     public let version: Int
     public let versionPolicy: TypeSchemaVersionPolicy?
 
@@ -26,6 +27,7 @@ public struct TypeSchema: Codable, Sendable {
         label: String? = nil,
         mergePolicy: MergePolicy? = nil,
         parent: String? = nil,
+        roles: [TypeSchemaRolesitem]? = nil,
         version: Int,
         versionPolicy: TypeSchemaVersionPolicy? = nil
     ) {
@@ -37,6 +39,7 @@ public struct TypeSchema: Codable, Sendable {
         self.label = label
         self.mergePolicy = mergePolicy
         self.parent = parent
+        self.roles = roles
         self.version = version
         self.versionPolicy = versionPolicy
     }
@@ -50,9 +53,14 @@ public struct TypeSchema: Codable, Sendable {
         case label
         case mergePolicy = "merge_policy"
         case parent
+        case roles
         case version
         case versionPolicy = "version_policy"
     }
+}
+
+public enum TypeSchemaRolesitem: String, Codable, Sendable, Hashable {
+    case container
 }
 
 public struct TypeSchemaDisplayHints: Codable, Sendable, Hashable {
