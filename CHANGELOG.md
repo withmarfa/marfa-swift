@@ -7,6 +7,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [13.0.0] — 2026-08-21
+
+### Removed
+
+- **`Integration.runtimeCompatibility`.** The manifest contract dropped the field it mirrored. It listed the runtime substrates an integration supported, from a time when the in-process runtime sat beside a separate Workers one; that substrate was retired, which left a required field whose only remaining value meant "runs on the Marfa runtime" — true of every integration. Removed rather than renamed, because a rename would have preserved a distinction that had stopped existing. This snapshot was the last published surface still declaring it.
+- **`ConnectionUninstallResult.schedulesDisarmed`** and **`.scheduleDisarmError`.** The server had already stopped returning them, so both had been decoding to their defaults rather than to anything real.
+
+### Added
+
+- **`Connection.mapping`.** `system.connection` has carried this since per-connection user mappings shipped, and this model never read it, so a field the platform declares was invisible to every client. Opaque for the same reason `configuration` is: the platform validates it as a whole document at `PUT /connections/{id}/mapping`, and its shape belongs to the shared mapping module rather than to the connection's own schema.
+- **`TypeSchema.roles`**, an optional array with a `container` case. A type declares itself a container to accept members through the containment edge, which replaced a fixed list of type names. Note the server does not currently populate this for any type, so it decodes as `nil` even for types that declare the role; that is a server defect rather than a contract one.
+
 ## [12.5.0] — 2026-08-19
 
 ### Added
