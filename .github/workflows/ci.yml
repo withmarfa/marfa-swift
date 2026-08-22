@@ -31,20 +31,52 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select latest Xcode (for Swift 6.2)
+      - name: Select a Swift 6.2 toolchain
         run: |
-          latest=$(ls -1 /Applications/ | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
-          if [[ -z "$latest" ]]; then
-            echo "::error::No Xcode found in /Applications"
+          # This package builds with `swift build` and `swift test` only.
+          # No xcodebuild, no simulator, no destination. So the requirement is
+          # a Swift toolchain at the package's tools version, not Xcode itself.
+          #
+          # Insisting on Xcode made this a scheduling lottery. The self-hosted
+          # runners advertise identical labels, but only some of the machines
+          # carry Xcode, so a job landing on the others failed with "No Xcode
+          # found in /Applications": an error naming the toolchain when the
+          # fact was which runner answered.
+          #
+          # Prefer Xcode when present, because that is what the hosted macOS
+          # images provide and what a developer's machine looks like. Fall back
+          # to whatever `swift` is on PATH, which on a Command Line Tools
+          # install is a complete toolchain for this package.
+          required_major=6
+          required_minor=2
+          latest=$(ls -1 /Applications/ 2>/dev/null | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
+          if [[ -n "$latest" ]]; then
+            dev_dir="/Applications/$latest/Contents/Developer"
+            echo "Selecting $dev_dir"
+            # Export DEVELOPER_DIR for subsequent steps. Avoids sudo
+            # xcode-select, which needs passwordless sudo on self-hosted
+            # runners; works identically on GitHub-hosted macOS images.
+            echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
+            # Also set it here, so the version assertion below tests the
+            # toolchain the later steps will use rather than the one on PATH.
+            export DEVELOPER_DIR="$dev_dir"
+          else
+            echo "No Xcode in /Applications; using the toolchain on PATH."
+          fi
+
+          # Whichever was chosen, assert it can actually build this package.
+          # A silent fall-through to an old toolchain would fail later and
+          # somewhere less obvious.
+          version_line=$(swift --version 2>&1 | grep -oE 'Apple Swift version [0-9]+\.[0-9]+' | head -1)
+          echo "  ${version_line:-unknown Swift version}"
+          have=$(sed -E 's/.*version ([0-9]+)\.([0-9]+).*/\1 \2/' <<<"$version_line")
+          have_major=${have% *}; have_minor=${have#* }
+          if [[ -z "$version_line" ]] \
+             || (( have_major < required_major )) \
+             || (( have_major == required_major && have_minor < required_minor )); then
+            echo "::error::This runner has ${version_line:-no usable Swift}, and the package needs ${required_major}.${required_minor} or newer."
             exit 1
           fi
-          dev_dir="/Applications/$latest/Contents/Developer"
-          echo "Selecting $dev_dir"
-          # Export DEVELOPER_DIR for subsequent steps. Avoids sudo xcode-select
-          # which requires passwordless sudo on self-hosted runners; works
-          # identically on GitHub-hosted macOS runners.
-          echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
-          DEVELOPER_DIR="$dev_dir" swift --version
 
       - name: Cache SPM checkouts
         uses: actions/cache@v6
@@ -92,15 +124,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select latest Xcode (for Swift 6.2)
+      - name: Select a Swift 6.2 toolchain
         run: |
-          latest=$(ls -1 /Applications/ | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
-          if [[ -z "$latest" ]]; then
-            echo "::error::No Xcode found in /Applications"
-            exit 1
-          fi
-          dev_dir="/Applications/$latest/Contents/Developer"
-          echo "Selecting $dev_dir"
+          # This package builds with `swift build` and `swift test` only.
+          # No xcodebuild, no simulator, no destination. So the requirement is
+          # a Swift toolchain at the package's tools version, not Xcode itself.
+          #
+          # Insisting on Xcode made this a scheduling lottery. The self-hosted
+          # runners advertise identical labels, but only some of the machines
+          # carry Xcode, so a job landing on the others failed with "No Xcode
+          # found in /Applications": an error naming the toolchain when the
+          # fact was which runner answered.
+          #
+          # Prefer Xcode when present, because that is what the hosted macOS
+          # images provide and what a developer's machine looks like. Fall back
+          # to whatever `swift` is on PATH, which on a Command Line Tools
+          # install is a complete toolchain for this package.
+          required_major=6
+          required_minor=2
+          latest=$(ls -1 /Applications/ 2>/dev/null | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
+          if [[ -n "$latest" ]]; then
+            dev_dir="/Applications/$latest/Contents/Developer"
+            echo "Selecting $dev_dir"
           echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$dev_dir" swift --version
 
