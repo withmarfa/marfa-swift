@@ -1,0 +1,80 @@
+name: Release
+
+# Cuts a GitHub Release from the changelog whenever a version tag is pushed.
+#
+# Swift Package Manager resolves from tags, so a missing release breaks no
+# consumer. What it breaks is the repository's own account of itself: the tags
+# said 13.0.0 while the release list said 12.3.0, and the only human-readable
+# statement of what shipped was four versions stale. This existed as a manual
+# step and was skipped four times running, which is the argument for it not
+# being a manual step.
+#
+# Hosted, never the self-hosted pool: this is a publishing job, and the pool's
+# availability should not decide whether a release exists.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to cut a release from"
+        required: true
+
+# Never cancel an in-flight release, and key per tag so two tag pushes queue
+# rather than one killing the other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Resolve the tag and its version
+        id: v
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      # Read the section for this version out of CHANGELOG.md. Fails loudly
+      # rather than publishing an empty release: a release whose notes are
+      # blank is the same shape of problem as no release at all.
+      - name: Extract the changelog section
+        id: notes
+        run: |
+          version="${{ steps.v.outputs.version }}"
+          awk -v v="${version}" '
+            $0 ~ "^## \\[?" v "\\]?" { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' CHANGELOG.md > /tmp/notes.md
+          if [ ! -s /tmp/notes.md ]; then
+            echo "✗ CHANGELOG.md has no section for ${version}." >&2
+            echo "  A release needs notes; add the section and re-run." >&2
+            exit 1
+          fi
+          echo "  $(wc -l < /tmp/notes.md) lines of notes for ${version}"
+
+      # Idempotent: re-running for an existing release updates its notes
+      # rather than failing, so a corrected changelog can be republished.
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.v.outputs.tag }}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release edit "${tag}" --notes-file /tmp/notes.md
+            echo "  updated ${tag}"
+          else
+            gh release create "${tag}" --title "${tag}" --notes-file /tmp/notes.md
+            echo "  created ${tag}"
+          fi
