@@ -7,6 +7,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [13.0.1] — 2026-08-23
+
 ### Fixed
 
 - **The `.callback` refusal on a local-only client now describes that client.** A `.callback` update with no resolver is refused at the call site, which is right, but the refusal called the client synced-mode and told the caller to register a resolver with `registerConflictResolver(_:)`. That method installs nothing on a local-only client, so following the advice produced the identical refusal with nothing to explain why. A local-only client never syncs, so no conflict can arise there and no resolver would ever run; the refusal now says exactly that, and points at `.auto`, `.manual`, or a per-call `resolve:` for code that also runs against a synced client. `registerConflictResolver(_:)` documents its inertness on both queueless clients rather than only on the direct one. Message text only; no behavior changed.
