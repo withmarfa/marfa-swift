@@ -32,6 +32,14 @@ struct WireRoundTripTests {
         #expect(lhs == rhs, "round-trip mismatch for \(fixture)", sourceLocation: sourceLocation)
     }
 
+    // Hand-written, and the only wire model in this suite that is. The
+    // generated ones are already guarded by the codegen freshness check;
+    // the hand-written ones are the ones that drift, and this is where that
+    // drift shows up as a dropped key rather than as a diff.
+    @Test("SpaceConfig (hand-written)") func spaceConfig() throws {
+        try assertRoundTrip(SpaceConfig.self, fixture: "space_config")
+    }
+
     @Test("Item") func item() throws { try assertRoundTrip(Item.self, fixture: "item") }
 
     @Test("Metadata") func metadata() throws { try assertRoundTrip(Metadata.self, fixture: "metadata") }

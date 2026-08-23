@@ -201,4 +201,60 @@ struct SpacesNamespaceTests {
             _ = try await client.spaces.quotas.set("space-1", SpaceQuotaInput())
         }
     }
+
+    // MARK: - Round trip
+
+    /// The read, change one field, write it back sequence, through the
+    /// namespace rather than the model.
+    ///
+    /// The model's own round trip is pinned by a fixture in the wire suite,
+    /// which is recursive and catches a dropped key inside `enforcement`
+    /// too. This one covers the half that fixture cannot: that what the
+    /// client puts on the wire for a `PUT` is what came off it for the
+    /// `GET`. The other tests in this file seed the mock with a Swift value
+    /// rather than wire bytes, which is tautological, and is why a model
+    /// missing two fields went unnoticed here.
+    @Test("a config read from the wire survives being written back")
+    func configRoundTripThroughTheNamespace() async throws {
+        let (client, mock) = makeClient()
+        let wire = """
+        {
+          "enforcement": { "strict_mode": { "types": ["core.note"] } },
+          "audit_retention_days": 30,
+          "event_log_retention_hours": 72,
+          "trash_retention_days": 14,
+          "activity_retention_days": 7,
+          "max_event_hop_budget": 3
+        }
+        """.data(using: .utf8)!
+
+        // Queued as an opaque JSON value, so the bytes the client reads
+        // never pass through `SpaceConfig` on the way in. Seeding the mock
+        // with a Swift value, which is what the tests above do, cannot show
+        // a field being dropped: the same model puts it in and takes it out.
+        let asJSON = try JSONDecoder().decode(JSONValue.self, from: wire)
+        mock.enqueue(asJSON)
+        var config = try await client.spaces.getConfig()
+        // The app changes the one thing it came to change.
+        config.trashRetentionDays = 21
+
+        mock.enqueue(asJSON)
+        _ = try await client.spaces.setConfig(config)
+
+        let body = try #require(mock.calls[1].body)
+        let sent = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+
+        #expect(sent["trash_retention_days"] as? Int == 21)
+        // PUT is a full replacement, so a key missing here is a value erased
+        // on the server, reported as a successful write.
+        #expect(sent["audit_retention_days"] as? Int == 30)
+        #expect(sent["event_log_retention_hours"] as? Int == 72)
+        #expect(sent["activity_retention_days"] as? Int == 7)
+        #expect(sent["max_event_hop_budget"] as? Int == 3)
+        let enforcement = try #require(sent["enforcement"] as? [String: Any])
+        let strict = try #require(enforcement["strict_mode"] as? [String: Any])
+        #expect(strict["types"] as? [String] == ["core.note"])
+    }
 }

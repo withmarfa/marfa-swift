@@ -43,7 +43,8 @@ struct ConnectionsNamespaceTests {
             inboundWebhooksDisabled: 0,
             leasedTokensRevoked: 1,
             oauthTokensDeleted: true,
-            revokedCredentialIds: ["cred-1"]
+            revokedCredentialIds: ["cred-1"],
+            upstreamCredential: ["revoked": .bool(true)]
         ))
 
         let result = try await client.connections.uninstall("conn-1")

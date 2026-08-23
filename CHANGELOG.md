@@ -7,6 +7,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Added
+
+- **`ConnectionUninstallResult.upstreamCredential`.** The server has returned it as a required field for some time and the snapshot this package generates from had not been refreshed since before it landed, so it decoded away. Non-optional, matching the contract.
+- **`SpaceConfig.activityRetentionDays`** and **`SpaceConfig.maxEventHopBudget`.** The platform's space configuration carries six fields and this model declared four, so the two missing ones decoded away silently. That matters more than an absent accessor: `PUT /spaces/me/config` is a full replacement, so the ordinary read, change one value, write it back sequence sent back a document with both keys gone and erased whatever the space had set, reporting a successful write. `activity_retention_days` has been settable since activity retention shipped, so this was reachable rather than theoretical.
+
+### Fixed
+
+- **The OpenAPI snapshot this package generates from was stale**, which is why the above went unnoticed. The codegen freshness check compares the generated types against the committed snapshot rather than against the platform, so a snapshot behind the server passes. Both declare the same `info.version`, so nothing signalled it either. Refreshed, which is also what brought `upstream_credential` in.
+- **`SpaceConfig.Enforcement.sourceFilter`'s documentation described the opposite lever.** It said the listed sources were blocked from writing the listed types, and called it the inverse of `sourceAllowlist`. It is a read-side predicate and the listed sources are the approved ones. An operator following the old text to stop an importer would have hidden every item of those types from every other source instead.
+
 ## [13.0.1] — 2026-08-23
 
 ### Fixed
