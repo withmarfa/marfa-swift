@@ -266,3 +266,73 @@ private actor ResolverProbe {
     private(set) var captured: ConflictData?
     func record(_ conflict: ConflictData) { captured = conflict }
 }
+
+/// The same refusal reaches a caller who has no queue and never will.
+///
+/// A local-only client keeps everything in its own store and never syncs, so
+/// no conflict can arise there and no resolver would ever run. The refusal
+/// fires anyway, which is right: the caller asked for a strategy that cannot
+/// be honored. What was wrong was what it said. It called the client
+/// synced-mode and told the caller to register a resolver, on a client where
+/// `registerConflictResolver(_:)` installs nothing, so following the advice
+/// produced the identical refusal with nothing pointing at why.
+@Suite("A local-only client explains why callback cannot work", .timeLimit(.minutes(1)))
+struct LocalOnlyCallbackRefusalTests {
+    @Test("the refusal names the local-only client rather than synced mode")
+    func localOnlyRefusalIsAboutThisClient() async throws {
+        let client = try await MarfaClient.local(path: ":memory:")
+        let created = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("original")])
+        )
+
+        do {
+            _ = try await client.items.update(
+                id: created.id,
+                properties: ["body": .string("edit")],
+                options: UpdateOptions(conflict: .callback)
+            )
+            Issue.record("expected ConflictResolverMissingError")
+        } catch let e as ConflictResolverMissingError {
+            #expect(e.message.contains("local-only"))
+            // The advice that cannot work must not be the advice given.
+            #expect(!e.message.contains("Pass `resolve:`, or register one"))
+            #expect(e.message.contains("no effect on this client"))
+        }
+    }
+
+    // Registering first must not change the answer. This is the loop the
+    // ticket describes: the caller follows the old advice and arrives back at
+    // the same refusal, so the test that matters is the second attempt.
+    @Test("registering a resolver first does not change the refusal")
+    func registeringChangesNothingOnALocalOnlyClient() async throws {
+        let client = try await MarfaClient.local(path: ":memory:")
+        let created = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("original")])
+        )
+        await client.registerConflictResolver { _ in ["body": .string("resolved")] }
+
+        await #expect(throws: ConflictResolverMissingError.self) {
+            _ = try await client.items.update(
+                id: created.id,
+                properties: ["body": .string("edit")],
+                options: UpdateOptions(conflict: .callback)
+            )
+        }
+    }
+
+    // A strategy that can be honored still works, so the guard is not simply
+    // refusing every update on this client.
+    @Test("an auto update on the same client is ordinary")
+    func autoUpdateStillWorks() async throws {
+        let client = try await MarfaClient.local(path: ":memory:")
+        let created = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("original")])
+        )
+        let updated = try await client.items.update(
+            id: created.id,
+            properties: ["body": .string("edit")],
+            options: UpdateOptions(conflict: .auto)
+        )
+        #expect(updated.properties["body"] == .string("edit"))
+    }
+}

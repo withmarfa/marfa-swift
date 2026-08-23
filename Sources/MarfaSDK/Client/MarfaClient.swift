@@ -78,8 +78,12 @@ public final class MarfaClient: Sendable {
     /// a `.callback` update with no resolver registered is refused at the call
     /// site rather than quietly resolving under a different strategy.
     ///
-    /// No-op on a direct client, which has no queue and calls the per-call
-    /// closure directly.
+    /// No-op on either client without a mutation queue, and for different
+    /// reasons. A direct client has no queue because it talks to the server
+    /// synchronously, so it calls the per-call closure itself and never needs
+    /// a registered one. A local-only client has no queue because it never
+    /// syncs, so no conflict can arise and no resolver would ever run; a
+    /// `.callback` update there is refused at the call site and says so.
     public func registerConflictResolver(_ resolver: @escaping ConflictResolver) async {
         await conflictResolvers?.register(resolver)
     }
