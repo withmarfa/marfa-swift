@@ -143,15 +143,26 @@ public struct ItemsNamespace: Sendable {
                 // registered resolver. Refusing here is the alternative to
                 // resolving under a strategy the caller did not choose.
                 //
-                // A per-call closure alone is accepted, because it is what
-                // the immediate write uses. It cannot survive the mutation
-                // queue, so a replay of that write looks the resolver up on
-                // the client instead — register one with
-                // `registerConflictResolver(_:)` and the replay resolves the
-                // way the call site did.
+                // A per-call closure alone is accepted, on this branch only.
+                // A write that lands in the local store first has nothing to
+                // collide with, so nothing here calls the closure; the
+                // collision, if there is one, happens at replay. What runs
+                // there is the registered resolver rather than this closure,
+                // because a closure cannot be written to the mutation queue.
+                // Accepting the closure says the caller has thought about
+                // resolution; registering one is what makes the replay honor
+                // it. (The remote path below is the other story: no store, no
+                // queue, and the closure is called on the 409 itself.)
+                //
+                // Which advice is true depends on which client this is, and
+                // the two are told apart by the queue. A local-only client
+                // has none, so it never replays and can reach no resolver at
+                // all; telling its caller to register one sends them back to
+                // a method that does nothing on that client.
                 throw ConflictResolverMissingError(
-                    message:
-                        "A synced-mode update asked for the .callback conflict strategy with no resolver to call: none was passed to this call and none is registered on the client. Pass `resolve:`, or register one with client.registerConflictResolver(_:)."
+                    message: mutationQueue == nil
+                        ? "A local-only client cannot honor the .callback conflict strategy. It never syncs, so no conflict can arise and no resolver would ever run; registerConflictResolver(_:) has no effect on this client. Use .auto or .manual, or pass `resolve:` if the same code also runs against a synced client."
+                        : "A synced-mode update asked for the .callback conflict strategy with no resolver to call: none was passed to this call and none is registered on the client. Pass `resolve:`, or register one with client.registerConflictResolver(_:)."
                 )
             }
             let item = try await store.updateItem(

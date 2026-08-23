@@ -65,9 +65,11 @@ public final class MarfaClient: Sendable {
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
-    /// Where a synced-mode `.callback` conflict strategy finds its resolver.
-    /// Non-nil in synced mode; `nil` for a direct (server-only) client, where
-    /// the per-call closure is reached directly and nothing is queued.
+    /// Where a synced client's `.callback` conflict strategy finds its
+    /// resolver. Non-nil there and `nil` on both other clients: a direct
+    /// (server-only) client reaches the per-call closure itself and queues
+    /// nothing, and a local-only client never syncs, so no conflict arises for
+    /// a resolver to handle.
     private let conflictResolvers: ConflictResolverRegistry?
 
     /// Installs the resolver that replayed `.callback` updates run through.
@@ -78,8 +80,12 @@ public final class MarfaClient: Sendable {
     /// a `.callback` update with no resolver registered is refused at the call
     /// site rather than quietly resolving under a different strategy.
     ///
-    /// No-op on a direct client, which has no queue and calls the per-call
-    /// closure directly.
+    /// No-op on either client without a mutation queue, and for different
+    /// reasons. A direct client has no queue because it talks to the server
+    /// synchronously, so it calls the per-call closure itself and never needs
+    /// a registered one. A local-only client has no queue because it never
+    /// syncs, so no conflict can arise and no resolver would ever run; a
+    /// `.callback` update there is refused at the call site and says so.
     public func registerConflictResolver(_ resolver: @escaping ConflictResolver) async {
         await conflictResolvers?.register(resolver)
     }
