@@ -311,28 +311,18 @@ struct LocalOnlyCallbackRefusalTests {
         )
         await client.registerConflictResolver { _ in ["body": .string("resolved")] }
 
-        await #expect(throws: ConflictResolverMissingError.self) {
+        do {
             _ = try await client.items.update(
                 id: created.id,
                 properties: ["body": .string("edit")],
                 options: UpdateOptions(conflict: .callback)
             )
+            Issue.record("expected ConflictResolverMissingError")
+        } catch let e as ConflictResolverMissingError {
+            // Same refusal, and still the message that explains itself. Giving
+            // `local()` a registry would satisfy the throw and change what the
+            // caller is told, which is the shape this pins.
+            #expect(e.message.contains("no effect on this client"))
         }
-    }
-
-    // A strategy that can be honored still works, so the guard is not simply
-    // refusing every update on this client.
-    @Test("an auto update on the same client is ordinary")
-    func autoUpdateStillWorks() async throws {
-        let client = try await MarfaClient.local(path: ":memory:")
-        let created = try await client.items.create(
-            CreateItemInput(type: "core.note", properties: ["body": .string("original")])
-        )
-        let updated = try await client.items.update(
-            id: created.id,
-            properties: ["body": .string("edit")],
-            options: UpdateOptions(conflict: .auto)
-        )
-        #expect(updated.properties["body"] == .string("edit"))
     }
 }

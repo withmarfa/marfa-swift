@@ -143,12 +143,16 @@ public struct ItemsNamespace: Sendable {
                 // registered resolver. Refusing here is the alternative to
                 // resolving under a strategy the caller did not choose.
                 //
-                // A per-call closure alone is accepted. The immediate write
-                // never resolves anything — a local write has nothing to
-                // collide with — so a closure matters only on replay, and a
-                // closure cannot be written to the mutation queue. Register
-                // one with `registerConflictResolver(_:)` and the replay
-                // resolves the way the call site would have.
+                // A per-call closure alone is accepted, on this branch only.
+                // A write that lands in the local store first has nothing to
+                // collide with, so nothing here calls the closure; the
+                // collision, if there is one, happens at replay. What runs
+                // there is the registered resolver rather than this closure,
+                // because a closure cannot be written to the mutation queue.
+                // Accepting the closure says the caller has thought about
+                // resolution; registering one is what makes the replay honor
+                // it. (The remote path below is the other story: no store, no
+                // queue, and the closure is called on the 409 itself.)
                 //
                 // Which advice is true depends on which client this is, and
                 // the two are told apart by the queue. A local-only client

@@ -65,9 +65,11 @@ public final class MarfaClient: Sendable {
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
-    /// Where a synced-mode `.callback` conflict strategy finds its resolver.
-    /// Non-nil in synced mode; `nil` for a direct (server-only) client, where
-    /// the per-call closure is reached directly and nothing is queued.
+    /// Where a synced client's `.callback` conflict strategy finds its
+    /// resolver. Non-nil there and `nil` on both other clients: a direct
+    /// (server-only) client reaches the per-call closure itself and queues
+    /// nothing, and a local-only client never syncs, so no conflict arises for
+    /// a resolver to handle.
     private let conflictResolvers: ConflictResolverRegistry?
 
     /// Installs the resolver that replayed `.callback` updates run through.
