@@ -66,6 +66,15 @@ struct WireFixtureSpecDriftTests {
         guard let schema = schema as? [String: Any] else { return }
 
         if let items = schema["items"], let elements = value as? [Any] {
+            // An empty fixture array hides its element's field set from the
+            // walk, which is this bug one level deeper. A fixture exists to
+            // be compared, so an array whose elements have declared fields
+            // has to carry one.
+            if elements.isEmpty, (items as? [String: Any])?["properties"] != nil {
+                Issue.record(
+                    "\(path) is empty in the fixture, so the fields its elements declare are never compared",
+                    sourceLocation: sourceLocation)
+            }
             for (index, element) in elements.enumerated() {
                 assertFields(
                     element, against: items, path: "\(path)[\(index)]",
@@ -105,12 +114,17 @@ struct WireFixtureSpecDriftTests {
                 .flatMap { $0["application/json"] as? [String: Any] }?["schema"],
             "GET /spaces/me/config declares no 200 response schema")
 
-        // Guard the guard: a schema that declared nothing would make every
-        // assertion below vacuous, and a snapshot that moved this route would
-        // read the same way.
+        // The `#require` is the vacuity guard: a moved route fails the
+        // schema lookup above, and a schema behind a `$ref` fails here,
+        // rather than passing with nothing compared.
         let declared = try #require(
             (schema as? [String: Any])?["properties"] as? [String: Any],
             "the 200 schema declares no properties, so there is nothing to compare")
+        // This is a ratchet on top of it, and a hand-maintained number. It
+        // catches a fixture shrunk in step with a shrinking schema, which
+        // the comparison below cannot see because both sides agree. A field
+        // the platform genuinely removes fails here and the fix is editing
+        // the six.
         #expect(declared.count >= 6, "the config schema lost fields rather than gaining them")
 
         assertFields(try fixture("space_config"), against: schema, path: "space_config")

@@ -23,9 +23,9 @@ concurrency:
 # stays main-only: it catches drift in vendored inputs, which a source PR
 # cannot introduce, and it costs more than it would pay back per push.
 #
-# Both jobs open with the same prelude, toolchain selection and the SPM
-# caches, which lives in .github/actions/swift-toolchain rather than being
-# written out twice.
+# Both jobs open with the same prelude: toolchain selection followed by the
+# two SPM caches. It lives in .github/actions/swift-toolchain rather than
+# being written out twice.
 
 jobs:
   validate:
