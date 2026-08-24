@@ -18,13 +18,13 @@ concurrency:
   cancel-in-progress: true
 
 # `validate` (build + full test suite) runs on every PR and every merge to
-# main — a change is not validated until its tests have run, and a PR is
-# where that has to happen. `freshness` (three codegen regens plus diffs)
+# main, because a change is not validated until its tests have run and a PR
+# is where that has to happen. `freshness` (three codegen regens plus diffs)
 # stays main-only: it catches drift in vendored inputs, which a source PR
 # cannot introduce, and it costs more than it would pay back per push.
 #
-# Both jobs open with the same prelude — toolchain selection and the SPM
-# caches — which lives in .github/actions/swift-toolchain rather than being
+# Both jobs open with the same prelude, toolchain selection and the SPM
+# caches, which lives in .github/actions/swift-toolchain rather than being
 # written out twice.
 
 jobs:

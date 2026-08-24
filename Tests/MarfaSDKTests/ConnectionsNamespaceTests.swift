@@ -44,12 +44,20 @@ struct ConnectionsNamespaceTests {
             leasedTokensRevoked: 1,
             oauthTokensDeleted: true,
             revokedCredentialIds: ["cred-1"],
-            upstreamCredential: ["revoked": .bool(true)]
+            // One of the four arms the spec's `oneOf` declares, rather than
+            // an invented key: this type's only documentation of that union
+            // is the doc on `connections.uninstall`, and a fixture that
+            // contradicts it teaches the wrong shape.
+            upstreamCredential: [
+                "status": .string("purged"),
+                "credential_id": .string("cred-1"),
+            ]
         ))
 
         let result = try await client.connections.uninstall("conn-1")
 
         #expect(result.leasedTokensRevoked == 1)
+        #expect(result.upstreamCredential["status"] == .string("purged"))
         #expect(mock.calls[0].method == .post)
         #expect(mock.calls[0].path == "/connections/conn-1/uninstall")
     }

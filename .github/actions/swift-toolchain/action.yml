@@ -18,6 +18,9 @@ runs:
   steps:
     - name: Select a Swift toolchain
       shell: bash
+      env:
+        REQUIRED_MAJOR: ${{ inputs.required-major }}
+        REQUIRED_MINOR: ${{ inputs.required-minor }}
       run: |
         # This package builds with `swift build` and `swift test` only.
         # No xcodebuild, no simulator, no destination. So the requirement is
@@ -33,9 +36,16 @@ runs:
         # images provide and what a developer's machine looks like. Fall back
         # to whatever `swift` is on PATH, which on a Command Line Tools
         # install is a complete toolchain for this package.
-        required_major='${{ inputs.required-major }}'
-        required_minor='${{ inputs.required-minor }}'
-        latest=$(ls -1 /Applications/ 2>/dev/null | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1)
+        # `|| true` on both greps below, because a composite step names its
+        # shell and naming `bash` selects `-o pipefail`, which an inline step
+        # does not get. Without it, "no Xcode here" and "swift --version says
+        # something unfamiliar" both kill the step at the assignment, before
+        # the branch written to handle them and before the error naming what
+        # happened. Those are the two cases this whole step exists for, so the
+        # pipelines say out loud that a non-match is an answer.
+        required_major="$REQUIRED_MAJOR"
+        required_minor="$REQUIRED_MINOR"
+        latest=$( { ls -1 /Applications/ 2>/dev/null | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1; } || true )
         if [[ -n "$latest" ]]; then
           dev_dir="/Applications/$latest/Contents/Developer"
           echo "Selecting $dev_dir"
@@ -53,7 +63,7 @@ runs:
         # Whichever was chosen, assert it can actually build this package.
         # A silent fall-through to an old toolchain would fail later and
         # somewhere less obvious.
-        version_line=$(swift --version 2>&1 | grep -oE 'Apple Swift version [0-9]+\.[0-9]+' | head -1)
+        version_line=$( { swift --version 2>&1 | grep -oE 'Apple Swift version [0-9]+\.[0-9]+' | head -1; } || true )
         echo "  ${version_line:-unknown Swift version}"
         have=$(sed -E 's/.*version ([0-9]+)\.([0-9]+).*/\1 \2/' <<<"$version_line")
         have_major=${have% *}; have_minor=${have#* }

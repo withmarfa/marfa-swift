@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-@testable import MarfaSDK
 
 /// `WireRoundTripTests` proves a model can re-encode a fixture without losing
 /// a key. It cannot prove the fixture carries every key the platform sends,
@@ -11,14 +10,20 @@ import Foundation
 /// That happened. `SpaceConfig` was missing two of the six fields the spec
 /// declares, and a `PUT` of a decoded config dropped them.
 ///
-/// So this reads the committed OpenAPI snapshot and asserts the fixture's key
-/// set matches it exactly. Refreshing the snapshot then fails this test, which
-/// fails until the fixture gains the field, which fails the round-trip until
-/// the model gains it too. The chain ends at the model rather than at whoever
-/// remembered.
+/// So this reads the committed OpenAPI snapshot and asserts the fixture's
+/// field set matches it, at every depth. Refreshing the snapshot then fails
+/// this test, which fails until the fixture gains the field, which fails the
+/// round-trip until the model gains it too. The chain ends at the model
+/// rather than at whoever remembered.
 ///
-/// Generated models need none of this: the freshness job regenerates them from
-/// the same snapshot and diffs. Hand-written ones are what drift.
+/// The walk is recursive on purpose. Checking only the top level and one
+/// level down would leave the same bug reachable one level deeper: a key
+/// added inside `enforcement.source_filter` would pass a shallow check, miss
+/// the fixture, miss the model, and be erased on the next full-replacement
+/// write.
+///
+/// Generated models need none of this: the freshness job regenerates them
+/// from the same snapshot and diffs. Hand-written ones are what drift.
 @Suite("Hand-written wire fixtures track the spec")
 struct WireFixtureSpecDriftTests {
 
@@ -44,17 +49,54 @@ struct WireFixtureSpecDriftTests {
         return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
-    /// Property names of an inline object schema, one level down.
-    private func properties(of schema: Any?) throws -> Set<String> {
-        let object = try #require(schema as? [String: Any], "expected an object schema")
-        let properties = try #require(
-            object["properties"] as? [String: Any], "schema declares no properties")
-        return Set(properties.keys)
+    /// Compare one object against its schema, then every nested object under
+    /// it. `path` is carried for the failure message: a mismatch four levels
+    /// down is useless without it.
+    ///
+    /// Only inline object schemas are walked. A `$ref`, a `oneOf` or an
+    /// `additionalProperties` map has no single declared field set to compare
+    /// against, so it is left alone rather than compared against a guess.
+    /// Objects inside arrays are walked through the array's `items`.
+    private func assertFields(
+        _ value: Any?,
+        against schema: Any?,
+        path: String,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        guard let schema = schema as? [String: Any] else { return }
+
+        if let items = schema["items"], let elements = value as? [Any] {
+            for (index, element) in elements.enumerated() {
+                assertFields(
+                    element, against: items, path: "\(path)[\(index)]",
+                    sourceLocation: sourceLocation)
+            }
+            return
+        }
+
+        guard let properties = schema["properties"] as? [String: Any] else { return }
+        guard let object = value as? [String: Any] else {
+            Issue.record(
+                "\(path) declares fields in the spec and the fixture has no object there",
+                sourceLocation: sourceLocation)
+            return
+        }
+
+        #expect(
+            Set(object.keys) == Set(properties.keys),
+            "\(path) and the spec disagree on which fields exist",
+            sourceLocation: sourceLocation)
+
+        for (key, childSchema) in properties where object[key] != nil {
+            assertFields(
+                object[key], against: childSchema, path: "\(path).\(key)",
+                sourceLocation: sourceLocation)
+        }
     }
 
     @Test("SpaceConfig")
     func spaceConfig() throws {
-        let response = try #require(
+        let schema = try #require(
             (((spec()["paths"] as? [String: Any])?["/spaces/me/config"]
                 as? [String: Any])?["get"] as? [String: Any])
                 .flatMap { $0["responses"] as? [String: Any] }
@@ -63,18 +105,15 @@ struct WireFixtureSpecDriftTests {
                 .flatMap { $0["application/json"] as? [String: Any] }?["schema"],
             "GET /spaces/me/config declares no 200 response schema")
 
-        let fixture = try fixture("space_config")
+        // Guard the guard: a schema that declared nothing would make every
+        // assertion below vacuous, and a snapshot that moved this route would
+        // read the same way.
+        let declared = try #require(
+            (schema as? [String: Any])?["properties"] as? [String: Any],
+            "the 200 schema declares no properties, so there is nothing to compare")
+        #expect(declared.count >= 6, "the config schema lost fields rather than gaining them")
 
-        #expect(
-            Set(fixture.keys) == (try properties(of: response)),
-            "space_config.json and the spec disagree on the top-level fields")
-
-        let enforcementSchema = try #require(
-            (response as? [String: Any])?["properties"] as? [String: Any])["enforcement"]
-        #expect(
-            Set((fixture["enforcement"] as? [String: Any] ?? [:]).keys)
-                == (try properties(of: enforcementSchema)),
-            "space_config.json and the spec disagree on the enforcement levers")
+        assertFields(try fixture("space_config"), against: schema, path: "space_config")
     }
 
     // `PaginatedResult` is the other hand-written model with a fixture, and it
