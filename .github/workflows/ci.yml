@@ -26,11 +26,19 @@ concurrency:
 # Both jobs open with the same prelude: toolchain selection followed by the
 # two SPM caches. It lives in .github/actions/swift-toolchain rather than
 # being written out twice.
+#
+# `xcode` in `runs-on` is a capability label rather than a machine. The
+# self-hosted pool carries a member with no usable Xcode, and a Swift job
+# landing there fails on a missing developer directory, which sends the
+# reader to the toolchain when the fact is that the job was scheduled
+# somewhere it was never going to run. Requiring the label means it queues
+# for a machine that can do the work instead. Unset CI_RUNNER to fall back
+# to GitHub's hosted macOS runners.
 
 jobs:
   validate:
     name: Build + test
-    runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
+    runs-on: ${{ vars.CI_RUNNER == 'self-hosted' && fromJSON('["self-hosted", "xcode"]') || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -47,7 +55,7 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
+    runs-on: ${{ vars.CI_RUNNER == 'self-hosted' && fromJSON('["self-hosted", "xcode"]') || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v7
 

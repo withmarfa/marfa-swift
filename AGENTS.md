@@ -103,7 +103,9 @@ Two jobs in `.github/workflows/ci.yml`.
 
 **Local before pushing.** Run `swift test` locally anyway. CI catching it is a slower loop than catching it yourself.
 
-**Runner routing.** Both jobs read `runs-on` from the `CI_RUNNER` Actions variable, defaulting to `macos-latest`. `CI_RUNNER=self-hosted` routes them to a self-hosted Apple Silicon pool. Reverts to hardcoded `macos-latest` before this repo goes public.
+**Runner routing.** Both jobs read `runs-on` from the `CI_RUNNER` Actions variable, defaulting to `macos-latest`. `CI_RUNNER=self-hosted` routes them to a self-hosted Apple Silicon pool, requiring an `xcode` label as well as `self-hosted`. Reverts to hardcoded `macos-latest` before this repo goes public.
+
+**Why the label.** `xcode` names a capability, not a machine. The pool carries a member with no usable Xcode, and a Swift job landing on it fails on a missing developer directory: an error that sends the reader to the toolchain when the fact is that the job was scheduled somewhere it was never going to run. It reads as flakiness, because the remedy that appears to work is a re-run, which succeeds most of the time and teaches exactly the wrong lesson. Requiring the label means such a job queues for a machine that can do the work instead of failing at once.
 
 ## Conventions
 
