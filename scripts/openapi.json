@@ -14777,6 +14777,11 @@
                         }
                       }
                     },
+                    "max_event_hop_budget": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
                     "audit_retention_days": {
                       "type": "integer",
                       "minimum": 0
@@ -14786,6 +14791,10 @@
                       "minimum": 0
                     },
                     "trash_retention_days": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "activity_retention_days": {
                       "type": "integer",
                       "minimum": 0
                     }
@@ -14880,7 +14889,7 @@
           "Spaces"
         ],
         "summary": "Replace the current space's configuration",
-        "description": "Overwrites the space's config with the supplied object — full replacement, not a merge. Cleanup-job retention overrides must be non-negative, where `0` disables the corresponding job for this space. Admin or space_admin.",
+        "description": "Overwrites the space's config with the supplied object — full replacement, not a merge. An unknown key is refused rather than dropped, because a full replacement that ignores a typo erases every override the space had. Cleanup-job retention overrides must be non-negative, where `0` disables the corresponding job for this space. Admin or space_admin.",
         "security": [
           {
             "bearerAuth": []
@@ -14907,7 +14916,8 @@
                         },
                         "required": [
                           "types"
-                        ]
+                        ],
+                        "additionalProperties": false
                       },
                       "source_allowlist": {
                         "type": "object",
@@ -14928,7 +14938,8 @@
                         "required": [
                           "types",
                           "sources"
-                        ]
+                        ],
+                        "additionalProperties": false
                       },
                       "source_filter": {
                         "type": "object",
@@ -14949,9 +14960,16 @@
                         "required": [
                           "types",
                           "sources"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
-                    }
+                    },
+                    "additionalProperties": false
+                  },
+                  "max_event_hop_budget": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
                   },
                   "audit_retention_days": {
                     "type": "integer",
@@ -14964,8 +14982,13 @@
                   "trash_retention_days": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "activity_retention_days": {
+                    "type": "integer",
+                    "minimum": 0
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -15039,6 +15062,11 @@
                         }
                       }
                     },
+                    "max_event_hop_budget": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
                     "audit_retention_days": {
                       "type": "integer",
                       "minimum": 0
@@ -15048,6 +15076,10 @@
                       "minimum": 0
                     },
                     "trash_retention_days": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "activity_retention_days": {
                       "type": "integer",
                       "minimum": 0
                     }
@@ -19021,7 +19053,7 @@
           "Connections"
         ],
         "summary": "Uninstall an integration connection",
-        "description": "Tears down a connection in one pass: revokes its credentials and leased tokens, drops upstream OAuth tokens, disables inbound webhooks, and transitions it to `revoked`. Idempotent per artifact, but rejects with 400 when the connection itself is already revoked.",
+        "description": "Tears down a connection in one pass: revokes its runtime credentials and leased tokens, drops the proxy's cached upstream OAuth tokens, disables inbound webhooks, transitions it to `revoked`, and removes the upstream credential it was installed with unless another live connection still shares it. `upstream_credential` in the response says which of those happened. Idempotent per artifact, but rejects with 400 when the connection itself is already revoked.",
         "security": [
           {
             "bearerAuth": []
@@ -19059,6 +19091,92 @@
                     "oauth_tokens_deleted": {
                       "type": "boolean"
                     },
+                    "upstream_credential": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "none"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "already_gone"
+                              ]
+                            },
+                            "credential_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "credential_id"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "purged"
+                              ]
+                            },
+                            "credential_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "credential_id"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "retained"
+                              ]
+                            },
+                            "credential_id": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "in_use_by_other_connections"
+                              ]
+                            },
+                            "connection_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "credential_id",
+                            "reason",
+                            "connection_ids"
+                          ]
+                        }
+                      ]
+                    },
                     "leased_tokens_revoked": {
                       "type": "integer",
                       "minimum": 0
@@ -19075,6 +19193,7 @@
                     "connection_id",
                     "revoked_credential_ids",
                     "oauth_tokens_deleted",
+                    "upstream_credential",
                     "leased_tokens_revoked",
                     "inbound_webhooks_disabled",
                     "activity_id"
@@ -22115,6 +22234,270 @@
                           "type": "string",
                           "enum": [
                             "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/spaces/{id}/delete": {
+      "post": {
+        "operationId": "adminDeleteSpace",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Delete a space and everything it holds, immediately",
+        "description": "Hard-deletes a space that no account owns, along with its items, edges, blobs, keys, webhooks, connection tokens and quota. There is no grace window and no undo. A space that still has users is refused: that case belongs to `POST /admin/accounts/{id}/delete`, which owns the account teardown as well. The body's `confirm` must be the space id, spelled exactly; the mismatch refusal is the fat-finger gate on an action with no undo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The space id."
+            },
+            "required": true,
+            "description": "The space id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The space id, exactly. Refused otherwise. The id rather than the name because a space name is neither required nor unique."
+                  }
+                },
+                "required": [
+                  "confirm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Space deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "confirm did not match the space id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Space not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The space still has users; delete the account instead",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
                           ]
                         },
                         "message": {

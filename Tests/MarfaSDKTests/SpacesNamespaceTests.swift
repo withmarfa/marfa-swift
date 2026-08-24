@@ -201,4 +201,63 @@ struct SpacesNamespaceTests {
             _ = try await client.spaces.quotas.set("space-1", SpaceQuotaInput())
         }
     }
+
+    // MARK: - Round trip
+
+    /// The read, change one field, write it back sequence, through the
+    /// namespace rather than the model.
+    ///
+    /// The model's own round trip is pinned by a fixture in the wire suite,
+    /// which is recursive and catches a dropped key inside `enforcement`
+    /// too. This one covers the half that fixture cannot: that what the
+    /// client puts on the wire for a `PUT` is what came off it for the
+    /// `GET`. The other tests in this file seed the mock with a Swift value
+    /// rather than wire bytes, which is tautological, and is why a model
+    /// missing two fields went unnoticed here.
+    ///
+    /// It reads the same fixture the wire suite does, so there is one copy
+    /// of the payload rather than two to remember. That fixture is held to
+    /// the OpenAPI snapshot by `WireFixtureSpecDriftTests`, which is what
+    /// makes a field added upstream reach this test without anyone editing
+    /// it.
+    @Test("a config read from the wire survives being written back")
+    func configRoundTripThroughTheNamespace() async throws {
+        let (client, mock) = makeClient()
+        let url = try #require(Bundle.module.url(
+            forResource: "space_config", withExtension: "json", subdirectory: "Fixtures/Wire"))
+        let wire = try Data(contentsOf: url)
+
+        // Queued as an opaque JSON value, so the bytes the client reads
+        // never pass through `SpaceConfig` on the way in. Seeding the mock
+        // with a Swift value, which is what the tests above do, cannot show
+        // a field being dropped: the same model puts it in and takes it out.
+        let asJSON = try JSONDecoder().decode(JSONValue.self, from: wire)
+        mock.enqueue(asJSON)
+        var config = try await client.spaces.getConfig()
+        // The app changes the one thing it came to change.
+        config.trashRetentionDays = 21
+
+        mock.enqueue(asJSON)
+        _ = try await client.spaces.setConfig(config)
+
+        let body = try #require(mock.calls[1].body)
+        let sent = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+
+        #expect(sent["trash_retention_days"] as? Int == 21)
+
+        // PUT is a full replacement, so a key missing here is a value erased
+        // on the server, reported as a successful write. Compared as a whole
+        // document rather than field by field: a list of fields is a list to
+        // keep up to date, and the bug this test exists for was a field
+        // nobody knew to add to one.
+        var expected = try #require(
+            try JSONSerialization.jsonObject(with: wire) as? [String: Any]
+        )
+        expected["trash_retention_days"] = 21
+        #expect(
+            sent as NSDictionary == expected as NSDictionary,
+            "the PUT body differs from the GET body by more than the one field changed")
+    }
 }

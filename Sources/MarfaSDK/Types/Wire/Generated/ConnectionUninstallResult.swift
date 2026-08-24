@@ -12,6 +12,7 @@ public struct ConnectionUninstallResult: Codable, Sendable, Hashable {
     public let leasedTokensRevoked: Int
     public let oauthTokensDeleted: Bool
     public let revokedCredentialIds: [String]
+    public let upstreamCredential: [String: JSONValue]
 
     public init(
         activityId: String,
@@ -19,7 +20,8 @@ public struct ConnectionUninstallResult: Codable, Sendable, Hashable {
         inboundWebhooksDisabled: Int,
         leasedTokensRevoked: Int,
         oauthTokensDeleted: Bool,
-        revokedCredentialIds: [String]
+        revokedCredentialIds: [String],
+        upstreamCredential: [String: JSONValue]
     ) {
         self.activityId = activityId
         self.connectionId = connectionId
@@ -27,6 +29,7 @@ public struct ConnectionUninstallResult: Codable, Sendable, Hashable {
         self.leasedTokensRevoked = leasedTokensRevoked
         self.oauthTokensDeleted = oauthTokensDeleted
         self.revokedCredentialIds = revokedCredentialIds
+        self.upstreamCredential = upstreamCredential
     }
 
     enum CodingKeys: String, CodingKey {
@@ -36,5 +39,6 @@ public struct ConnectionUninstallResult: Codable, Sendable, Hashable {
         case leasedTokensRevoked = "leased_tokens_revoked"
         case oauthTokensDeleted = "oauth_tokens_deleted"
         case revokedCredentialIds = "revoked_credential_ids"
+        case upstreamCredential = "upstream_credential"
     }
 }

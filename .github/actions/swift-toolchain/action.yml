@@ -1,0 +1,106 @@
+name: Swift toolchain
+description: >-
+  Select a Swift toolchain the package can build with, and restore the SPM
+  caches. One copy, because both jobs need the identical prelude and the
+  previous arrangement kept two: a truncated paste into the second copy left
+  an unclosed `if`, and the job it belonged to had not run since.
+
+inputs:
+  required-major:
+    description: Minimum Swift major version.
+    default: '6'
+  required-minor:
+    description: Minimum Swift minor version.
+    default: '2'
+
+runs:
+  using: composite
+  steps:
+    - name: Select a Swift toolchain
+      shell: bash
+      env:
+        REQUIRED_MAJOR: ${{ inputs.required-major }}
+        REQUIRED_MINOR: ${{ inputs.required-minor }}
+      run: |
+        # This package builds with `swift build` and `swift test` only.
+        # No xcodebuild, no simulator, no destination. So the requirement is
+        # a Swift toolchain at the package's tools version, not Xcode itself.
+        #
+        # Insisting on Xcode made this a scheduling lottery. The self-hosted
+        # runners advertise identical labels, but only some of the machines
+        # carry Xcode, so a job landing on the others failed with "No Xcode
+        # found in /Applications": an error naming the toolchain when the
+        # fact was which runner answered.
+        #
+        # Prefer Xcode when present, because that is what the hosted macOS
+        # images provide and what a developer's machine looks like. Fall back
+        # to whatever `swift` is on PATH, which on a Command Line Tools
+        # install is a complete toolchain for this package.
+        # `|| true` on both greps below, because a composite step names its
+        # shell and naming `bash` selects `-o pipefail`, which an inline step
+        # does not get. Without it, "no Xcode here" and "swift --version says
+        # something unfamiliar" both kill the step at the assignment, before
+        # the branch written to handle them and before the error naming what
+        # happened. Those are the two cases this whole step exists for, so the
+        # pipelines say out loud that a non-match is an answer.
+        required_major="$REQUIRED_MAJOR"
+        required_minor="$REQUIRED_MINOR"
+        latest=$( { ls -1 /Applications/ 2>/dev/null | grep -iE '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1; } || true )
+        if [[ -n "$latest" ]]; then
+          dev_dir="/Applications/$latest/Contents/Developer"
+          echo "Selecting $dev_dir"
+          # Export DEVELOPER_DIR for subsequent steps. Avoids sudo
+          # xcode-select, which needs passwordless sudo on self-hosted
+          # runners; works identically on GitHub-hosted macOS images.
+          echo "DEVELOPER_DIR=$dev_dir" >> "$GITHUB_ENV"
+          # Also set it here, so the version assertion below tests the
+          # toolchain the later steps will use rather than the one on PATH.
+          export DEVELOPER_DIR="$dev_dir"
+        else
+          echo "No Xcode in /Applications; using the toolchain on PATH."
+        fi
+
+        # Whichever was chosen, assert it can actually build this package.
+        # A silent fall-through to an old toolchain would fail later and
+        # somewhere less obvious.
+        version_line=$( { swift --version 2>&1 | grep -oE 'Apple Swift version [0-9]+\.[0-9]+' | head -1; } || true )
+        echo "  ${version_line:-unknown Swift version}"
+        have=$(sed -E 's/.*version ([0-9]+)\.([0-9]+).*/\1 \2/' <<<"$version_line")
+        have_major=${have% *}; have_minor=${have#* }
+        if [[ -z "$version_line" ]] \
+           || (( have_major < required_major )) \
+           || (( have_major == required_major && have_minor < required_minor )); then
+          echo "::error::This runner has ${version_line:-no usable Swift}, and the package needs ${required_major}.${required_minor} or newer."
+          exit 1
+        fi
+
+    - name: Cache SPM checkouts
+      uses: actions/cache@v6
+      with:
+        # Scope by runner.name. Self-hosted runners on the same host share
+        # the cache backend, but each runner's working dir is baked into
+        # compiled PCMs; a cross-runner restore surfaces as "missing
+        # required module 'SwiftShims'". Per-runner keys keep each runner
+        # reading its own correctly-pathed cache. GitHub-hosted runners get
+        # a stable runner.name per OS, so the keys still hit cache there.
+        path: .build/checkouts
+        key: ${{ runner.name }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
+        restore-keys: |
+          ${{ runner.name }}-spm-checkouts-
+
+    - name: Cache SPM build artifacts
+      uses: actions/cache@v6
+      with:
+        # Cache the whole .build directory (except checkouts, cached
+        # separately with a finer key). Keyed by Package.resolved +
+        # the hash of all Swift sources, so source-only edits still
+        # get an incremental-compile hit and dependency bumps miss
+        # cleanly. Per-runner scoping for the same reason as the
+        # checkouts cache above.
+        path: |
+          .build
+          !.build/checkouts
+        key: ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
+        restore-keys: |
+          ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved') }}-
+          ${{ runner.name }}-spm-build-
