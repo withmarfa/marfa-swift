@@ -214,19 +214,18 @@ struct SpacesNamespaceTests {
     /// `GET`. The other tests in this file seed the mock with a Swift value
     /// rather than wire bytes, which is tautological, and is why a model
     /// missing two fields went unnoticed here.
+    ///
+    /// It reads the same fixture the wire suite does, so there is one copy
+    /// of the payload rather than two to remember. That fixture is held to
+    /// the OpenAPI snapshot by `WireFixtureSpecDriftTests`, which is what
+    /// makes a field added upstream reach this test without anyone editing
+    /// it.
     @Test("a config read from the wire survives being written back")
     func configRoundTripThroughTheNamespace() async throws {
         let (client, mock) = makeClient()
-        let wire = """
-        {
-          "enforcement": { "strict_mode": { "types": ["core.note"] } },
-          "audit_retention_days": 30,
-          "event_log_retention_hours": 72,
-          "trash_retention_days": 14,
-          "activity_retention_days": 7,
-          "max_event_hop_budget": 3
-        }
-        """.data(using: .utf8)!
+        let url = try #require(Bundle.module.url(
+            forResource: "space_config", withExtension: "json", subdirectory: "Fixtures/Wire"))
+        let wire = try Data(contentsOf: url)
 
         // Queued as an opaque JSON value, so the bytes the client reads
         // never pass through `SpaceConfig` on the way in. Seeding the mock
@@ -247,14 +246,18 @@ struct SpacesNamespaceTests {
         )
 
         #expect(sent["trash_retention_days"] as? Int == 21)
+
         // PUT is a full replacement, so a key missing here is a value erased
-        // on the server, reported as a successful write.
-        #expect(sent["audit_retention_days"] as? Int == 30)
-        #expect(sent["event_log_retention_hours"] as? Int == 72)
-        #expect(sent["activity_retention_days"] as? Int == 7)
-        #expect(sent["max_event_hop_budget"] as? Int == 3)
-        let enforcement = try #require(sent["enforcement"] as? [String: Any])
-        let strict = try #require(enforcement["strict_mode"] as? [String: Any])
-        #expect(strict["types"] as? [String] == ["core.note"])
+        // on the server, reported as a successful write. Compared as a whole
+        // document rather than field by field: a list of fields is a list to
+        // keep up to date, and the bug this test exists for was a field
+        // nobody knew to add to one.
+        var expected = try #require(
+            try JSONSerialization.jsonObject(with: wire) as? [String: Any]
+        )
+        expected["trash_retention_days"] = 21
+        #expect(
+            sent as NSDictionary == expected as NSDictionary,
+            "the PUT body differs from the GET body by more than the one field changed")
     }
 }

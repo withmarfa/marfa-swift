@@ -32,10 +32,15 @@ struct WireRoundTripTests {
         #expect(lhs == rhs, "round-trip mismatch for \(fixture)", sourceLocation: sourceLocation)
     }
 
-    // Hand-written, and the only wire model in this suite that is. The
-    // generated ones are already guarded by the codegen freshness check;
-    // the hand-written ones are the ones that drift, and this is where that
-    // drift shows up as a dropped key rather than as a diff.
+    // Two models in this suite are hand-written: this one and `PaginatedResult`
+    // below. The rest are codegen output, regenerated and diffed by the
+    // freshness job, so a codec bug in one of them is a bug in the emitter.
+    // The hand-written pair have no such backstop, which makes this suite
+    // the only place their drift shows up.
+    //
+    // Exact equality is the point: a key the model drops on re-encode fails
+    // here. What it cannot see is a key the fixture never carried, which is
+    // what `WireFixtureSpecDriftTests` is for.
     @Test("SpaceConfig (hand-written)") func spaceConfig() throws {
         try assertRoundTrip(SpaceConfig.self, fixture: "space_config")
     }
@@ -72,11 +77,11 @@ struct WireRoundTripTests {
         try assertRoundTrip(TypeSchema.self, fixture: "type_schema")
     }
 
-    @Test("ConflictResponse (hand-written)") func conflictResponse() throws {
+    @Test("ConflictResponse") func conflictResponse() throws {
         try assertRoundTrip(ConflictResponse.self, fixture: "conflict_response")
     }
 
-    @Test("PaginatedResult<Item>") func paginatedItems() throws {
+    @Test("PaginatedResult<Item> (hand-written)") func paginatedItems() throws {
         try assertRoundTrip(PaginatedResult<Item>.self, fixture: "paginated_items")
     }
 

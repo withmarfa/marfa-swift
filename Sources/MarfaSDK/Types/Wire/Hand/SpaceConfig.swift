@@ -132,8 +132,11 @@ public struct SpaceConfig: Codable, Sendable, Hashable {
             /// Type IDs the filter applies to.
             public var types: [String]
 
-            /// Source values blocked from writing items of the listed
-            /// types.
+            /// The approved sources. A row of one of the listed types is
+            /// returned by a read only when its source appears here, so an
+            /// empty list hides every row of those types. This is a read
+            /// filter, not a write rule: it never refuses a write, and it
+            /// is not the list of sources to block.
             public var sources: [String]
 
             public init(types: [String], sources: [String]) {

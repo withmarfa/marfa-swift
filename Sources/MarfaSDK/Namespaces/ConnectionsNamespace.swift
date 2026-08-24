@@ -110,15 +110,37 @@ public struct ConnectionsNamespace: Sendable {
     ///
     /// Server-side pipeline:
     /// 1. Revokes runtime credentials.
-    /// 2. Deletes upstream OAuth tokens.
+    /// 2. Deletes the proxy's cached upstream OAuth tokens.
     /// 3. Revokes active leased tokens.
     /// 4. Disables inbound webhook subscriptions.
-    /// 5. Transitions the connection state to `revoked`.
-    /// 6. Emits a `system.activity` row.
+    /// 5. Removes the upstream credential the connection was installed
+    ///    with, unless another live connection still shares it.
+    /// 6. Transitions the connection state to `revoked`.
+    /// 7. Emits a `system.activity` row.
     ///
-    /// Idempotent at the artifact level — revoking already-revoked
-    /// tokens is a no-op — but rejects with `400 ValidationError` when
-    /// the connection itself is already in state `revoked`.
+    /// Idempotent at the artifact level, since revoking an already-revoked
+    /// token is a no-op, but rejects with `400 ValidationError` when the
+    /// connection itself is already in state `revoked`.
+    ///
+    /// ### Reading `upstreamCredential`
+    ///
+    /// Step 5 has four outcomes, and the field reports which one happened.
+    /// It is typed as a free-form map because the spec declares it as an
+    /// unnamed union, so there is no generated type to read it through.
+    /// Discriminate on `status`:
+    ///
+    /// - `none`: the connection had no upstream credential. No other keys.
+    /// - `already_gone`: it was gone before this call. Carries
+    ///   `credential_id`.
+    /// - `purged`: this call deleted it. Carries `credential_id`.
+    /// - `retained`: left in place because other live connections use it.
+    ///   Carries `credential_id`, `reason`
+    ///   (`in_use_by_other_connections`) and `connection_ids`, the
+    ///   connections that kept it alive.
+    ///
+    /// A caller wanting the upstream account fully disconnected wants
+    /// `purged` or `already_gone`. `retained` means the account is still
+    /// reachable through the connections it names.
     ///
     /// Synonym: this is sometimes called "revoke" colloquially. The wire
     /// spelling is "uninstall"; this method matches.
