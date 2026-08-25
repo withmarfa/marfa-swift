@@ -172,7 +172,9 @@ public struct EdgesNamespace: Sendable {
         limit: Int? = nil
     ) async throws -> PaginatedResult<Edge> {
         if let store = localStore {
-            return try await store.fetchEdges(edgeType: edgeType, limit: limit)
+            return try await store.fetchEdges(
+                edgeType: edgeType, cursor: cursor, limit: limit
+            )
         }
         var query: [(String, String)] = []
         if let edgeType { query.append(("edge_type", edgeType)) }
@@ -193,7 +195,7 @@ public struct EdgesNamespace: Sendable {
     ) async throws -> PaginatedResult<Edge> {
         if let store = localStore {
             return try await store.fetchEdgesFromSource(
-                sourceId: sourceId, edgeType: edgeType, limit: limit
+                sourceId: sourceId, edgeType: edgeType, cursor: cursor, limit: limit
             )
         }
         var query: [(String, String)] = []
@@ -215,7 +217,7 @@ public struct EdgesNamespace: Sendable {
     ) async throws -> PaginatedResult<Edge> {
         if let store = localStore {
             return try await store.fetchEdgesToTarget(
-                targetId: targetId, edgeType: edgeType, limit: limit
+                targetId: targetId, edgeType: edgeType, cursor: cursor, limit: limit
             )
         }
         var query: [(String, String)] = []

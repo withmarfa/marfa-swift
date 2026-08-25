@@ -83,19 +83,12 @@ public struct ItemsNamespace: Sendable {
     /// Lists items with metadata included.
     public func listWithMetadata(filters: ListFilters? = nil) async throws -> PaginatedResult<ItemWithMetadata> {
         if let store = localStore {
-            let result = try await store.fetchItems(filters: filters)
-            let pairs = try await withThrowingTaskGroup(of: ItemWithMetadata.self) { group in
-                for item in result.data {
-                    group.addTask {
-                        let metadata = try await store.fetchMetadata(itemId: item.id)
-                        return ItemWithMetadata(item: item, metadata: metadata)
-                    }
-                }
-                var collected: [ItemWithMetadata] = []
-                for try await pair in group { collected.append(pair) }
-                return collected
-            }
-            return PaginatedResult(data: pairs, cursor: nil, hasMore: false)
+            // One store call rather than a metadata fetch per item. The task
+            // group this replaces also collected in completion order, so the
+            // page came back in whatever order the reads happened to finish
+            // — losing the sort the caller asked for — and it discarded the
+            // cursor and `hasMore` it had just been handed.
+            return try await store.fetchItemsWithMetadataPage(filters: filters)
         }
         var params = filters?.toQueryParams() ?? []
         params.append(("include", "metadata"))
@@ -381,7 +374,7 @@ public struct ItemsNamespace: Sendable {
     ) async throws -> PaginatedResult<Edge> {
         if let store = localStore {
             return try await store.fetchEdgesFromSource(
-                sourceId: id, edgeType: edgeType, limit: limit
+                sourceId: id, edgeType: edgeType, cursor: cursor, limit: limit
             )
         }
         var query: [(String, String)] = []
@@ -403,7 +396,7 @@ public struct ItemsNamespace: Sendable {
     ) async throws -> PaginatedResult<Edge> {
         if let store = localStore {
             return try await store.fetchEdgesToTarget(
-                targetId: id, edgeType: edgeType, limit: limit
+                targetId: id, edgeType: edgeType, cursor: cursor, limit: limit
             )
         }
         var query: [(String, String)] = []
