@@ -48,8 +48,11 @@ public final class ItemsWithMetadataQuery {
 
     private func refetch() {
         do {
-            let descriptor = LocalStore.makeItemsDescriptor(filters: filters)
-            let itemModels = try context.fetch(descriptor)
+            // Through the shared selector rather than the raw descriptor, so
+            // a `tags` filter narrows here exactly as it does on the actor.
+            // Tags cannot narrow a fetch, so they are applied after a
+            // metadata join and the window with them; see `itemModels`.
+            let itemModels = try LocalStore.itemModels(in: context, for: filters).rows
             let ids = Set(itemModels.map(\.id))
             let metadataById: [String: MarfaMetadataModel]
             if ids.isEmpty {
@@ -62,11 +65,13 @@ public final class ItemsWithMetadataQuery {
                 // indexed on it but carries no `#Unique`, which CloudKit
                 // mirroring forbids, and two devices setting metadata on the
                 // same item leave two rows. `uniqueKeysWithValues` would trap.
-                // Last write wins, matching what a later fetch returns anyway.
-                // First row, matching `fetchMetadata` and `writeMetadata`,
-                // which both take `.first` under a `fetchLimit` of 1. A
-                // different choice renders one row here and another in the
-                // detail view of the same item, permanently.
+                // First row wins, matching `fetchMetadata` and
+                // `writeMetadata`, which both take `.first` under a
+                // `fetchLimit` of 1. A different choice renders one row here
+                // and another in the detail view of the same item,
+                // permanently. (This comment used to open by saying last
+                // write wins, which is neither what the line below does nor
+                // what the rest of the comment then said.)
                 metadataById = Dictionary(
                     metaModels.map { ($0.itemId, $0) },
                     uniquingKeysWith: { first, _ in first }

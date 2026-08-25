@@ -115,18 +115,77 @@ public actor LocalStore {
     /// as "that was all of them" and silently truncated every loop that
     /// believed it.
     func fetchItems(filters: ListFilters?) throws -> PaginatedResult<Item> {
-        let offset = try LocalCursor.validated(filters?.cursor) ?? 0
-        // One row past the limit, so truncation is known without a second
-        // count query. The extra row is dropped before the caller sees it.
-        var probe = filters
-        if let limit = filters?.limit { probe?.limit = limit + 1 }
-        let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe))
-        let page = Self.page(models, limit: filters?.limit)
+        let page = try Self.itemModels(in: modelContext, for: filters)
         return PaginatedResult(
             data: page.rows.map { $0.toWireItem() },
-            cursor: page.hasMore ? LocalCursor(o: offset + page.rows.count).encoded() : nil,
+            cursor: page.hasMore ? LocalCursor(o: page.offset + page.rows.count).encoded() : nil,
             hasMore: page.hasMore
         )
+    }
+
+    /// The item models a set of filters selects, windowed.
+    ///
+    /// Two paths, because `tags` cannot narrow a fetch. Tags live in
+    /// `MarfaMetadataModel.tagsData`, a blob the predicate engine cannot see
+    /// into, so a tag filter can only be applied after a metadata join. That
+    /// rules out pushing the limit into the descriptor as well: a page of
+    /// `limit` rows that then loses most of itself to the tag filter would
+    /// hand back a short page and call it a complete one.
+    ///
+    /// So a tag-filtered list walks its candidate set and windows here, which
+    /// costs a full ordered fetch of everything the other filters allow.
+    /// `LocalStoreSearch` makes the same trade for the same reason. Without
+    /// tags, nothing changes: the descriptor windows, which is the cheap path
+    /// and the common one.
+    /// `nonisolated` and context-taking so the reactive queries, which own
+    /// their own `ModelContext` and cannot reach the actor, select rows the
+    /// same way rather than growing a second copy of this that drifts.
+    nonisolated static func itemModels(
+        in modelContext: ModelContext,
+        for filters: ListFilters?
+    ) throws -> (rows: [MarfaItemModel], hasMore: Bool, offset: Int) {
+        let offset = try LocalCursor.validated(filters?.cursor) ?? 0
+        let required = Set(filters?.tags ?? [])
+
+        guard !required.isEmpty else {
+            // One row past the limit, so truncation is known without a second
+            // count query. The extra row is dropped before the caller sees it.
+            var probe = filters
+            if let limit = filters?.limit { probe?.limit = limit + 1 }
+            let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe))
+            let page = Self.page(models, limit: filters?.limit)
+            return (page.rows, page.hasMore, offset)
+        }
+
+        var unwindowed = filters
+        unwindowed?.limit = nil
+        unwindowed?.cursor = nil
+        let candidates = try modelContext.fetch(Self.makeItemsDescriptor(filters: unwindowed))
+        let tagged = try filterByTags(in: modelContext, candidates, required: required)
+        let page = Self.page(Array(tagged.dropFirst(offset)), limit: filters?.limit)
+        return (page.rows, page.hasMore, offset)
+    }
+
+    /// Keeps only the models carrying every requested tag. AND semantics,
+    /// matching the server: an item must have all of them, not any.
+    nonisolated static func filterByTags(
+        in modelContext: ModelContext,
+        _ models: [MarfaItemModel],
+        required: Set<String>
+    ) throws -> [MarfaItemModel] {
+        let ids = Set(models.map(\.id))
+        guard !ids.isEmpty else { return [] }
+        let metaPredicate = #Predicate<MarfaMetadataModel> { ids.contains($0.itemId) }
+        let metaModels = try modelContext.fetch(FetchDescriptor(predicate: metaPredicate))
+        // First row wins on a duplicate `itemId`, for the reason spelled out
+        // in `joinMetadata`: the model carries no `#Unique`, so duplicates are
+        // constructible, and the two places that read metadata have to agree
+        // on which one they mean.
+        let tagsById = Dictionary(
+            metaModels.map { ($0.itemId, Set($0.tags)) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return models.filter { required.isSubset(of: tagsById[$0.id] ?? []) }
     }
 
     /// Splits an over-fetched result into the page the caller asked for and
@@ -157,8 +216,7 @@ public actor LocalStore {
     /// row fall back to an empty ``Metadata``, matching the
     /// ``fetchMetadata(itemId:)`` contract.
     func fetchItemsWithMetadata(filters: ListFilters?) throws -> [ItemWithMetadata] {
-        let itemModels = try modelContext.fetch(Self.makeItemsDescriptor(filters: filters))
-        return try joinMetadata(itemModels)
+        return try joinMetadata(Self.itemModels(in: modelContext, for: filters).rows)
     }
 
     /// The paginated form, for callers that page rather than take everything.
@@ -167,14 +225,10 @@ public actor LocalStore {
     func fetchItemsWithMetadataPage(
         filters: ListFilters?
     ) throws -> PaginatedResult<ItemWithMetadata> {
-        let offset = try LocalCursor.validated(filters?.cursor) ?? 0
-        var probe = filters
-        if let limit = filters?.limit { probe?.limit = limit + 1 }
-        let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe))
-        let page = Self.page(models, limit: filters?.limit)
+        let page = try Self.itemModels(in: modelContext, for: filters)
         return PaginatedResult(
             data: try joinMetadata(page.rows),
-            cursor: page.hasMore ? LocalCursor(o: offset + page.rows.count).encoded() : nil,
+            cursor: page.hasMore ? LocalCursor(o: page.offset + page.rows.count).encoded() : nil,
             hasMore: page.hasMore
         )
     }
@@ -720,6 +774,15 @@ public actor LocalStore {
     // Items descriptor — shared by `fetchItems`, `fetchItemsWithMetadata`,
     // and the ItemQuery / ItemsWithMetadataQuery refetch paths via the
     // `nonisolated` static helpers.
+    ///
+    /// **What a local list still does not narrow on.** `source`, `filter`,
+    /// `edge` and `backref` are accepted and ignored here. `filter` is the
+    /// server's structured expression and is not evaluated locally, matching
+    /// how `LocalStoreSearch` treats `SearchFilters.filter`; the other three
+    /// have no local implementation yet. Listed rather than left silent,
+    /// because a filter that is quietly dropped is indistinguishable from one
+    /// that matched everything, and that is the defect this file just spent
+    /// two changes repairing.
     nonisolated static func makeItemsDescriptor(filters: ListFilters?) -> FetchDescriptor<MarfaItemModel> {
         // Captured-value short-circuit pattern (predicate convention 8):
         // SwiftData has no runtime `Predicate<T>` composition, so we
@@ -733,12 +796,17 @@ public actor LocalStore {
         let hasSince = filters?.since != nil
         let until = filters?.until ?? ""
         let hasUntil = filters?.until != nil
+        // `TierFilter` and `Tier` share their raw values, so the filter
+        // compares directly against the stored column.
+        let tierFilter = filters?.tier?.rawValue ?? ""
+        let hasTierFilter = filters?.tier != nil
 
         let predicate = #Predicate<MarfaItemModel> { item in
             (!hasTypeFilter  || item.type == typeFilter) &&
             (!hasStateFilter || item.stateRaw == stateFilter) &&
             (!hasSince       || item.updatedAt >= since) &&
-            (!hasUntil       || item.updatedAt <= until)
+            (!hasUntil       || item.updatedAt <= until) &&
+            (!hasTierFilter  || item.tierRaw == tierFilter)
         }
 
         var descriptor = FetchDescriptor<MarfaItemModel>(
