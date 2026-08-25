@@ -3,9 +3,20 @@ import Foundation
 /// Strategy for resolving version conflicts during item updates.
 ///
 /// `Codable` so the strategy can be persisted with queued mutations and
-/// re-applied during replay. The `.callback` resolver closure itself is
-/// not serializable; on replay, `.callback` degrades to `.auto` because
-/// the closure is not available in the new process context.
+/// re-applied during replay.
+///
+/// The `.callback` resolver closure itself is not serializable, and a
+/// replay therefore cannot reach the closure a call site passed. It does
+/// **not** fall back to `.auto`: resolving under a strategy the caller did
+/// not choose is the thing this avoids. A replayed `.callback` update runs
+/// the resolver registered on the client with
+/// ``MarfaClient/registerConflictResolver(_:)``, and if none is registered
+/// it throws ``ConflictResolverMissingError`` and stays queued until one is.
+///
+/// Register one at startup on any synced client that uses `.callback`.
+/// Passing `resolve:` per call is accepted and is not sufficient on its own:
+/// on a synced client the write lands locally and is queued, so the closure
+/// is never what resolves the collision. The replay is.
 public enum ConflictStrategy: String, Codable, Sendable {
     /// Auto-merge non-conflicting fields. For conflicting fields, follow
     /// the type's `merge_policy` (server-resolved, embedded in the 409
