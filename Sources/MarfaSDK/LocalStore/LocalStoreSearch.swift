@@ -72,7 +72,7 @@ extension LocalStore {
     /// - **Fields.** Types whose text lives under other keys never match
     ///   at all — `core.entity` and its subtypes (`name`), `core.highlight`
     ///   and `readwise.highlight` (`text`, `note`). A
-    ///   `withmarfa.captured_email` matches on `body` but never on its
+    ///   `marfa.captured_email` matches on `body` but never on its
     ///   `subject`. This is a whole-type blind spot, not a partial one.
     /// - **Tags.** The server indexes tags as searchable text, so an item
     ///   tagged `fiction` is a hit for the query `fiction`. Locally it is
