@@ -65,8 +65,11 @@ public final class ItemQuery {
 
     private func refetch() {
         do {
-            let descriptor = LocalStore.makeItemsDescriptor(filters: filters)
-            let models = try context.fetch(descriptor)
+            // Through the shared selector rather than the raw descriptor.
+            // A `tags` filter cannot narrow a fetch, so it is applied after a
+            // metadata join inside `itemModels`; going straight to the
+            // descriptor here would accept `tags` and quietly ignore it.
+            let models = try LocalStore.itemModels(in: context, for: filters).rows
             self.items = models.map { $0.toWireItem() }
             self.isLoading = false
             self.error = nil
@@ -132,8 +135,8 @@ public final class TypedItemQuery<T: MarfaItem> {
 
     private func refetch() {
         do {
-            let descriptor = LocalStore.makeItemsDescriptor(filters: filters)
-            let models = try context.fetch(descriptor)
+            // Shared selector, for the reason given in `ItemQuery.refetch`.
+            let models = try LocalStore.itemModels(in: context, for: filters).rows
             self.items = models.compactMap { T(from: $0.toWireItem()) }
             self.isLoading = false
             self.error = nil

@@ -233,6 +233,94 @@ struct LocalStoreTests {
         #expect(Set(collected).count == collected.count, "an edge was returned twice")
     }
 
+    // MARK: - Tag and tier filters
+    //
+    // Both used to be accepted and dropped, so a filtered list returned
+    // everything. Tags cannot narrow a fetch (they live in an opaque blob on
+    // a separate row), so they are applied after a metadata join, which is
+    // why the paging case below is worth its own test.
+
+    @Test("tier narrows a local list")
+    func fetchItemsFiltersByTier() async throws {
+        let store = try await makeStore()
+        let library = try await store.createItem(noteInput(body: "library"))
+        let feed = try await store.createItem(noteInput(body: "feed"))
+        _ = try await store.updateItem(id: feed.id, properties: [:], tier: .feed)
+
+        let feedOnly = try await store.fetchItems(filters: ListFilters(tier: .feed))
+        #expect(feedOnly.data.map(\.id) == [feed.id])
+        #expect(!feedOnly.data.map(\.id).contains(library.id))
+    }
+
+    @Test("tags narrow a local list, and every requested tag must be present")
+    func fetchItemsFiltersByTags() async throws {
+        let store = try await makeStore()
+        let both = try await store.createItem(noteInput(body: "both"))
+        let one = try await store.createItem(noteInput(body: "one"))
+        let none = try await store.createItem(noteInput(body: "none"))
+        try await store.setMetadata(itemId: both.id, input: MetadataInput(tags: ["red", "blue"]))
+        try await store.setMetadata(itemId: one.id, input: MetadataInput(tags: ["red"]))
+
+        let red = try await store.fetchItems(filters: ListFilters(tags: ["red"]))
+        #expect(Set(red.data.map(\.id)) == [both.id, one.id])
+        #expect(!red.data.map(\.id).contains(none.id))
+
+        // AND, not OR: the server requires every listed tag.
+        let redAndBlue = try await store.fetchItems(filters: ListFilters(tags: ["red", "blue"]))
+        #expect(redAndBlue.data.map(\.id) == [both.id])
+    }
+
+    @Test("a tag-filtered list pages over the filtered set, not the raw one")
+    func fetchItemsPagesTagFiltered() async throws {
+        let store = try await makeStore()
+        var tagged: Set<String> = []
+        // Interleaved so a page taken before filtering would be mostly
+        // untagged rows, which is the shape that produced short pages.
+        for i in 0..<10 {
+            let item = try await store.createItem(noteInput(body: "n\(i)"))
+            if i % 2 == 0 {
+                try await store.setMetadata(itemId: item.id, input: MetadataInput(tags: ["keep"]))
+                tagged.insert(item.id)
+            }
+        }
+
+        var collected: [String] = []
+        var cursor: String? = nil
+        var pages = 0
+        repeat {
+            var filters = ListFilters(tags: ["keep"], limit: 2)
+            filters.cursor = cursor
+            let page = try await store.fetchItems(filters: filters)
+            #expect(page.data.allSatisfy { tagged.contains($0.id) })
+            collected.append(contentsOf: page.data.map(\.id))
+            cursor = page.cursor
+            pages += 1
+            #expect(pages < 10, "paging did not terminate")
+            if !page.hasMore { break }
+        } while cursor != nil
+
+        #expect(Set(collected) == tagged)
+        #expect(Set(collected).count == collected.count, "a row was returned twice")
+    }
+
+    @Test("a reactive item query narrows on tags too")
+    func itemQueryFiltersByTags() async throws {
+        let client = try await makeLocalClient()
+        let kept = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("kept")])
+        )
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("dropped")])
+        )
+        try await client.metadata.set(itemId: kept.id, input: MetadataInput(tags: ["keep"]))
+
+        let store = try #require(await client.makeStore())
+        let query = await store.query(filters: ListFilters(tags: ["keep"]))
+        try await Task.sleep(for: .milliseconds(300))
+        let ids = await query.items.map { $0.id }
+        #expect(ids == [kept.id])
+    }
+
     @Test("a cursor that is not ours is refused rather than restarting")
     func fetchItemsRejectsForeignCursor() async throws {
         let store = try await makeStore()
