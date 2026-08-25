@@ -233,6 +233,61 @@ struct LocalStoreTests {
         #expect(Set(collected).count == collected.count, "an edge was returned twice")
     }
 
+    // MARK: - Date range
+    //
+    // `since`/`until` used to compare `updatedAt` here while the server
+    // compares `COALESCE(timestamp, created_at)` and every card in a consumer
+    // app drew `timestamp`. Choosing "today" returned items *edited* today on
+    // rows dated months earlier, and the same filter through search returned
+    // a different set again.
+
+    @Test("a date range filters on the item's own timestamp, not when it was last edited")
+    func fetchItemsDateRangeUsesTimestamp() async throws {
+        let store = try await makeStore()
+        var input = noteInput(body: "dated last year")
+        input.timestamp = "2025-03-01T12:00:00.000Z"
+        let item = try await store.createItem(input)
+
+        // Editing it now moves `updatedAt` to today and leaves `timestamp`
+        // where it was. This is the divergence, made deliberate.
+        _ = try await store.updateItem(id: item.id, properties: ["body": .string("edited today")])
+
+        let aroundItsOwnDate = try await store.fetchItems(
+            filters: ListFilters(since: "2025-02-01T00:00:00.000Z", until: "2025-04-01T00:00:00.000Z")
+        )
+        #expect(aroundItsOwnDate.data.map(\.id).contains(item.id))
+
+        let aroundTheEdit = try await store.fetchItems(
+            filters: ListFilters(since: "2026-01-01T00:00:00.000Z")
+        )
+        #expect(!aroundTheEdit.data.map(\.id).contains(item.id),
+                "an item edited today is not an item dated today")
+    }
+
+    @Test("an item with no timestamp is judged on when it was created")
+    func dateBoundsFallBackToCreatedAt() async throws {
+        // Exercised directly: the store always stamps a timestamp on create,
+        // so a row without one only arrives by syncing from a server where
+        // the column is nullable, which is the case the server's COALESCE
+        // exists for.
+        let undated = MarfaItemModel()
+        undated.id = "undated"
+        undated.timestamp = ""
+        undated.createdAt = "2025-06-15T00:00:00.000Z"
+
+        let inRange = LocalStore.applyDateBounds(
+            [undated],
+            filters: ListFilters(since: "2025-06-01T00:00:00.000Z", until: "2025-07-01T00:00:00.000Z")
+        )
+        #expect(inRange.count == 1)
+
+        let outOfRange = LocalStore.applyDateBounds(
+            [undated],
+            filters: ListFilters(since: "2025-08-01T00:00:00.000Z")
+        )
+        #expect(outOfRange.isEmpty, "an undated item is not silently kept, nor silently dropped")
+    }
+
     // MARK: - Tag and tier filters
     //
     // Both used to be accepted and dropped, so a filtered list returned

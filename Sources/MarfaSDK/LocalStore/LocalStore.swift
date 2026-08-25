@@ -146,8 +146,13 @@ public actor LocalStore {
     ) throws -> (rows: [MarfaItemModel], hasMore: Bool, offset: Int) {
         let offset = try LocalCursor.validated(filters?.cursor) ?? 0
         let required = Set(filters?.tags ?? [])
+        // Dates join tags on the slow path for the same reason: the exact
+        // answer is only known after the fetch, so the window cannot be
+        // pushed into the descriptor without reporting a short page as a
+        // whole one.
+        let datesNeedSettling = filters?.since != nil || filters?.until != nil
 
-        guard !required.isEmpty else {
+        guard !required.isEmpty || datesNeedSettling else {
             // One row past the limit, so truncation is known without a second
             // count query. The extra row is dropped before the caller sees it.
             var probe = filters
@@ -160,10 +165,32 @@ public actor LocalStore {
         var unwindowed = filters
         unwindowed?.limit = nil
         unwindowed?.cursor = nil
-        let candidates = try modelContext.fetch(Self.makeItemsDescriptor(filters: unwindowed))
-        let tagged = try filterByTags(in: modelContext, candidates, required: required)
-        let page = Self.page(Array(tagged.dropFirst(offset)), limit: filters?.limit)
+        var candidates = try modelContext.fetch(Self.makeItemsDescriptor(filters: unwindowed))
+        candidates = Self.applyDateBounds(candidates, filters: filters)
+        if !required.isEmpty {
+            candidates = try filterByTags(in: modelContext, candidates, required: required)
+        }
+        let page = Self.page(Array(candidates.dropFirst(offset)), limit: filters?.limit)
         return (page.rows, page.hasMore, offset)
+    }
+
+    /// Settles the rows the descriptor let through permissively.
+    ///
+    /// Only rows with no timestamp are in question: the descriptor already
+    /// compared every other row against the bounds. Those few are judged on
+    /// `createdAt`, which is what the server's `COALESCE(timestamp,
+    /// created_at)` falls back to.
+    nonisolated static func applyDateBounds(
+        _ models: [MarfaItemModel],
+        filters: ListFilters?
+    ) -> [MarfaItemModel] {
+        guard filters?.since != nil || filters?.until != nil else { return models }
+        return models.filter { item in
+            guard item.timestamp.isEmpty else { return true }
+            if let since = filters?.since, item.createdAt < since { return false }
+            if let until = filters?.until, item.createdAt > until { return false }
+            return true
+        }
     }
 
     /// Keeps only the models carrying every requested tag. AND semantics,
@@ -801,11 +828,23 @@ public actor LocalStore {
         let tierFilter = filters?.tier?.rawValue ?? ""
         let hasTierFilter = filters?.tier != nil
 
+        // The date bounds narrow here but do not decide here. The server
+        // compares `COALESCE(timestamp, created_at)`, and a row that reached
+        // this store from a server with no timestamp holds `""`, so the
+        // honest comparison needs both columns. Naming both, twice, pushes
+        // the macro past what the type-checker accepts, and this predicate is
+        // shared with every reactive query.
+        //
+        // So SQL narrows on `timestamp` and deliberately lets every empty one
+        // through, and `applyDateBounds` settles those few against
+        // `createdAt` afterwards. Permissive rather than strict on purpose: a
+        // row wrongly excluded here cannot be recovered later, whereas one
+        // wrongly included is dropped a moment later at no cost.
         let predicate = #Predicate<MarfaItemModel> { item in
             (!hasTypeFilter  || item.type == typeFilter) &&
             (!hasStateFilter || item.stateRaw == stateFilter) &&
-            (!hasSince       || item.updatedAt >= since) &&
-            (!hasUntil       || item.updatedAt <= until) &&
+            (!hasSince || item.timestamp >= since || item.timestamp == "") &&
+            (!hasUntil || item.timestamp <= until) &&
             (!hasTierFilter  || item.tierRaw == tierFilter)
         }
 
