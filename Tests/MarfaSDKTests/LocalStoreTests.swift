@@ -133,7 +133,136 @@ struct LocalStoreTests {
         let ids = result.data.map(\.id)
         #expect(ids.contains(a.id))
         #expect(ids.contains(b.id))
+        // No limit, so nothing was left behind. `hasMore` used to read
+        // `false` here whether or not that was true; the pagination suite
+        // below is what pins the difference.
         #expect(result.hasMore == false)
+        #expect(result.cursor == nil)
+    }
+
+    // MARK: - Pagination
+    //
+    // A limit used to be applied and then reported as `hasMore: false`, so a
+    // caller looping until `!hasMore` stopped after one page and believed it
+    // had everything. These pin both halves: that truncation is announced,
+    // and that the cursor actually reaches the rest.
+
+    /// Seeds `count` items and returns their ids in the order `fetchItems`
+    /// will hand them back with no filters.
+    private func seedOrderedItems(_ store: LocalStore, count: Int) async throws -> [String] {
+        for i in 0..<count {
+            _ = try await store.createItem(noteInput(body: "item \(i)"))
+        }
+        return try await store.fetchItems(filters: nil).data.map(\.id)
+    }
+
+    @Test("a limit that truncates says so and offers a cursor")
+    func fetchItemsAnnouncesTruncation() async throws {
+        let store = try await makeStore()
+        _ = try await seedOrderedItems(store, count: 5)
+
+        let page = try await store.fetchItems(filters: ListFilters(limit: 2))
+        #expect(page.data.count == 2)
+        #expect(page.hasMore == true)
+        #expect(page.cursor != nil)
+    }
+
+    @Test("a limit that does not truncate reports no more")
+    func fetchItemsExactFitReportsNoMore() async throws {
+        let store = try await makeStore()
+        _ = try await seedOrderedItems(store, count: 3)
+
+        // Exactly the number of rows there are: the probe fetches one past
+        // the limit and finds nothing, so this is the boundary that a
+        // count-based check would get wrong.
+        let page = try await store.fetchItems(filters: ListFilters(limit: 3))
+        #expect(page.data.count == 3)
+        #expect(page.hasMore == false)
+        #expect(page.cursor == nil)
+    }
+
+    @Test("paging a local store reaches every row exactly once")
+    func fetchItemsPagesThroughEverything() async throws {
+        let store = try await makeStore()
+        let expected = try await seedOrderedItems(store, count: 7)
+
+        var collected: [String] = []
+        var cursor: String? = nil
+        var pages = 0
+        repeat {
+            var filters = ListFilters(limit: 2)
+            filters.cursor = cursor
+            let page = try await store.fetchItems(filters: filters)
+            collected.append(contentsOf: page.data.map(\.id))
+            cursor = page.cursor
+            pages += 1
+            #expect(pages < 10, "paging did not terminate")
+            if !page.hasMore { break }
+        } while cursor != nil
+
+        #expect(collected == expected)
+        #expect(Set(collected).count == collected.count, "a row was returned twice")
+    }
+
+    @Test("paging edges reaches every edge exactly once")
+    func fetchEdgesPagesThroughEverything() async throws {
+        let store = try await makeStore()
+        let a = try await store.createItem(noteInput(body: "source"))
+        var expected: [String] = []
+        for i in 0..<5 {
+            let target = try await store.createItem(noteInput(body: "target \(i)"))
+            let edge = try await store.createEdge(
+                source: a.id, target: target.id,
+                edgeType: "about", properties: nil
+            )
+            expected.append(edge.id)
+        }
+
+        var collected: [String] = []
+        var cursor: String? = nil
+        repeat {
+            let page = try await store.fetchEdgesFromSource(
+                sourceId: a.id, edgeType: nil, cursor: cursor, limit: 2
+            )
+            collected.append(contentsOf: page.data.map(\.id))
+            cursor = page.cursor
+            if !page.hasMore { break }
+        } while cursor != nil
+
+        #expect(Set(collected) == Set(expected))
+        #expect(Set(collected).count == collected.count, "an edge was returned twice")
+    }
+
+    @Test("a cursor that is not ours is refused rather than restarting")
+    func fetchItemsRejectsForeignCursor() async throws {
+        let store = try await makeStore()
+        _ = try await seedOrderedItems(store, count: 3)
+
+        var filters = ListFilters(limit: 2)
+        // The shape the server mints. Silently treating it as "no cursor"
+        // would return page one forever.
+        filters.cursor = "eyJ2IjoiMjAyNi0wOC0yNSIsImlkIjoiYWJjIn0"
+        await #expect(throws: ValidationError.self) {
+            _ = try await store.fetchItems(filters: filters)
+        }
+    }
+
+    @Test("listWithMetadata keeps the order it was asked for and paginates")
+    func listWithMetadataOrdersAndPaginates() async throws {
+        let client = try await makeLocalClient()
+        for i in 0..<6 {
+            _ = try await client.items.create(
+                CreateItemInput(type: "core.note", properties: ["body": .string("n\(i)")])
+            )
+        }
+        let plain = try await client.items.list(filters: ListFilters(limit: 4))
+        let withMeta = try await client.items.listWithMetadata(filters: ListFilters(limit: 4))
+
+        // The metadata join used to collect from a task group in completion
+        // order, so the page came back shuffled and its cursor discarded.
+        #expect(withMeta.data.map(\.item.id) == plain.data.map(\.id))
+        #expect(withMeta.hasMore == plain.hasMore)
+        #expect((withMeta.cursor == nil) == (plain.cursor == nil))
     }
 
     @Test("fetchItems filters by type") func fetchItemsFiltersByType() async throws {
@@ -280,7 +409,7 @@ struct LocalStoreTests {
         #expect(edge.edgeType == "about")
 
         let edges = try await store.fetchEdgesFromSource(
-            sourceId: a.id, edgeType: nil, limit: nil
+            sourceId: a.id, edgeType: nil, cursor: nil, limit: nil
         )
         #expect(edges.data.map(\.id).contains(edge.id))
     }
@@ -294,7 +423,7 @@ struct LocalStoreTests {
             edgeType: "about", properties: nil
         )
         let backrefs = try await store.fetchEdgesToTarget(
-            targetId: b.id, edgeType: nil, limit: nil
+            targetId: b.id, edgeType: nil, cursor: nil, limit: nil
         )
         #expect(backrefs.data.map(\.id).contains(edge.id))
     }
@@ -308,7 +437,7 @@ struct LocalStoreTests {
         _ = try await store.createEdge(source: a.id, target: c.id, edgeType: "references", properties: nil)
 
         let aboutEdges = try await store.fetchEdgesFromSource(
-            sourceId: a.id, edgeType: "about", limit: nil
+            sourceId: a.id, edgeType: "about", cursor: nil, limit: nil
         )
         #expect(aboutEdges.data.count == 1)
         #expect(aboutEdges.data[0].edgeType == "about")
@@ -325,7 +454,7 @@ struct LocalStoreTests {
         )
 
         let outbound = try await store.fetchEdgesFromSource(
-            sourceId: attachment.id, edgeType: "attached-to", limit: nil
+            sourceId: attachment.id, edgeType: "attached-to", cursor: nil, limit: nil
         )
         #expect(outbound.data.map(\.id) == [edge.id])
         #expect(outbound.data[0].targetId == host.id)
@@ -355,7 +484,7 @@ struct LocalStoreTests {
         )
         try await store.deleteEdge(id: edge.id)
         let edges = try await store.fetchEdgesFromSource(
-            sourceId: a.id, edgeType: nil, limit: nil
+            sourceId: a.id, edgeType: nil, cursor: nil, limit: nil
         )
         #expect(!edges.data.map(\.id).contains(edge.id))
     }

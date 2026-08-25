@@ -107,14 +107,49 @@ public actor LocalStore {
         return model.toWireItem()
     }
 
-    /// Fetches items, applying optional filters. Returns a
-    /// ``PaginatedResult`` with `hasMore: false` — local stores don't
-    /// cursor-paginate.
+    /// Fetches items, applying optional filters.
+    ///
+    /// Paginates when the caller sets `limit`: the page carries `hasMore`,
+    /// and a cursor to resume from when there is more. This used to apply the
+    /// limit and report `hasMore: false` regardless, which reads to a caller
+    /// as "that was all of them" and silently truncated every loop that
+    /// believed it.
     func fetchItems(filters: ListFilters?) throws -> PaginatedResult<Item> {
-        let descriptor = Self.makeItemsDescriptor(filters: filters)
-        let models = try modelContext.fetch(descriptor)
-        let items = models.map { $0.toWireItem() }
-        return PaginatedResult(data: items, cursor: nil, hasMore: false)
+        let offset = try LocalCursor.validated(filters?.cursor) ?? 0
+        // One row past the limit, so truncation is known without a second
+        // count query. The extra row is dropped before the caller sees it.
+        var probe = filters
+        if let limit = filters?.limit { probe?.limit = limit + 1 }
+        let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe))
+        let page = Self.page(models, limit: filters?.limit)
+        return PaginatedResult(
+            data: page.rows.map { $0.toWireItem() },
+            cursor: page.hasMore ? LocalCursor(o: offset + page.rows.count).encoded() : nil,
+            hasMore: page.hasMore
+        )
+    }
+
+    /// Splits an over-fetched result into the page the caller asked for and
+    /// whether anything was left behind. The probe asks for `limit + 1`, so a
+    /// whole extra row is the signal; it never reaches the caller.
+    nonisolated private static func page<M>(_ models: [M], limit: Int?) -> (rows: [M], hasMore: Bool) {
+        guard let limit, models.count > limit else { return (models, false) }
+        return (Array(models.prefix(limit)), true)
+    }
+
+    /// Edges always order by `createdAt` ascending with an `id` tiebreak, so
+    /// one helper mints every edge page and its cursor.
+    nonisolated private static func edgePage(
+        _ models: [MarfaEdgeModel],
+        limit: Int?,
+        offset: Int
+    ) -> PaginatedResult<Edge> {
+        let page = Self.page(models, limit: limit)
+        return PaginatedResult(
+            data: page.rows.map { $0.toWireEdge() },
+            cursor: page.hasMore ? LocalCursor(o: offset + page.rows.count).encoded() : nil,
+            hasMore: page.hasMore
+        )
     }
 
     /// Fetches items paired with their metadata in two predicate-safe
@@ -122,8 +157,32 @@ public actor LocalStore {
     /// row fall back to an empty ``Metadata``, matching the
     /// ``fetchMetadata(itemId:)`` contract.
     func fetchItemsWithMetadata(filters: ListFilters?) throws -> [ItemWithMetadata] {
-        let descriptor = Self.makeItemsDescriptor(filters: filters)
-        let itemModels = try modelContext.fetch(descriptor)
+        let itemModels = try modelContext.fetch(Self.makeItemsDescriptor(filters: filters))
+        return try joinMetadata(itemModels)
+    }
+
+    /// The paginated form, for callers that page rather than take everything.
+    /// Shares the join below, so the two cannot drift on how metadata is
+    /// matched or how duplicate rows are resolved.
+    func fetchItemsWithMetadataPage(
+        filters: ListFilters?
+    ) throws -> PaginatedResult<ItemWithMetadata> {
+        let offset = try LocalCursor.validated(filters?.cursor) ?? 0
+        var probe = filters
+        if let limit = filters?.limit { probe?.limit = limit + 1 }
+        let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe))
+        let page = Self.page(models, limit: filters?.limit)
+        return PaginatedResult(
+            data: try joinMetadata(page.rows),
+            cursor: page.hasMore ? LocalCursor(o: offset + page.rows.count).encoded() : nil,
+            hasMore: page.hasMore
+        )
+    }
+
+    /// Pairs already-ordered item models with their metadata in one further
+    /// read. The order of `itemModels` is the order out: the caller sorted
+    /// them and a metadata join is not the place to lose that.
+    private func joinMetadata(_ itemModels: [MarfaItemModel]) throws -> [ItemWithMetadata] {
         let ids = Set(itemModels.map(\.id))
         guard !ids.isEmpty else { return [] }
 
@@ -323,43 +382,55 @@ public actor LocalStore {
     func fetchEdgesFromSource(
         sourceId: String,
         edgeType: String?,
+        cursor: String?,
         limit: Int?
     ) throws -> PaginatedResult<Edge> {
         let typeFilter = edgeType ?? ""
         let hasTypeFilter = edgeType != nil
+        let offset = try LocalCursor.validated(cursor) ?? 0
         let predicate = #Predicate<MarfaEdgeModel> { edge in
-            edge.sourceId == sourceId &&
-            (!hasTypeFilter || edge.edgeType == typeFilter)
+            (edge.sourceId == sourceId &&
+            (!hasTypeFilter || edge.edgeType == typeFilter))
         }
         var descriptor = FetchDescriptor<MarfaEdgeModel>(
             predicate: predicate,
-            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+            sortBy: [
+                SortDescriptor(\.createdAt, order: .forward),
+                SortDescriptor(\.id, order: .forward),
+            ]
         )
-        if let limit { descriptor.fetchLimit = limit }
+        descriptor.fetchOffset = offset
+        // One past the limit so truncation is detectable; see `page`.
+        if let limit { descriptor.fetchLimit = limit + 1 }
         let models = try modelContext.fetch(descriptor)
-        let edges = models.map { $0.toWireEdge() }
-        return PaginatedResult(data: edges, cursor: nil, hasMore: false)
+        return Self.edgePage(models, limit: limit, offset: offset)
     }
 
     /// Global edge listing across the entire local store, optionally
     /// filtered by type. Backs `edges.list(edgeType:)`.
     func fetchEdges(
         edgeType: String?,
+        cursor: String?,
         limit: Int?
     ) throws -> PaginatedResult<Edge> {
         let typeFilter = edgeType ?? ""
         let hasTypeFilter = edgeType != nil
+        let offset = try LocalCursor.validated(cursor) ?? 0
         let predicate = #Predicate<MarfaEdgeModel> { edge in
             !hasTypeFilter || edge.edgeType == typeFilter
         }
         var descriptor = FetchDescriptor<MarfaEdgeModel>(
             predicate: predicate,
-            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+            sortBy: [
+                SortDescriptor(\.createdAt, order: .forward),
+                SortDescriptor(\.id, order: .forward),
+            ]
         )
-        if let limit { descriptor.fetchLimit = limit }
+        descriptor.fetchOffset = offset
+        // One past the limit so truncation is detectable; see `page`.
+        if let limit { descriptor.fetchLimit = limit + 1 }
         let models = try modelContext.fetch(descriptor)
-        let edges = models.map { $0.toWireEdge() }
-        return PaginatedResult(data: edges, cursor: nil, hasMore: false)
+        return Self.edgePage(models, limit: limit, offset: offset)
     }
 
     /// Lists edges where `targetId == targetId`, optionally filtered by
@@ -367,22 +438,28 @@ public actor LocalStore {
     func fetchEdgesToTarget(
         targetId: String,
         edgeType: String?,
+        cursor: String?,
         limit: Int?
     ) throws -> PaginatedResult<Edge> {
         let typeFilter = edgeType ?? ""
         let hasTypeFilter = edgeType != nil
+        let offset = try LocalCursor.validated(cursor) ?? 0
         let predicate = #Predicate<MarfaEdgeModel> { edge in
-            edge.targetId == targetId &&
-            (!hasTypeFilter || edge.edgeType == typeFilter)
+            (edge.targetId == targetId &&
+            (!hasTypeFilter || edge.edgeType == typeFilter))
         }
         var descriptor = FetchDescriptor<MarfaEdgeModel>(
             predicate: predicate,
-            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+            sortBy: [
+                SortDescriptor(\.createdAt, order: .forward),
+                SortDescriptor(\.id, order: .forward),
+            ]
         )
-        if let limit { descriptor.fetchLimit = limit }
+        descriptor.fetchOffset = offset
+        // One past the limit so truncation is detectable; see `page`.
+        if let limit { descriptor.fetchLimit = limit + 1 }
         let models = try modelContext.fetch(descriptor)
-        let edges = models.map { $0.toWireEdge() }
-        return PaginatedResult(data: edges, cursor: nil, hasMore: false)
+        return Self.edgePage(models, limit: limit, offset: offset)
     }
 
     /// Batched inbound-edge lookup. Returns a dictionary keyed by every
@@ -666,26 +743,42 @@ public actor LocalStore {
 
         var descriptor = FetchDescriptor<MarfaItemModel>(
             predicate: predicate,
-            sortBy: [Self.sortDescriptor(filters: filters)]
+            sortBy: Self.sortDescriptors(filters: filters)
         )
+        // The cursor advances the window rather than narrowing the predicate.
+        // A keyset boundary is what the server uses and was tried first here,
+        // but naming a sort column and both directions inside `#Predicate`
+        // pushes the macro past what the type-checker will accept, and the
+        // predicate is shared with every reactive query — not somewhere to
+        // spend that budget. See `LocalCursor` for what this costs.
+        if let raw = filters?.cursor, let offset = LocalCursor.offset(decoding: raw) {
+            descriptor.fetchOffset = offset
+        }
         if let limit = filters?.limit {
             descriptor.fetchLimit = limit
         }
         return descriptor
     }
 
-    /// Shared sort descriptor honoring `filters.sort` / `filters.direction`.
+    /// Shared sort descriptors honoring `filters.sort` / `filters.direction`.
     /// Default is `updatedAt` DESC, matching the server's
     /// `GET /items` default. Falls back to `updatedAt` for any
     /// unsupported sort key — predicate-safe access only.
-    nonisolated static func sortDescriptor(filters: ListFilters?) -> SortDescriptor<MarfaItemModel> {
+    ///
+    /// `id` is a second descriptor rather than decoration: rows sharing a
+    /// sort value would otherwise come back in whatever order the store felt
+    /// like, and a keyset cursor over an unstable order skips or repeats rows
+    /// at every page boundary. It follows the primary direction, as the
+    /// server's system-column sort does.
+    nonisolated static func sortDescriptors(filters: ListFilters?) -> [SortDescriptor<MarfaItemModel>] {
         let order: SortOrder = filters?.direction == .ascending ? .forward : .reverse
+        let primary: SortDescriptor<MarfaItemModel>
         switch filters?.sort?.rawValue ?? "updated_at" {
-        case "created_at": return SortDescriptor(\.createdAt, order: order)
-        case "timestamp":  return SortDescriptor(\.timestamp, order: order)
-        case "type":       return SortDescriptor(\.type, order: order)
-        default:           return SortDescriptor(\.updatedAt, order: order)
+        case "created_at": primary = SortDescriptor(\.createdAt, order: order)
+        case "timestamp":  primary = SortDescriptor(\.timestamp, order: order)
+        default:           primary = SortDescriptor(\.updatedAt, order: order)
         }
+        return [primary, SortDescriptor(\.id, order: order)]
     }
 
     // Each namespace's stored value is an object. The wire type models
