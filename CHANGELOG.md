@@ -7,6 +7,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [14.1.0] — 2026-08-26
+
+Minor: two additions and no source-breaking change. Both exist because a
+consumer app got something wrong that this SDK made easy to get wrong — one an
+auth parameter that does not mean what it is called, the other a question with
+no cheap answer, which an app answered by decoding its whole library on every
+save.
+
 ### Added
 
 - **`MarfaStore.queryTypesInData()` answers which item types a store actually holds.** No route returns this, no server aggregate exists, and it has to work offline, so walking the item rows is the only way to know it. What makes the walk affordable is what it declines to do: it reads one column and never calls `toWireItem()`, so no `propertiesData` blob is JSON-decoded — the same trade `TagsQuery` already makes. The alternative a consumer reaches for is an unfiltered `ItemsWithMetadataQuery` plus a walk over `item.type`, which materializes and decodes the entire library on every store save to answer a question about a filter menu; an app shipped exactly that. Trashed rows are excluded, which is a deliberate divergence from that unfiltered walk: a type whose only items are in the trash is not a type the space holds, and `TagsQuery` already excluded them, so a consumer building one filter list from both had the type of a trashed item offered while its tags were not.
