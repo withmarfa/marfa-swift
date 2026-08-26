@@ -44,7 +44,14 @@ public enum Passkey {
     /// the user can register a new platform passkey for their account.
     ///
     /// - Parameters:
-    ///   - issuer: Marfa instance base URL (e.g. `https://staging.marfa.so`).
+    ///   - issuer: Marfa instance base URL (e.g. `https://api.marfa.so`).
+    ///     Despite the name this is the **server URL**, not the OAuth issuer
+    ///     identifier that ``MarfaAuth`` and ``DeviceFlow`` take: the enroll
+    ///     page is an ordinary route under `/auth`, appended below. Handing it
+    ///     ``OAuthDiscovery/issuer(forServer:)`` produces
+    ///     `/auth/auth/passkey/enroll`. One label meaning two things across
+    ///     three entry points is a wart; the parameter wants renaming to
+    ///     `serverURL`, which is a breaking change and so not made here.
     ///   - presentationContextProvider: SwiftUI/UIKit context provider for
     ///     the system browser window.
     ///   - callbackURLScheme: Custom scheme passed to the underlying

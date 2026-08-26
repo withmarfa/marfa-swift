@@ -5,9 +5,15 @@ import Foundation
 ///
 /// ## Flow
 ///
+/// The server URL and the OAuth issuer identifier are **not the same value** —
+/// see ``OAuthDiscovery/issuer(forServer:)``. Keep the server URL for the
+/// client and derive the issuer for the flow.
+///
 /// ```swift
+/// let serverURL = URL(string: "https://api.marfa.so")!
+///
 /// let handle = try await DeviceFlow.start(
-///     issuer: URL(string: "https://staging.marfa.so")!,
+///     issuer: OAuthDiscovery.issuer(forServer: serverURL),
 ///     clientId: "marfa-cli",
 ///     scopes: ["core.note:read"],
 ///     storage: KeychainStorage()
@@ -22,7 +28,7 @@ import Foundation
 ///
 /// // Block on the user finishing:
 /// let provider = try await handle.awaitToken()
-/// let client = MarfaClient(url: handle.issuer, tokenProvider: provider)
+/// let client = MarfaClient(url: serverURL, tokenProvider: provider)
 /// ```
 public enum DeviceFlow {
 

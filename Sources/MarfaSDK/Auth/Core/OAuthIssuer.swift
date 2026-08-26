@@ -1,6 +1,11 @@
 import Foundation
 
-enum OAuthIssuerValidationError: Error, Sendable, CustomStringConvertible {
+/// `LocalizedError` as well as `CustomStringConvertible`: this type is
+/// internal, but `MarfaAuth.signIn`, `MarfaAuth.restore` and `DeviceFlow.start`
+/// all throw it out through public API, so a consumer only ever sees it as
+/// `localizedDescription`. Without the conformance that reads as a bare case
+/// index rather than as the malformed issuer it is complaining about.
+enum OAuthIssuerValidationError: Error, Sendable, CustomStringConvertible, LocalizedError {
     case notAbsolute(String)
     case userInfo(String)
     case query(String)
@@ -18,6 +23,8 @@ enum OAuthIssuerValidationError: Error, Sendable, CustomStringConvertible {
             return "OAuth issuer must not contain a fragment: \(issuer)"
         }
     }
+
+    var errorDescription: String? { description }
 }
 
 /// Canonical OAuth issuer identity shared by discovery and credential storage.

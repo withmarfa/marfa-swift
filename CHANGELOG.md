@@ -7,6 +7,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Added
+
+- **`OAuthDiscovery.issuer(forServer:)` derives the OAuth issuer identifier from a Marfa server URL.** A Marfa deployment mounts its authorization server under `/auth` and publishes `https://<host>/auth` as its issuer, so a bare server URL is not an issuer and RFC 8414 §3.3 refuses a document that names one against a request for the other. Every consumer of this SDK had assumed otherwise, and the uniformity is the point rather than a coincidence: two apps, both written against these docstrings, both passing the server URL to a parameter called `issuer`, both with sign-in dead for weeks. The derivation now has one documented home instead of being knowledge each app was expected to have. The parameter still takes the issuer — deriving it inside the flows, so the wrong value becomes unrepresentable rather than merely avoidable, is the right end state and is a breaking change with a rename attached, so it is not this release.
+
+### Fixed
+
+- **`OAuthDiscoveryError` reached consumers as a case index rather than as a sentence.** The type carried a `CustomStringConvertible` description naming both issuers in plain text and did not conform to `LocalizedError`, so `localizedDescription` fell through to the NSError bridge and rendered every case as "The operation couldn't be completed. (MarfaSDK.OAuthDiscoveryError error 3.)". A consumer showing `localizedDescription`, which is what a SwiftUI error row shows, therefore had no route to the description at all. That is not a cosmetic gap: it is what turned a one-line issuer mismatch in a consumer app into an afternoon of reading discovery code, the server's published metadata and RFC 8414 side by side. `OAuthIssuerValidationError` gets the same treatment — it is internal, but `MarfaAuth.signIn`, `MarfaAuth.restore` and `DeviceFlow.start` all throw it out through public API, so a consumer only ever sees it through `localizedDescription` too.
+
+- **The `MarfaAuth` and `DeviceFlow` docstring examples showed a value that cannot work.** Both opened with `issuer: URL(string: "https://staging.marfa.so")!`, which fails at the first discovery call against any Marfa server, and both then built a `MarfaClient` from `auth.issuer` / `handle.issuer`. The second line is wrong in the other direction once the first is corrected: an issuer carrying `/auth` points the API client at the authorization server. The examples now hold the server URL and derive the issuer from it, which shows the distinction rather than describing it. `Passkey.enroll(issuer:)` is documented as the wart it is: its parameter genuinely means the server URL, so one label now means two things across three entry points, and it wants renaming to `serverURL` in a release that can break source.
+
 ## [14.0.0] — 2026-08-26
 
 **Major because `ConnectionUninstallResult`'s memberwise initializer gains a
