@@ -52,6 +52,33 @@ public actor OAuthDiscovery {
 
     public init() {}
 
+    /// The OAuth issuer identifier for a Marfa server reachable at `serverURL`.
+    ///
+    /// A Marfa deployment mounts its authorization server under `/auth` and
+    /// publishes `https://<host>/auth` as its issuer identifier, so a bare
+    /// server URL is **not** an issuer. RFC 8414 §3.3 requires the published
+    /// `issuer` to be identical to the one the caller asked about, which means
+    /// handing a bare server URL to ``MarfaAuth`` or ``DeviceFlow`` fails with
+    /// ``OAuthDiscoveryError/malformedDoc(issuer:underlying:)`` — a fetch that
+    /// succeeds and then a document that cannot match. Both Swift apps built
+    /// on this SDK made exactly that mistake, so the derivation lives here
+    /// rather than in each of them.
+    ///
+    /// `/auth` is a platform layout constant, in company with the passkey,
+    /// account and userinfo routes this SDK already addresses. The published
+    /// document remains authoritative: a deployment serving its authorization
+    /// server from somewhere else needs the issuer it actually publishes, not
+    /// this.
+    ///
+    /// Nothing is guarded. A caller passing something that is already an
+    /// issuer gets `/auth/auth`, which fails loudly on the next discovery
+    /// call. This function exists to be named at a call site, and a call site
+    /// that names it has said what it is passing; quietly accepting the other
+    /// thing would hide the same class of mistake this exists to end.
+    public static func issuer(forServer serverURL: URL) -> URL {
+        serverURL.appending(path: "auth")
+    }
+
     /// Returns the discovered endpoints for `issuer`. First call fetches
     /// the well-known doc; subsequent calls return the cached value.
     /// Concurrent first-calls share a single in-flight task.
@@ -255,6 +282,16 @@ public enum OAuthDiscoveryError: Error, Sendable {
     case httpError(issuer: URL, status: Int)
     case malformedDoc(issuer: URL, underlying: Error)
     case missingField(issuer: URL, field: String)
+}
+
+/// Without this the NSError bridge renders every case as "The operation
+/// couldn't be completed. (MarfaSDK.OAuthDiscoveryError error 3.)", naming the
+/// case index and nothing else. A consumer showing `localizedDescription` —
+/// which is what a SwiftUI error row shows — therefore had no route to the
+/// description below, so an issuer mismatch that names both issuers in plain
+/// text reached a person as a number instead.
+extension OAuthDiscoveryError: LocalizedError {
+    public var errorDescription: String? { description }
 }
 
 extension OAuthDiscoveryError: CustomStringConvertible {

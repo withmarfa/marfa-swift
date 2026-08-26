@@ -10,9 +10,18 @@ import Foundation
 ///
 /// ## Flow
 ///
+/// The server URL and the OAuth issuer identifier are **not the same value**.
+/// A Marfa deployment publishes `https://<host>/auth` as its issuer, so keep
+/// the server URL and derive the issuer from it with
+/// ``OAuthDiscovery/issuer(forServer:)``. Passing the bare server URL here
+/// fails at the first discovery call, and building a ``MarfaClient`` from
+/// ``issuer`` points the API at `/auth`.
+///
 /// ```swift
+/// let serverURL = URL(string: "https://api.marfa.so")!
+///
 /// let auth = MarfaAuth(
-///     issuer: URL(string: "https://staging.marfa.so")!,
+///     issuer: OAuthDiscovery.issuer(forServer: serverURL),
 ///     clientId: "marfa-notes",
 ///     redirectURI: URL(string: "marfa-notes://auth/callback")!,
 ///     scopes: ["core.note:read", "core.note:write", "openid", "profile", "email"],
@@ -21,11 +30,11 @@ import Foundation
 ///
 /// // On a "Sign in" tap:
 /// let provider = try await auth.signIn(presentationContextProvider: window)
-/// let client = MarfaClient(url: auth.issuer, tokenProvider: provider)
+/// let client = MarfaClient(url: serverURL, tokenProvider: provider)
 ///
 /// // On app cold-start:
 /// if let provider = try await auth.restore() {
-///     let client = MarfaClient(url: auth.issuer, tokenProvider: provider)
+///     let client = MarfaClient(url: serverURL, tokenProvider: provider)
 /// }
 ///
 /// // On sign-out:
@@ -57,7 +66,12 @@ import Foundation
 @MainActor
 public final class MarfaAuth {
 
-    /// The issuer as the caller spelled it.
+    /// The OAuth issuer identifier, as the caller spelled it.
+    ///
+    /// Not the API base URL, and not a substitute for it. On a Marfa
+    /// deployment the two differ by a `/auth` path component — see
+    /// ``OAuthDiscovery/issuer(forServer:)`` — so a ``MarfaClient`` built from
+    /// this addresses `/auth` rather than the API.
     ///
     /// Discovery compares the published `issuer` against this, not against the
     /// canonical form: an identifier that legitimately ends in a slash is the
