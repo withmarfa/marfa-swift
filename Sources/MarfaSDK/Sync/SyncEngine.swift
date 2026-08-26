@@ -1276,7 +1276,7 @@ public actor SyncEngine {
                 let body = UpdateItemBody(
                     properties: p.properties,
                     version: nil,
-                    snapshot: nil,
+                    forceSnapshot: nil,
                     tier: p.tier,
                     sourceId: p.sourceId
                 )

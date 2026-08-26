@@ -103,6 +103,28 @@ struct WireFixtureSpecDriftTests {
         }
     }
 
+    @Test("OccurrencesResponse")
+    func occurrencesResponse() throws {
+        let schema = try #require(
+            (((spec()["paths"] as? [String: Any])?["/occurrences"]
+                as? [String: Any])?["get"] as? [String: Any])
+                .flatMap { $0["responses"] as? [String: Any] }
+                .flatMap { $0["200"] as? [String: Any] }
+                .flatMap { $0["content"] as? [String: Any] }
+                .flatMap { $0["application/json"] as? [String: Any] }?["schema"],
+            "GET /occurrences declares no 200 response schema")
+
+        let declared = try #require(
+            (schema as? [String: Any])?["properties"] as? [String: Any],
+            "the 200 schema declares no properties, so there is nothing to compare")
+        // Same ratchet as below, and the same reason. The model carried
+        // `data` alone for long enough that a caller could not see the
+        // window the server actually expanded, or the series it failed to.
+        #expect(declared.count >= 3, "the occurrences schema lost fields rather than gaining them")
+
+        assertFields(try fixture("occurrences_response"), against: schema, path: "occurrences_response")
+    }
+
     @Test("SpaceConfig")
     func spaceConfig() throws {
         let schema = try #require(

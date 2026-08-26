@@ -20,11 +20,22 @@
       "has_more": false
     }
   },
+  "extensions": {
+    "connection.runtime": {
+      "cursor": "2026-04-14T10:00:00Z",
+      "recent_errors": []
+    }
+  },
   "id": "itm_01JABCXYZ",
-  "properties": { "title": "Hello", "count": 3, "active": true },
+  "properties": {
+    "title": "Hello",
+    "count": 3,
+    "active": true
+  },
   "schema_version": 1,
   "source": "mobile",
   "source_id": "src_42",
+  "space_id": "tnt_01",
   "state": "active",
   "tier": "library",
   "timestamp": "2026-04-14T10:00:00Z",

@@ -14,17 +14,61 @@ public struct Occurrence: Codable, Sendable, Hashable {
     public let endsAt: String?
     /// The item the occurrence was expanded from.
     public let item: Item
+    /// The series this was expanded from, when it came from a recurrence
+    /// rather than standing alone.
+    public let seriesId: String?
+    /// The date in the series this occurrence overrides, when it is an
+    /// exception rather than a plain expansion.
+    public let replaces: String?
 
     enum CodingKeys: String, CodingKey {
         case startsAt = "starts_at"
         case endsAt = "ends_at"
         case item
+        case seriesId = "series_id"
+        case replaces
+    }
+}
+
+/// The window a set of occurrences was expanded over.
+///
+/// Always present, and worth reading rather than assuming: the server
+/// bounds the expansion, so a caller that asked for a wider range than the
+/// server will expand gets this narrower one back and no indication
+/// anywhere else.
+public struct OccurrenceWindow: Codable, Sendable, Hashable {
+    public let from: String
+    public let to: String
+}
+
+/// A series that could not be expanded, and why.
+///
+/// Reported rather than thrown: one unparseable recurrence rule should not
+/// cost the caller every other occurrence in the window.
+public struct OccurrenceSeriesError: Codable, Sendable, Hashable {
+    public let itemId: String
+    public let message: String
+
+    enum CodingKeys: String, CodingKey {
+        case itemId = "item_id"
+        case message
     }
 }
 
 /// Envelope for `GET /occurrences`.
 public struct OccurrencesResponse: Codable, Sendable {
     public let data: [Occurrence]
+    /// The range actually expanded, which may be narrower than the one asked
+    /// for.
+    public let window: OccurrenceWindow
+    /// Series the server could not expand. Absent when every series in the
+    /// window expanded cleanly.
+    public let seriesErrors: [OccurrenceSeriesError]?
+
+    enum CodingKeys: String, CodingKey {
+        case data, window
+        case seriesErrors = "series_errors"
+    }
 }
 
 /// How one field compares between an item and a mirror of it.

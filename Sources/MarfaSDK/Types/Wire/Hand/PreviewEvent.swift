@@ -33,6 +33,18 @@ public enum PreviewEventDispatchReason: String, Codable, Sendable, Hashable, Cas
     /// Subscriber's connection or webhook subscription is paused or
     /// revoked.
     case subscriptionInactive = "subscription_inactive"
+
+    /// The item's type is in the reserved `system.*` namespace, which
+    /// never fans out to subscribers.
+    case systemType = "system_type"
+
+    /// The subscriber's mapping does not name this item's type, so the
+    /// envelope is not theirs to receive.
+    case typeNotTargeted = "type_not_targeted"
+
+    /// The subscription exists and is deliberately paused, as distinct
+    /// from inactive: somebody turned it off and can turn it back on.
+    case subscriptionPaused = "subscription_paused"
 }
 
 /// Hop-count metadata supplied with a synthetic event. When omitted, the

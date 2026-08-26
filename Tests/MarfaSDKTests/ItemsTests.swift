@@ -147,8 +147,13 @@ struct ItemsTests {
         #expect(mock.calls[0].method == .patch)
     }
 
-    @Test("Create item with edges emits edges array in snake_case body")
+    @Test("Create item with edges sends the shape the route accepts")
     func createWithEdges() async throws {
+        // This test previously asserted an array of objects carrying
+        // `edge_type`, `other_id` and `direction`, which the route's schema
+        // refuses. It passed, so the suite certified a request the server
+        // would reject. Asserting the wire shape is only worth anything
+        // when the shape asserted is the one the server reads.
         let (client, mock) = makeClient()
         mock.enqueue(sampleItem())
 
@@ -156,27 +161,16 @@ struct ItemsTests {
             type: "core.note",
             properties: ["title": .string("Hello")],
             edges: [
-                CreateItemEdge(
-                    edgeType: "in-thread",
-                    direction: .outbound,
-                    otherId: "thread-1",
-                    properties: ["position": .double(1)]
-                ),
-                CreateItemEdge(
-                    edgeType: "about",
-                    direction: .outbound,
-                    otherId: "topic-1"
-                ),
+                "in-thread": ["thread-1"],
+                "about": ["topic-1", "topic-2"],
             ]
         )
         _ = try await client.items.create(input)
 
         let body = try JSONSerialization.jsonObject(with: mock.calls[0].body!) as? [String: Any]
-        let edges = body?["edges"] as? [[String: Any]]
-        #expect(edges?.count == 2)
-        #expect(edges?[0]["edge_type"] as? String == "in-thread")
-        #expect(edges?[0]["other_id"] as? String == "thread-1")
-        #expect(edges?[0]["direction"] as? String == "outbound")
+        let edges = body?["edges"] as? [String: [String]]
+        #expect(edges?["in-thread"] == ["thread-1"])
+        #expect(edges?["about"] == ["topic-1", "topic-2"])
         // parent_id / thread_id / about must be absent on the wire now.
         #expect(body?["parent_id"] == nil)
         #expect(body?["thread_id"] == nil)

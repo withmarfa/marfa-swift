@@ -19,7 +19,14 @@ public struct CreateItemInput: Codable, Sendable {
     public var captureLatitude: Double?
     public var captureLongitude: Double?
     public var tags: [String]?
-    public var edges: [CreateItemEdge]?
+    /// Outbound edges to create atomically with the item, as
+    /// `{ <edge_type>: [targetId] }`.
+    ///
+    /// Outbound only, and carrying no per-edge properties, because that is
+    /// what `POST /items` accepts. An edge that needs a direction of its own
+    /// or properties on it is a separate `client.edges.create(...)` call
+    /// against the item this returns.
+    public var edges: [String: [String]]?
 
     public init(
         type: String,
@@ -34,7 +41,7 @@ public struct CreateItemInput: Codable, Sendable {
         captureLatitude: Double? = nil,
         captureLongitude: Double? = nil,
         tags: [String]? = nil,
-        edges: [CreateItemEdge]? = nil
+        edges: [String: [String]]? = nil
     ) {
         self.type = type
         self.properties = properties
@@ -59,47 +66,15 @@ public struct CreateItemInput: Codable, Sendable {
     }
 }
 
-/// One edge to attach atomically when creating an item.
-///
-/// `direction` picks whether the new item is the edge's source or target.
-/// `otherId` is the already-existing item on the other side.
-public struct CreateItemEdge: Codable, Sendable, Hashable {
-    public enum Direction: String, Codable, Sendable, Hashable {
-        /// The new item is the edge's source; `otherId` is the target.
-        case outbound
-        /// The new item is the edge's target; `otherId` is the source.
-        case inbound
-    }
-
-    public var edgeType: String
-    public var direction: Direction
-    public var otherId: String
-    public var properties: [String: JSONValue]?
-
-    public init(
-        edgeType: String,
-        direction: Direction,
-        otherId: String,
-        properties: [String: JSONValue]? = nil
-    ) {
-        self.edgeType = edgeType
-        self.direction = direction
-        self.otherId = otherId
-        self.properties = properties
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case edgeType = "edge_type"
-        case direction
-        case otherId = "other_id"
-        case properties
-    }
-}
-
 struct UpdateItemBody: Codable, Sendable {
     var properties: [String: JSONValue]?
     var version: Int?
-    var snapshot: Bool?
+    /// Force a version snapshot on this write.
+    ///
+    /// The key is `force_snapshot`. It was `snapshot` here, which the route
+    /// does not read, so the flag encoded and did nothing. Nothing set it,
+    /// so nothing broke; it was waiting for the first caller.
+    var forceSnapshot: Bool?
     var tier: Tier?
     /// Rename the natural key under this item's `source`. Server validates
     /// uniqueness of `(source, source_id)` and 409s with
@@ -108,7 +83,8 @@ struct UpdateItemBody: Codable, Sendable {
     var sourceId: String?
 
     enum CodingKeys: String, CodingKey {
-        case properties, version, snapshot, tier
+        case properties, version, tier
+        case forceSnapshot = "force_snapshot"
         case sourceId = "source_id"
     }
 }

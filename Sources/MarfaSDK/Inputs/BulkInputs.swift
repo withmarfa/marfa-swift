@@ -5,10 +5,10 @@ import Foundation
 /// One item to create-or-upsert in a bulk call. Shape matches
 /// `CreateItemInput` plus inline edges scoped to bulk writes.
 ///
-/// `edges` uses the compact server shape (`{ <edge_type>: [targetId] }`)
-/// rather than the richer `CreateItemEdge` structure — bulk writes only
-/// support outbound edges and that's the shape the `/items/bulk` route
-/// accepts verbatim.
+/// `edges` uses the server shape, `{ <edge_type>: [targetId] }`: outbound
+/// only, no per-edge properties, which is what the `/items/bulk` route
+/// accepts verbatim. `CreateItemInput` carries the same shape for the same
+/// reason.
 public struct BulkItemInput: Codable, Sendable {
     public var id: String?
     public var type: String
