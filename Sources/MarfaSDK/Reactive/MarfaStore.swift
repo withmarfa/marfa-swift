@@ -186,6 +186,12 @@ public final class MarfaStore {
         TagsQuery(container: container)
     }
 
+    /// Creates a live query over the distinct item types present in the local
+    /// store. See ``TypesInDataQuery``.
+    public func queryTypesInData() -> TypesInDataQuery {
+        TypesInDataQuery(container: container)
+    }
+
     // MARK: - Connection-aware queries
 
     /// Creates a live typed query over `system.connection` items.
