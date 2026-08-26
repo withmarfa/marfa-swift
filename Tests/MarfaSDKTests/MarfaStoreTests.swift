@@ -354,6 +354,102 @@ struct MarfaStoreTests {
         query.stop()
     }
 
+    // MARK: - TypesInDataQuery
+
+    @Test("TypesInDataQuery returns distinct types, sorted") func typesInDataDistinct() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "one"))
+        _ = try await client.items.create(noteInput(body: "two"))
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.bookmark", properties: ["url": .string("https://example.test")])
+        )
+
+        let query = store.queryTypesInData()
+        try await waitForCondition(timeout: .seconds(2)) { query.types.count == 2 }
+
+        #expect(query.types == ["core.bookmark", "core.note"])
+        query.stop()
+    }
+
+    @Test("TypesInDataQuery picks up a new type live") func typesInDataLiveAdd() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "only a note"))
+        let query = store.queryTypesInData()
+        try await waitForCondition(timeout: .seconds(2)) { query.types == ["core.note"] }
+
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.task", properties: ["title": .string("later")])
+        )
+        try await waitForCondition(timeout: .seconds(2)) { query.types.count == 2 }
+
+        #expect(query.types == ["core.note", "core.task"])
+        query.stop()
+    }
+
+    /// The deliberate divergence from an unfiltered item walk. A type whose
+    /// only items are trashed is not a type the space holds, and `TagsQuery`
+    /// already excludes those rows — so a consumer building one filter list
+    /// from both had the type of a trashed item offered while its tags were
+    /// not.
+    @Test("TypesInDataQuery excludes trashed items") func typesInDataExcludesTrashed() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "stays"))
+        let doomed = try await client.items.create(
+            CreateItemInput(type: "core.bookmark", properties: ["url": .string("https://example.test")])
+        )
+
+        let query = store.queryTypesInData()
+        try await waitForCondition(timeout: .seconds(2)) { query.types.count == 2 }
+
+        try await client.items.delete(id: doomed.id)
+        try await waitForCondition(timeout: .seconds(2)) { query.types.count == 1 }
+
+        #expect(query.types == ["core.note"])
+        query.stop()
+    }
+
+    /// The query is only affordable because it never decodes an item's
+    /// properties, and no test can observe that directly. What this pins is the
+    /// correctness half: a row whose properties blob dwarfs every other column
+    /// still reports its type. A future attempt to narrow the fetch further
+    /// breaks here if it narrows it wrongly.
+    ///
+    /// `FetchDescriptor.propertiesToFetch` was tried and removed. It changes
+    /// nothing observable — SwiftData faults an unlisted property on access, so
+    /// asking for the wrong column left every test in this suite passing, which
+    /// makes it a claim no test can hold.
+    @Test("TypesInDataQuery reads the type of an item with a large body") func typesInDataLargeBody() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(
+            CreateItemInput(
+                type: "core.note",
+                properties: ["body": .string(String(repeating: "long. ", count: 20_000))]
+            )
+        )
+
+        let query = store.queryTypesInData()
+        try await waitForCondition(timeout: .seconds(2)) { !query.isLoading }
+
+        #expect(query.types == ["core.note"])
+        query.stop()
+    }
+
     // MARK: - BackrefsQuery
 
     @Test("BackrefsQuery groups inbound edges by target") func backrefsQueryGroups() async throws {
