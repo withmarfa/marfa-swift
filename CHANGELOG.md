@@ -7,6 +7,15 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [14.0.0] — 2026-08-26
+
+**Major because `ConnectionUninstallResult`'s memberwise initializer gains a
+required `upstreamCredential` parameter**, so an existing
+`ConnectionUninstallResult(...)` stops compiling. That is the only
+source-breaking change in this release; everything else is a fix. Decoding is
+unaffected, and in practice the callers are tests seeding `MockTransport`
+through `MarfaSDKTestSupport`.
+
 ### Added
 
 - **`ConnectionUninstallResult.upstreamCredential`.** The server has returned it as a required field for some time and the snapshot this package generates from had not been refreshed since before it landed, so it decoded away. Non-optional, matching the contract. `connections.uninstall` documents how to read it: the spec declares it as an unnamed union, so it arrives as a free-form map discriminated on `status`, with `retained` naming the other connections that kept the upstream credential alive.
