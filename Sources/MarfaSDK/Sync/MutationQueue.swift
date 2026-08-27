@@ -578,6 +578,19 @@ public actor MutationQueue {
         }
     }
 
+    /// How many writes are queued.
+    ///
+    /// Distinct from ``isEmpty`` because a refusal is more useful when it says
+    /// how much is outstanding: a count that does not fall across retries is a
+    /// stuck queue rather than a busy one, and a person needs to tell those
+    /// apart. `isEmpty` stays as it is — it stops after one row and is the
+    /// cheaper answer where only presence matters.
+    var pendingCount: Int {
+        get throws {
+            try modelContext.fetchCount(FetchDescriptor<PendingMutationModel>())
+        }
+    }
+
     // MARK: - Sync state (Last-Event-ID cursor)
 
     func loadSyncState(key: String) throws -> String? {
