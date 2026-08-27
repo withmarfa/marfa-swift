@@ -138,6 +138,14 @@ actor BlockingTransport: Transport {
             }
             return try JSONDecoder().decode(T.self, from: data)
         }
+        if path == "/edges" && method == .get {
+            // The initial sync's second pass. This transport exists to hold the
+            // *items* request open, so edges answer straight away with an empty
+            // page: a second continuation would make the one this class offers
+            // ambiguous, and no test here is about the edge pass.
+            let empty = PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false)
+            return try JSONDecoder().decode(T.self, from: JSONEncoder().encode(empty))
+        }
         fatalError("BlockingTransport: unexpected request \(method.rawValue) \(path)")
     }
 

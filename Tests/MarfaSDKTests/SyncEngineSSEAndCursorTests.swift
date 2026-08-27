@@ -336,8 +336,10 @@ struct SyncEngineSSEAndCursorTests {
             data: #"{"type":"catchup_too_old","min_retained_id":100,"requested":50}"#
         )
         transport.enqueueEvents([catchup])
-        // performInitialSync will issue a GET /items — return an empty page.
+        // performInitialSync issues a GET /items and then a GET /edges — return
+        // an empty page for each.
         transport.enqueue(PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false))
+        transport.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
         // Second SSE connection after reconnect — empty.
         transport.enqueueEvents([])
 
