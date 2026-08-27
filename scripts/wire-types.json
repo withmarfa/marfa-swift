@@ -19,7 +19,12 @@
     {
       "name": "Item",
       "pointer": "/paths/~1items~1{id}/get/responses/200/content/application~1json/schema/properties/item",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id",
       "fieldOverrides": {
         "edges": "[String: ItemEdgeGroup]"
@@ -32,30 +37,53 @@
     {
       "name": "Edge",
       "pointer": "/paths/~1edges/post/responses/201/content/application~1json/schema/properties/edge",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "EdgeType",
       "pointer": "/paths/~1edge-types/get/responses/200/content/application~1json/schema/properties/edge_types/items",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "Metadata",
       "pointer": "/paths/~1items~1{id}/get/responses/200/content/application~1json/schema/properties/metadata",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "Version",
       "pointer": "/paths/~1items~1{id}~1versions/get/responses/200/content/application~1json/schema/properties/versions/items",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "ApiKey",
       "pointer": "/paths/~1keys/get/responses/200/content/application~1json/schema/properties/keys/items",
-      "conformances": ["Codable", "Sendable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Identifiable"
+      ],
       "identifiableKey": "id",
       "fieldOverrides": {
         "type_permissions": "[String: TypePermission]",
@@ -71,7 +99,10 @@
     {
       "name": "CreatedKey",
       "pointer": "/paths/~1keys/post/responses/201/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable"],
+      "conformances": [
+        "Codable",
+        "Sendable"
+      ],
       "fieldOverrides": {
         "type_permissions": "[String: TypePermission]",
         "extension_permissions": "[String: ExtensionPermission]",
@@ -86,35 +117,60 @@
     {
       "name": "Webhook",
       "pointer": "/paths/~1webhooks~1{id}/get/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "WebhookDelivery",
       "pointer": "/paths/~1webhooks~1{id}~1deliveries/get/responses/200/content/application~1json/schema/properties/deliveries/items",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "AuditEntry",
       "pointer": "/paths/~1audit/get/responses/200/content/application~1json/schema/properties/data/items",
-      "conformances": ["Codable", "Sendable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "BlobUploadResponse",
       "pointer": "/paths/~1blobs/post/responses/201/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "PresignedURLResponse",
       "pointer": "/paths/~1blobs~1{hash}~1url/get/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "TypeSchema",
       "pointer": "/paths/~1types~1{id}/get/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable"],
+      "conformances": [
+        "Codable",
+        "Sendable"
+      ],
       "fieldOverrides": {
         "merge_policy": "MergePolicy"
       }
@@ -122,7 +178,11 @@
     {
       "name": "MergePolicy",
       "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/0/properties/merge_policy",
-      "conformances": ["Codable", "Sendable", "Hashable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ],
       "enumOverrides": {
         "default": "MergePolicyStrategy",
         "fields": "MergePolicyStrategy"
@@ -131,12 +191,19 @@
     {
       "name": "ConflictSnapshot",
       "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/0/properties/current",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "ConflictResponse",
       "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/0",
-      "conformances": ["Codable", "Sendable"],
+      "conformances": [
+        "Codable",
+        "Sendable"
+      ],
       "fieldOverrides": {
         "current": "ConflictSnapshot",
         "ancestor": "ConflictSnapshot",
@@ -146,67 +213,127 @@
     {
       "name": "Profile",
       "pointer": "/paths/~1profile~1me/get/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "UpdateProfileInput",
       "pointer": "/paths/~1profile~1me/patch/requestBody/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "Integration",
       "pointer": "/paths/~1integrations~1{id}/get/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "RegisterIntegrationInput",
       "pointer": "/paths/~1integrations/post/requestBody/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable"]
+      "conformances": [
+        "Codable",
+        "Sendable"
+      ]
     },
     {
       "name": "ConnectionInstallInput",
       "pointer": "/paths/~1connections~1install/post/requestBody/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "ConnectionInstallResult",
       "pointer": "/paths/~1connections~1install/post/responses/201/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "ConnectionUninstallResult",
       "pointer": "/paths/~1connections~1{id}~1uninstall/post/responses/200/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "LeaseToken",
       "pointer": "/paths/~1connections~1{id}~1lease-tokens/get/responses/200/content/application~1json/schema/properties/leases/items",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "CreatedLeaseToken",
       "pointer": "/paths/~1connections~1{id}~1lease-tokens/post/responses/201/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "LeaseTokenInput",
       "pointer": "/paths/~1connections~1{id}~1lease-tokens/post/requestBody/content/application~1json/schema",
-      "conformances": ["Codable", "Sendable", "Hashable"]
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     },
     {
       "name": "InboundWebhookSubscription",
       "pointer": "/paths/~1connections~1{id}~1inbound-webhooks/get/responses/200/content/application~1json/schema/properties/inbound_webhooks/items",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
     },
     {
       "name": "InboundWebhookDelivery",
       "pointer": "/paths/~1connections~1{id}~1inbound-webhooks~1{webhook_id}~1deliveries/get/responses/200/content/application~1json/schema/properties/deliveries/items",
-      "conformances": ["Codable", "Sendable", "Hashable", "Identifiable"],
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
       "identifiableKey": "id"
+    },
+    {
+      "name": "AuthMe",
+      "pointer": "/paths/~1auth~1me/get/responses/200/content/application~1json/schema",
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable"
+      ]
     }
   ]
 }

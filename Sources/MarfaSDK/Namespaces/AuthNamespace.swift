@@ -25,6 +25,32 @@ public struct AuthNamespace: Sendable {
     public var account: AuthAccountNamespace {
         AuthAccountNamespace(transport: transport, isLocalMode: isLocalMode)
     }
+
+    /// Who this client's credential belongs to.
+    ///
+    /// `GET /auth/me`. The server resolves it from the credential, so nothing
+    /// is passed on the wire and the answer is whoever is holding it.
+    ///
+    /// `space` is always present and `space.id` is the value worth having: it
+    /// is per-account, assigned at provisioning, and identical for an API key
+    /// and an OAuth token reaching the same account. `user` is `nil` for a
+    /// credential with no person behind it, which is the ordinary case for an
+    /// API key — so read identity from `space`, not from `user`.
+    ///
+    /// Use ``MarfaClient/accountIdentity()`` rather than this when the question
+    /// is "whose store is this", since it pairs the space id with the server it
+    /// came from; the same space id on two deployments is two different places.
+    public func me() async throws -> AuthMe {
+        if isLocalMode {
+            throw LocalModeUnsupportedError(operation: "auth.me")
+        }
+        return try await transport.request(
+            method: .get,
+            path: "/auth/me",
+            body: nil,
+            query: nil
+        )
+    }
 }
 
 /// Account-lifecycle endpoints. Deletion is two-phase: an initial request
