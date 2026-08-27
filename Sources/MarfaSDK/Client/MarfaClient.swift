@@ -108,7 +108,11 @@ public final class MarfaClient: Sendable {
     /// ``search(query:filters:)`` can resolve locally in pure-local mode.
     /// `LocalStore` is an actor, so storing the reference is
     /// `Sendable`-safe.
-    private let localStore: LocalStore?
+    ///
+    /// Internal rather than private so the account-ownership extension can
+    /// reach it from its own file. Still not public: a consumer reaching into
+    /// the store directly is how a client and its store get out of step.
+    let localStore: LocalStore?
 
     // MARK: - Init
 
