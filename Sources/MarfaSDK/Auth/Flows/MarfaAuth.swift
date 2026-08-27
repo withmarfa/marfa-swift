@@ -226,26 +226,42 @@ public final class MarfaAuth {
     ///
     /// Clears the legacy spelling too, so an install that never restored a
     /// session after upgrading is covered as well.
+    ///
+    /// - Note: This clears and does not revoke, so on its own it leaves a live
+    ///   grant on the server. Unless you specifically want only the local half,
+    ///   prefer ``MarfaSession/end(serverURL:clientId:storage:revoking:urlSession:)``,
+    ///   which does both, takes the server URL so the issuer cannot be got
+    ///   wrong, and works on the platforms this type does not exist on.
     public static func clearStoredCredentials(
         issuer: URL,
         clientId: String,
         storage: any SecureStorage
     ) async throws {
-        let canonical = OAuthIssuer.normalize(issuer)
-        for key in [
-            OAuthIssuer.storageKey(kind: "tokens", issuer: canonical, clientId: clientId),
-            OAuthIssuer.storageKey(kind: "pending", issuer: canonical, clientId: clientId),
-            OAuthIssuer.legacyStorageKey(
-                kind: "tokens", issuer: canonical, clientId: clientId
-            ),
-            OAuthIssuer.legacyStorageKey(
-                kind: "pending", issuer: canonical, clientId: clientId
-            ),
-        ] {
-            try await storage.delete(for: key)
-        }
+        // One implementation, in `MarfaSession.swift`, because this is reachable
+        // on platforms where `MarfaAuth` is not.
+        try await clearCredentialAccounts(
+            issuer: issuer,
+            clientId: clientId,
+            storage: storage
+        )
     }
 
+    /// Revoke this session's tokens with the server and forget them locally.
+    ///
+    /// Does less than the name suggests, which is worth knowing before relying
+    /// on it as a sign-out:
+    ///
+    /// - It is a **no-op for any provider that is not a `StoredTokenProvider`**,
+    ///   so an API-key session passes through it unchanged.
+    /// - It clears only the **tokens** account. The pending PKCE account and
+    ///   both pre-11.4.0 spellings are left in storage.
+    /// - It needs a live provider, which needs discovery to have succeeded, so
+    ///   it cannot help on a device that is offline.
+    ///
+    /// For ending a session, prefer
+    /// ``MarfaSession/end(serverURL:clientId:storage:revoking:urlSession:)``,
+    /// which composes this with the full storage sweep in the right order and
+    /// still clears when there is no provider to revoke with.
     public func signOut(_ provider: TokenProvider) async throws {
         if let stored = provider as? StoredTokenProvider {
             do {
@@ -421,19 +437,12 @@ public final class MarfaAuth {
     }
 
     internal func revoke(token: String) async throws {
-        let endpoints = try await OAuthDiscovery.shared.endpoints(
-            for: issuer,
-            httpClient: urlSession
+        try await revokeToken(
+            token,
+            issuer: issuer,
+            clientId: clientId,
+            urlSession: urlSession
         )
-        var request = URLRequest(url: endpoints.revoke)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let body = [
-            "token": token,
-            "client_id": clientId,
-        ]
-        request.httpBody = formURLEncode(body).data(using: .utf8)
-        _ = try await urlSession.data(for: request)
     }
 
     private struct PendingState: Codable {
