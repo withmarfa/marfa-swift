@@ -7,6 +7,24 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [14.2.0] — 2026-08-27
+
+Minor. Three of the four changes here are about one seam: a local store, a
+credential, and the fact that nothing connected them. The SDK had no notion of
+which account populated a store, so every consumer holding both invented that
+guard itself, and the one that shipped keyed it on the credential rather than on
+the account — which moved one account's whole library into another's space. The
+initial sync also imported items without their edges, leaving a signed-in device
+showing a library with no relationships, and imported over local writes that had
+not yet replayed.
+
+**One entry below is not from this wave and is source-breaking.**
+`CreateItemEdge`'s removal landed on `main` before any of this and reached no
+changelog, so it is recorded here rather than published unrecorded. This release
+is numbered a minor with that in it deliberately: the project is pre-release, and
+both shipping consumers were checked against the removal and compile unchanged.
+A third consumer needs the migration note under **Removed**.
+
 ### Added
 
 - **The SDK knows which account a local store belongs to.** It had no such concept: `MarfaClient.synced(...)` opened whatever store was at `storePath` and built an engine against it, and the sync state that would betray a mismatch — the SSE cursor, the full-sync stamp — is keyed to the file rather than to an account. So handing a different account's credential to an engine pointed at the same store resumed from the previous account's cursor and replayed the previous account's queued writes into the new space, and nothing noticed. Every consumer with a store and a switchable credential had to invent the guard, and the one that shipped compared API-key hashes — which are only ever written when a key is saved, so an install that reached its first account by OAuth had nothing recorded to compare against, the guard stayed silent, and that account's entire library uploaded into the second account's space. The credential is the wrong identity for the question. `MarfaAccountIdentity` pairs the space id with the server it was read from: per-account, assigned at provisioning, identical for an API key and an OAuth token, and unchanged by a rotation — none of which is true of a token or a key. `MarfaClient.accountIdentity()` resolves it, `storeOwnership(for:)` and `storeOwnership(resolvedWith:)` compare it against a claim recorded in the store's own `sync_state` table, and `claimStore(for:)` records one. **Asking never records**, which is load-bearing rather than fastidious: at the moment a caller asks, the upload it is deciding whether to run has not happened, and a resolve that quietly claimed would make the retry after a failed upload read as `sameAccount` and skip the check protecting it. `StoreOwnership` has four cases and not two, because `unresolved` must not collapse into `sameAccount`: a caller deciding whether to *discard* a store has to read a failure to resolve as "do nothing", since wiping on a network blip destroys data the next sync would have reconciled, while a caller deciding whether to *upload* has to read it as "stop", since writing into the wrong space cannot be undone and another person can read it. One boolean cannot carry both, and a consumer modelling it as "did the account change" gets one of them backwards.
@@ -17,11 +35,25 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - **`InitialSyncError`**, thrown by `performInitialSync` when the mutation queue is not empty. Carries the count rather than a bare refusal: a number that does not fall across retries is a stuck queue rather than a busy one, and those want different answers from a person. `LocalizedError` from the start, so a SwiftUI error row shows the sentence rather than the case index.
 
+### Changed
+
+- **`PreviewEventDispatchReason` carries all eight of the route's cases**, having carried five. It is a raw-value enum with no unknown case, so a response naming one of the missing three threw a decoding error rather than degrading — the failure was real rather than cosmetic. **An exhaustive `switch` over it without a `default` stops compiling**, which is the only way a closed enum can gain a case.
+
+- **`CreateKeyInput` can send edge and metadata permissions.** Both parameters are defaulted, so existing call sites compile unchanged. Without them a key minted through this SDK always took the server's default for both, whatever the caller intended; the two enums were already in the file, unused.
+
+### Removed
+
+- **`CreateItemEdge`, and `CreateItemInput.edges` changes shape with it.** The field was an array of objects carrying an edge type, a direction and per-edge properties; the route declares an object mapping edge type to target ids, outbound only. Anything populating it sent a body the schema refuses, and `BulkItemInput` in this same SDK already carried the correct shape — so two inputs disagreed about one field. `CreateItemEdge` is removed rather than deprecated because it could only ever build a refused request, and leaving it in place would leave a trap. **A call site passing `edges:` to `CreateItemInput` stops compiling**, which is the intended outcome: it was not working, it was failing at the server. Replace `[CreateItemEdge(edgeType: "core.about", ...)]` with `["core.about": [targetId]]`. Inbound edges and per-edge properties are not expressible here and want `client.edges.create(...)`.
+
 ### Fixed
 
 - **The initial sync no longer overwrites a local edit that has not replayed.** It called `upsertItem` on every row it received, and `upsertItem` replaces all of an item's columns with no version check, while `setMetadata`'s contract is replace rather than merge. The conflict machinery could not help: it runs only on an outbound update meeting a 409, and is unreachable from the import. So an edit made offline and still queued lost to the server's older body, silently, and the queued mutation then replayed on top of a row whose earlier state nobody could see. It now refuses, and the refusal belongs here rather than in the caller for a specific reason: a consumer cannot ask this question at the moment it needs to. `hasPendingMutations` hangs off `SyncEngine`, and the caller deciding whether to import is typically holding a local client, which has neither an engine nor a queue — so what it actually writes is `syncEngine?.hasPendingMutations ?? false`, which answers "safe" because there was nothing to ask. A presence check standing in for a liveness check, and one that reads as correct. Per-row skipping was the alternative and cannot be made complete: a queued mutation carries an optional `localId` and the three bulk enqueues set none, so a bulk write is invisible to any "does this item have a pending edit" test. **This is a behaviour change rather than a source-breaking one**: a caller that previously imported over a non-empty queue now gets a thrown error where it used to get silent data loss. The one caller inside this package, the `catchup_too_old` branch, drains before importing rather than refusing — it is running, which is what a drain requires, and it is the only thing that ever asks for a full import, so a refusal there would leave the store stale with no route back.
 
 - **The initial sync imports edges, so a device that signs in gets relationships and not just items.** `performInitialSync` paginated `/items` and stopped there, and its own docstring recorded that as a deliberate limit — edges "arrive via SSE once emitted", with a per-item edge fetch suggested for anything that needed them sooner. That holds for one screen and does not hold for a library: edge reads resolve against the local store whenever one exists, so a store with no edge rows shows every item with none of its connections. Related is empty, a thread shows a root with no replies, attachments show none. It does not heal either, because SSE delivers only events after the cursor and a fresh install has none, so edges created before the device signed in are never emitted to it and the gap is permanent rather than eventual. A consumer could not close it from outside: `MarfaClient.localStore` is `private`, so `LocalStore.upsertEdge` is public and unreachable, and `edges.create` on a synced client would enqueue a mutation to re-create edges that already exist server-side. The import now walks `GET /edges` the same way it walks `/items`. Two things this also repairs, both wider than first sign-in: the `catchup_too_old` branch clears the cursor and calls this function, so a client whose cursor fell outside the retention window was losing every edge emitted during the gap; and the local-to-server migration path a consumer app offers as ordinary sync setup was wiping its store and repopulating it from this import, which returned items and no edges. The pass order does not matter and is not an accident — an edge holds its endpoints as plain id columns with no relationship, precisely so one whose item has not arrived is stored rather than refused. `limit` is clamped to 500 for the edge pass because that is the route's ceiling and a larger value is refused rather than clamped. The return value still counts items only: widening it would break every existing call site to report a number no caller currently asks for, so the edge count is logged instead.
+
+- **`UpdateItemBody` emitted `snapshot` where the route reads `force_snapshot`.** Nothing set it, so nothing broke — it was waiting for the first caller to wire a force-a-snapshot option through and find it did nothing. The type is internal, so the rename costs no caller anything.
+
+- **`Occurrence` and `OccurrencesResponse` were missing four fields between them**, including the window the server actually expanded — which can be narrower than the one asked for, with nothing else saying so.
 
 ## [14.1.0] — 2026-08-26
 
