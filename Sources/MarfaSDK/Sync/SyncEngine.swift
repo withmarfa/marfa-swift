@@ -460,18 +460,20 @@ public actor SyncEngine {
     }
 
     /// Performs a one-shot catch-up import: paginates through `GET
-    /// /items?include=metadata` and upserts each item plus its metadata into
-    /// the local store. SSE alone only delivers events since the cursor, so
-    /// without this call a freshly-signed-in app shows an empty store even
-    /// when the server has history.
+    /// /items?include=metadata` and then `GET /edges`, upserting each item,
+    /// its metadata, and every edge into the local store. SSE alone only
+    /// delivers events since the cursor, so without this call a freshly
+    /// signed-in app shows an empty store even when the server has history.
     ///
-    /// Safe to call repeatedly — `upsertItem` / `setMetadata` are idempotent.
-    /// Edges are not imported here; they arrive via SSE once emitted. V1
-    /// apps that need thread/about edges for initial state should call
-    /// ``ItemsNamespace/list(filters:)`` or add a per-item edge fetch.
+    /// Safe to call repeatedly — `upsertItem`, `setMetadata` and `upsertEdge`
+    /// are all idempotent.
     ///
-    /// - Parameter pageSize: Server-side page size for each request.
-    /// - Returns: The total number of items imported across all pages.
+    /// - Parameter pageSize: Server-side page size for each request. Clamped
+    ///   to 500 for the edge pass, which is that route's ceiling.
+    /// - Returns: The number of *items* imported across all pages. Edges are
+    ///   imported too and their count is logged rather than returned, because
+    ///   widening the return type would break every existing call site to
+    ///   report a number no caller currently asks for.
     /// - Throws: Transport errors from the pagination requests, or upsert
     ///   errors from the local store.
     @discardableResult
@@ -501,6 +503,48 @@ public actor SyncEngine {
             }
             cursor = page.cursor
         } while cursor != nil
+
+        // Edges, on the same one-shot basis, and not a nicety. Edge reads
+        // resolve against the local store whenever one exists, so a store with
+        // no edge rows shows a library with no relationships — Related empty,
+        // a thread showing a root with no replies, attachments showing none.
+        // SSE carries only events after the cursor, so edges created before
+        // this device signed in are never emitted to it and the gap is
+        // permanent rather than eventual. This pass is the only thing that
+        // closes it.
+        //
+        // Order against the items above does not matter: an edge holds its
+        // endpoints as plain id columns with no relationship, precisely so an
+        // edge whose item has not arrived is stored rather than refused.
+        //
+        // Through `transport` rather than `edges.list`, which in synced mode
+        // answers from the very table this is filling.
+        var edgeCursor: String? = nil
+        var edgesImported = 0
+        repeat {
+            // 500 is the route's own ceiling; a larger `limit` is refused
+            // rather than clamped.
+            var query: [(String, String)] = [("limit", String(min(pageSize, 500)))]
+            if let edgeCursor { query.append(("cursor", edgeCursor)) }
+
+            let page: PaginatedResult<Edge> = try await transport.request(
+                method: .get, path: "/edges", body: nil, query: query
+            )
+
+            for edge in page.data {
+                try await localStore.upsertEdge(edge)
+                edgesImported += 1
+            }
+
+            if !page.hasMore {
+                break
+            }
+            edgeCursor = page.cursor
+        } while edgeCursor != nil
+
+        logger.log.info(
+            "sync.initial_sync items=\(imported, privacy: .public) edges=\(edgesImported, privacy: .public)"
+        )
 
         // Stamp the completion so consumers can gate fresh pulls on recency
         // rather than "is the local store empty?". Uses the same ISO 8601

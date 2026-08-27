@@ -51,6 +51,7 @@ struct SyncEngineStateTrackingTests {
         transport.enqueue(
             PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
         )
+        transport.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
 
         let before = Date()
         _ = try await engine.performInitialSync()
@@ -70,6 +71,7 @@ struct SyncEngineStateTrackingTests {
         transport.enqueue(
             PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
         )
+        transport.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
         _ = try await engine.performInitialSync()
         let first = await engine.lastFullSyncAt
         #expect(first != nil)
