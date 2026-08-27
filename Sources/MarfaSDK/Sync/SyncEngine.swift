@@ -478,6 +478,33 @@ public actor SyncEngine {
     ///   errors from the local store.
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
+        // Refuse rather than overwrite. Every row this function receives goes
+        // through `upsertItem`, which replaces all of an item's columns with no
+        // version check, and `setMetadata`, whose contract is replace rather
+        // than merge. The conflict machinery is unreachable from here — it only
+        // runs on an outbound update meeting a 409. So an edit made offline and
+        // still queued loses to the server's older body, with nothing reporting
+        // it.
+        //
+        // The check belongs here rather than in the caller, and that is the
+        // whole point of the change. A consumer cannot ask this question at the
+        // moment it needs to: `hasPendingMutations` hangs off this engine, and
+        // the caller deciding whether to import is typically holding a local
+        // client that has neither an engine nor a queue. What it writes instead
+        // is `syncEngine?.hasPendingMutations ?? false`, which answers "safe"
+        // because there was nothing to ask — a presence check standing in for a
+        // liveness check, and one that reads as correct. Here the queue is in
+        // hand, so the answer cannot be right by accident.
+        //
+        // Per-row skipping was the other option and it cannot be made
+        // complete: a mutation carries an optional `localId`, and the three
+        // bulk enqueues set none at all, so a bulk write is invisible to any
+        // "does item X have a pending edit" test.
+        let pending = try await mutationQueue.pendingCount
+        if pending > 0 {
+            throw InitialSyncError.pendingMutations(count: pending)
+        }
+
         var cursor: String? = nil
         var imported = 0
         repeat {
@@ -967,8 +994,23 @@ public actor SyncEngine {
             resyncing = true
             logger.log.info("sync.catchup_too_old — clearing cursor and triggering full resync")
             try? await mutationQueue.clearSyncState(key: cursorKey)
+            // Drain before importing, because the import now refuses on a
+            // non-empty queue and this is the one call site that can do
+            // something about it: the engine is running here, which is what
+            // `replayMutations` requires, whereas an outside caller holding a
+            // local client has no engine to drain. Skipping this would leave
+            // the store stale with no route back — the cursor is already
+            // cleared, so a reconnect resumes from nothing and only this branch
+            // ever asks for a full import.
+            await replayMutations()
             do {
                 _ = try await performInitialSync()
+            } catch let error as InitialSyncError {
+                // Distinct from a transport failure. Reaching here means the
+                // drain above did not empty the queue — a write enqueued in
+                // between, or one that keeps failing — so the gap persists
+                // until a later drain succeeds and something asks again.
+                logger.log.error("sync.catchup_too_old.resync_refused reason=\(String(describing: error), privacy: .public)")
             } catch {
                 logger.log.error("sync.catchup_too_old.resync_failed reason=\(String(describing: type(of: error)), privacy: .public)")
             }
