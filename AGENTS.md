@@ -81,6 +81,19 @@ Three sibling sub-directories:
 
 Hand-written because codegen-domain currently scans only `core.*` types: `Connection` (typed wrapper for `system.connection`, surfacing `kind: ConnectionKind`, `scopes`, `integrationRef`, `runtimeStatus`, etc.) and `Activity` (typed wrapper for `system.activity`, surfacing `severity: ActivitySeverity`, `summary`, `connectionId`). Both conform to `MarfaItem` so they slot into `client.items.list({type: ...})`, `typedQuery<T>()`, and the `queryConnections` / `queryActivity` factories. The closed enums `ConnectionKind` (`app | integration`) and `ActivitySeverity` (`info | warning | error | actionRequired`) are hand-written under `Types/Wire/Hand/` so apps pattern-match without comparing raw strings.
 
+### Route coverage (`Tests/MarfaSDKTests/RouteCoverageTests.swift`)
+
+Compares the routes the SDK calls against the operations `scripts/openapi.json` declares, **in both directions**. Nothing else does: no generator reads the spec's `paths`, so before this the two surfaces drifted apart silently. It runs under `validate` with the rest of the suite and needs no separate wiring.
+
+Call sites are recovered by scanning `Sources/MarfaSDK` for `method:`/`path:` argument pairs, plus `eventStream(path:)` — which takes no `method:` and would otherwise make `GET /events` look unwrapped. A companion test asserts every `method:` argument in those sources is one the scan captured, so a call site written in a shape the regex cannot read fails loudly instead of quietly dropping out of the count.
+
+Two maps, and the distinction between them is the point:
+
+- **`deliberatelyUnwrapped`** — the spec declares it, the SDK does not call it, and that is a decision. Each entry carries its reason. Several read "no decision on record", which is honest rather than a placeholder: the operation is unwrapped and nothing explains why. Those are the entries worth revisiting; the rest are settled.
+- **`undeclaredUpstream`** — the SDK calls it and the spec does not declare it. Not a missing wrapper: the wrapper works, and the route is live. These are routes the platform serves but its spec generation does not describe, concentrated in the admin and account-deletion surfaces. The fix is upstream, not here.
+
+**When it fires**, read which direction. A new entry in the first means an operation appeared in the snapshot and nothing wraps it — write the wrapper, or add it to the map with the reason you chose not to. A new entry in the second means the SDK is calling something the spec does not describe: either get the route documented upstream and record it, or the path is wrong and the call 404s. The suite also fails on entries that have gone stale in either map, so a map cannot outlive what it describes.
+
 ## Build
 
 ```bash
