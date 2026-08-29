@@ -341,9 +341,15 @@ struct RouteCoverageTests {
     /// `NSRange` locations are UTF-16 offsets; failure messages want line
     /// numbers, because "the scan cannot see this call site" is only
     /// actionable if it says which one.
+    ///
+    /// Counts any newline rather than `\n` specifically. `Array(String)`
+    /// yields `\r\n` as one grapheme, so a file with CRLF endings would
+    /// otherwise report line 1 for everything and send the reader to the
+    /// wrong place — a wrong line number is worse than none, because it
+    /// reads as authoritative.
     private static func line(of utf16Offset: Int, in text: String) -> Int {
         let index = String.Index(utf16Offset: utf16Offset, in: text)
-        return text[text.startIndex..<index].filter { $0 == "\n" }.count + 1
+        return text[text.startIndex..<index].filter(\.isNewline).count + 1
     }
 
     // MARK: - Reading Swift source well enough to be believed
@@ -363,17 +369,24 @@ struct RouteCoverageTests {
         /// An interpolation is code, so `"/items/\(id)"` contributes
         /// `/items/` and nothing from `id`.
         ///
-        /// The guards that hunt for a stray `method:` or `path:` argument
-        /// skip any match beginning in one of these. An argument label
-        /// inside a literal is prose — a log line, an error message — and
-        /// reporting it as an escaped HTTP call is a false failure with a
-        /// confidently wrong diagnosis. A genuine argument label cannot be
-        /// inside a literal, so nothing real is skipped.
+        /// Two scans read this and they lean on it in opposite directions,
+        /// which is worth keeping straight. Call-site recovery uses it to
+        /// *refuse* a `transport.…(` written inside a literal, and that
+        /// refusal is safe in both directions: a literal claimed where there
+        /// is none costs a recovered call, and the raw-file guard then
+        /// reports the call as unaccounted for rather than losing it. The
+        /// `method:` and `path:` scope guards use it to *suppress* a match,
+        /// and that direction is not self-checking — a literal claimed over
+        /// real code silences a guard. What holds that line is the literal
+        /// model below being right about raw literals, and the constructed
+        /// cases in `ScannerBehavior` that pin it.
         let literalRanges: [NSRange]
 
         func beginsInsideLiteral(_ utf16Offset: Int) -> Bool {
             literalRanges.contains { NSLocationInRange(utf16Offset, $0) }
         }
+
+
     }
 
     /// Swift opens a multiline string literal only where `"""` is followed
@@ -386,27 +399,21 @@ struct RouteCoverageTests {
     /// stripping off across that whole span, the one misread here that is
     /// not bounded to a single line.
     ///
-    /// Two shapes were built and run against the unconstrained branch, and
+    /// Two shapes were built and run against the unconstrained branch and
     /// both reached it: `#"""#`, a raw literal whose body is one quote, and
     /// `#"… == "PURGE"""#`, which is `Inputs/BulkInputs.swift` today plus a
     /// single character. In each case a `transport.request(…)` written in a
-    /// doc comment below was recovered as a real call site.
-    ///
-    /// A third, `#"expected """#`, was built too and did *not* reach it: by
-    /// the time the scan arrives at those quotes it is already inside a
-    /// mis-parsed literal. That is worth recording, because it means
-    /// reachability here turns on where the scan happens to be rather than
-    /// on the shape alone — which is exactly the kind of question not to
-    /// settle by argument. `noCallSiteIsReadOutOfAComment` settles it by
-    /// measurement instead, and does not depend on this function being
-    /// right.
+    /// doc comment below was recovered as a real call site. Raw literals are
+    /// now consumed by `consumeLiteral` before this is ever asked, so those
+    /// two reach it no longer — but the constraint stays, because it is
+    /// cheap and it is the shape of mistake that recurs here.
     private static func opensMultilineLiteral(_ characters: [Character], at index: Int) -> Bool {
         var probe = index + 3
         while probe < characters.count, characters[probe] == " " || characters[probe] == "\t" {
             probe += 1
         }
         guard probe < characters.count else { return false }
-        return characters[probe] == "\n" || characters[probe] == "\r"
+        return characters[probe].isNewline
     }
 
     /// Blanks every comment in `source` and records where its string
@@ -418,27 +425,54 @@ struct RouteCoverageTests {
     /// `local(path: "/path/to/store.sqlite")`, and both would be reported as
     /// escaped call sites by the cross-checks below.
     ///
-    /// **What this is not.** It is not a lexer. String literals are honored
-    /// so a `//` inside one survives, a multiline literal is skipped whole,
-    /// and a single-line literal is closed at the newline so a misread
-    /// cannot run past one line. Raw literals (`#"…"#`) and a string literal
-    /// nested inside an interpolation are read as ordinary literals, which
-    /// can misjudge where a literal ends — bounded to the rest of that line.
+    /// **What this is not.** It is not a lexer. It models line and block
+    /// comments, single-line and multiline literals, raw literals at any
+    /// hash count, escapes and interpolations. Three things it does not
+    /// model, listed because the boundary of this list is where every defect
+    /// in this file has been found:
     ///
-    /// **Both directions of a mistake here are guarded, and neither guard
-    /// trusts this function.**
+    /// - A string literal nested inside an interpolation (`"\("x")"`) reads
+    ///   as the end of the outer literal — bounded to the rest of that line
+    ///   for a single-line literal, and not bounded for a multiline one.
+    /// - A regex literal (`/…/` or `#/…/#`) is read as code. A call shape
+    ///   inside one is therefore recovered rather than refused, and then
+    ///   reported as unreadable for want of a `path:` — loud rather than
+    ///   silent, which is the direction to be wrong in. There are none in
+    ///   this package.
+    /// - Conditional compilation is invisible, which is deliberate: a call
+    ///   inside an `#if os(...)` branch is a call the SDK makes on some
+    ///   platform, and reading only the branches that compile here would
+    ///   under-report by exactly the platforms this SDK exists to support.
+    ///   A call in a permanently dead branch would be counted; there are
+    ///   none, and the two `#if` blocks in the package hold no calls.
     ///
-    /// - *Over-blanking*, code taken for a comment, hides call sites.
+    /// All three are pinned in `ScannerBehavior`.
+    ///
+    /// **Raw literals are modeled rather than approximated, and that is
+    /// load-bearing.** A raw literal holding an odd number of `"` —
+    /// `#"say "hi"#` — desynchronizes naive quote pairing for the rest of
+    /// its line, and the run of "literal" that follows swallows real code.
+    /// Constructed and run against the version that did not model them, that
+    /// silenced both scope guards on a genuinely escaped
+    /// `request(method:path:)` call sitting on the same line. It is not an
+    /// exotic shape: `Inputs/BulkInputs.swift` carries a raw literal today.
+    ///
+    /// **Every direction of a mistake here is guarded, and no guard trusts
+    /// this function.**
+    ///
+    /// - *Over-blanking*, code taken for prose, hides call sites.
     ///   `nothingCallShapedEscapesTheScan` catches it by scanning the **raw**
-    ///   file for `transport.<callee>(` and requiring every match to have
-    ///   been recovered.
-    /// - *Under-blanking*, a comment taken for code, **invents** call sites,
-    ///   and an invented call is the silent direction: it removes a
+    ///   file for `transport.<callee>(` and requiring every match to be
+    ///   accounted for.
+    /// - *Under-blanking*, prose taken for code, **invents** call sites, and
+    ///   an invented call is the silent direction: it removes a
     ///   declared-but-unwrapped operation from the report and takes the
-    ///   suite green over a real gap. `noCallSiteIsReadOutOfAComment`
-    ///   catches it by asking `commentRangesIgnoringStringLiterals` where
-    ///   the comments are and requiring this function to have blanked every
-    ///   one that falls inside a recovered call.
+    ///   suite green over a real gap. `noCallSiteIsReadOutOfProse` catches
+    ///   it.
+    /// - *Prose that was never blanked at all* — a literal, which this
+    ///   function emits verbatim by design — is the same failure wearing a
+    ///   different hat, and is why call recovery refuses a receiver inside
+    ///   `literalRanges`.
     private static func strippingComments(_ source: String) -> StrippedSource {
         let characters = Array(source)
         var output: [Character] = []
@@ -447,6 +481,7 @@ struct RouteCoverageTests {
         // UTF-16 offset of the next character to be emitted, so recorded
         // ranges index the original file.
         var offset = 0
+        var index = 0
 
         func emit(_ character: Character) {
             output.append(character)
@@ -454,9 +489,12 @@ struct RouteCoverageTests {
         }
 
         func blank(_ character: Character) {
-            if character == "\n" {
+            // A newline is kept whatever it is spelled as, so line numbers
+            // survive. `\r\n` is one Character of two UTF-16 units, and
+            // emitting it keeps the offset arithmetic true.
+            if character.isNewline {
                 output.append(character)
-                offset += 1
+                offset += character.utf16.count
             } else {
                 for _ in 0..<character.utf16.count { output.append(" ") }
                 offset += character.utf16.count
@@ -468,13 +506,117 @@ struct RouteCoverageTests {
             literalRanges.append(NSRange(location: start, length: offset - start))
         }
 
-        var index = 0
+        /// `count` consecutive `#` starting at `position`. A raw literal's
+        /// delimiters, escapes and interpolations all carry the same count.
+        func hashes(_ count: Int, at position: Int) -> Bool {
+            guard count > 0 else { return true }
+            guard position + count <= characters.count else { return false }
+            return (position..<(position + count)).allSatisfy { characters[$0] == "#" }
+        }
+
+        /// The hash count of a string literal opening at `index`, or `nil`
+        /// if none opens there. `"` is a literal with no hashes.
+        func literalOpener() -> Int? {
+            var count = 0
+            var probe = index
+            while probe < characters.count, characters[probe] == "#" {
+                count += 1
+                probe += 1
+            }
+            guard probe < characters.count, characters[probe] == "\"" else { return nil }
+            return count
+        }
+
+        func consumeLiteral(hashCount: Int) {
+            for _ in 0..<hashCount {
+                emit(characters[index])
+                index += 1
+            }
+            let multiline =
+                index + 2 < characters.count && characters[index + 1] == "\""
+                && characters[index + 2] == "\""
+                && Self.opensMultilineLiteral(characters, at: index)
+            for _ in 0..<(multiline ? 3 : 1) {
+                emit(characters[index])
+                index += 1
+            }
+
+            var start = offset
+            var interpolation = 0
+            while index < characters.count {
+                let character = characters[index]
+
+                if interpolation > 0 {
+                    if character == "(" { interpolation += 1 }
+                    if character == ")" {
+                        interpolation -= 1
+                        if interpolation == 0 {
+                            emit(character)
+                            index += 1
+                            start = offset
+                            continue
+                        }
+                    }
+                    emit(character)
+                    index += 1
+                    continue
+                }
+
+                // Neither a raw nor an ordinary single-line literal may
+                // cross a line, so a misread cannot run past one.
+                if !multiline, character.isNewline { break }
+
+                if character == "\"" {
+                    let quotes = multiline ? 3 : 1
+                    let closes =
+                        (multiline
+                            ? index + 2 < characters.count && characters[index + 1] == "\""
+                                && characters[index + 2] == "\""
+                            : true) && hashes(hashCount, at: index + quotes)
+                    if closes {
+                        recordLiteral(from: start)
+                        for _ in 0..<(quotes + hashCount) {
+                            emit(characters[index])
+                            index += 1
+                        }
+                        return
+                    }
+                    emit(character)
+                    index += 1
+                    continue
+                }
+
+                if character == "\\", hashes(hashCount, at: index + 1) {
+                    let after = index + 1 + hashCount
+                    guard after < characters.count else { break }
+                    if characters[after] == "(" {
+                        recordLiteral(from: start)
+                        for _ in 0..<(hashCount + 2) {
+                            emit(characters[index])
+                            index += 1
+                        }
+                        interpolation = 1
+                        continue
+                    }
+                    for _ in 0..<(hashCount + 2) {
+                        emit(characters[index])
+                        index += 1
+                    }
+                    continue
+                }
+
+                emit(character)
+                index += 1
+            }
+            if interpolation == 0 { recordLiteral(from: start) }
+        }
+
         while index < characters.count {
             let character = characters[index]
             let next: Character? = index + 1 < characters.count ? characters[index + 1] : nil
 
             if character == "/", next == "/" {
-                while index < characters.count, characters[index] != "\n" {
+                while index < characters.count, !characters[index].isNewline {
                     blank(characters[index])
                     index += 1
                 }
@@ -508,77 +650,8 @@ struct RouteCoverageTests {
                 continue
             }
 
-            if character == "\"", index + 2 < characters.count,
-                characters[index + 1] == "\"", characters[index + 2] == "\"",
-                Self.opensMultilineLiteral(characters, at: index) {
-                for delimiter in index...(index + 2) { emit(characters[delimiter]) }
-                index += 3
-                let start = offset
-                while index < characters.count {
-                    if characters[index] == "\"", index + 2 < characters.count,
-                        characters[index + 1] == "\"", characters[index + 2] == "\"" {
-                        recordLiteral(from: start)
-                        for delimiter in index...(index + 2) { emit(characters[delimiter]) }
-                        index += 3
-                        break
-                    }
-                    emit(characters[index])
-                    index += 1
-                }
-                if index >= characters.count { recordLiteral(from: start) }
-                continue
-            }
-
-            if character == "\"" {
-                emit(character)
-                index += 1
-                // Literal text runs from here to the closing quote, broken
-                // wherever an interpolation puts code back in the middle.
-                var start = offset
-                var interpolation = 0
-                var closed = false
-                while index < characters.count, characters[index] != "\n" {
-                    let inner = characters[index]
-                    if interpolation > 0 {
-                        if inner == "(" { interpolation += 1 }
-                        if inner == ")" {
-                            interpolation -= 1
-                            if interpolation == 0 {
-                                emit(inner)
-                                index += 1
-                                start = offset
-                                continue
-                            }
-                        }
-                        emit(inner)
-                        index += 1
-                        continue
-                    }
-                    if inner == "\\", index + 1 < characters.count {
-                        if characters[index + 1] == "(" {
-                            recordLiteral(from: start)
-                            emit(inner)
-                            emit(characters[index + 1])
-                            interpolation = 1
-                            index += 2
-                            continue
-                        }
-                        emit(inner)
-                        emit(characters[index + 1])
-                        index += 2
-                        continue
-                    }
-                    if inner == "\"" {
-                        recordLiteral(from: start)
-                        emit(inner)
-                        index += 1
-                        closed = true
-                        break
-                    }
-                    emit(inner)
-                    index += 1
-                }
-                if !closed, interpolation == 0 { recordLiteral(from: start) }
+            if let hashCount = literalOpener() {
+                consumeLiteral(hashCount: hashCount)
                 continue
             }
 
@@ -591,7 +664,7 @@ struct RouteCoverageTests {
     /// Where a comment could be in `raw`, found without any notion of string
     /// literals: **every** `//` in the text marks to the end of its line, and
     /// **every** `/*` marks to the `*/` that closes it under Swift's nesting
-    /// rule. Regions overlap freely and nothing suppresses anything else.
+    /// rule.  Regions overlap freely and nothing suppresses anything else.
     ///
     /// **Complete by construction, which is the only property that matters
     /// here.** Every comment in a Swift file begins with one of those two
@@ -610,13 +683,13 @@ struct RouteCoverageTests {
     /// written inside a later line comment, and the rest of that line goes
     /// unmarked. Constructed and run, that shape walked an invented call
     /// site straight past this check and took the suite green over a real
-    /// gap — the exact failure the check exists to stop. Reasoning about it
-    /// would have cleared it.
+    /// gap. Reasoning about it would have cleared it.
     ///
-    /// Checking `strippingComments` against a scan that could also miss a
-    /// comment would be checking a guess against a guess. Checking it
-    /// against one that can only over-report means a mistake *here* costs a
-    /// false failure with an explanation, never a false pass.
+    /// **A `/*` with no `*/` after it marks to the end of its line and no
+    /// further**, which loses nothing: an unterminated block comment does
+    /// not compile, so in a file that builds every real `/*` has a close.
+    /// Without that bound, a `/*` inside a string literal swallowed the rest
+    /// of the file and turned every call below it into a false failure.
     private static func commentRangesIgnoringStringLiterals(_ raw: String) -> [NSRange] {
         let characters = Array(raw)
         // UTF-16 offset of each character, so the ranges index the file the
@@ -629,13 +702,18 @@ struct RouteCoverageTests {
         }
         offsets[characters.count] = running
 
+        func endOfLine(from position: Int) -> Int {
+            var end = position
+            while end < characters.count, !characters[end].isNewline { end += 1 }
+            return end
+        }
+
         var ranges: [NSRange] = []
         for index in characters.indices where index + 1 < characters.count {
             guard characters[index] == "/" else { continue }
 
             if characters[index + 1] == "/" {
-                var end = index
-                while end < characters.count, characters[end] != "\n" { end += 1 }
+                let end = endOfLine(from: index)
                 ranges.append(
                     NSRange(location: offsets[index], length: offsets[end] - offsets[index]))
                 continue
@@ -644,6 +722,7 @@ struct RouteCoverageTests {
             if characters[index + 1] == "*" {
                 var depth = 0
                 var cursor = index
+                var closed = false
                 while cursor < characters.count {
                     if characters[cursor] == "/", cursor + 1 < characters.count,
                         characters[cursor + 1] == "*" {
@@ -655,12 +734,15 @@ struct RouteCoverageTests {
                         characters[cursor + 1] == "/" {
                         depth -= 1
                         cursor += 2
-                        if depth == 0 { break }
+                        if depth == 0 {
+                            closed = true
+                            break
+                        }
                         continue
                     }
                     cursor += 1
                 }
-                let end = min(cursor, characters.count)
+                let end = closed ? min(cursor, characters.count) : endOfLine(from: index)
                 ranges.append(
                     NSRange(location: offsets[index], length: offsets[end] - offsets[index]))
             }
@@ -849,6 +931,13 @@ struct RouteCoverageTests {
         let line: Int
         /// UTF-16 range of the whole call, for the cross-checks.
         let range: NSRange
+        /// UTF-16 range of the `transport.<callee>(` token alone. The check
+        /// that a call was not read out of prose asks about this rather than
+        /// the whole call: a comment written *inside* a real argument list is
+        /// legitimate and blanked, and testing the whole span against a
+        /// comment scan that reports `//` inside literals made
+        /// `body: ["url": "https://…"]` a failure.
+        let receiverRange: NSRange
     }
 
     private struct ScannedFile {
@@ -887,43 +976,61 @@ struct RouteCoverageTests {
     /// `nothingCallShapedEscapesTheScan` and
     /// `noCallSiteIsReadOutOfAComment`.
     private func scanSDKSources() throws -> [ScannedFile] {
-        let receiver = try Self.regex(#"\btransport\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\("#)
-        var scanned: [ScannedFile] = []
-
-        for file in try sdkSourceFiles() {
-            let raw = try String(contentsOf: file, encoding: .utf8)
-            let stripped = Self.strippingComments(raw)
-            let text = stripped.text
-            let whole = NSRange(text.startIndex..., in: text)
-            var calls: [TransportCall] = []
-
-            for match in receiver.matches(in: text, range: whole) {
-                guard
-                    let calleeRange = Range(match.range(at: 1), in: text),
-                    let matchRange = Range(match.range, in: text)
-                else { continue }
-                let openParen = text.index(before: matchRange.upperBound)
-                let parsed = Self.argumentList(in: text, openParenAt: openParen)
-                let end = parsed?.end ?? matchRange.upperBound
-                calls.append(
-                    TransportCall(
-                        callee: String(text[calleeRange]),
-                        // A list that would not close reads as no arguments,
-                        // which fails the readability check below by way of
-                        // the missing `path:`.
-                        arguments: parsed?.arguments ?? [],
-                        line: Self.line(of: match.range.location, in: text),
-                        range: NSRange(matchRange.lowerBound..<end, in: text)))
-            }
-            scanned.append(
-                ScannedFile(
-                    name: file.lastPathComponent,
-                    raw: raw,
-                    stripped: stripped,
-                    commentRanges: Self.commentRangesIgnoringStringLiterals(raw),
-                    calls: calls))
+        try sdkSourceFiles().map { file in
+            try Self.scan(
+                name: file.lastPathComponent,
+                raw: String(contentsOf: file, encoding: .utf8))
         }
-        return scanned
+    }
+
+    /// The scan of one file, as a function of its text alone.
+    ///
+    /// Separated from the filesystem so the constructed cases in
+    /// `ScannerBehavior` can drive it with sources that must never exist
+    /// under `Sources/` — a raw literal that desynchronizes quote pairing,
+    /// a route spelled inside a doc comment, a file with CRLF endings.
+    /// Every limitation this file admits to is pinned there against this
+    /// function rather than argued about in a comment.
+    private static func scan(name: String, raw: String) throws -> ScannedFile {
+        let receiver = try regex(#"\btransport\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\("#)
+        let stripped = strippingComments(raw)
+        let text = stripped.text
+        let whole = NSRange(text.startIndex..., in: text)
+        var calls: [TransportCall] = []
+
+        for match in receiver.matches(in: text, range: whole) {
+            // Text inside a string literal is prose the stripper emits
+            // verbatim by design, so a `transport.request(method: .get,
+            // path: "/x")` written inside a multiline or raw literal would
+            // otherwise be recovered as a live call and count as a route the
+            // SDK calls. Refusing it here is safe in both directions: the
+            // raw-file guard reports whatever this refuses, so a literal
+            // claimed over real code is loud rather than lost.
+            guard !stripped.beginsInsideLiteral(match.range.location) else { continue }
+            guard
+                let calleeRange = Range(match.range(at: 1), in: text),
+                let matchRange = Range(match.range, in: text)
+            else { continue }
+            let openParen = text.index(before: matchRange.upperBound)
+            let parsed = argumentList(in: text, openParenAt: openParen)
+            let end = parsed?.end ?? matchRange.upperBound
+            calls.append(
+                TransportCall(
+                    callee: String(text[calleeRange]),
+                    // A list that would not close reads as no arguments,
+                    // which fails the readability check below by way of
+                    // the missing `path:`.
+                    arguments: parsed?.arguments ?? [],
+                    line: line(of: match.range.location, in: text),
+                    range: NSRange(matchRange.lowerBound..<end, in: text),
+                    receiverRange: match.range))
+        }
+        return ScannedFile(
+            name: name,
+            raw: raw,
+            stripped: stripped,
+            commentRanges: commentRangesIgnoringStringLiterals(raw),
+            calls: calls)
     }
 
     /// What a call site yielded: a route, or why it could not be read. The
@@ -1109,33 +1216,75 @@ struct RouteCoverageTests {
     /// `"method: \(verb)"` would otherwise turn the suite red under the
     /// heading "`method:` argument outside any transport call". That is a
     /// false red with a wrong diagnosis, which is worse than a quiet one.
-    /// A genuine argument label cannot sit inside a literal, so skipping
-    /// them costs nothing.
     ///
-    /// **The one shape neither guard sees.** A call on a *rebound* receiver
-    /// (`let http = transport; http.…`) is not recovered, because the
-    /// receiver pattern wants the binding spelled `transport`. Such a call
-    /// is still reported if it carries a `method:` argument, or a `path:`
-    /// beginning `"/` or `"\(`. It escapes entirely only when all three miss
-    /// at once: a rebound receiver, a callee with no `method:` (only
-    /// `eventStream` is written that way), and a `path:` that is neither —
-    /// a bare variable, or a literal starting with something other than a
-    /// slash or an interpolation. Guarding the rebinding itself was tried
-    /// and is not available cheaply: every namespace stores the transport
-    /// with `self.transport = transport`, so a pattern that caught a
-    /// rebinding would fire on six legitimate initializers.
+    /// **That suppression is a dependency, and it was wrong once.** An
+    /// earlier revision defended it with "a genuine argument label cannot be
+    /// inside a literal, so nothing real is skipped", which is true of the
+    /// language and was not true of the model: before raw literals were
+    /// modeled, `#"say "hi"#` left an odd quote and everything after it on
+    /// that line was claimed as literal text — silencing both guards on a
+    /// genuinely escaped call. The claim now rests on `strippingComments`
+    /// modeling raw literals, and on the constructed cases in
+    /// `ScannerBehavior` that drive exactly that shape rather than
+    /// reasoning about it.
+    ///
+    /// **The shapes found to escape, which is not the same as the shapes
+    /// that escape.** An earlier revision of this paragraph said "the one
+    /// shape", and the next round of review found two more — by attacking
+    /// the boundary of the claim rather than the code behind it, which is
+    /// how every defect in this file has been found. What follows is a list
+    /// of what has been looked for and not a proof of what is left.
+    ///
+    /// - A call on a *rebound* receiver (`let http = transport; http.…`) is
+    ///   not recovered, because the receiver pattern wants the binding
+    ///   spelled `transport`. It is still reported if it carries a `method:`
+    ///   argument or a `path:` beginning `"/` or `"\(`, so it escapes only
+    ///   when all three miss at once: rebound receiver, a callee with no
+    ///   `method:` (only `eventStream` is written that way), and a path that
+    ///   is a bare variable or a literal starting with neither a slash nor
+    ///   an interpolation. Guarding the rebinding was tried and is not cheap:
+    ///   every namespace writes `self.transport = transport`, so the pattern
+    ///   would fire on six legitimate initializers. Pinned in
+    ///   `ScannerBehavior`.
+    /// - A string literal nested inside an interpolation ends the outer
+    ///   literal early, so text after it on that line reads as code. That
+    ///   costs a false report rather than a miss, and no source here writes
+    ///   one. Also pinned.
+    /// - Anything reaching HTTP without a binding spelled `transport` at
+    ///   all — the OAuth `URLRequest` code — is outside the scan by design
+    ///   and is described where `scanSDKSources` is defined.
     @Test("nothing call-shaped escapes the scan")
     func nothingCallShapedEscapesTheScan() throws {
-        let receiver = try Self.regex(#"\btransport\s*\.\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\("#)
-        let methodLabel = try Self.regex(#"\bmethod\s*:"#)
+        var escaped: [String] = []
+        for file in try scanSDKSources() {
+            escaped.append(contentsOf: try Self.escapedCallShapes(in: file))
+        }
+        #expect(
+            escaped.isEmpty,
+            """
+            these look like HTTP calls the route scan cannot account for. Either they \
+            are routes going uncounted, or the scan needs teaching. Call-shaped text \
+            in a doc comment or a string literal lands here on purpose, because the \
+            scan will not count it and something has to say so — spell it as a symbol \
+            reference (``Transport/foo(method:path:)``) or break it so it is not \
+            call-shaped:
+            \(escaped.sorted().joined(separator: "\n"))
+            """)
+    }
+
+    /// The scope findings for one file, so `ScannerBehavior` can drive the
+    /// same code the suite runs rather than a paraphrase of it.
+    private static func escapedCallShapes(in file: ScannedFile) throws -> [String] {
+        let receiver = try regex(#"\btransport\s*\.\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\("#)
+        let methodLabel = try regex(#"\bmethod\s*:"#)
         // `"/…"` is a route written whole; `"\(…"` is one composed with a
         // leading interpolation, which `read` refuses for the same reason
         // and which would otherwise be the only route-shaped path neither
         // this guard nor the receiver pattern could see.
-        let routePathLabel = try Self.regex(#"\bpath\s*:\s*"(?:/|\\\()"#)
+        let routePathLabel = try regex(#"\bpath\s*:\s*"(?:/|\\\()"#)
 
         var escaped: [String] = []
-        for file in try scanSDKSources() {
+        do {
             let recovered = Set(file.calls.map(\.range.location))
             let covered = file.calls.map(\.range)
             func isCovered(_ location: Int) -> Bool {
@@ -1144,13 +1293,20 @@ struct RouteCoverageTests {
 
             // Read from the raw file, not the stripped copy: a call site the
             // stripper wrongly blanked has to surface here rather than
-            // vanish. A doc comment that spells a call as `transport.foo(`
-            // fails this — write it as ``Transport/foo(method:path:)``.
+            // vanish. This deliberately does *not* exempt the two kinds of
+            // prose the scan refuses to recover from — a doc comment or a
+            // string literal spelling `transport.foo(` fails here, and that
+            // is the point: recovery refusing it and this guard exempting it
+            // would put the same text beyond both, which is how a route gets
+            // lost rather than reported.
             let rawWhole = NSRange(file.raw.startIndex..., in: file.raw)
             for match in receiver.matches(in: file.raw, range: rawWhole)
             where !recovered.contains(match.range.location) {
+                let cause =
+                    file.stripped.beginsInsideLiteral(match.range.location)
+                    ? "inside a string literal" : "in prose the scan will not read as code"
                 escaped.append(
-                    "\(file.name):\(Self.line(of: match.range.location, in: file.raw)) — call-shaped text the scan did not recover")
+                    "\(file.name):\(line(of: match.range.location, in: file.raw)) — call-shaped text the scan did not recover, \(cause)")
             }
 
             let text = file.stripped.text
@@ -1159,86 +1315,83 @@ struct RouteCoverageTests {
             where !isCovered(match.range.location)
                 && !file.stripped.beginsInsideLiteral(match.range.location) {
                 escaped.append(
-                    "\(file.name):\(Self.line(of: match.range.location, in: text)) — `method:` argument outside any transport call")
+                    "\(file.name):\(line(of: match.range.location, in: text)) — `method:` argument outside any transport call")
             }
             for match in routePathLabel.matches(in: text, range: whole)
             where !isCovered(match.range.location)
                 && !file.stripped.beginsInsideLiteral(match.range.location) {
                 escaped.append(
-                    "\(file.name):\(Self.line(of: match.range.location, in: text)) — route-shaped `path:` argument outside any transport call")
+                    "\(file.name):\(line(of: match.range.location, in: text)) — route-shaped `path:` argument outside any transport call")
             }
         }
-        #expect(
-            escaped.isEmpty,
-            """
-            these look like HTTP calls the route scan cannot account for. Either they \
-            are routes going uncounted, or the scan needs teaching:
-            \(escaped.sorted().joined(separator: "\n"))
-            """)
+        return escaped
     }
 
-    /// The other direction of a comment-stripping mistake, and the one that
-    /// is silent.
+    /// The other direction of a stripping mistake, and the one that is
+    /// silent.
     ///
     /// If the stripper *over*-blanks it hides a call site, and
     /// `nothingCallShapedEscapesTheScan` above reads the raw file to catch
-    /// that. If it *under*-blanks it does the opposite: a comment reaches
-    /// the scanner as code, and a `transport.request(method: .get, path:
+    /// that. If it *under*-blanks it does the opposite: prose reaches the
+    /// scanner as code, and a `transport.request(method: .get, path:
     /// "/items")` written inside a doc comment is recovered as a real call.
     /// That is not merely wrong, it is wrong in the direction that takes the
     /// suite green — the invented route subtracts a genuine
     /// declared-but-unwrapped operation from the report, so a real gap stops
-    /// being named. Nothing guarded it.
+    /// being named.
     ///
-    /// **What this asserts.** For every recovered call, every character in
-    /// its range that `commentRangesIgnoringStringLiterals` calls a comment
-    /// must have been blanked. A legitimate `// note` written inside a real
-    /// call's argument list passes: the stripper blanked it, so there is
-    /// nothing to report. An invented call fails at its first character,
-    /// because the receiver token itself is comment text the stripper left
-    /// alone.
+    /// **Two claims, deliberately at different scopes**, because one scope
+    /// cannot serve both.
     ///
-    /// **Why it is checked rather than argued.** The previous version of
+    /// 1. *No recovered call's receiver token sits in a comment.* This is
+    ///    the invention check and it depends on nothing but the comment
+    ///    scan, which can only over-report. An invented call fails at its
+    ///    first character, since the `transport.foo(` token itself is the
+    ///    comment text.
+    /// 2. *No recovered call's argument list holds unblanked comment text.*
+    ///    This catches the narrower shape where a real call's arguments are
+    ///    polluted — `/* a, path: "/x", b */` inside a live argument list
+    ///    reads as a `path:` argument and silently retargets the route.
+    ///    Comment regions lying wholly inside a string literal are skipped
+    ///    here, and that is a dependency on `literalRanges` rather than a
+    ///    free lunch: a literal claimed over real code would dismiss a real
+    ///    comment. It buys the shapes that have to stay legal —
+    ///    `body: ["url": "https://example.com"]` and `path: "/items/*/x"`
+    ///    both put a comment opener inside a literal in an argument list —
+    ///    and claim 1 is not weakened by it.
+    ///
+    /// **Why this is checked rather than argued.** An earlier version of
     /// this file reasoned that the stripper's `"""` branch was unreachable
-    /// from valid Swift and left it there. It was reachable — a raw literal
-    /// whose body ends in an empty quoted token puts three consecutive
-    /// quotes in the file, and `Sources/MarfaSDK/Inputs/BulkInputs.swift`
-    /// is one character from that shape today. The branch is constrained now
-    /// as well, but this check does not depend on that being right, which is
-    /// the whole reason it exists.
-    @Test("no call site is read out of a comment")
-    func noCallSiteIsReadOutOfAComment() throws {
-        // What "blanked" looks like: the stripper emits a space for every
-        // character it removes and keeps newlines so line numbers survive.
-        let space = UInt16(UInt8(ascii: " "))
-        let newline = UInt16(UInt8(ascii: "\n"))
-
+    /// from valid Swift and left it there. It was reachable. The version
+    /// after that scoped this check to *comments* and left string literals —
+    /// also emitted verbatim, also prose — outside the guarantee entirely;
+    /// one line added to the multiline literal in `Sync/InitialSyncError.swift`
+    /// invented a route with every guard quiet. Both were failures of the
+    /// stated boundary rather than of the mechanism, which is why
+    /// `ScannerBehavior` below drives the scanner with constructed sources
+    /// instead of taking the prose here on trust.
+    @Test("no call site is read out of prose")
+    func noCallSiteIsReadOutOfProse() throws {
         var invented: [String] = []
+        var polluted: [String] = []
         var misaligned: [String] = []
         for file in try scanSDKSources() {
-            let stripped = Array(file.stripped.text.utf16)
-            // Blanking preserves offsets to the UTF-16 unit. If that ever
-            // stops being true, every range taken on the stripped copy
-            // indexes the raw file at the wrong place and this check
-            // measures nothing — quietly, which is the failure mode the
-            // whole file is built against.
-            guard stripped.count == file.raw.utf16.count else {
-                misaligned.append(
-                    "\(file.name) — comment stripping changed the file's length, so no range taken on it lines up with the source")
+            guard let aligned = Self.alignmentFailure(in: file) else {
+                for call in file.calls {
+                    if let comment = Self.commentSurviving(call.receiverRange, in: file) {
+                        invented.append(
+                            "\(file.name):\(call.line) — recovered as a transport call, but the comment starting at line \(Self.line(of: comment.location, in: file.raw)) runs through its receiver unblanked")
+                        continue
+                    }
+                    if let comment = Self.commentSurviving(
+                        call.range, in: file, skippingCommentsInsideLiterals: true) {
+                        polluted.append(
+                            "\(file.name):\(call.line) — its argument list holds unblanked comment text from line \(Self.line(of: comment.location, in: file.raw)), which can be read as an argument")
+                    }
+                }
                 continue
             }
-            for call in file.calls {
-                for comment in file.commentRanges {
-                    let overlap = NSIntersectionRange(comment, call.range)
-                    guard overlap.length > 0 else { continue }
-                    let survived = (overlap.location..<(overlap.location + overlap.length))
-                        .contains { stripped[$0] != space && stripped[$0] != newline }
-                    guard survived else { continue }
-                    invented.append(
-                        "\(file.name):\(call.line) — recovered as a transport call, but the comment starting at line \(Self.line(of: comment.location, in: file.raw)) runs through it unblanked")
-                    break
-                }
-            }
+            misaligned.append(aligned)
         }
         #expect(
             misaligned.isEmpty,
@@ -1253,13 +1406,58 @@ struct RouteCoverageTests {
             comment text reached the route scan as code, so these call sites are \
             invented rather than found — and an invented route silently removes a \
             real unwrapped operation from the report below. Fix the comment \
-            stripper; do not delete the comment. \
-            The other reading is a false alarm from the comment scan itself, which \
-            ignores string literals on purpose: a `//` or `/*` inside a literal in \
-            one of these argument lists would land here too, and moving that literal \
-            onto its own line clears it.
+            stripper; do not delete the comment:
             \(invented.sorted().joined(separator: "\n"))
             """)
+        #expect(
+            polluted.isEmpty,
+            """
+            unblanked comment text sits inside these argument lists, where the \
+            argument split can read it as a `path:` or `method:` and retarget the \
+            route without saying so. A comment written inside a call is legal and \
+            normally blanked, so this means the stripper stopped blanking it:
+            \(polluted.sorted().joined(separator: "\n"))
+            """)
+    }
+
+    /// Blanking preserves offsets to the UTF-16 unit. If that stops being
+    /// true, every range taken on the stripped copy indexes the raw file at
+    /// the wrong place and the checks reading them measure nothing —
+    /// quietly, which is the failure mode this whole file is built against.
+    private static func alignmentFailure(in file: ScannedFile) -> String? {
+        guard file.stripped.text.utf16.count != file.raw.utf16.count else { return nil }
+        return
+            "\(file.name) — comment stripping changed the file's length, so no range taken on it lines up with the source"
+    }
+
+    /// The first comment region overlapping `range` whose text the stripper
+    /// left unblanked, or `nil` if every one of them was blanked.
+    private static func commentSurviving(
+        _ range: NSRange, in file: ScannedFile, skippingCommentsInsideLiterals: Bool = false
+    ) -> NSRange? {
+        // What "blanked" looks like: the stripper emits a space for every
+        // character it removes and keeps newlines so line numbers survive.
+        // Both spellings of a line ending count, since `\r\n` reaches this
+        // as two units.
+        let blanks: Set<UInt16> = [
+            UInt16(UInt8(ascii: " ")), UInt16(UInt8(ascii: "\n")), UInt16(UInt8(ascii: "\r")),
+        ]
+        let text = Array(file.stripped.text.utf16)
+        for comment in file.commentRanges {
+            // Asked of the opener rather than the whole region: a `//`
+            // found inside a literal still runs to the end of its line, so
+            // it reaches past the closing quote and is never wholly inside.
+            if skippingCommentsInsideLiterals,
+                file.stripped.beginsInsideLiteral(comment.location) {
+                continue
+            }
+            let overlap = NSIntersectionRange(comment, range)
+            guard overlap.length > 0 else { continue }
+            let survived = (overlap.location..<(overlap.location + overlap.length))
+                .contains { !blanks.contains(text[$0]) }
+            if survived { return comment }
+        }
+        return nil
     }
 
     /// `Transport/` is skipped by the file scan because it declares the
@@ -1384,4 +1582,266 @@ struct RouteCoverageTests {
             Remove them: \(nolongerCalled.sorted())
             """)
     }
+    // MARK: - The scanner, driven with sources that must never exist in Sources/
+
+    /// Constructed inputs for every claim the scan makes and every
+    /// limitation it admits to.
+    ///
+    /// Three rounds of review found the same defect three times, and twice
+    /// it was reached by attacking the **boundary** of a stated guarantee
+    /// rather than its internals: "unreachable" where the input had simply
+    /// never been constructed, and "comments" where the honest word was
+    /// "prose" — string literals are emitted verbatim too, so a route
+    /// written in one was invented with every guard quiet. **A guarantee's
+    /// stated scope is a claim like any other, and a claim that is only
+    /// written down is a claim nothing checks.**
+    ///
+    /// So each test here is named for the claim it witnesses rather than the
+    /// mechanism it drives, and the boundaries are pinned alongside the
+    /// guarantees: some of these assert a shape goes *unreported*, so that
+    /// closing one of those boundaries fails a test and forces the prose to
+    /// be corrected with it.
+    @Suite("Route scanning survives the source it has to read")
+    struct ScannerBehavior {
+
+        /// UTF-16 offset of `needle`, which is how every range in the scan
+        /// is measured.
+        private func offset(of needle: String, in source: String) throws -> Int {
+            let found = try #require(source.range(of: needle), "the probe source lost \(needle)")
+            return source.utf16.distance(from: source.utf16.startIndex, to: found.lowerBound)
+        }
+
+        @Test("an ordinary call is still recovered, so the refusals below mean something")
+        func anOrdinaryCallIsRecovered() throws {
+            let source = ##"""
+                let items = try await transport.request(method: .get, path: "/items", body: nil)
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            #expect(file.calls.count == 1)
+            let call = try #require(file.calls.first)
+            guard case .route(let route) = RouteCoverageTests.read(call) else {
+                Issue.record("an ordinary call did not read into a route")
+                return
+            }
+            #expect(route == "GET /items")
+            #expect(try RouteCoverageTests.escapedCallShapes(in: file).isEmpty)
+        }
+
+        @Test("a route spelled inside a multiline literal is not counted as called")
+        func multilineLiteralDoesNotInventARoute() throws {
+            let source = ##"""
+                let help = """
+                    transport.request(method: .get, path: "/zzphantom", body: nil)
+                    """
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            #expect(
+                file.calls.isEmpty,
+                "a route written inside a string literal was recovered as a live call, which is how an unwrapped operation gets masked")
+            let escaped = try RouteCoverageTests.escapedCallShapes(in: file)
+            #expect(
+                escaped.contains { $0.contains("inside a string literal") },
+                "refusing to count it is only half the job — it has to be reported, or the route is lost rather than named")
+        }
+
+        @Test("a route spelled inside a raw literal is not counted as called")
+        func rawLiteralDoesNotInventARoute() throws {
+            let source = ##"""
+                let help = #"transport.request(method: .get, path: "/zzphantom")"#
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            #expect(file.calls.isEmpty)
+            #expect(
+                try RouteCoverageTests.escapedCallShapes(in: file)
+                    .contains { $0.contains("inside a string literal") })
+        }
+
+        @Test("a route spelled inside a doc comment is not counted as called")
+        func commentDoesNotInventARoute() throws {
+            let source = ##"""
+                /// transport.request(method: .get, path: "/zzphantom", body: nil)
+                let marker = 1
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            #expect(file.calls.isEmpty)
+        }
+
+        /// The shape that silenced both scope guards before raw literals were
+        /// modeled: `#"say "hi"#` holds an odd number of quotes, so naive
+        /// pairing treats everything after it as literal text and the guards
+        /// skip whatever is in there.
+        @Test("a raw literal holding an odd quote does not swallow the code after it")
+        func rawLiteralDoesNotDesynchroniseQuotePairing() throws {
+            let source = ##"""
+                let p = #"say "hi"#; let r = http.request(method: .get, path: "/escaped")
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+
+            let methodOffset = try offset(of: "method:", in: source)
+            let pathOffset = try offset(of: "path:", in: source)
+            #expect(
+                !file.stripped.beginsInsideLiteral(methodOffset),
+                "the raw literal desynchronized quote pairing, so a real `method:` reads as literal text and the guard skips it")
+            #expect(!file.stripped.beginsInsideLiteral(pathOffset))
+
+            let escaped = try RouteCoverageTests.escapedCallShapes(in: file)
+            #expect(
+                escaped.contains { $0.contains("`method:` argument outside") },
+                "an HTTP call on a binding the scan does not recognize has to be reported, which is the whole purpose of the guard this shape silenced")
+            #expect(escaped.contains { $0.contains("route-shaped `path:` argument outside") })
+        }
+
+        @Test("a raw literal is read to its own terminator, not to the next quote")
+        func rawLiteralTerminatorIsHonored() throws {
+            // The shape already in `Inputs/BulkInputs.swift`, plus the two
+            // that reached the old multiline branch.
+            for source in [
+                ##"""
+                let m = #"bulk_action(.purge) requires options.confirm == "PURGE""#
+                let r = try await transport.request(method: .get, path: "/items", body: nil)
+                """##,
+                ##"""
+                let q = #"""#
+                let r = try await transport.request(method: .get, path: "/items", body: nil)
+                """##,
+                ##"""
+                let e = #"expected """#
+                let r = try await transport.request(method: .get, path: "/items", body: nil)
+                """##,
+            ] {
+                let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+                #expect(
+                    file.calls.count == 1,
+                    "the raw literal ran past its terminator and took the call after it with it")
+            }
+        }
+
+        /// A `//` or `/*` inside a literal in a real call's argument list is
+        /// ordinary code. The comment scan reports it as a comment on
+        /// purpose, so the check that reads it has to be scoped narrowly
+        /// enough that these stay legal — there was a version where
+        /// `path: "/items/*/x"` had no spelling that passed.
+        @Test("comment openers inside argument literals are not failures")
+        func commentOpenersInsideArgumentLiteralsAreLegal() throws {
+            for source in [
+                ##"""
+                let r = try await transport.rawRequest(
+                    method: .post, path: "/blobs", body: ["url": "https://example.com"])
+                """##,
+                ##"""
+                let r = try await transport.request(method: .get, path: "/items/*/x", body: nil)
+                """##,
+            ] {
+                let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+                let call = try #require(file.calls.first, "the call was not recovered at all")
+                #expect(
+                    RouteCoverageTests.commentSurviving(call.receiverRange, in: file) == nil,
+                    "a comment opener inside an argument literal was read as prose reaching the scanner")
+                #expect(
+                    RouteCoverageTests.commentSurviving(
+                        call.range, in: file, skippingCommentsInsideLiterals: true) == nil)
+            }
+        }
+
+        /// `Array(String)` yields `\r\n` as one grapheme, so every place
+        /// that compared against `"\n"` was wrong on a CRLF file: the
+        /// multiline literal never opened, the line-comment loop never
+        /// terminated, and line numbers all read 1.
+        @Test("CRLF line endings do not break stripping or line numbers")
+        func crlfIsHandled() throws {
+            let comment =
+                "let a = 1\r\n// transport.request(method: .get, path: \"/zz\")\r\nlet b = 2\r\n"
+            let commented = try RouteCoverageTests.scan(name: "Probe.swift", raw: comment)
+            #expect(commented.calls.isEmpty)
+            #expect(
+                commented.stripped.text.contains("let b = 2"),
+                "the line comment ran past the CRLF and blanked the rest of the file")
+
+            let multiline =
+                "let s = \"\"\"\r\ntransport.request(method: .get, path: \"/zz\")\r\n\"\"\"\r\nlet b = 2\r\n"
+            let quoted = try RouteCoverageTests.scan(name: "Probe.swift", raw: multiline)
+            #expect(
+                quoted.calls.isEmpty,
+                "the multiline literal did not open on a CRLF, so its contents were read as code")
+
+            let numbered =
+                "let a = 1\r\nlet b = 2\r\nlet c = try await transport.request(method: .get, path: \"/items\", body: nil)\r\n"
+            let lines = try RouteCoverageTests.scan(name: "Probe.swift", raw: numbered)
+            #expect(
+                lines.calls.first?.line == 3,
+                "a wrong line number is worse than none, because it reads as authoritative")
+        }
+
+        /// Pinned as a limitation rather than a guarantee. If someone closes
+        /// this, the test fails — and the paragraph in
+        /// `nothingCallShapedEscapesTheScan` claiming it is open has to be
+        /// corrected at the same time.
+        @Test("the rebound-receiver boundary is still open, and is the shape to know about")
+        func reboundReceiverBoundaryIsOpen() throws {
+            let source = ##"""
+                let http = transport
+                let r = http.stream(path: composedElsewhere)
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            #expect(file.calls.isEmpty)
+            #expect(
+                try RouteCoverageTests.escapedCallShapes(in: file).isEmpty,
+                "this shape is now caught — good, and the documented boundary is stale")
+        }
+
+        /// Pinned as a limitation. A regex literal is read as code, so a
+        /// call shape inside one is recovered rather than refused — but it
+        /// then has no `path:` and is reported, which is the loud direction.
+        /// The package has no regex literals; this records what would happen
+        /// if it grew one.
+        @Test("a call shape inside a regex literal is reported rather than counted")
+        func regexLiteralIsNotModelledButFailsLoudly() throws {
+            let source = ##"""
+                let pattern = #/transport.request(group)/#
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            let call = try #require(
+                file.calls.first,
+                "regex literals are now modeled — the doc should stop admitting this")
+            guard case .unreadable = RouteCoverageTests.read(call) else {
+                Issue.record("a regex literal produced a route, which is the silent direction")
+                return
+            }
+        }
+
+        /// The hash-prefixed syntax that is *not* a raw literal has to fall
+        /// through untouched, or `#warning("…")` and friends would open a
+        /// literal that never closes.
+        @Test("hash-prefixed syntax that is not a raw literal opens no literal")
+        func hashSyntaxIsNotMistakenForARawLiteral() throws {
+            let source = ##"""
+                #warning("check this")
+                #if canImport(Foundation)
+                let r = try await transport.request(method: .get, path: "/items", body: nil)
+                #endif
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            #expect(
+                file.calls.count == 1,
+                "a call inside an `#if` is a call the SDK makes on some platform, and `#warning` must not swallow it")
+        }
+
+        /// Also pinned as a limitation. A string literal inside an
+        /// interpolation ends the outer literal early, so the text after it
+        /// reads as code. It costs a false report rather than a miss, which
+        /// is the direction to be wrong in, and no source in this package
+        /// writes one.
+        @Test("a literal nested inside an interpolation is still misread, in the loud direction")
+        func nestedLiteralInsideInterpolationIsMisread() throws {
+            let source = ##"""
+                let label = "\(pieces.map { "method: none" }.joined())"
+                """##
+            let file = try RouteCoverageTests.scan(name: "Probe.swift", raw: source)
+            let methodOffset = try offset(of: "method: none", in: source)
+            #expect(
+                !file.stripped.beginsInsideLiteral(methodOffset),
+                "the nested literal is now read correctly — the limitation is closed and the doc should stop admitting it")
+        }
+    }
+
 }
