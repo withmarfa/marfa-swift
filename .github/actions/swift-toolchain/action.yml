@@ -1,9 +1,9 @@
 name: Swift toolchain
 description: >-
-  Select a Swift toolchain the package can build with, and restore the SPM
-  caches. One copy, because both jobs need the identical prelude and the
-  previous arrangement kept two: a truncated paste into the second copy left
-  an unclosed `if`, and the job it belonged to had not run since.
+  Select a Swift toolchain the package can build with. One copy, because both
+  jobs need the identical prelude and the previous arrangement kept two: a
+  truncated paste into the second copy left an unclosed `if`, and the job it
+  belonged to had not run since.
 
 inputs:
   required-major:
@@ -73,34 +73,3 @@ runs:
           echo "::error::This runner has ${version_line:-no usable Swift}, and the package needs ${required_major}.${required_minor} or newer."
           exit 1
         fi
-
-    - name: Cache SPM checkouts
-      uses: actions/cache@v6
-      with:
-        # Scope by runner.name. Self-hosted runners on the same host share
-        # the cache backend, but each runner's working dir is baked into
-        # compiled PCMs; a cross-runner restore surfaces as "missing
-        # required module 'SwiftShims'". Per-runner keys keep each runner
-        # reading its own correctly-pathed cache. GitHub-hosted runners get
-        # a stable runner.name per OS, so the keys still hit cache there.
-        path: .build/checkouts
-        key: ${{ runner.name }}-spm-checkouts-${{ hashFiles('Package.resolved') }}
-        restore-keys: |
-          ${{ runner.name }}-spm-checkouts-
-
-    - name: Cache SPM build artifacts
-      uses: actions/cache@v6
-      with:
-        # Cache the whole .build directory (except checkouts, cached
-        # separately with a finer key). Keyed by Package.resolved +
-        # the hash of all Swift sources, so source-only edits still
-        # get an incremental-compile hit and dependency bumps miss
-        # cleanly. Per-runner scoping for the same reason as the
-        # checkouts cache above.
-        path: |
-          .build
-          !.build/checkouts
-        key: ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved', 'Sources/**/*.swift', 'Tests/**/*.swift') }}
-        restore-keys: |
-          ${{ runner.name }}-spm-build-${{ hashFiles('Package.resolved') }}-
-          ${{ runner.name }}-spm-build-
