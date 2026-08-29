@@ -7,6 +7,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Changed
+
+- **`Transport.uploadMultipart(...)` requires an explicit `method:`**, having defaulted it to `.post`. **A caller that omitted the argument stops compiling**, which is the intended outcome and the only reason the default was worth removing: a defaulted verb is invisible in the source, so a call site that omits it reads as a route with no method at all, and neither a person nor a scan of the sources can tell which verb it sends. No call site in this package ever omitted it, and the one caller — `ProfileNamespace.uploadAvatar(...)` — already spelled it, so nothing here changed behavior. Add `method: .post` to any call site that relied on the default; the request it builds is identical.
+
 ## [14.2.0] — 2026-08-27
 
 Minor. Three of the four changes here are about one seam: a local store, a

@@ -108,8 +108,17 @@ public extension Transport {
     /// carrying `data` under the supplied `filename` and `mimeType`, then
     /// routes through ``rawRequest(method:path:body:contentType:query:)``
     /// so auth, retry, and rate-limit handling all apply.
+    ///
+    /// `method` carries no default on purpose. It had one, and a defaulted
+    /// verb is invisible in the source: a call site that omits it reads as a
+    /// route with no method at all. No call site ever omitted it, so nothing
+    /// broke — but deleting the argument from the one caller and running
+    /// `RouteCoverageTests` reported this working wrapper as unwrapped, and
+    /// told the reader to record it as a deliberate omission. Spelling the
+    /// verb at every call site costs a line and keeps the route readable from
+    /// the text.
     func uploadMultipart(
-        method: HTTPMethod = .post,
+        method: HTTPMethod,
         path: String,
         fieldName: String,
         filename: String,
