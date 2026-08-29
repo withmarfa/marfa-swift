@@ -434,11 +434,23 @@ struct RouteCoverageTests {
     /// - A string literal nested inside an interpolation (`"\("x")"`) reads
     ///   as the end of the outer literal — bounded to the rest of that line
     ///   for a single-line literal, and not bounded for a multiline one.
-    /// - A regex literal (`/…/` or `#/…/#`) is read as code. A call shape
-    ///   inside one is therefore recovered rather than refused, and then
-    ///   reported as unreadable for want of a `path:` — loud rather than
-    ///   silent, which is the direction to be wrong in. There are none in
-    ///   this package.
+    /// - A regex literal (`/…/` or `#/…/#`) is read as code, and **the
+    ///   direction it fails in depends on what the regex contains.** One
+    ///   with no `path:` is recovered and then reported unreadable, which is
+    ///   loud. One that spells a `path:` is read into a route with nothing
+    ///   reported at all: regex bodies are not literal spans, so the raw-file
+    ///   guard sees the receiver as recovered and the comment scan finds
+    ///   nothing. That is a silent invented route, and it can mask a real
+    ///   gap — proven by adding a function whose body is one regex literal
+    ///   naming a genuinely unwrapped operation, which turned the suite
+    ///   green. An earlier version of this comment claimed the failure was
+    ///   loud, on the evidence of the one input it had tried.
+    ///
+    ///   Not modeled, and refused instead: `noRegexLiteralsInScannedSources`
+    ///   fails if any appears under `Sources/`. There are none today, and a
+    ///   refusal is the whole of the fix that is worth having — teaching this
+    ///   scanner one more corner of Swift syntax is what produced the last
+    ///   four defects in it.
     /// - Conditional compilation is invisible, which is deliberate: a call
     ///   inside an `#if os(...)` branch is a call the SDK makes on some
     ///   platform, and reading only the branches that compile here would
@@ -446,7 +458,12 @@ struct RouteCoverageTests {
     ///   A call in a permanently dead branch would be counted; there are
     ///   none, and the two `#if` blocks in the package hold no calls.
     ///
-    /// All three are pinned in `ScannerBehavior`.
+    /// The first two are pinned in `ScannerBehavior`. **The third is not**,
+    /// and saying so is the point: nothing fails if someone teaches the
+    /// scanner to skip inactive `#if` branches, which would under-report by
+    /// exactly the platforms this SDK exists to support. A claim that
+    /// something is checked, when nothing checks it, is this file's own
+    /// defect class.
     ///
     /// **Raw literals are modeled rather than approximated, and that is
     /// load-bearing.** A raw literal holding an odd number of `"` —
@@ -1477,6 +1494,46 @@ struct RouteCoverageTests {
     /// calls: a helper in `Transport/` that forwards a caller's path into
     /// `request(...)` passes, because there is no literal to find. So this
     /// narrows the excluded directory; it does not close it.
+    /// The scanner cannot read a regex literal, and the direction it gets
+    /// that wrong in is the silent one: a regex spelling a `path:` becomes a
+    /// route nothing reported, which can hide a genuinely unwrapped
+    /// operation. Modeling regex literals means teaching this file another
+    /// corner of Swift syntax, and every previous corner it learned arrived
+    /// with a defect of its own.
+    ///
+    /// So it refuses instead. `Sources/MarfaSDK` holds no regex literal
+    /// today; the day one appears, this fails and names the file rather than
+    /// letting the coverage numbers quietly become wrong. Whoever adds one
+    /// can then decide between excluding the file and teaching the scanner,
+    /// with the trade in front of them.
+    @Test("no regex literal reaches a scanner that cannot read one")
+    func noRegexLiteralsInScannedSources() throws {
+        // `#/…/#` and the `Regex`/`NSRegularExpression` constructors. The
+        // bare `/…/` literal is deliberately not matched: it is ambiguous
+        // with division and a pattern for it would fire on ordinary
+        // arithmetic, which is a false failure on every build rather than a
+        // guard. The extended form is the one Swift recommends and the one a
+        // multi-line pattern must use.
+        let regexSyntax = try Self.regex(#"#/|\bRegex\s*[({]|\bNSRegularExpression\b"#)
+        var found: [String] = []
+        for file in try sdkSourceFiles() + transportSourceFiles() {
+            let raw = try String(contentsOf: file, encoding: .utf8)
+            let whole = NSRange(raw.startIndex..., in: raw)
+            for match in regexSyntax.matches(in: raw, range: whole) {
+                found.append(
+                    "\(file.lastPathComponent):\(Self.line(of: match.range.location, in: raw))")
+            }
+        }
+        #expect(
+            found.isEmpty,
+            """
+            A regex literal is now in the scanned sources, and this scanner reads \
+            regex bodies as code. One spelling a `path:` becomes a route nothing \
+            reported, which hides an unwrapped operation rather than reporting it: \
+            \(found.sorted())
+            """)
+    }
+
     @Test("no route literals hide in the excluded Transport directory")
     func noRouteLiteralsHideInTransport() throws {
         let routeLiteral = try Self.regex(#""/[a-zA-Z]"#)
