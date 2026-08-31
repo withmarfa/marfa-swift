@@ -1,0 +1,105 @@
+name: Consumer pins
+
+# Which SDK version each Swift consumer pins, and whether any is behind.
+#
+# Both apps pin `exactVersion` deliberately: neither auto-upgrades and
+# neither breaks when a new SDK ships. The cost is silence — a consumer
+# never notices the SDK moving, so the distance grows and nothing reports
+# it. One app sat a major and two minors behind for weeks and what surfaced
+# it was a stock-take.
+#
+# Lives here rather than in each app because this repository is the one
+# that knows what "latest" means, and because one job answering for every
+# consumer is the question somebody actually asks. An app checking only
+# itself would need the same list maintained twice.
+
+on:
+  schedule:
+    # Weekly. The thing being watched moves on the order of weeks, and a
+    # daily report on a number that rarely changes is how a report stops
+    # being read.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: consumer-pins
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pins:
+    name: Report each consumer's pin
+    # Hosted, not the pool. This reads two repositories through the API and
+    # builds nothing, so it needs no Xcode and no local machine — and a
+    # report that cannot run when the pool is busy is a report nobody can
+    # rely on.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Compare each consumer's pin against the newest tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/consumer-pins.sh
+
+  notify:
+    needs: [pins]
+    # Skipped when no alert destination is configured, so a fork sends
+    # nothing. Gated on the variable rather than the token because
+    # `secrets` is not available in an `if:` at any level, while `vars` is.
+    if: always() && vars.ALERT_WEBHOOK_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report outcome
+        env:
+          ALERT_URL: ${{ vars.ALERT_WEBHOOK_URL }}
+          ALERT_TOKEN: ${{ secrets.ALERT_WEBHOOK_TOKEN }}
+          RESULT: ${{ needs.pins.result }}
+          WORKFLOW: ${{ github.workflow }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          # `failure` is the ordinary case here rather than a fault: the
+          # script exits non-zero when a consumer is behind, which is a
+          # finding and not a broken job. The two are separated so the
+          # alert says which, because "a consumer is behind" and "the
+          # check could not run" want different responses.
+          case "$RESULT" in
+            success)
+              STATE=resolved
+              TITLE="Every Swift consumer is on the newest SDK"
+              ;;
+            failure)
+              STATE=open
+              TITLE="A Swift consumer is behind the newest SDK"
+              ;;
+            *)
+              STATE=open
+              TITLE="The Swift consumer pin report did not run"
+              ;;
+          esac
+
+          # Built rather than hardcoded: an unset token would otherwise be
+          # sent as "Bearer " with nothing after it, which reads as a
+          # malformed request rather than an unauthenticated one.
+          AUTH=()
+          if [ -n "${ALERT_TOKEN:-}" ]; then
+            AUTH=(-H "Authorization: Bearer $ALERT_TOKEN")
+          fi
+
+          # Keyed on the estate's state rather than per run, so one alert
+          # opens when a consumer falls behind and the next run that finds
+          # everything current resolves it.
+          jq -n --arg t "$TITLE" --arg s "$STATE" --arg k "github/$REPO/$WORKFLOW" \
+                --arg u "$RUN_URL" --arg r "$REPO" --arg w "$WORKFLOW" --arg j "$RESULT" \
+            '{source:"github",severity:"warning",title:$t,state:$s,key:$k,link:$u,
+              fields:{Repository:$r,Workflow:$w,Report:$j}}' \
+          | curl -sS --fail-with-body --max-time 20 -X POST "$ALERT_URL" \
+              "${AUTH[@]}" \
+              -H "Content-Type: application/json" --data @- \
+          || echo "Alert POST did not succeed (see above); not failing the run over it."
