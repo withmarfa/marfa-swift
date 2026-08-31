@@ -50,7 +50,8 @@ let package = Package(
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
                 "sync-types.sh", "codegen-domain.swift",
                 "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
-                "cloudkit-smoke",
+                "cloudkit-smoke", "PublicSurfaceCore", "public-surface",
+                "public-surface.sh", "public-surface.txt",
             ],
             sources: ["codegen-wire.swift"]
         ),
@@ -61,7 +62,8 @@ let package = Package(
                 "wire-types.json", "openapi.json", "sync-openapi.sh",
                 "sync-types.sh", "codegen-wire.swift",
                 "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
-                "cloudkit-smoke",
+                "cloudkit-smoke", "PublicSurfaceCore", "public-surface",
+                "public-surface.sh", "public-surface.txt",
             ],
             sources: ["codegen-domain.swift"]
         ),
@@ -114,6 +116,23 @@ let package = Package(
             name: "CodegenCompileCheckTests",
             dependencies: ["MarfaSDK"],
             path: "Tests/CodegenCustomTypesTests/CompileCheck"
+        ),
+
+        // MARK: - Public surface lock
+
+        .target(
+            name: "PublicSurfaceCore",
+            path: "scripts/PublicSurfaceCore"
+        ),
+        .executableTarget(
+            name: "public-surface",
+            dependencies: ["PublicSurfaceCore"],
+            path: "scripts/public-surface"
+        ),
+        .testTarget(
+            name: "PublicSurfaceTests",
+            dependencies: ["PublicSurfaceCore"],
+            path: "Tests/PublicSurfaceTests"
         ),
 
         // MARK: - CloudKit readiness smoke (manual)

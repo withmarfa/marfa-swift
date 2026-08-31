@@ -136,6 +136,23 @@ Two jobs in `.github/workflows/ci.yml`.
 
 **Runner routing.** Both jobs read `runs-on` from the `CI_RUNNER` Actions variable, defaulting to `macos-latest`. `CI_RUNNER=self-hosted` routes them to a self-hosted Apple Silicon pool. Reverts to hardcoded `macos-latest` before this repo goes public.
 
+## Public surface
+
+`scripts/public-surface.txt` records every public and open declaration in `MarfaSDK` — path, kind, declaration — **as of the last release**. `validate` regenerates the surface at HEAD, compares the two, and fails when the `## [Unreleased]` section of `CHANGELOG.md` does not name a declaration that was added, removed or retyped.
+
+```bash
+./scripts/public-surface.sh                 # rewrite the baseline (release cuts only)
+./scripts/public-surface.sh /tmp/head.txt   # write the current surface somewhere else
+swift run public-surface check scripts/public-surface.txt /tmp/head.txt CHANGELOG.md
+```
+
+- **Regenerate the baseline at a release cut and never in between** — after the Unreleased section has been renamed to the version being cut, so the two moves land in one commit. Forgetting is loud rather than silent: the next change's check reports the last release's entries as unaccounted for, because they are no longer in Unreleased.
+- **Additions are held to the same standard as removals**, which is the part that reads as excessive and is not. A release analysed as purely additive broke a consumer on the first compile, because the SDK added a public name the consumer had already invented for the same concept. That is the predictable consequence of closing a gap a consumer worked around, so a changelog that lists the names a version adds lets them see it before they bump.
+- **Members roll up.** A type that arrives or leaves is reported once rather than once per member, and an enum's cases are reported as the enum, because a closed enum gaining a case breaks an exhaustive switch and that is a fact about the enum.
+- **The mention test is literal**, matching whole names: `Foo`, `Foo.bar`, or the call spelling for a namespace method (`auth.me`). It asks whether the name a consumer would search for is on the page, not whether the prose is good.
+- **What it cannot see: protocol conformances.** Dropping a public conformance is source-breaking and lives in the symbol graph's relationships, under a pile of synthesised `Sendable` and `Copyable` entries. Separating declared conformances from synthesised ones is its own piece of work, and this check is silent on that class.
+- **`MarfaSDKTestSupport` is deliberately outside the snapshot**, because it carries no semver stability across SDK minor versions and holding a changelog entry against every change to it would demand records this project does not promise.
+
 ## Conventions
 
 - American English.
