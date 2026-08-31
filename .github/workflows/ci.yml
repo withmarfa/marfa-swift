@@ -42,6 +42,23 @@ jobs:
       - name: Test
         run: swift test --parallel
 
+      # The changelog is the only place a consumer learns that a version will
+      # stop their build, and until now nothing held it to what the version
+      # actually did. It runs here rather than in `freshness` because it must
+      # report on a pull request: the release workflow fires on the tag push,
+      # so anything it caught would already be published, and `freshness` is
+      # main-only, which is after the merge that introduced the change.
+      #
+      # `swift test` above has already built every module, so the extraction
+      # below is close to free.
+      - name: Public surface accounted for
+        run: |
+          ./scripts/public-surface.sh "${RUNNER_TEMP}/public-surface-head.txt"
+          swift run --quiet public-surface check \
+            scripts/public-surface.txt \
+            "${RUNNER_TEMP}/public-surface-head.txt" \
+            CHANGELOG.md
+
   freshness:
     name: Codegen freshness
     if: >-

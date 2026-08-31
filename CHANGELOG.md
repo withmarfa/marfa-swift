@@ -39,6 +39,8 @@ A third consumer needs the migration note under **Removed**.
 
 - **`InitialSyncError`**, thrown by `performInitialSync` when the mutation queue is not empty. Carries the count rather than a bare refusal: a number that does not fall across retries is a stuck queue rather than a busy one, and those want different answers from a person. `LocalizedError` from the start, so a SwiftUI error row shows the sentence rather than the case index.
 
+- **The public names this release adds, listed.** Recorded after the fact, by the surface check introduced in a later version and run backwards over this cut. Adding a public name is not a source-compatible act in the way the rest of this section's analysis assumed: a consumer that already invented the same name for the same concept stops compiling on the bare spelling, which is what `MarfaAccountIdentity` did to one of them. Beyond the names spelled out above, this release adds the types `AuthMe`, `AuthMeSpace`, `AuthMeUser`, `NoLocalStoreError`, `OccurrenceSeriesError` and `OccurrenceWindow`; the method `MarfaClient.releaseStoreClaim()`; and the properties `CreateKeyInput.edgePermissions`, `CreateKeyInput.metadataPermissions`, `Occurrence.seriesId` and `OccurrencesResponse.seriesErrors`. If you hold a type of one of those names, expect to disambiguate.
+
 ### Changed
 
 - **`PreviewEventDispatchReason` carries all eight of the route's cases**, having carried five. It is a raw-value enum with no unknown case, so a response naming one of the missing three threw a decoding error rather than degrading — the failure was real rather than cosmetic. **An exhaustive `switch` over it without a `default` stops compiling**, which is the only way a closed enum can gain a case.
