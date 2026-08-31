@@ -39,8 +39,17 @@ public struct CreateKeyInput: Codable, Sendable {
 }
 
 /// API key role.
+///
+/// The top role is `instanceAdmin` rather than `admin`: it sits above
+/// `spaceAdmin` and named no scope, so the wider of the two read as the
+/// generic one. Both admin-shaped roles now say what they govern.
+///
+/// The old wire value is deliberately absent. A case for it would keep a
+/// retired word decoding indefinitely and hide a server nobody upgraded,
+/// which is the same argument the platform makes for not carrying a
+/// permanent translation table.
 public enum KeyRole: String, Codable, Sendable {
-    case admin
+    case instanceAdmin = "instance_admin"
     case spaceAdmin = "space_admin"
     case member
 }

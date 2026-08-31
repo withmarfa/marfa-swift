@@ -1720,12 +1720,12 @@ JSONValue.toAny()	method	func toAny() -> Any?
 JSONValue.toDictionary(_:)	type.method	static func toDictionary(_ dict: [String : JSONValue]) -> [String : Any]
 KeyRole	enum	enum KeyRole
 KeyRole.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
-KeyRole.admin	enum.case	case admin
 KeyRole.encode(to:)	method	func encode(to encoder: any Encoder) throws
 KeyRole.hash(into:)	method	func hash(into hasher: inout Hasher)
 KeyRole.hashValue	property	var hashValue: Int { get }
 KeyRole.init(from:)	init	init(from decoder: any Decoder) throws
 KeyRole.init(rawValue:)	init	init?(rawValue: String)
+KeyRole.instanceAdmin	enum.case	case instanceAdmin
 KeyRole.member	enum.case	case member
 KeyRole.spaceAdmin	enum.case	case spaceAdmin
 KeychainError	enum	enum KeychainError
@@ -2695,7 +2695,7 @@ Transport.rawUpload(method:path:body:contentType:query:onBytesSent:)	method	func
 Transport.rawUpload(method:path:body:contentType:query:onBytesSent:)	method	func rawUpload(method: HTTPMethod, path: String, body: Data, contentType: String?, query: [(String, String)]?, onBytesSent: @escaping @Sendable (Int64, Int64) -> Void) async throws -> (Data, HTTPURLResponse)
 Transport.request(method:path:body:query:)	method	func request<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?) async throws -> T where T : Decodable, T : Sendable
 Transport.requestWithConflict(method:path:body:query:)	method	func requestWithConflict<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?) async throws -> ConflictResult<T> where T : Decodable, T : Sendable
-Transport.uploadMultipart(method:path:fieldName:filename:data:mimeType:query:)	method	func uploadMultipart(method: HTTPMethod = .post, path: String, fieldName: String, filename: String, data: Data, mimeType: String, query: [(String, String)]? = nil) async throws -> (Data, HTTPURLResponse)
+Transport.uploadMultipart(method:path:fieldName:filename:data:mimeType:query:)	method	func uploadMultipart(method: HTTPMethod, path: String, fieldName: String, filename: String, data: Data, mimeType: String, query: [(String, String)]? = nil) async throws -> (Data, HTTPURLResponse)
 TypePermission	enum	enum TypePermission
 TypePermission.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 TypePermission.encode(to:)	method	func encode(to encoder: any Encoder) throws

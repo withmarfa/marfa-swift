@@ -9,6 +9,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **`KeyRole.admin` is renamed to `KeyRole.instanceAdmin`, and its wire value is now `instance_admin`.** Source-breaking for any caller naming the case, and the case is the smaller half: `ApiKey.role` and `CreatedKey.role` are non-optional, so a `Codable` enum meeting a raw value it has no case for throws `DecodingError.dataCorrupted` and **fails the whole decode**. Against a current server this SDK therefore could not read `keys.list()` or `keys.create()` at all until this change. The old wire value is deliberately absent rather than kept as a second case: carrying it would keep a retired word decoding indefinitely and hide a server nobody upgraded.
+
 - **`Transport.uploadMultipart(...)` requires an explicit `method:`**, having defaulted it to `.post`. **A caller that omitted the argument stops compiling**, which is the intended outcome and the only reason the default was worth removing: a defaulted verb is invisible in the source, so a call site that omits it reads as a route with no method at all, and neither a person nor a scan of the sources can tell which verb it sends. No call site in this package ever omitted it, and the one caller — `ProfileNamespace.uploadAvatar(...)` — already spelled it, so nothing here changed behavior. Add `method: .post` to any call site that relied on the default; the request it builds is identical.
 
 ## [14.2.0] — 2026-08-27
