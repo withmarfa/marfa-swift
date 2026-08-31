@@ -8,7 +8,7 @@
   "key": "marfa_k1_abcdef0123456789",
   "label": "New integration key",
   "last_used_at": "2026-04-14T10:00:00Z",
-  "role": "admin",
+  "role": "instance_admin",
   "source": "cli",
   "type_permissions": { "core.note": "write" }
 }
