@@ -7,6 +7,28 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [15.0.0] — 2026-09-01
+
+Major, and every breaking change in it is a name that meant the wrong thing.
+
+Two of the three are ordinary renames. The third is the reason the release is
+worth reading: **`issuer:` meant the server URL, and every consumer written
+against it got that wrong.** Both shipping Swift apps passed a server URL to a
+parameter called `issuer` and had sign-in dead for weeks; the SDK's own docstring
+examples showed the same wrong value. A helper that derived the issuer correctly
+shipped as the fix, and a helper is opt-in, so the next consumer that did not
+call it would have failed identically. The derivation moves inside.
+
+Storage keys do not move with it, which is the half worth checking if you have
+your own consumer: credentials are still keyed on the derived issuer, so a
+consumer that was deriving correctly keeps every stored credential across the
+upgrade.
+
+One fix rides along and had been failing silently since the derivation helper
+shipped. The pre-11.4.0 credential migration refuses an ambiguous server, and
+that question was being asked of the issuer, which has a path by construction on
+every Marfa deployment — so the guard refused everything and nobody could see it.
+
 ### Changed
 
 - **`MarfaAuth`, `DeviceFlow` and `Passkey` take a `serverURL:` and derive the OAuth issuer themselves.** `MarfaAuth.init(issuer:)`, `MarfaAuth.clearStoredCredentials(issuer:)`, `DeviceFlow.start(issuer:)` and `Passkey.enroll(issuer:)` are all now spelled `serverURL:`, and every caller stops compiling until it passes the value it would give `MarfaClient`. A Marfa deployment publishes `https://<host>/auth` as its issuer, so the server URL is not the issuer — and **both** shipping consumers of this SDK passed the server URL to a parameter called `issuer` and had sign-in dead for weeks. A parameter whose affordance has a hundred per cent failure rate is misnamed, and `OAuthDiscovery.issuer(forServer:)` shipped as the fix for it, but a helper is opt-in and the next consumer that does not call it fails identically. `MarfaSession.end(serverURL:)` already worked this way and its argument is the same one. **`Passkey.enroll` is the odd one and is worth reading twice if you call it:** its parameter always meant the server URL despite its name, so its *value* semantics are unchanged and only the label moved — while the other three take a genuinely different value than before. Leaving it behind would have shipped a release where one label meant opposite things on the same three entry points, with the type system unable to tell them apart.

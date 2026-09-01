@@ -1337,7 +1337,7 @@ CredentialsNamespace	struct	struct CredentialsNamespace
 CredentialsNamespace.createApiToken(_:)	method	func createApiToken(_ input: CreateApiTokenCredentialInput) async throws -> CreatedCredential
 CredentialsNamespace.createOAuthProvider(_:)	method	func createOAuthProvider(_ input: CreateOAuthProviderCredentialInput) async throws -> CreatedCredential
 DeviceFlow	enum	enum DeviceFlow
-DeviceFlow.start(issuer:clientId:scopes:storage:httpClient:clock:)	type.method	static func start(issuer: URL, clientId: String, scopes: [String], storage: any SecureStorage, httpClient: any DeviceFlowHTTPClient = URLSession.shared, clock: any DeviceFlowClock = SystemDeviceFlowClock()) async throws -> DeviceFlowHandle
+DeviceFlow.start(serverURL:clientId:scopes:storage:httpClient:clock:)	type.method	static func start(serverURL: URL, clientId: String, scopes: [String], storage: any SecureStorage, httpClient: any DeviceFlowHTTPClient = URLSession.shared, clock: any DeviceFlowClock = SystemDeviceFlowClock()) async throws -> DeviceFlowHandle
 DeviceFlowClock	protocol	protocol DeviceFlowClock : Sendable
 DeviceFlowClock.now()	method	func now() -> Date
 DeviceFlowClock.sleep(for:)	method	func sleep(for duration: TimeInterval) async throws
@@ -1832,13 +1832,14 @@ MarfaAccountIdentity.serverOrigin	property	let serverOrigin: String
 MarfaAccountIdentity.spaceId	property	let spaceId: String
 MarfaAccountIdentity.storageKey	property	var storageKey: String { get }
 MarfaAuth	class	@MainActor final class MarfaAuth
-MarfaAuth.clearStoredCredentials(issuer:clientId:storage:)	type.method	@MainActor static func clearStoredCredentials(issuer: URL, clientId: String, storage: any SecureStorage) async throws
+MarfaAuth.clearStoredCredentials(serverURL:clientId:storage:)	type.method	@MainActor static func clearStoredCredentials(serverURL: URL, clientId: String, storage: any SecureStorage) async throws
 MarfaAuth.clientId	property	@MainActor let clientId: String
-MarfaAuth.init(issuer:clientId:redirectURI:scopes:storage:urlSession:)	init	@MainActor init(issuer: URL, clientId: String, redirectURI: URL, scopes: [String], storage: any SecureStorage, urlSession: URLSession = .shared)
+MarfaAuth.init(serverURL:clientId:redirectURI:scopes:storage:urlSession:)	init	@MainActor init(serverURL: URL, clientId: String, redirectURI: URL, scopes: [String], storage: any SecureStorage, urlSession: URLSession = .shared)
 MarfaAuth.issuer	property	@MainActor let issuer: URL
 MarfaAuth.redirectURI	property	@MainActor let redirectURI: URL
 MarfaAuth.restore()	method	@MainActor func restore() async throws -> (any TokenProvider)?
 MarfaAuth.scopes	property	@MainActor let scopes: [String]
+MarfaAuth.serverURL	property	@MainActor let serverURL: URL
 MarfaAuth.signIn(presentationContextProvider:)	method	@MainActor func signIn(presentationContextProvider: any ASWebAuthenticationPresentationContextProviding) async throws -> any TokenProvider
 MarfaAuth.signOut(_:)	method	@MainActor func signOut(_ provider: any TokenProvider) async throws
 MarfaClient	class	final class MarfaClient
@@ -2160,7 +2161,7 @@ PaginatedSequence.reduce(_:_:)	method	func reduce<Result>(_ initialResult: Resul
 PaginatedSequence.reduce(into:_:)	method	func reduce<Result>(into initialResult: Result, _ updateAccumulatingResult: (inout Result, Self.Element) async throws -> Void) async rethrows -> Result
 PaginatedSequence.unicodeScalars	property	var unicodeScalars: AsyncUnicodeScalarSequence<Self> { get }
 Passkey	enum	@MainActor enum Passkey
-Passkey.enroll(issuer:presentationContextProvider:callbackURLScheme:)	type.method	@MainActor static func enroll(issuer: URL, presentationContextProvider: any ASWebAuthenticationPresentationContextProviding, callbackURLScheme: String = "marfa-auth-host") async
+Passkey.enroll(serverURL:presentationContextProvider:callbackURLScheme:)	type.method	@MainActor static func enroll(serverURL: URL, presentationContextProvider: any ASWebAuthenticationPresentationContextProviding, callbackURLScheme: String = "marfa-auth-host") async
 PasskeyError	class	final class PasskeyError
 PasskeyError.Code	enum	enum Code
 PasskeyError.Code.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
