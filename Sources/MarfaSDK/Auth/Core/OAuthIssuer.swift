@@ -120,18 +120,30 @@ enum OAuthIssuer {
         "marfa.auth.\(kind):\(issuer.host ?? issuer.absoluteString):\(clientId)"
     }
 
-    /// Promotes the old host-only token account only for an unambiguous issuer.
-    /// A path, explicit port, or non-HTTPS scheme could have shared that old
-    /// account with a different authorization server, so those shapes never
-    /// claim it automatically.
+    /// Promotes the old host-only token account only for an unambiguous
+    /// **server**. A path, explicit port, or non-HTTPS scheme could have shared
+    /// that old account with a different authorization server, so those shapes
+    /// never claim it automatically.
+    ///
+    /// - Important: The ambiguity question is asked of `serverURL` and the keys
+    ///   are computed from `issuer`, and the two are not interchangeable here.
+    ///   The legacy account is keyed on the host alone, so what makes it
+    ///   ambiguous is whether *another* Marfa could have written it — a
+    ///   question about where the server sits, not about the `/auth` component
+    ///   Marfa itself appends. Asking it of the issuer instead disables this
+    ///   migration outright, because every Marfa issuer has a path by
+    ///   construction. That is not hypothetical: it is what this code did until
+    ///   the callers began passing a derived issuer, and the failure is silent
+    ///   — `restore()` finds no account and asks a signed-in user to sign in.
     static func migrateLegacyRootTokenIfNeeded(
         in storage: any SecureStorage,
+        serverURL: URL,
         issuer: URL,
         clientId: String
     ) async throws -> Bool {
         let canonicalIssuer = try canonicalURL(issuer)
         guard let components = URLComponents(
-            url: canonicalIssuer,
+            url: try canonicalURL(serverURL),
             resolvingAgainstBaseURL: false
         ), components.scheme == "https", components.port == nil,
               components.percentEncodedPath.isEmpty

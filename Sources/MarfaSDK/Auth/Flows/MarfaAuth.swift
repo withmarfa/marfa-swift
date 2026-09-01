@@ -10,18 +10,17 @@ import Foundation
 ///
 /// ## Flow
 ///
-/// The server URL and the OAuth issuer identifier are **not the same value**.
-/// A Marfa deployment publishes `https://<host>/auth` as its issuer, so keep
-/// the server URL and derive the issuer from it with
-/// ``OAuthDiscovery/issuer(forServer:)``. Passing the bare server URL here
-/// fails at the first discovery call, and building a ``MarfaClient`` from
-/// ``issuer`` points the API at `/auth`.
+/// This takes the **Marfa server URL** and derives the OAuth issuer itself.
+/// The two are not the same value — a Marfa deployment publishes
+/// `https://<host>/auth` as its issuer — and every consumer written against
+/// the older `issuer:` label got that wrong, which is why the derivation moved
+/// in here. Pass the same URL you would give ``MarfaClient``.
 ///
 /// ```swift
 /// let serverURL = URL(string: "https://api.marfa.so")!
 ///
 /// let auth = MarfaAuth(
-///     issuer: OAuthDiscovery.issuer(forServer: serverURL),
+///     serverURL: serverURL,
 ///     clientId: "marfa-notes",
 ///     redirectURI: URL(string: "marfa-notes://auth/callback")!,
 ///     scopes: ["core.note:read", "core.note:write", "openid", "profile", "email"],
@@ -66,12 +65,17 @@ import Foundation
 @MainActor
 public final class MarfaAuth {
 
-    /// The OAuth issuer identifier, as the caller spelled it.
+    /// The Marfa server, as the caller supplied it.
+    ///
+    /// This is the value to build a ``MarfaClient`` from. ``issuer`` is not.
+    public let serverURL: URL
+
+    /// The OAuth issuer identifier, derived from ``serverURL``.
     ///
     /// Not the API base URL, and not a substitute for it. On a Marfa
     /// deployment the two differ by a `/auth` path component — see
     /// ``OAuthDiscovery/issuer(forServer:)`` — so a ``MarfaClient`` built from
-    /// this addresses `/auth` rather than the API.
+    /// this addresses `/auth` rather than the API. Use ``serverURL``.
     ///
     /// Discovery compares the published `issuer` against this, not against the
     /// canonical form: an identifier that legitimately ends in a slash is the
@@ -92,14 +96,20 @@ public final class MarfaAuth {
     private let pendingKey: String
     private let tokensKey: String
 
+    /// - Parameter serverURL: The Marfa server, e.g. `https://api.marfa.so`.
+    ///   The OAuth issuer is derived from it; storage accounts are keyed on
+    ///   that derived value, which is what they were already keyed on before
+    ///   the derivation moved inside this initializer.
     public init(
-        issuer: URL,
+        serverURL: URL,
         clientId: String,
         redirectURI: URL,
         scopes: [String],
         storage: any SecureStorage,
         urlSession: URLSession = .shared
     ) {
+        let issuer = OAuthDiscovery.derivedIssuer(forServer: serverURL)
+        self.serverURL = serverURL
         self.issuer = issuer
         self.canonicalIssuer = OAuthIssuer.normalize(issuer)
         self.clientId = clientId
@@ -186,6 +196,7 @@ public final class MarfaAuth {
         _ = try OAuthIssuer.canonicalURL(issuer)
         _ = try await OAuthIssuer.migrateLegacyRootTokenIfNeeded(
             in: storage,
+            serverURL: serverURL,
             issuer: issuer,
             clientId: clientId
         )
@@ -230,17 +241,21 @@ public final class MarfaAuth {
     /// - Note: This clears and does not revoke, so on its own it leaves a live
     ///   grant on the server. Unless you specifically want only the local half,
     ///   prefer ``MarfaSession/end(serverURL:clientId:storage:revoking:urlSession:)``,
-    ///   which does both, takes the server URL so the issuer cannot be got
-    ///   wrong, and works on the platforms this type does not exist on.
+    ///   which does both and works on the platforms this type does not exist on.
+    ///
+    /// - Parameter serverURL: The Marfa server, as given to ``init(serverURL:clientId:redirectURI:scopes:storage:urlSession:)``.
+    ///   Taking the issuer here instead is how this call used to fail without
+    ///   saying so: the accounts it computed did not exist, so it deleted
+    ///   nothing and returned normally.
     public static func clearStoredCredentials(
-        issuer: URL,
+        serverURL: URL,
         clientId: String,
         storage: any SecureStorage
     ) async throws {
         // One implementation, in `MarfaSession.swift`, because this is reachable
         // on platforms where `MarfaAuth` is not.
         try await clearCredentialAccounts(
-            issuer: issuer,
+            issuer: OAuthDiscovery.derivedIssuer(forServer: serverURL),
             clientId: clientId,
             storage: storage
         )

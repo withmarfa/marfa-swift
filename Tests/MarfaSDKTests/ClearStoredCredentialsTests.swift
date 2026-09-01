@@ -19,7 +19,11 @@ import Testing
 @Suite("Clearing stored credentials")
 struct ClearStoredCredentialsTests {
 
-    private let issuer = URL(string: "https://auth.example.test")!
+    /// What a caller actually holds. The accounts are keyed on the issuer the
+    /// SDK derives from this, which is the distinction the call exists to stop
+    /// a consumer having to know about.
+    private let serverURL = URL(string: "https://auth.example.test")!
+    private var issuer: URL { OAuthDiscovery.issuer(forServer: serverURL) }
     private let clientId = "client-abc"
 
     @Test("removes the token and the pending authorization")
@@ -35,7 +39,7 @@ struct ClearStoredCredentialsTests {
         try await storage.set("half-finished", for: pendingKey)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: issuer, clientId: clientId, storage: storage
+            serverURL: serverURL, clientId: clientId, storage: storage
         )
 
         #expect(try await storage.get(for: tokensKey) == nil)
@@ -58,7 +62,7 @@ struct ClearStoredCredentialsTests {
         try await storage.set("half-finished", for: legacyPending)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: issuer, clientId: clientId, storage: storage
+            serverURL: serverURL, clientId: clientId, storage: storage
         )
 
         #expect(try await storage.get(for: legacyTokens) == nil)
@@ -77,17 +81,23 @@ struct ClearStoredCredentialsTests {
         try await storage.set("their-token", for: otherKey)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: issuer, clientId: clientId, storage: storage
+            serverURL: serverURL, clientId: clientId, storage: storage
         )
 
         #expect(try await storage.get(for: otherKey) == "their-token")
     }
 
-    @Test("an issuer spelled with a trailing slash addresses the same rows")
+    @Test("a server URL spelled with a trailing slash addresses the same rows")
     func trailingSlashIsTheSameAccount() async throws {
-        // Storage keys are canonicalized, so the two spellings are one account.
-        // Without that, signing out through one and back in through the other
-        // would leave a credential behind under the spelling nobody used.
+        // Both spellings derive one issuer, so the two are one account. Without
+        // that, signing out through one and back in through the other would
+        // leave a credential behind under the spelling nobody used.
+        //
+        // Note what this does *not* pin any more. Derivation appends a path
+        // component, which absorbs a trailing slash before storage keying is
+        // consulted, so this no longer reaches `OAuthIssuer`'s own strip loop —
+        // it used to, when the caller supplied the issuer directly.
+        // `issuerSpellingsCanonicalizeToOneAccount` below pins that half.
         let storage = InMemoryKeychain()
         let tokensKey = OAuthIssuer.storageKey(
             kind: "tokens", issuer: issuer, clientId: clientId
@@ -95,11 +105,31 @@ struct ClearStoredCredentialsTests {
         try await storage.set("live-token", for: tokensKey)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: URL(string: "https://auth.example.test/")!,
+            serverURL: URL(string: "https://auth.example.test/")!,
             clientId: clientId,
             storage: storage
         )
 
         #expect(try await storage.get(for: tokensKey) == nil)
+    }
+
+    /// The canonicalization the test above used to reach.
+    ///
+    /// Storage keys are computed from the *issuer*, and an issuer can still
+    /// arrive spelled with a trailing slash — a caller handing an entry point
+    /// its own published issuer takes the guarded branch, and a consumer
+    /// computing a key itself takes none of it. Asserted on the key directly
+    /// rather than through a flow, because a flow that derives first can no
+    /// longer produce the input this is about.
+    @Test("two spellings of one issuer address one account")
+    func issuerSpellingsCanonicalizeToOneAccount() {
+        #expect(
+            OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
+                == OAuthIssuer.storageKey(
+                    kind: "tokens",
+                    issuer: URL(string: "\(issuer.absoluteString)/")!,
+                    clientId: clientId
+                )
+        )
     }
 }

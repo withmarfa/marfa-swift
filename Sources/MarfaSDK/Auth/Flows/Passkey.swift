@@ -44,14 +44,12 @@ public enum Passkey {
     /// the user can register a new platform passkey for their account.
     ///
     /// - Parameters:
-    ///   - issuer: Marfa instance base URL (e.g. `https://api.marfa.so`).
-    ///     Despite the name this is the **server URL**, not the OAuth issuer
-    ///     identifier that ``MarfaAuth`` and ``DeviceFlow`` take: the enroll
-    ///     page is an ordinary route under `/auth`, appended below. Handing it
-    ///     ``OAuthDiscovery/issuer(forServer:)`` produces
-    ///     `/auth/auth/passkey/enroll`. One label meaning two things across
-    ///     three entry points is a wart; the parameter wants renaming to
-    ///     `serverURL`, which is a breaking change and so not made here.
+    ///   - serverURL: Marfa instance base URL (e.g. `https://api.marfa.so`).
+    ///     The enroll page is an ordinary route under `/auth`, appended below.
+    ///     This parameter always meant the server URL; it was named `issuer`
+    ///     until the same release that moved derivation inside ``MarfaAuth``
+    ///     and ``DeviceFlow``, at which point one label across three entry
+    ///     points finally means one thing.
     ///   - presentationContextProvider: SwiftUI/UIKit context provider for
     ///     the system browser window.
     ///   - callbackURLScheme: Custom scheme passed to the underlying
@@ -69,12 +67,31 @@ public enum Passkey {
     /// once a credential is stored against the account. Never throws on
     /// user dismissal — would be misleading given we can't tell success
     /// from cancellation.
+    /// The URL ``enroll(serverURL:presentationContextProvider:callbackURLScheme:)``
+    /// opens.
+    ///
+    /// Extracted only so it can be asserted on. `enroll` opens an
+    /// `ASWebAuthenticationSession`, which no test can drive, so the suite used
+    /// to re-implement this line and assert against its own copy — a test that
+    /// would have kept passing whatever `enroll` actually did.
+    ///
+    /// ``OAuthDiscovery/serverRoot(forSupplied:)`` absorbs an issuer handed to
+    /// a `serverURL:` parameter, for the same reason the sign-in flows do and
+    /// with more at stake here: this call cannot observe its own outcome by
+    /// design, so a caller supplying `https://<host>/auth` would open
+    /// `/auth/auth/passkey/enroll`, take a 404 inside the system browser, and
+    /// be told nothing by the SDK at all.
+    internal nonisolated static func enrollURL(forServer serverURL: URL) -> URL {
+        OAuthDiscovery.serverRoot(forSupplied: serverURL)
+            .appendingPathComponent("auth/passkey/enroll")
+    }
+
     public static func enroll(
-        issuer: URL,
+        serverURL: URL,
         presentationContextProvider: ASWebAuthenticationPresentationContextProviding,
         callbackURLScheme: String = "marfa-auth-host"
     ) async {
-        let url = issuer.appendingPathComponent("auth/passkey/enroll")
+        let url = enrollURL(forServer: serverURL)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let session = ASWebAuthenticationSession(
                 url: url,

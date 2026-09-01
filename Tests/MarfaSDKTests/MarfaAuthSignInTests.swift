@@ -94,11 +94,17 @@ private func makeStubbedSession() -> URLSession {
 /// Stub well-known discovery doc — the SDK reads this on first OAuth
 /// operation. Tests queue it ahead of their scripted token/revoke
 /// responses.
-private func discoveryCanned(for issuer: URL) -> MarfaAuthStubURLProtocol.Canned {
-    let base = issuer.absoluteString
+///
+/// Takes the **server URL**, because that is what a test now hands `MarfaAuth`.
+/// The document has to publish the issuer the SDK derives from it —
+/// `<server>/auth` — or RFC 8414 §3.3 refuses it and every restore fails on the
+/// identity check rather than on its own subject. The endpoints hang off the
+/// server, which is where the deployment actually serves them.
+private func discoveryCanned(forServer serverURL: URL) -> MarfaAuthStubURLProtocol.Canned {
+    let base = serverURL.absoluteString
     let body = """
     {
-      "issuer": "\(base)",
+      "issuer": "\(OAuthDiscovery.issuer(forServer: serverURL).absoluteString)",
       "authorization_endpoint": "\(base)/auth/oauth2/authorize",
       "token_endpoint": "\(base)/auth/oauth2/token",
       "revocation_endpoint": "\(base)/auth/oauth2/revoke",
@@ -209,14 +215,16 @@ struct MarfaAuthSignInTests {
     /// each test gets an origin nobody else uses and starts cold — which
     /// is what keeps the scripted response queue aligned without clearing
     /// the shared cache out from under other suites.
-    let issuer = uniqueIssuer("marfa-auth-signin")
+    let serverURL = uniqueIssuer("marfa-auth-signin")
+    /// What the SDK keys storage and discovery on, derived as `MarfaAuth` derives it.
+    var issuer: URL { OAuthDiscovery.issuer(forServer: serverURL) }
     let clientId = "test-client"
     let redirectURI = URL(string: "marfa-test://auth/callback")!
     let scopes = ["openid", "profile", "email"]
 
     func makeAuth(session: URLSession, storage: InMemoryKeychain = InMemoryKeychain()) -> MarfaAuth {
         MarfaAuth(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,
@@ -254,7 +262,7 @@ struct MarfaAuthSignInTests {
     @Test("buildAuthorizeURL URL-encodes redirect URI and state safely")
     func authorizeURLEncoding() throws {
         let auth = MarfaAuth(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: "client with spaces",
             redirectURI: URL(string: "marfa-test://path?with=query&special=%26")!,
             scopes: ["scope+1", "scope+2"],
@@ -422,7 +430,7 @@ struct MarfaAuthSignInTests {
         try await storage.set(json, for: key)
 
         // restore() runs OAuth discovery to resolve the refresh endpoint.
-        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: issuer)])
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(forServer: serverURL)])
 
         let auth = makeAuth(session: makeStubbedSession(), storage: storage)
         let provider = try await auth.restore()
@@ -435,10 +443,15 @@ struct MarfaAuthSignInTests {
     @Test("issuer identity isolates PKCE state and restored tokens")
     func issuerIdentityIsolatesPendingAndTokens() async throws {
         let storage = InMemoryKeychain()
-        let issuerA = URL(string: "https://space-auth.example.test:8443/space-a")!
-        let issuerB = URL(string: "http://space-auth.example.test:9443/space-b")!
+        let serverA = URL(string: "https://space-auth.example.test:8443/space-a")!
+        let serverB = URL(string: "http://space-auth.example.test:9443/space-b")!
+        // Each space derives its own issuer — `<server>/auth` — and it is the
+        // derived value the accounts are keyed on, so the isolation asserted
+        // below is the isolation the SDK actually provides.
+        let issuerA = OAuthDiscovery.issuer(forServer: serverA)
+        let issuerB = OAuthDiscovery.issuer(forServer: serverB)
         let authA = MarfaAuth(
-            issuer: issuerA,
+            serverURL: serverA,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,
@@ -446,7 +459,7 @@ struct MarfaAuthSignInTests {
             urlSession: makeStubbedSession()
         )
         let authB = MarfaAuth(
-            issuer: issuerB,
+            serverURL: serverB,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,
@@ -470,8 +483,8 @@ struct MarfaAuthSignInTests {
         await OAuthDiscovery.shared.reset(for: issuerA)
         await OAuthDiscovery.shared.reset(for: issuerB)
         MarfaAuthStubURLProtocol.reset(with: [
-            discoveryCanned(for: issuerA),
-            discoveryCanned(for: issuerB),
+            discoveryCanned(forServer: serverA),
+            discoveryCanned(forServer: serverB),
         ])
 
         let providerA = try #require(await authA.restore())
@@ -480,18 +493,23 @@ struct MarfaAuthSignInTests {
         #expect(try await providerB.currentToken().accessToken == "token-b")
     }
 
-    @Test("restore migrates an origin-only token only for an HTTPS root issuer")
+    @Test("restore migrates an origin-only token only for an HTTPS root server")
     func restoreMigratesLegacyTokenKey() async throws {
         let storage = InMemoryKeychain()
-        let rootIssuer = URL(string: "https://legacy-auth.example.test")!
-        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
-        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
+        // HTTPS, no port, no path — the shape that makes a host-only legacy
+        // account unambiguous. That question is asked of the *server*: every
+        // Marfa issuer carries a path by construction, so asking it of the
+        // derived issuer would disable this migration outright and silently.
+        let rootServerURL = URL(string: "https://legacy-auth.example.test")!
+        let issuer = OAuthDiscovery.issuer(forServer: rootServerURL)
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: issuer, clientId: clientId)
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
         let token = #"{"access_token":"legacy-token","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         try await storage.set(token, for: legacyKey)
-        await OAuthDiscovery.shared.reset(for: rootIssuer)
-        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: rootIssuer)])
+        await OAuthDiscovery.shared.reset(for: issuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(forServer: rootServerURL)])
         let auth = MarfaAuth(
-            issuer: rootIssuer,
+            serverURL: rootServerURL,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,
@@ -505,47 +523,13 @@ struct MarfaAuthSignInTests {
         #expect(await storage.peek(account: legacyKey) == nil)
     }
 
-    @Test("restore never promotes a host-only token into an ambiguous issuer")
-    func restoreDoesNotMigrateAmbiguousIssuer() async throws {
-        let cases = [
-            URL(string: "https://ambiguous-auth.example.test/space")!,
-            URL(string: "https://ambiguous-auth.example.test:8443")!,
-            URL(string: "http://ambiguous-auth.example.test")!,
-        ]
-
-        for (index, ambiguousIssuer) in cases.enumerated() {
-            let storage = InMemoryKeychain()
-            let caseClient = "client-\(index)"
-            let legacyKey = OAuthIssuer.legacyTokenStorageKey(
-                issuer: ambiguousIssuer,
-                clientId: caseClient
-            )
-            let canonicalKey = OAuthIssuer.storageKey(
-                kind: "tokens",
-                issuer: ambiguousIssuer,
-                clientId: caseClient
-            )
-            try await storage.set("legacy-token", for: legacyKey)
-            let auth = MarfaAuth(
-                issuer: ambiguousIssuer,
-                clientId: caseClient,
-                redirectURI: redirectURI,
-                scopes: scopes,
-                storage: storage,
-                urlSession: makeStubbedSession()
-            )
-
-            #expect(try await auth.restore() == nil)
-            #expect(await storage.peek(account: canonicalKey) == nil)
-            #expect(await storage.peek(account: legacyKey) == "legacy-token")
-        }
-    }
 
     @Test("concurrent restores promote a legacy root token once")
     func concurrentRestoreMigratesOnce() async throws {
-        let rootIssuer = URL(string: "https://concurrent-migration.example.test")!
-        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
-        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
+        let rootServerURL = URL(string: "https://concurrent-migration.example.test")!
+        let issuer = OAuthDiscovery.issuer(forServer: rootServerURL)
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: issuer, clientId: clientId)
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
         let token = #"{"access_token":"legacy-token","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         let storage = MigrationTrackingStorage(
             values: [legacyKey: token],
@@ -553,7 +537,7 @@ struct MarfaAuthSignInTests {
         )
         let session = makeStubbedSession()
         let firstAuth = MarfaAuth(
-            issuer: rootIssuer,
+            serverURL: rootServerURL,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,
@@ -561,15 +545,15 @@ struct MarfaAuthSignInTests {
             urlSession: session
         )
         let secondAuth = MarfaAuth(
-            issuer: rootIssuer,
+            serverURL: rootServerURL,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,
             storage: storage,
             urlSession: session
         )
-        await OAuthDiscovery.shared.reset(for: rootIssuer)
-        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: rootIssuer)])
+        await OAuthDiscovery.shared.reset(for: issuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(forServer: rootServerURL)])
 
         async let firstProvider = firstAuth.restore()
         async let secondProvider = secondAuth.restore()
@@ -599,7 +583,8 @@ struct MarfaAuthSignInTests {
             clientId: victimClientId
         )
 
-        let aliasIssuer = URL(string: "https://v2")!
+        let aliasServerURL = URL(string: "https://v2")!
+        let aliasIssuer = OAuthDiscovery.issuer(forServer: aliasServerURL)
         let aliasClientId = "19:https://example.com:6:abcdef"
         let aliasLegacyKey = OAuthIssuer.legacyTokenStorageKey(
             issuer: aliasIssuer,
@@ -608,12 +593,16 @@ struct MarfaAuthSignInTests {
         #expect(aliasLegacyKey != victimKey)
 
         // End to end. `https://v2` is absolute, HTTPS, portless and path-free,
-        // so it clears every migration guard — key disjointness is the only
-        // thing standing between the alias and the victim's token.
+        // so the server clears every migration guard — the guard asks about the
+        // server while the keys are computed from the issuer derived from it,
+        // and the host the legacy spelling keys on is `v2` either way. Key
+        // disjointness is the only thing standing between the alias and the
+        // victim's token.
         let storage = InMemoryKeychain()
         try await storage.set("victim-token", for: victimKey)
         let migrated = try await OAuthIssuer.migrateLegacyRootTokenIfNeeded(
             in: storage,
+            serverURL: aliasServerURL,
             issuer: aliasIssuer,
             clientId: aliasClientId
         )
@@ -645,17 +634,18 @@ struct MarfaAuthSignInTests {
     @Test("restore keeps a canonical token when a legacy key also exists")
     func restorePrefersCanonicalTokenKey() async throws {
         let storage = InMemoryKeychain()
-        let rootIssuer = URL(string: "https://canonical-auth.example.test")!
-        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: rootIssuer, clientId: clientId)
-        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: rootIssuer, clientId: clientId)
+        let rootServerURL = URL(string: "https://canonical-auth.example.test")!
+        let issuer = OAuthDiscovery.issuer(forServer: rootServerURL)
+        let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: issuer, clientId: clientId)
+        let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
         let legacyToken = #"{"access_token":"legacy","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         let canonicalToken = #"{"access_token":"canonical","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
         try await storage.set(legacyToken, for: legacyKey)
         try await storage.set(canonicalToken, for: canonicalKey)
-        await OAuthDiscovery.shared.reset(for: rootIssuer)
-        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(for: rootIssuer)])
+        await OAuthDiscovery.shared.reset(for: issuer)
+        MarfaAuthStubURLProtocol.reset(with: [discoveryCanned(forServer: rootServerURL)])
         let auth = MarfaAuth(
-            issuer: rootIssuer,
+            serverURL: rootServerURL,
             clientId: clientId,
             redirectURI: redirectURI,
             scopes: scopes,

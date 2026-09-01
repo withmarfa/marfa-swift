@@ -57,9 +57,12 @@ struct DeviceFlowPollingTests {
     /// Tests for `DeviceFlow.start()` enqueue this ahead of their
     /// device-code response.
     ///
-    /// Endpoints are derived from the issuer the test passes in, so a
-    /// test that takes its own origin still sees a self-consistent
-    /// document and can assert on the URLs the SDK ends up calling.
+    /// Built from the **server URL** the test passes to `start()`, because that
+    /// is the value a caller now has: the document has to publish the issuer the
+    /// SDK derives from it — `<server>/auth` — or RFC 8414 §3.3 refuses it before
+    /// the device-code request goes out. Endpoints hang off the server, so a test
+    /// taking its own origin still sees a self-consistent document and can assert
+    /// on the URLs the SDK ends up calling.
     private struct DiscoveryDoc: Encodable {
         let issuer: String
         let authorization_endpoint: String
@@ -67,9 +70,9 @@ struct DeviceFlowPollingTests {
         let revocation_endpoint: String
         let device_authorization_endpoint: String
 
-        init(issuer: URL) {
-            let origin = issuer.absoluteString
-            self.issuer = origin
+        init(serverURL: URL) {
+            let origin = serverURL.absoluteString
+            self.issuer = OAuthDiscovery.issuer(forServer: serverURL).absoluteString
             self.authorization_endpoint = "\(origin)/auth/oauth2/authorize"
             self.token_endpoint = "\(origin)/auth/oauth2/token"
             self.revocation_endpoint = "\(origin)/auth/oauth2/revoke"
@@ -167,7 +170,7 @@ struct DeviceFlowPollingTests {
 
     @Test("start never migrates a legacy origin-only token key")
     func startDoesNotMigrateLegacyTokenKey() async throws {
-        struct RootIssuerDiscoveryDoc: Encodable {
+        struct RootServerDiscoveryDoc: Encodable {
             let issuer: String
             let authorization_endpoint = "https://device-flow.example.test/auth/oauth2/authorize"
             let token_endpoint = "https://device-flow.example.test/auth/oauth2/token"
@@ -175,18 +178,22 @@ struct DeviceFlowPollingTests {
             let device_authorization_endpoint = "https://device-flow.example.test/auth/device"
         }
 
-        let issuer = URL(string: "https://device-flow.example.test")!
+        // A root server: HTTPS, no port, no path. That is the shape the legacy
+        // migration guard calls unambiguous, so nothing here is stopping the
+        // promotion except that `start()` never attempts one.
+        let serverURL = URL(string: "https://device-flow.example.test")!
+        let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
         let legacyKey = OAuthIssuer.legacyTokenStorageKey(issuer: issuer, clientId: "test-client")
         let canonicalKey = OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: "test-client")
         try await storage.set("legacy-token", for: legacyKey)
         await OAuthDiscovery.shared.reset(for: issuer)
         let http = FakeDeviceFlowHTTPClient()
-        try http.enqueueJSON(RootIssuerDiscoveryDoc(issuer: issuer.absoluteString))
+        try http.enqueueJSON(RootServerDiscoveryDoc(issuer: issuer.absoluteString))
         http.enqueueDeviceCodeResponse()
 
         _ = try await DeviceFlow.start(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -379,11 +386,11 @@ struct DeviceFlowPollingTests {
 
     @Test("start() decodes the device-code response into a populated handle")
     func startSuccessParsesResponse() async throws {
-        let issuer = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
-        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
+        try http.enqueueJSON(DiscoveryDoc(serverURL: serverURL))
         http.enqueueDeviceCodeResponse(
             deviceCode: "DC-1234",
             userCode: "WDJB-MJHT",
@@ -394,7 +401,7 @@ struct DeviceFlowPollingTests {
         )
 
         let handle = try await DeviceFlow.start(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -412,7 +419,7 @@ struct DeviceFlowPollingTests {
         #expect(http.calls.count == 2)
         let request = try #require(http.calls.last)
         #expect(request.httpMethod == "POST")
-        #expect(request.url == issuer.appendingPathComponent("auth/device"))
+        #expect(request.url == serverURL.appendingPathComponent("auth/device"))
         let body = try #require(request.httpBody)
         let decoded = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(decoded["client_id"] as? String == "test-client")
@@ -421,17 +428,17 @@ struct DeviceFlowPollingTests {
 
     @Test("start() throws OAuthError on a non-2xx response")
     func startOAuthErrorIsParsed() async throws {
-        let issuer = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
-        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
+        try http.enqueueJSON(DiscoveryDoc(serverURL: serverURL))
         http.enqueueOAuthError(code: "invalid_client", description: "no such client")
 
         let thrown: Error
         do {
             _ = try await DeviceFlow.start(
-                issuer: issuer,
+                serverURL: serverURL,
                 clientId: "test-client",
                 scopes: ["core.note:read"],
                 storage: storage,
@@ -450,16 +457,16 @@ struct DeviceFlowPollingTests {
 
     @Test("start() defaults interval to 5 when the server omits it")
     func startDefaultsIntervalWhenMissing() async throws {
-        let issuer = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
         // RFC 8628 says `interval` is optional; SDK must default to 5s.
-        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
+        try http.enqueueJSON(DiscoveryDoc(serverURL: serverURL))
         http.enqueueDeviceCodeResponse(interval: nil)
 
         let handle = try await DeviceFlow.start(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -477,18 +484,18 @@ struct DeviceFlowPollingTests {
 
     @Test("start() leaves verification_uri_complete nil when the server omits it")
     func startVerificationURICompleteOptional() async throws {
-        let issuer = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueIssuer("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
-        try http.enqueueJSON(DiscoveryDoc(issuer: issuer))
+        try http.enqueueJSON(DiscoveryDoc(serverURL: serverURL))
         http.enqueueDeviceCodeResponse(
-            verificationURI: "\(issuer.absoluteString)/device",
+            verificationURI: "\(serverURL.absoluteString)/device",
             verificationURIComplete: nil
         )
 
         let handle = try await DeviceFlow.start(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: "test-client",
             scopes: ["core.note:read"],
             storage: storage,
@@ -497,6 +504,6 @@ struct DeviceFlowPollingTests {
         )
 
         #expect(handle.verificationURIComplete == nil)
-        #expect(handle.verificationURI == URL(string: "\(issuer.absoluteString)/device"))
+        #expect(handle.verificationURI == URL(string: "\(serverURL.absoluteString)/device"))
     }
 }
