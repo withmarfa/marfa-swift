@@ -119,7 +119,7 @@ struct MarfaSessionEndTests {
 
     @Test("it takes the server URL and clears what the derived issuer keyed")
     func derivesTheIssuerFromTheServerURL() async throws {
-        let serverURL = uniqueIssuer("session-end-derive")
+        let serverURL = uniqueServerURL("session-end-derive")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
         try await seedEverySpelling(storage, issuer: issuer, clientId: "cid")
@@ -140,7 +140,7 @@ struct MarfaSessionEndTests {
 
     @Test("the bare server URL leaves the live credential behind and reports success")
     func theBareHostMissesTheCurrentAccounts() async throws {
-        let serverURL = uniqueIssuer("session-end-bare")
+        let serverURL = uniqueServerURL("session-end-bare")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
         try await seedEverySpelling(storage, issuer: issuer, clientId: "cid")
@@ -163,7 +163,7 @@ struct MarfaSessionEndTests {
 
     @Test("it clears with no provider in hand")
     func clearsWithoutAProvider() async throws {
-        let serverURL = uniqueIssuer("session-end-offline")
+        let serverURL = uniqueServerURL("session-end-offline")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
         try await seedEverySpelling(storage, issuer: issuer, clientId: "cid")
@@ -182,7 +182,7 @@ struct MarfaSessionEndTests {
 
     @Test("it leaves another client's credentials alone")
     func leavesAnotherClientAlone() async throws {
-        let serverURL = uniqueIssuer("session-end-isolate")
+        let serverURL = uniqueServerURL("session-end-isolate")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
         try await seedEverySpelling(storage, issuer: issuer, clientId: "mine")
@@ -199,7 +199,7 @@ struct MarfaSessionEndTests {
     @Test("with a live provider it revokes both tokens and says so")
     func revokesAccessAndRefresh() async throws {
         SessionEndStubURLProtocol.reset()
-        let serverURL = uniqueIssuer("session-end-revoke")
+        let serverURL = uniqueServerURL("session-end-revoke")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let session = stubbedSession()
         let storage = InMemoryKeychain()
@@ -248,7 +248,7 @@ struct MarfaSessionEndTests {
 
     @Test("an unreachable server still clears the device, and reports that it did not revoke")
     func clearsEvenWhenRevocationFails() async throws {
-        let serverURL = uniqueIssuer("session-end-unreachable")
+        let serverURL = uniqueServerURL("session-end-unreachable")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
         try await seedEverySpelling(storage, issuer: issuer, clientId: "cid")

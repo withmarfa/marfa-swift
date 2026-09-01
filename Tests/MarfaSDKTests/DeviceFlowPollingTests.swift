@@ -386,7 +386,7 @@ struct DeviceFlowPollingTests {
 
     @Test("start() decodes the device-code response into a populated handle")
     func startSuccessParsesResponse() async throws {
-        let serverURL = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueServerURL("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
@@ -428,7 +428,7 @@ struct DeviceFlowPollingTests {
 
     @Test("start() throws OAuthError on a non-2xx response")
     func startOAuthErrorIsParsed() async throws {
-        let serverURL = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueServerURL("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
@@ -457,7 +457,7 @@ struct DeviceFlowPollingTests {
 
     @Test("start() defaults interval to 5 when the server omits it")
     func startDefaultsIntervalWhenMissing() async throws {
-        let serverURL = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueServerURL("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()
@@ -484,7 +484,7 @@ struct DeviceFlowPollingTests {
 
     @Test("start() leaves verification_uri_complete nil when the server omits it")
     func startVerificationURICompleteOptional() async throws {
-        let serverURL = uniqueIssuer("device-flow-start")
+        let serverURL = uniqueServerURL("device-flow-start")
         let http = FakeDeviceFlowHTTPClient()
         let clock = ManualDeviceFlowClock()
         let storage = InMemoryKeychain()

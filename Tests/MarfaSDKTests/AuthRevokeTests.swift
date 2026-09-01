@@ -103,7 +103,7 @@ struct AuthRevokeTests {
     /// instantiated once per test, so each test gets an origin nobody
     /// else uses and starts cold — no clearing of the shared cache, and
     /// so no interference with suites running alongside this one.
-    let serverURL = uniqueIssuer("marfa-auth-revoke")
+    let serverURL = uniqueServerURL("marfa-auth-revoke")
     let clientId = "test-client"
     /// What the SDK keys storage on, derived the way `MarfaAuth` derives it.
     var issuer: URL { OAuthDiscovery.issuer(forServer: serverURL) }
