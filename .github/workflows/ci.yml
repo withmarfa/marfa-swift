@@ -31,6 +31,9 @@ jobs:
   validate:
     name: Build + test
     runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
+    # Max observed 6m54s, median 2m01s. The 3.4x spread is contention on the
+    # shared pool, so the bound has to clear the max rather than the median.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -65,6 +68,8 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
+    # Three codegen regenerations plus a git diff have taken up to 3m50s.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 

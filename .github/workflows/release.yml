@@ -31,6 +31,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Changelog extraction plus one gh release call: observed max 8s.
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
