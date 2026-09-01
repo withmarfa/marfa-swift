@@ -55,7 +55,7 @@ struct MarfaStoreTests {
         let query = store.query()
 
         // Wait for the didSave-driven refetch to land.
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count >= 2") { query.items.count >= 2 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count >= 2") { query.items.count >= 2 }
 
         #expect(query.items.count == 2)
         #expect(query.isLoading == false)
@@ -75,7 +75,7 @@ struct MarfaStoreTests {
         )
 
         let query = store.query(filters: ListFilters(type: "core.note"))
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count >= 1") { query.items.count >= 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count >= 1") { query.items.count >= 1 }
 
         #expect(query.items.count == 1)
         #expect(query.items[0].type == "core.note")
@@ -93,7 +93,7 @@ struct MarfaStoreTests {
         try await client.items.delete(id: toTrash.id)
 
         let query = store.query(filters: ListFilters(state: .active))
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
 
         let ids = query.items.map(\.id)
         #expect(ids.contains(active.id))
@@ -109,12 +109,12 @@ struct MarfaStoreTests {
 
         let query = store.query(filters: ListFilters(type: "core.note"))
         // Wait for first (empty) result.
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
         #expect(query.items.isEmpty)
 
         // Insert a note — the observation should fire and update `items`.
         _ = try await client.items.create(noteInput(body: "Live update"))
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
 
         #expect(query.items[0].properties["body"] == .string("Live update"))
         query.stop()
@@ -128,15 +128,15 @@ struct MarfaStoreTests {
 
         let item = try await client.items.create(noteInput(body: "Will be trashed"))
         let query = store.query()
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
 
         // Trash the item — it changes state, so the query sees 1 item still (state changed).
         // Use a state filter to confirm.
         let activeQuery = store.query(filters: ListFilters(state: .active))
-        try await waitForCondition(timeout: .seconds(2), description: "activeQuery.items.count == 1") { activeQuery.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "activeQuery.items.count == 1") { activeQuery.items.count == 1 }
 
         try await client.items.delete(id: item.id)
-        try await waitForCondition(timeout: .seconds(2), description: "activeQuery.items.isEmpty") { activeQuery.items.isEmpty }
+        try await waitUntil(timeout: .seconds(2), description: "activeQuery.items.isEmpty") { activeQuery.items.isEmpty }
 
         query.stop()
         activeQuery.stop()
@@ -152,7 +152,7 @@ struct MarfaStoreTests {
 
         let created = try await client.items.create(noteInput(body: "Single"))
         let query = store.queryItem(id: created.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.item != nil") { query.item != nil }
+        try await waitUntil(timeout: .seconds(2), description: "query.item != nil") { query.item != nil }
 
         #expect(query.item?.id == created.id)
         #expect(query.item?.properties["body"] == .string("Single"))
@@ -166,7 +166,7 @@ struct MarfaStoreTests {
         }
 
         let query = store.queryItem(id: "does-not-exist")
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
 
         #expect(query.item == nil)
         #expect(query.error == nil)
@@ -181,13 +181,13 @@ struct MarfaStoreTests {
 
         let created = try await client.items.create(noteInput(body: "Original"))
         let query = store.queryItem(id: created.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.item != nil") { query.item != nil }
+        try await waitUntil(timeout: .seconds(2), description: "query.item != nil") { query.item != nil }
 
         _ = try await client.items.update(
             id: created.id,
             properties: ["body": .string("Updated")]
         )
-        try await waitForCondition(timeout: .seconds(2), description: "query.item?.properties[\"body\"] == .string(\"Updated\")") {
+        try await waitUntil(timeout: .seconds(2), description: "query.item?.properties[\"body\"] == .string(\"Updated\")") {
             query.item?.properties["body"] == .string("Updated")
         }
 
@@ -208,7 +208,7 @@ struct MarfaStoreTests {
         )
 
         let query = store.typedQuery(CoreNote.self)
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count >= 1") { query.items.count >= 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count >= 1") { query.items.count >= 1 }
 
         #expect(query.items.count == 1)
         #expect(query.items[0].body == "Typed note")
@@ -224,7 +224,7 @@ struct MarfaStoreTests {
         _ = try await client.items.create(noteInput(body: "Note"))
 
         let query = store.typedQuery(CoreTask.self)
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
 
         #expect(query.items.isEmpty)
         query.stop()
@@ -243,7 +243,7 @@ struct MarfaStoreTests {
         _ = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
 
         let query = store.queryEdges(from: a.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.edges.count >= 1") { query.edges.count >= 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.edges.count >= 1") { query.edges.count >= 1 }
 
         #expect(query.edges.count == 1)
         #expect(query.edges[0].edgeType == "about")
@@ -265,7 +265,7 @@ struct MarfaStoreTests {
         _ = try await client.edges.create(source: a.id, target: c.id, edgeType: "references")
 
         let aboutQuery = store.queryEdges(from: a.id, edgeType: "about")
-        try await waitForCondition(timeout: .seconds(2), description: "aboutQuery.edges.count >= 1") { aboutQuery.edges.count >= 1 }
+        try await waitUntil(timeout: .seconds(2), description: "aboutQuery.edges.count >= 1") { aboutQuery.edges.count >= 1 }
 
         #expect(aboutQuery.edges.count == 1)
         #expect(aboutQuery.edges[0].edgeType == "about")
@@ -283,10 +283,10 @@ struct MarfaStoreTests {
         let edge = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
 
         let query = store.queryEdges(from: a.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.edges.count == 1") { query.edges.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.edges.count == 1") { query.edges.count == 1 }
 
         try await client.edges.delete(id: edge.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.edges.isEmpty") { query.edges.isEmpty }
+        try await waitUntil(timeout: .seconds(2), description: "query.edges.isEmpty") { query.edges.isEmpty }
 
         query.stop()
     }
@@ -305,7 +305,7 @@ struct MarfaStoreTests {
         _ = try await client.metadata.addTags(itemId: b.id, tags: ["work"])
 
         let query = store.queryTags()
-        try await waitForCondition(timeout: .seconds(2), description: "query.tags.count >= 2") { query.tags.count >= 2 }
+        try await waitUntil(timeout: .seconds(2), description: "query.tags.count >= 2") { query.tags.count >= 2 }
 
         #expect(query.tags == [
             TagWithCount(tag: "work", count: 2),
@@ -322,11 +322,11 @@ struct MarfaStoreTests {
 
         let item = try await client.items.create(noteInput(body: "live"))
         let query = store.queryTags()
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
         #expect(query.tags.isEmpty)
 
         _ = try await client.metadata.addTags(itemId: item.id, tags: ["fresh"])
-        try await waitForCondition(timeout: .seconds(2), description: "!query.tags.isEmpty") { !query.tags.isEmpty }
+        try await waitUntil(timeout: .seconds(2), description: "!query.tags.isEmpty") { !query.tags.isEmpty }
 
         #expect(query.tags == [TagWithCount(tag: "fresh", count: 1)])
         query.stop()
@@ -342,10 +342,10 @@ struct MarfaStoreTests {
         _ = try await client.metadata.addTags(itemId: item.id, tags: ["tmp"])
 
         let query = store.queryTags()
-        try await waitForCondition(timeout: .seconds(2), description: "query.tags.count == 1") { query.tags.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.tags.count == 1") { query.tags.count == 1 }
 
         try await client.items.delete(id: item.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.tags.isEmpty") { query.tags.isEmpty }
+        try await waitUntil(timeout: .seconds(2), description: "query.tags.isEmpty") { query.tags.isEmpty }
 
         query.stop()
     }
@@ -365,7 +365,7 @@ struct MarfaStoreTests {
         )
 
         let query = store.queryTypesInData()
-        try await waitForCondition(timeout: .seconds(2), description: "query.types.count == 2") { query.types.count == 2 }
+        try await waitUntil(timeout: .seconds(2), description: "query.types.count == 2") { query.types.count == 2 }
 
         #expect(query.types == ["core.bookmark", "core.note"])
         query.stop()
@@ -379,12 +379,12 @@ struct MarfaStoreTests {
 
         _ = try await client.items.create(noteInput(body: "only a note"))
         let query = store.queryTypesInData()
-        try await waitForCondition(timeout: .seconds(2), description: "query.types == [\"core.note\"]") { query.types == ["core.note"] }
+        try await waitUntil(timeout: .seconds(2), description: "query.types == [\"core.note\"]") { query.types == ["core.note"] }
 
         _ = try await client.items.create(
             CreateItemInput(type: "core.task", properties: ["title": .string("later")])
         )
-        try await waitForCondition(timeout: .seconds(2), description: "query.types.count == 2") { query.types.count == 2 }
+        try await waitUntil(timeout: .seconds(2), description: "query.types.count == 2") { query.types.count == 2 }
 
         #expect(query.types == ["core.note", "core.task"])
         query.stop()
@@ -407,10 +407,10 @@ struct MarfaStoreTests {
         )
 
         let query = store.queryTypesInData()
-        try await waitForCondition(timeout: .seconds(2), description: "query.types.count == 2") { query.types.count == 2 }
+        try await waitUntil(timeout: .seconds(2), description: "query.types.count == 2") { query.types.count == 2 }
 
         try await client.items.delete(id: doomed.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.types.count == 1") { query.types.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.types.count == 1") { query.types.count == 1 }
 
         #expect(query.types == ["core.note"])
         query.stop()
@@ -440,7 +440,7 @@ struct MarfaStoreTests {
         )
 
         let query = store.queryTypesInData()
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
 
         #expect(query.types == ["core.note"])
         query.stop()
@@ -462,7 +462,7 @@ struct MarfaStoreTests {
         _ = try await client.edges.create(source: src.id, target: t2.id, edgeType: "in-thread")
 
         let query = store.queryBackrefs(to: [t1.id, t2.id], edgeType: "in-thread")
-        try await waitForCondition(timeout: .seconds(2), description: "(query.edgesByTarget[t1.id]?.count ?? 0) == 2") {
+        try await waitUntil(timeout: .seconds(2), description: "(query.edgesByTarget[t1.id]?.count ?? 0) == 2") {
             (query.edgesByTarget[t1.id]?.count ?? 0) == 2
         }
 
@@ -483,12 +483,12 @@ struct MarfaStoreTests {
         )
 
         let query = store.queryBackrefs(to: [tgt.id])
-        try await waitForCondition(timeout: .seconds(2), description: "query.edgesByTarget[tgt.id]?.count == 1") {
+        try await waitUntil(timeout: .seconds(2), description: "query.edgesByTarget[tgt.id]?.count == 1") {
             query.edgesByTarget[tgt.id]?.count == 1
         }
 
         try await client.edges.delete(id: edge.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.edgesByTarget[tgt.id]?.isEmpty == true") {
+        try await waitUntil(timeout: .seconds(2), description: "query.edgesByTarget[tgt.id]?.isEmpty == true") {
             query.edgesByTarget[tgt.id]?.isEmpty == true
         }
 
@@ -518,7 +518,7 @@ struct MarfaStoreTests {
         _ = try await client.edges.create(source: src.id, target: real.id, edgeType: "about")
 
         let query = store.queryBackrefs(to: [real.id, "ghost-id"])
-        try await waitForCondition(timeout: .seconds(2), description: "query.edgesByTarget[real.id]?.count == 1") {
+        try await waitUntil(timeout: .seconds(2), description: "query.edgesByTarget[real.id]?.count == 1") {
             query.edgesByTarget[real.id]?.count == 1
         }
 
@@ -540,7 +540,7 @@ struct MarfaStoreTests {
         _ = try await client.metadata.addTags(itemId: b.id, tags: ["home", "work"])
 
         let query = store.queryItemsWithMetadata()
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 2") { query.items.count == 2 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 2") { query.items.count == 2 }
 
         let byId = Dictionary(uniqueKeysWithValues: query.items.map { ($0.item.id, $0) })
         #expect(Set(byId[a.id]?.metadata.tags ?? []) == ["work"])
@@ -558,7 +558,7 @@ struct MarfaStoreTests {
         let item = try await client.items.create(noteInput(body: "no tags"))
 
         let query = store.queryItemsWithMetadata()
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
 
         #expect(query.items.first?.item.id == item.id)
         #expect(query.items.first?.metadata.tags.isEmpty == true)
@@ -573,11 +573,11 @@ struct MarfaStoreTests {
         }
 
         let query = store.queryItemsWithMetadata()
-        try await waitForCondition(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
+        try await waitUntil(timeout: .seconds(2), description: "!query.isLoading") { !query.isLoading }
         #expect(query.items.isEmpty)
 
         _ = try await client.items.create(noteInput(body: "fresh"))
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
 
         #expect(query.items.first?.metadata.tags.isEmpty == true)
         query.stop()
@@ -592,11 +592,11 @@ struct MarfaStoreTests {
         let item = try await client.items.create(noteInput(body: "will be tagged"))
 
         let query = store.queryItemsWithMetadata()
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
         #expect(query.items.first?.metadata.tags.isEmpty == true)
 
         _ = try await client.metadata.addTags(itemId: item.id, tags: ["added"])
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.first?.metadata.tags.contains(\"added\") == true") {
+        try await waitUntil(timeout: .seconds(2), description: "query.items.first?.metadata.tags.contains(\"added\") == true") {
             query.items.first?.metadata.tags.contains("added") == true
         }
 
@@ -616,7 +616,7 @@ struct MarfaStoreTests {
         )
 
         let query = store.queryItemsWithMetadata(filters: ListFilters(type: "core.note"))
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
 
         #expect(query.items.allSatisfy { $0.item.type == "core.note" })
         query.stop()
@@ -633,7 +633,7 @@ struct MarfaStoreTests {
         }
 
         let query = store.queryItemsWithMetadata(filters: ListFilters(limit: 3))
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 3") { query.items.count == 3 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 3") { query.items.count == 3 }
 
         query.stop()
     }
@@ -647,10 +647,10 @@ struct MarfaStoreTests {
         let item = try await client.items.create(noteInput(body: "soon-trashed"))
 
         let query = store.queryItemsWithMetadata(filters: ListFilters(state: .active))
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.count == 1") { query.items.count == 1 }
 
         try await client.items.delete(id: item.id)
-        try await waitForCondition(timeout: .seconds(2), description: "query.items.isEmpty") { query.items.isEmpty }
+        try await waitUntil(timeout: .seconds(2), description: "query.items.isEmpty") { query.items.isEmpty }
 
         query.stop()
     }

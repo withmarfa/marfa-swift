@@ -55,7 +55,7 @@ struct TestSupportHelpersTests {
             )
 
             let query = store.query()
-            try await waitForCondition(timeout: .seconds(2), description: "query.items.count >= 1") {
+            try await waitUntil(timeout: .seconds(2), description: "query.items.count >= 1") {
                 query.items.count >= 1
             }
             #expect(query.items.count == 1)
