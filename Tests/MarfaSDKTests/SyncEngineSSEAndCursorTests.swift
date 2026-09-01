@@ -39,7 +39,10 @@ struct SyncEngineSSEAndCursorTests {
         await engine.suspendNextStartPublicationForTesting()
 
         let startTask = Task { await engine.start() }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "engine.isStartingForTesting && engine.isStartPublicationSuspendedForTesting"
+        ) {
             let isStarting = await engine.isStartingForTesting
             let isSuspended = await engine.isStartPublicationSuspendedForTesting
             return isStarting && isSuspended
@@ -81,7 +84,7 @@ struct SyncEngineSSEAndCursorTests {
         await transport.waitUntilRequestStarted()
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500), description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
         let restartTask = Task { await engine.start() }
@@ -91,11 +94,14 @@ struct SyncEngineSSEAndCursorTests {
 
         #expect(await engine.isRunningForTesting)
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "transport.requestCallCount >= 2"
+        ) {
             await transport.requestCallCount >= 2
         }
         let finalStopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500), description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
         await transport.releaseRequest()
@@ -120,7 +126,7 @@ struct SyncEngineSSEAndCursorTests {
         await transport.waitUntilRequestStarted()
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2), description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
 
@@ -156,12 +162,15 @@ struct SyncEngineSSEAndCursorTests {
         await engine.suspendStreamForTesting(at: .beforeReconnectSchedule)
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .seconds(2),
+            description: "engine.isStreamSuspendedForTesting"
+        ) {
             await engine.isStreamSuspendedForTesting
         }
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2), description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
         await engine.resumeStreamForTesting()
@@ -179,12 +188,15 @@ struct SyncEngineSSEAndCursorTests {
         await engine.suspendStreamForTesting(at: .beforeMarkOnline)
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .seconds(2),
+            description: "engine.isStreamSuspendedForTesting"
+        ) {
             await engine.isStreamSuspendedForTesting
         }
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2), description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
         await engine.resumeStreamForTesting()
@@ -209,7 +221,7 @@ struct SyncEngineSSEAndCursorTests {
         await engine.start()
         await engine.stop()
 
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2), description: "finished.isSet") {
             await finished.isSet
         }
         consumer.cancel()
@@ -266,12 +278,13 @@ struct SyncEngineSSEAndCursorTests {
         // opens the SSE stream, drains our events, and finishes.
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await store.fetchItem(id: \"server-1\"))?.properties[\"body\"] == .string(\"v2\")"
+        ) {
             (try? await store.fetchItem(id: "server-1"))?.properties["body"] == .string("v2")
         }
 
-        let fetched = try await store.fetchItem(id: "server-1")
-        #expect(fetched.properties["body"] == .string("v2"))
         // Cursor should land on the last event.
         let cursor = try await queue.loadSyncState(key: "last_event_id")
         #expect(cursor == "evt-2")
@@ -302,7 +315,10 @@ struct SyncEngineSSEAndCursorTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-A\""
+        ) {
             (try? await queue.loadSyncState(key: "last_event_id")) == "evt-A"
         }
 
@@ -310,12 +326,14 @@ struct SyncEngineSSEAndCursorTests {
         await connManager.applyStateForTesting(.offline)
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "transport.calls.filter { $0.path == \"/events\" }.count >= 2"
+        ) {
             await transport.calls.filter { $0.path == "/events" }.count >= 2
         }
 
         let sseCalls = await transport.calls.filter { $0.path == "/events" }
-        #expect(sseCalls.count >= 2)
         #expect(sseCalls.first?.lastEventID == nil)            // first call had no cursor
         #expect(sseCalls.last?.lastEventID == "evt-A")         // second call resumes from cursor
         await engine.stop()
@@ -347,12 +365,18 @@ struct SyncEngineSSEAndCursorTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait for the cursor to be cleared.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == nil"
+        ) {
             (try? await queue.loadSyncState(key: "last_event_id")) == nil
         }
 
         // GET /items should have been issued by the resync.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "transport.calls.contains an /items GET"
+        ) {
             await transport.calls.contains { $0.path == "/items" && $0.method == .get }
         }
 
@@ -360,7 +384,10 @@ struct SyncEngineSSEAndCursorTests {
         await connManager.applyStateForTesting(.offline)
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "transport.calls.filter { $0.path == \"/events\" }.count >= 2"
+        ) {
             await transport.calls.filter { $0.path == "/events" }.count >= 2
         }
 
@@ -408,7 +435,10 @@ struct SyncEngineSSEAndCursorTests {
         async let second: Void = engine._applyEventForTesting(catchup)
 
         // Wait for the first to enter GET /items.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "transport.itemsCallCount >= 1"
+        ) {
             await transport.itemsCallCount >= 1
         }
 

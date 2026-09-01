@@ -64,7 +64,10 @@ struct SyncEngineReplayTests {
         await transport.waitUntilRequestStarted()
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "engine.isStoppingForTesting"
+        ) {
             await engine.isStoppingForTesting
         }
         #expect(await transport.requestCallCount == 1)
@@ -112,7 +115,10 @@ struct SyncEngineReplayTests {
         await transport.waitUntilRequestStarted()
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "engine.isStoppingForTesting"
+        ) {
             await engine.isStoppingForTesting
         }
         await transport.releaseRequest()
@@ -190,10 +196,12 @@ struct SyncEngineReplayTests {
         await connManager.applyStateForTesting(.connecting)
 
         // The replay should remove the record (no retry on permanent error).
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
-        #expect(try await queue.isEmpty)
 
         let collected = await collector.value
         let dropEvent = collected.first { if case .mutationDropped = $0 { return true } else { return false } }
@@ -224,10 +232,12 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
-        #expect(try await queue.isEmpty)
         await engine.stop()
     }
 
@@ -363,7 +373,10 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
 
@@ -408,7 +421,10 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
 
@@ -492,13 +508,15 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
 
         // Queue is fully drained — A's createItem + cascade dropped,
         // Y's updateItem replayed successfully.
-        #expect(try await queue.isEmpty)
 
         // Ghost A purged from local store; survivor Y intact.
         let ghostFetch = try? await store.fetchItem(id: "A")
@@ -546,10 +564,13 @@ struct SyncEngineReplayTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait for the first SSE stream to be observed.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "transport.calls.filter { $0.path == \"/events\" }.count >= 1"
+        ) {
             await transport.calls.filter { $0.path == "/events" }.count >= 1
         }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500), description: "connManager.state == .online") {
             connManager.state == .online
         }
 
@@ -563,17 +584,20 @@ struct SyncEngineReplayTests {
         // re-triggering `.connecting`. Wait for the observable effect instead
         // of sampling immediately after the queue drains: proactive replay can
         // empty the queue before the reconnect delay elapses.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(800),
+            description: "transport.calls.filter { $0.path == \"/events\" }.count >= 2"
+        ) {
             transport.calls.filter { $0.path == "/events" }.count >= 2
         }
-        let sseCallCount = transport.calls.filter { $0.path == "/events" }.count
-        #expect(sseCallCount >= 2)
 
         // The mutation also drains without another reachability transition.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(800),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
-        #expect(try await queue.isEmpty)
 
         await engine.stop()
     }
@@ -623,10 +647,12 @@ struct SyncEngineReplayTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait for full drain — both cycles must complete cleanly.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(800),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
-        #expect(try await queue.isEmpty)
 
         // createItem reached the server twice (once transient, once success).
         let postCalls = await transport.calls.filter {
@@ -704,10 +730,12 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(800),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
-        #expect(try await queue.isEmpty)
 
         // All three operations reached the server — and only once each.
         let postCalls = await transport.calls.filter {
@@ -796,10 +824,12 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(800)) {
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(800),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
             (try? await queue.isEmpty) == true
         }
-        #expect(try await queue.isEmpty)
 
         // updateItem(B) was called exactly once (in cycle 1).
         let patchBCalls = await transport.calls.filter {
