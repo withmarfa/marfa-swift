@@ -4,14 +4,16 @@ import Foundation
 import MarfaSDKTestSupport
 
 /// Unit tests for `OAuthDiscovery`. The actor cache is process-wide and
-/// keyed by issuer origin, so each test takes an origin of its own rather
-/// than clearing the shared cache — see `uniqueIssuer(_:)`. A struct suite
-/// is instantiated once per test, so this stored property is a fresh
-/// origin every time.
+/// keyed by the canonical issuer, path included, so each test takes a host
+/// of its own rather than clearing the shared cache — see
+/// `uniqueServerURL(_:)`. A struct suite is instantiated once per test, so
+/// this stored property is a fresh host every time. These tests exercise
+/// the actor directly, so the minted URL stands in as the issuer itself
+/// rather than as a server whose issuer has to be derived.
 @Suite("OAuthDiscovery", .timeLimit(.minutes(1)))
 struct OAuthDiscoveryTests {
 
-    private let issuer = uniqueIssuer("oauth-discovery")
+    private let issuer = uniqueServerURL("oauth-discovery")
 
     private struct DiscoveryDoc: Encodable {
         let issuer: String

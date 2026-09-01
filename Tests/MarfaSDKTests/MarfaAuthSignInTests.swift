@@ -215,7 +215,7 @@ struct MarfaAuthSignInTests {
     /// each test gets an origin nobody else uses and starts cold — which
     /// is what keeps the scripted response queue aligned without clearing
     /// the shared cache out from under other suites.
-    let serverURL = uniqueIssuer("marfa-auth-signin")
+    let serverURL = uniqueServerURL("marfa-auth-signin")
     /// What the SDK keys storage and discovery on, derived as `MarfaAuth` derives it.
     var issuer: URL { OAuthDiscovery.issuer(forServer: serverURL) }
     let clientId = "test-client"

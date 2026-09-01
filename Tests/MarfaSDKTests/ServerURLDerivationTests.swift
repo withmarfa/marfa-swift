@@ -50,7 +50,7 @@ struct ServerURLDerivationTests {
     /// not move.
     @Test("a credential stored by 14.2.0 is still found after the derivation moves inside")
     func storedCredentialSurvivesTheChange() async throws {
-        let serverURL = uniqueIssuer("derivation-continuity")
+        let serverURL = uniqueServerURL("derivation-continuity")
         let storage = InMemoryKeychain()
 
         // Exactly what `MarfaAuth(issuer: OAuthDiscovery.issuer(forServer:))`
@@ -77,7 +77,7 @@ struct ServerURLDerivationTests {
     /// value is left where it was, with nothing thrown.
     @Test("a pre-11.4.0 host-only account is promoted through an ordinary server URL")
     func legacyAccountIsMigrated() async throws {
-        let serverURL = uniqueIssuer("derivation-legacy")
+        let serverURL = uniqueServerURL("derivation-legacy")
         let storage = InMemoryKeychain()
 
         // Host-only, which is all the old spelling ever carried.
@@ -113,7 +113,7 @@ struct ServerURLDerivationTests {
         arguments: ["/space", ":8443", "http"]
     )
     func ambiguousServerDoesNotMigrate(shape: String) async throws {
-        let base = uniqueIssuer("derivation-ambiguous")
+        let base = uniqueServerURL("derivation-ambiguous")
         let serverURL: URL = switch shape {
         case "/space": base.appending(path: "space")
         case ":8443": URL(string: "\(base.absoluteString):8443")!
@@ -141,7 +141,7 @@ struct ServerURLDerivationTests {
     /// it was passing before this change — is not derived a second time.
     @Test("an already-derived issuer passed as the server URL is left alone")
     func anIssuerIsNotDerivedTwice() async throws {
-        let serverURL = uniqueIssuer("derivation-guard")
+        let serverURL = uniqueServerURL("derivation-guard")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
 
@@ -168,7 +168,7 @@ struct ServerURLDerivationTests {
     /// suite before this.
     @Test("an issuer supplied as the server URL is absorbed on every entry point")
     func everyEntryPointAbsorbsAnIssuer() async throws {
-        let serverURL = uniqueIssuer("derivation-guard-all")
+        let serverURL = uniqueServerURL("derivation-guard-all")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let accounts = [
             OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId),
@@ -220,7 +220,7 @@ struct ServerURLDerivationTests {
     /// a working credential on a device the person believes is signed out.
     @Test("clearing by server URL reaches every account a sign-in wrote")
     func clearingReachesTheAccountsSignInWrote() async throws {
-        let serverURL = uniqueIssuer("derivation-clear")
+        let serverURL = uniqueServerURL("derivation-clear")
         let issuer = OAuthDiscovery.issuer(forServer: serverURL)
         let storage = InMemoryKeychain()
 

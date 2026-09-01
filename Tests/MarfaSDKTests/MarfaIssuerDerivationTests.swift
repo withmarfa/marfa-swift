@@ -8,9 +8,9 @@ import MarfaSDKTestSupport
 /// derivation and, more importantly, pin the failure the wrong value produces
 /// so it can never again arrive as an opaque error code.
 ///
-/// Each test mints its own origin: `OAuthDiscovery.shared` is a process-wide
-/// cache keyed by issuer, and the suite runs in parallel — see
-/// `uniqueIssuer(_:)`.
+/// Each test mints its own host: `OAuthDiscovery.shared` is a process-wide
+/// cache keyed by the canonical issuer, path included, and the suite runs in
+/// parallel — see `uniqueServerURL(_:)`.
 @Suite("Marfa issuer derivation", .timeLimit(.minutes(1)))
 struct MarfaIssuerDerivationTests {
 
@@ -69,7 +69,7 @@ struct MarfaIssuerDerivationTests {
     /// the platform serves, and the published issuer matches what was asked.
     @Test("the derived issuer resolves and verifies")
     func derivedIssuerResolves() async throws {
-        let server = uniqueIssuer("marfa-issuer-ok")
+        let server = uniqueServerURL("marfa-issuer-ok")
         let http = FakeDeviceFlowHTTPClient()
         try http.enqueueJSON(MarfaShapedDoc(serverOrigin: server))
 
@@ -92,7 +92,7 @@ struct MarfaIssuerDerivationTests {
     /// its argument unchanged and this is the test that fails.
     @Test("a bare server URL is refused as an issuer")
     func bareServerURLIsRefused() async throws {
-        let server = uniqueIssuer("marfa-issuer-bare")
+        let server = uniqueServerURL("marfa-issuer-bare")
         let http = FakeDeviceFlowHTTPClient()
         try http.enqueueJSON(MarfaShapedDoc(serverOrigin: server))
 
@@ -107,7 +107,7 @@ struct MarfaIssuerDerivationTests {
     /// row showed a person while sign-in was broken for four releases.
     @Test("an issuer mismatch describes itself")
     func mismatchIsReadable() async throws {
-        let server = uniqueIssuer("marfa-issuer-readable")
+        let server = uniqueServerURL("marfa-issuer-readable")
         let http = FakeDeviceFlowHTTPClient()
         try http.enqueueJSON(MarfaShapedDoc(serverOrigin: server))
 
