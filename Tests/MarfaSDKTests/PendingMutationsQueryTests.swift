@@ -31,7 +31,7 @@ struct PendingMutationsQueryTests {
 
         // Initial fetch races with the init Task that kicks off the
         // first refetch. Poll until the async init settles.
-        try await waitUntil { !query.isLoading }
+        try await waitUntil(description: "!query.isLoading") { !query.isLoading }
         #expect(query.mutations.isEmpty)
         #expect(query.isEmpty)
         query.stop()
@@ -44,7 +44,7 @@ struct PendingMutationsQueryTests {
 
         try await queue.enqueueUpdateItem(id: "i-1", properties: ["body": .string("x")])
 
-        try await waitUntil { query.mutations.count == 1 }
+        try await waitUntil(description: "query.mutations.count == 1") { query.mutations.count == 1 }
         let summary = query.mutations[0]
         #expect(summary.kind == .updateItem)
         #expect(summary.itemId == "i-1")
@@ -58,12 +58,14 @@ struct PendingMutationsQueryTests {
         let query = store.queryPendingMutations()
 
         try await queue.enqueueDeleteItem(id: "i-2")
-        try await waitUntil { query.mutations.count == 1 }
+        try await waitUntil(description: "query.mutations.count == 1") { query.mutations.count == 1 }
 
         let id = query.mutations[0].id
         try await queue.recordFailure(id: id, error: "offline")
 
-        try await waitUntil {
+        try await waitUntil(
+            description: "the mutation's status becomes .retrying"
+        ) {
             if case .retrying = query.mutations.first?.status { return true }
             return false
         }
@@ -83,17 +85,19 @@ struct PendingMutationsQueryTests {
         let query = store.queryPendingMutations()
 
         try await queue.enqueueUpdateItem(id: "i-3", properties: [:])
-        try await waitUntil { query.mutations.count == 1 }
+        try await waitUntil(description: "query.mutations.count == 1") { query.mutations.count == 1 }
         let id = query.mutations[0].id
 
         try await queue.markInFlight(id: id)
-        try await waitUntil { query.mutations.first?.status == .inFlight }
+        try await waitUntil(description: "query.mutations.first?.status == .inFlight") { query.mutations.first?.status == .inFlight }
 
         // On transient failure the engine calls recordFailure which
         // reverts to .pending with attemptCount bumped — surfacing as
         // .retrying in the query projection.
         try await queue.recordFailure(id: id, error: "transient")
-        try await waitUntil {
+        try await waitUntil(
+            description: "the mutation's status becomes .retrying"
+        ) {
             if case .retrying = query.mutations.first?.status { return true }
             return false
         }
@@ -106,11 +110,11 @@ struct PendingMutationsQueryTests {
         let query = store.queryPendingMutations()
 
         try await queue.enqueueDeleteItem(id: "i-4")
-        try await waitUntil { query.mutations.count == 1 }
+        try await waitUntil(description: "query.mutations.count == 1") { query.mutations.count == 1 }
         let id = query.mutations[0].id
 
         try await queue.remove(id: id)
-        try await waitUntil { query.mutations.isEmpty }
+        try await waitUntil(description: "query.mutations.isEmpty") { query.mutations.isEmpty }
         #expect(query.isEmpty)
         query.stop()
     }
@@ -119,7 +123,7 @@ struct PendingMutationsQueryTests {
     func stopHaltsFurtherRefreshes() async throws {
         let (store, queue, _) = try await makeFixture()
         let query = store.queryPendingMutations()
-        try await waitUntil { !query.isLoading }
+        try await waitUntil(description: "!query.isLoading") { !query.isLoading }
 
         query.stop()
 
