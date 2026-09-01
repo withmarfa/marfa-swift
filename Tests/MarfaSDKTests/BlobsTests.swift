@@ -205,16 +205,14 @@ struct BlobsTests {
         await connManager.markConnecting()
 
         // Wait for the mutation queue to drain.
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            let isEmpty = (try? await queue.isEmpty) ?? false
-            if isEmpty { break }
-            try await Task.sleep(for: .milliseconds(20))
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .seconds(5),
+            every: .milliseconds(20),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
+            (try? await queue.isEmpty) == true
         }
         await engine.stop()
-
-        // Queue is drained.
-        #expect((try? await queue.isEmpty) == true)
 
         // Transport received the POST /blobs call with the right content.
         let blobCall = mock.calls.first { $0.path == "/blobs" }

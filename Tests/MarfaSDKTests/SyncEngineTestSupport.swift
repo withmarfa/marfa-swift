@@ -111,6 +111,10 @@ enum SyncEngineTestKit {
         let deadline = ContinuousClock.now + duration
         while ContinuousClock.now < deadline {
             if try await condition() {
+                // Not a throw: every call site runs unconditional teardown right
+                // after this returns, so throwing here would skip it and leak
+                // whatever that teardown was releasing (a lock, an engine, a
+                // blocked transport) into the next test.
                 Issue.record("expectRemainsFalse: condition became true within \(duration)")
                 return
             }
