@@ -450,7 +450,7 @@ struct SearchQueryTests {
         _ = try await client.items.create(note("Shopping list"))
 
         let query = store.querySearch(text: "invoice")
-        try await waitForCondition(timeout: .seconds(2)) { query.isLoading == false }
+        try await waitForCondition(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
 
         #expect(query.results.count == 1)
         #expect(query.error == nil)
@@ -468,7 +468,7 @@ struct SearchQueryTests {
         #expect(query.isLoading == true)
         #expect(query.results.isEmpty)
 
-        try await waitForCondition(timeout: .seconds(2)) { query.isLoading == false }
+        try await waitForCondition(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
         #expect(query.results.count == 1)
         query.stop()
     }
@@ -476,11 +476,11 @@ struct SearchQueryTests {
     @Test("Picks up items created after the query started") func updatesOnWrite() async throws {
         let (client, store) = try await makeStore()
         let query = store.querySearch(text: "invoice")
-        try await waitForCondition(timeout: .seconds(2)) { query.isLoading == false }
+        try await waitForCondition(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
         #expect(query.results.isEmpty)
 
         _ = try await client.items.create(note("A new invoice"))
-        try await waitForCondition(timeout: .seconds(3)) { query.results.count == 1 }
+        try await waitForCondition(timeout: .seconds(3), description: "query.results.count == 1") { query.results.count == 1 }
 
         query.stop()
     }
@@ -493,7 +493,7 @@ struct SearchQueryTests {
         )
 
         let query = store.querySearch(text: "invoice", filters: SearchFilters(type: "core.task"))
-        try await waitForCondition(timeout: .seconds(2)) { query.isLoading == false }
+        try await waitForCondition(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
 
         #expect(query.results.count == 1)
         #expect(query.results[0].item.type == "core.task")
@@ -503,7 +503,7 @@ struct SearchQueryTests {
     @Test("stop() halts further updates") func stopHaltsUpdates() async throws {
         let (client, store) = try await makeStore()
         let query = store.querySearch(text: "invoice")
-        try await waitForCondition(timeout: .seconds(2)) { query.isLoading == false }
+        try await waitForCondition(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
         query.stop()
 
         _ = try await client.items.create(note("Late invoice"))
