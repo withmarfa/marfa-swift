@@ -46,18 +46,24 @@ final class RevokeStubURLProtocol: URLProtocol, @unchecked Sendable {
         // probe; otherwise return an empty 200 (the revoke endpoint
         // returns no body on success per RFC 7009 §2.2).
         //
-        // The document is built from the origin that was actually asked for.
-        // Discovery requires the published issuer to equal the requested one,
-        // and each test mints its own issuer, so a stub answering with a fixed
-        // origin would be rejected before any revoke request went out.
+        // The document is built from the URL that was actually asked for, and
+        // it answers the **path-aware** well-known address rather than the root
+        // one. `MarfaAuth` derives its issuer as `<server>/auth`, so RFC 8414 §3
+        // puts the issuer's path after the well-known prefix and §3.3 refuses a
+        // document naming anything else. Each test also mints its own origin, so
+        // a stub answering with a fixed one would be rejected before any revoke
+        // request went out.
+        let wellKnown = "/.well-known/oauth-authorization-server"
         let responseBody: Data
         if let url = request.url,
-           url.path == "/.well-known/oauth-authorization-server",
+           url.path.hasPrefix(wellKnown),
            var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            let issuerPath = String(url.path.dropFirst(wellKnown.count))
             components.path = ""
             let origin = components.url?.absoluteString ?? ""
+            let issuer = origin + issuerPath
             let discovery = """
-            {"issuer":"\(origin)","authorization_endpoint":"\(origin)/auth/oauth2/authorize","token_endpoint":"\(origin)/auth/oauth2/token","revocation_endpoint":"\(origin)/auth/oauth2/revoke","device_authorization_endpoint":"\(origin)/auth/device"}
+            {"issuer":"\(issuer)","authorization_endpoint":"\(origin)/auth/oauth2/authorize","token_endpoint":"\(origin)/auth/oauth2/token","revocation_endpoint":"\(origin)/auth/oauth2/revoke","device_authorization_endpoint":"\(origin)/auth/device"}
             """
             responseBody = Data(discovery.utf8)
         } else {
@@ -93,8 +99,10 @@ struct AuthRevokeTests {
     /// instantiated once per test, so each test gets an origin nobody
     /// else uses and starts cold — no clearing of the shared cache, and
     /// so no interference with suites running alongside this one.
-    let issuer = uniqueIssuer("marfa-auth-revoke")
+    let serverURL = uniqueIssuer("marfa-auth-revoke")
     let clientId = "test-client"
+    /// What the SDK keys storage on, derived the way `MarfaAuth` derives it.
+    var issuer: URL { OAuthDiscovery.issuer(forServer: serverURL) }
     var tokensKey: String {
         OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
     }
@@ -103,7 +111,7 @@ struct AuthRevokeTests {
         let storage = InMemoryKeychain()
         let session = makeStubbedSession()
         let auth = MarfaAuth(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: clientId,
             redirectURI: URL(string: "marfa-test://auth/callback")!,
             scopes: ["openid"],
@@ -181,7 +189,7 @@ struct AuthRevokeTests {
         config.protocolClasses = [FailingStub.self]
         let session = URLSession(configuration: config)
         let auth = MarfaAuth(
-            issuer: issuer,
+            serverURL: serverURL,
             clientId: clientId,
             redirectURI: URL(string: "marfa-test://auth/callback")!,
             scopes: ["openid"],
@@ -191,7 +199,7 @@ struct AuthRevokeTests {
         let provider = StoredTokenProvider(
             storage: storage,
             storageKey: tokensKey,
-            tokenEndpoint: issuer.appendingPathComponent("auth/token"),
+            tokenEndpoint: serverURL.appendingPathComponent("auth/token"),
             clientId: clientId,
             urlSession: session
         )

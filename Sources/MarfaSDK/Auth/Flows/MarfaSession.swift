@@ -47,7 +47,7 @@ public enum MarfaSession {
     /// right order plus a value nobody could guess. ``MarfaAuth/signOut(_:)``
     /// revokes and clears the *tokens* account, and leaves the pending PKCE
     /// account and both pre-11.4.0 spellings behind;
-    /// ``MarfaAuth/clearStoredCredentials(issuer:clientId:storage:)`` reaches
+    /// ``MarfaAuth/clearStoredCredentials(serverURL:clientId:storage:)`` reaches
     /// all four and revokes nothing. Doing one and not the other leaves either
     /// a credential on the device or a live grant on the server, and neither
     /// failure says anything at the time.
@@ -98,7 +98,7 @@ public enum MarfaSession {
         revoking provider: (any TokenProvider)? = nil,
         urlSession: URLSession = .shared
     ) async throws -> EndResult {
-        let issuer = OAuthDiscovery.issuer(forServer: serverURL)
+        let issuer = OAuthDiscovery.derivedIssuer(forServer: serverURL)
 
         var revoked = false
         if let stored = provider as? StoredTokenProvider {
@@ -145,7 +145,7 @@ public enum MarfaSession {
 /// Delete every spelling of every credential account for one issuer and client.
 ///
 /// One implementation, reached from ``MarfaSession/end(serverURL:clientId:storage:revoking:urlSession:)``
-/// and from ``MarfaAuth/clearStoredCredentials(issuer:clientId:storage:)``. It
+/// and from ``MarfaAuth/clearStoredCredentials(serverURL:clientId:storage:)``. It
 /// lives here rather than on `MarfaAuth` because `MarfaAuth` does not exist on
 /// every platform that can hold these accounts.
 ///

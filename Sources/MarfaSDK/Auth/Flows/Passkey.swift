@@ -44,14 +44,12 @@ public enum Passkey {
     /// the user can register a new platform passkey for their account.
     ///
     /// - Parameters:
-    ///   - issuer: Marfa instance base URL (e.g. `https://api.marfa.so`).
-    ///     Despite the name this is the **server URL**, not the OAuth issuer
-    ///     identifier that ``MarfaAuth`` and ``DeviceFlow`` take: the enroll
-    ///     page is an ordinary route under `/auth`, appended below. Handing it
-    ///     ``OAuthDiscovery/issuer(forServer:)`` produces
-    ///     `/auth/auth/passkey/enroll`. One label meaning two things across
-    ///     three entry points is a wart; the parameter wants renaming to
-    ///     `serverURL`, which is a breaking change and so not made here.
+    ///   - serverURL: Marfa instance base URL (e.g. `https://api.marfa.so`).
+    ///     The enroll page is an ordinary route under `/auth`, appended below.
+    ///     This parameter always meant the server URL; it was named `issuer`
+    ///     until the same release that moved derivation inside ``MarfaAuth``
+    ///     and ``DeviceFlow``, at which point one label across three entry
+    ///     points finally means one thing.
     ///   - presentationContextProvider: SwiftUI/UIKit context provider for
     ///     the system browser window.
     ///   - callbackURLScheme: Custom scheme passed to the underlying
@@ -70,11 +68,11 @@ public enum Passkey {
     /// user dismissal — would be misleading given we can't tell success
     /// from cancellation.
     public static func enroll(
-        issuer: URL,
+        serverURL: URL,
         presentationContextProvider: ASWebAuthenticationPresentationContextProviding,
         callbackURLScheme: String = "marfa-auth-host"
     ) async {
-        let url = issuer.appendingPathComponent("auth/passkey/enroll")
+        let url = serverURL.appendingPathComponent("auth/passkey/enroll")
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let session = ASWebAuthenticationSession(
                 url: url,

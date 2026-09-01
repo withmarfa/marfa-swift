@@ -79,6 +79,38 @@ public actor OAuthDiscovery {
         serverURL.appending(path: "auth")
     }
 
+    /// The issuer for a server URL supplied by a caller who did not say which
+    /// of the two they were passing.
+    ///
+    /// Every entry point taking a `serverURL:` label reaches this rather than
+    /// ``issuer(forServer:)``, because the two are answering different
+    /// questions. A caller who *names* the public helper has stated what it is
+    /// handing over, and quietly accepting the other thing there would hide the
+    /// mistake the helper exists to end. A caller filling in a `serverURL:`
+    /// parameter has stated nothing, and the value most likely to be wrong is
+    /// the one they were passing before this SDK derived internally: the
+    /// already-derived issuer.
+    ///
+    /// So this one absorbs that case, and the absorption has a price worth
+    /// naming: a deployment whose Marfa server is genuinely rooted at a path
+    /// ending in `/auth` cannot be reached through these entry points, because
+    /// its server URL is indistinguishable from an issuer. Such a deployment
+    /// passes its published issuer to ``OAuthDiscovery/endpoints(for:)`` and
+    /// builds the flow from there.
+    ///
+    /// - Important: The reason this is worth a guard at all is that not every
+    ///   double-derivation fails loudly. A sign-in does — discovery refuses a
+    ///   document whose issuer is not the one asked for. A *clear* does not:
+    ///   ``MarfaSession/end(serverURL:clientId:storage:revoking:urlSession:)``
+    ///   and ``MarfaAuth/clearStoredCredentials(serverURL:clientId:storage:)``
+    ///   would compute accounts under `/auth/auth`, delete nothing, and report
+    ///   success, leaving a live credential on a device the person believes is
+    ///   signed out.
+    internal static func derivedIssuer(forServer serverURL: URL) -> URL {
+        guard serverURL.lastPathComponent != "auth" else { return serverURL }
+        return issuer(forServer: serverURL)
+    }
+
     /// Returns the discovered endpoints for `issuer`. First call fetches
     /// the well-known doc; subsequent calls return the cached value.
     /// Concurrent first-calls share a single in-flight task.

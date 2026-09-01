@@ -5,15 +5,15 @@ import Foundation
 ///
 /// ## Flow
 ///
-/// The server URL and the OAuth issuer identifier are **not the same value** —
-/// see ``OAuthDiscovery/issuer(forServer:)``. Keep the server URL for the
-/// client and derive the issuer for the flow.
+/// This takes the **Marfa server URL** and derives the OAuth issuer itself —
+/// see ``OAuthDiscovery/issuer(forServer:)`` for why the two differ. Pass the
+/// same URL you would give ``MarfaClient``.
 ///
 /// ```swift
 /// let serverURL = URL(string: "https://api.marfa.so")!
 ///
 /// let handle = try await DeviceFlow.start(
-///     issuer: OAuthDiscovery.issuer(forServer: serverURL),
+///     serverURL: serverURL,
 ///     clientId: "marfa-cli",
 ///     scopes: ["core.note:read"],
 ///     storage: KeychainStorage()
@@ -39,6 +39,9 @@ public enum DeviceFlow {
     /// code expires).
     ///
     /// - Parameters:
+    ///   - serverURL: The Marfa server, e.g. `https://api.marfa.so`. The OAuth
+    ///     issuer is derived from it, and the token account is keyed on that
+    ///     derived value.
     ///   - httpClient: HTTP transport seam — defaults to
     ///     `URLSession.shared`. Tests inject a fake; consumer apps
     ///     normally leave the default.
@@ -46,13 +49,14 @@ public enum DeviceFlow {
     ///     Used for the device-code expiry timestamp on the returned
     ///     handle and the between-poll sleep inside `awaitToken()`.
     public static func start(
-        issuer: URL,
+        serverURL: URL,
         clientId: String,
         scopes: [String],
         storage: any SecureStorage,
         httpClient: any DeviceFlowHTTPClient = URLSession.shared,
         clock: any DeviceFlowClock = SystemDeviceFlowClock()
     ) async throws -> DeviceFlowHandle {
+        let issuer = OAuthDiscovery.derivedIssuer(forServer: serverURL)
         // Validated, not substituted. Discovery compares the published
         // `issuer` against what the caller asked for, so handing it the
         // canonical form made a server whose identifier legitimately ends in a
@@ -128,7 +132,7 @@ public enum DeviceFlow {
     }
 }
 
-/// Live handle returned by ``DeviceFlow/start(issuer:clientId:scopes:storage:httpClient:clock:)``.
+/// Live handle returned by ``DeviceFlow/start(serverURL:clientId:scopes:storage:httpClient:clock:)``.
 ///
 /// The user-visible codes (``userCode``, ``verificationURI``,
 /// ``verificationURIComplete``) are read-only. ``awaitToken()`` performs

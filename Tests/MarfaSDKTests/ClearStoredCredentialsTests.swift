@@ -19,7 +19,11 @@ import Testing
 @Suite("Clearing stored credentials")
 struct ClearStoredCredentialsTests {
 
-    private let issuer = URL(string: "https://auth.example.test")!
+    /// What a caller actually holds. The accounts are keyed on the issuer the
+    /// SDK derives from this, which is the distinction the call exists to stop
+    /// a consumer having to know about.
+    private let serverURL = URL(string: "https://auth.example.test")!
+    private var issuer: URL { OAuthDiscovery.issuer(forServer: serverURL) }
     private let clientId = "client-abc"
 
     @Test("removes the token and the pending authorization")
@@ -35,7 +39,7 @@ struct ClearStoredCredentialsTests {
         try await storage.set("half-finished", for: pendingKey)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: issuer, clientId: clientId, storage: storage
+            serverURL: serverURL, clientId: clientId, storage: storage
         )
 
         #expect(try await storage.get(for: tokensKey) == nil)
@@ -58,7 +62,7 @@ struct ClearStoredCredentialsTests {
         try await storage.set("half-finished", for: legacyPending)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: issuer, clientId: clientId, storage: storage
+            serverURL: serverURL, clientId: clientId, storage: storage
         )
 
         #expect(try await storage.get(for: legacyTokens) == nil)
@@ -77,17 +81,18 @@ struct ClearStoredCredentialsTests {
         try await storage.set("their-token", for: otherKey)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: issuer, clientId: clientId, storage: storage
+            serverURL: serverURL, clientId: clientId, storage: storage
         )
 
         #expect(try await storage.get(for: otherKey) == "their-token")
     }
 
-    @Test("an issuer spelled with a trailing slash addresses the same rows")
+    @Test("a server URL spelled with a trailing slash addresses the same rows")
     func trailingSlashIsTheSameAccount() async throws {
-        // Storage keys are canonicalized, so the two spellings are one account.
-        // Without that, signing out through one and back in through the other
-        // would leave a credential behind under the spelling nobody used.
+        // Both spellings derive one issuer, and storage keys are canonicalized,
+        // so the two are one account. Without that, signing out through one and
+        // back in through the other would leave a credential behind under the
+        // spelling nobody used.
         let storage = InMemoryKeychain()
         let tokensKey = OAuthIssuer.storageKey(
             kind: "tokens", issuer: issuer, clientId: clientId
@@ -95,7 +100,7 @@ struct ClearStoredCredentialsTests {
         try await storage.set("live-token", for: tokensKey)
 
         try await MarfaAuth.clearStoredCredentials(
-            issuer: URL(string: "https://auth.example.test/")!,
+            serverURL: URL(string: "https://auth.example.test/")!,
             clientId: clientId,
             storage: storage
         )
