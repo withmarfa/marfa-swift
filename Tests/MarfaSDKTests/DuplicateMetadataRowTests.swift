@@ -91,9 +91,8 @@ struct DuplicateMetadataRowTests {
         defer { query.stop() }
         // The query refetches on `didSave`; the initial fetch is what this
         // covers, so wait on it settling rather than on a notification.
-        let deadline = Date().addingTimeInterval(5)
-        while query.isLoading, Date() < deadline {
-            try await Task.sleep(nanoseconds: 20_000_000)
+        try await waitUntil(timeout: .seconds(5), every: .milliseconds(20), description: "!query.isLoading") {
+            !query.isLoading
         }
         #expect(query.error == nil)
         #expect(query.items.contains { $0.item.id == itemId })

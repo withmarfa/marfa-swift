@@ -39,7 +39,7 @@ struct DroppedMutationsQueryTests {
     func initialStateIsEmpty() async throws {
         let (store, _, _) = try await makeSyncedFixture()
         let query = try #require(store.queryDroppedMutations())
-        try await waitUntil { !query.isLoading }
+        try await waitUntil(description: "!query.isLoading") { !query.isLoading }
         #expect(query.dropped.isEmpty)
         #expect(query.isEmpty)
         query.stop()
@@ -49,7 +49,7 @@ struct DroppedMutationsQueryTests {
     func recordDroppedTriggersRefresh() async throws {
         let (store, queue, _) = try await makeSyncedFixture()
         let query = try #require(store.queryDroppedMutations())
-        try await waitUntil { !query.isLoading }
+        try await waitUntil(description: "!query.isLoading") { !query.isLoading }
 
         try await queue.enqueueDeleteItem(id: "server-D")
         let live = try await queue.fetchAll()
@@ -58,7 +58,7 @@ struct DroppedMutationsQueryTests {
             error: ValidationError(message: "bad delete")
         )
 
-        try await waitUntil { query.dropped.count == 1 }
+        try await waitUntil(description: "query.dropped.count == 1") { query.dropped.count == 1 }
         let row = try #require(query.dropped.first)
         #expect(row.kind == .deleteItem)
         #expect(row.localId == "server-D")
@@ -70,7 +70,7 @@ struct DroppedMutationsQueryTests {
     func dismissAllViaStoreClears() async throws {
         let (store, queue, _) = try await makeSyncedFixture()
         let query = try #require(store.queryDroppedMutations())
-        try await waitUntil { !query.isLoading }
+        try await waitUntil(description: "!query.isLoading") { !query.isLoading }
 
         try await queue.enqueueDeleteItem(id: "server-A")
         try await queue.enqueueDeleteItem(id: "server-B")
@@ -81,11 +81,11 @@ struct DroppedMutationsQueryTests {
                 error: ValidationError(message: "x")
             )
         }
-        try await waitUntil { query.dropped.count == 2 }
+        try await waitUntil(description: "query.dropped.count == 2") { query.dropped.count == 2 }
 
         try await store.dismissAllDropped()
 
-        try await waitUntil { query.dropped.isEmpty }
+        try await waitUntil(description: "query.dropped.isEmpty") { query.dropped.isEmpty }
         query.stop()
     }
 

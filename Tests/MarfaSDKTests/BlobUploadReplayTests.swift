@@ -63,8 +63,9 @@ struct BlobUploadReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await waitUntil(timeout: .seconds(5)) { (try? await queue.isEmpty) == true }
-        #expect(try await queue.isEmpty)
+        try await waitUntil(timeout: .seconds(5), description: "(try? await queue.isEmpty) == true") {
+            (try? await queue.isEmpty) == true
+        }
 
         // The substance: the second mutation resolved as already-complete
         // rather than being dropped as a permanent failure. A dropped record

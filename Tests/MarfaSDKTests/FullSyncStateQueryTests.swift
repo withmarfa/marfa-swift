@@ -55,9 +55,16 @@ struct FullSyncStateQueryTests {
 
         let query = try #require(store.queryFullSyncState())
 
-        try await waitUntil {
+        try await waitUntil(
+
+            description: "query.state becomes .synced"
+
+        ) {
+
             if case .synced = query.state { return true }
+
             return false
+
         }
         query.stop()
     }
@@ -84,7 +91,9 @@ struct FullSyncStateQueryTests {
         // The cycle emits `.syncing` and then `.failed`. We assert
         // both arrive in order — the query should land on `.failed`
         // having passed through `.syncing`.
-        try await waitUntil {
+        try await waitUntil(
+            description: "query.state becomes .failed"
+        ) {
             if case .failed = query.state { return true }
             return false
         }
@@ -99,9 +108,16 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        try await waitUntil {
+        try await waitUntil(
+
+            description: "query.state becomes .synced"
+
+        ) {
+
             if case .synced = query.state { return true }
+
             return false
+
         }
         query.stop()
     }
@@ -120,9 +136,16 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        try await waitUntil {
+        try await waitUntil(
+
+            description: "query.state becomes .failed"
+
+        ) {
+
             if case .failed = query.state { return true }
+
             return false
+
         }
 
         // Cycle 2 — same row replays cleanly.
@@ -130,9 +153,16 @@ struct FullSyncStateQueryTests {
         transport.enqueue(EmptyResponse())
         await engine.triggerProactiveDrainForTesting()
 
-        try await waitUntil {
+        try await waitUntil(
+
+            description: "query.state becomes .synced"
+
+        ) {
+
             if case .synced = query.state { return true }
+
             return false
+
         }
         query.stop()
     }
@@ -150,7 +180,9 @@ struct FullSyncStateQueryTests {
 
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
-        try await waitUntil {
+        try await waitUntil(
+            description: "query.state becomes .synced"
+        ) {
             if case .synced = query.state { return true }
             return false
         }

@@ -59,12 +59,24 @@ enum SyncEngineTestKit {
         return (store, queue, transport, connManager, engine)
     }
 
+    /// Thrown by `waitUntil` when `condition` never becomes true before the
+    /// timeout, so the failure names what was awaited and for how long
+    /// instead of leaving the caller's next line — and the assertion after
+    /// it — to run against state the wait never established.
+    struct WaitUntilTimeoutError: Error, CustomStringConvertible {
+        let description: String
+    }
+
     // Simple polling helper — SSE consumption is task-driven and can't be
     // pinned to a known deadline. Poll until `condition` returns true or
-    // the timeout elapses. Keeps tests deterministic without hard sleeps.
+    // the timeout elapses, then throw. Keeps its own deadline instead of
+    // leaning on Swift Testing's `.timeLimit` trait: that trait's
+    // granularity bottoms out at a minute, far coarser than these
+    // sub-second waits.
     static func waitUntil(
         timeout: Duration,
         every: Duration = .milliseconds(10),
+        description: String,
         _ condition: @Sendable () async throws -> Bool
     ) async throws {
         let start = ContinuousClock.now
@@ -73,7 +85,9 @@ enum SyncEngineTestKit {
             try await Task.sleep(for: every)
         }
         if try await condition() { return }
-        Issue.record("waitUntil: condition never satisfied within \(timeout)")
+        throw WaitUntilTimeoutError(
+            description: "timed out after \(timeout) waiting for \(description)"
+        )
     }
 
     /// The inverse of ``waitUntil``: proves something does *not* happen while
@@ -81,6 +95,14 @@ enum SyncEngineTestKit {
     /// immediately — a missing wait or guard publishes state within a couple
     /// of actor hops, so a window measured in hundreds of milliseconds is
     /// decisive rather than a timing gamble.
+    ///
+    /// Unlike `waitUntil`, this isn't a readiness gate a caller builds on:
+    /// every call site here runs unconditional teardown afterward (signaling
+    /// a lock, stopping an engine, releasing a blocked transport), never an
+    /// assertion that assumes the window held. `Issue.record` already names
+    /// the right failure when the condition fires early, and throwing would
+    /// skip that teardown and leak the blocked task or lock into the next
+    /// test instead.
     static func expectRemainsFalse(
         for duration: Duration,
         every: Duration = .milliseconds(10),
@@ -89,6 +111,10 @@ enum SyncEngineTestKit {
         let deadline = ContinuousClock.now + duration
         while ContinuousClock.now < deadline {
             if try await condition() {
+                // Not a throw: every call site runs unconditional teardown right
+                // after this returns, so throwing here would skip it and leak
+                // whatever that teardown was releasing (a lock, an engine, a
+                // blocked transport) into the next test.
                 Issue.record("expectRemainsFalse: condition became true within \(duration)")
                 return
             }

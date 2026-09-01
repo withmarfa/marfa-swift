@@ -88,7 +88,7 @@ struct LocalStoreTests {
         }
 
         releaseLock.signal()
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(5)) {
+        try await SyncEngineTestKit.waitUntil(timeout: .seconds(5), description: "completed.isSet") {
             await completed.isSet
         }
     }
