@@ -79,12 +79,28 @@ public actor OAuthDiscovery {
         serverURL.appending(path: "auth")
     }
 
+    /// The server root a caller meant, when the value they supplied might be an
+    /// issuer instead.
+    ///
+    /// One premise, in one place: **a URL whose last path component is already
+    /// `auth` is an issuer, not a server.** ``derivedIssuer(forServer:)`` and
+    /// ``Passkey/enroll(serverURL:presentationContextProvider:callbackURLScheme:)``
+    /// both act on it and would otherwise each carry their own copy — and they
+    /// act on it in opposite directions, one declining to append and the other
+    /// needing to strip, which is exactly the shape that ends up implemented
+    /// once and claimed twice.
+    internal static func serverRoot(forSupplied url: URL) -> URL {
+        guard url.lastPathComponent == "auth" else { return url }
+        return url.deletingLastPathComponent()
+    }
+
     /// The issuer for a server URL supplied by a caller who did not say which
     /// of the two they were passing.
     ///
-    /// Every entry point taking a `serverURL:` label reaches this rather than
-    /// ``issuer(forServer:)``, because the two are answering different
-    /// questions. A caller who *names* the public helper has stated what it is
+    /// Every entry point taking a `serverURL:` label and needing an *issuer*
+    /// reaches this rather than ``issuer(forServer:)``, because the two are
+    /// answering different questions. (``Passkey/enroll(serverURL:presentationContextProvider:callbackURLScheme:)``
+    /// needs no issuer and takes ``serverRoot(forSupplied:)`` directly.) A caller who *names* the public helper has stated what it is
     /// handing over, and quietly accepting the other thing there would hide the
     /// mistake the helper exists to end. A caller filling in a `serverURL:`
     /// parameter has stated nothing, and the value most likely to be wrong is
@@ -107,8 +123,7 @@ public actor OAuthDiscovery {
     ///   success, leaving a live credential on a device the person believes is
     ///   signed out.
     internal static func derivedIssuer(forServer serverURL: URL) -> URL {
-        guard serverURL.lastPathComponent != "auth" else { return serverURL }
-        return issuer(forServer: serverURL)
+        issuer(forServer: serverRoot(forSupplied: serverURL))
     }
 
     /// Returns the discovered endpoints for `issuer`. First call fetches

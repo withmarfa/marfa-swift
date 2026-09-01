@@ -89,10 +89,15 @@ struct ClearStoredCredentialsTests {
 
     @Test("a server URL spelled with a trailing slash addresses the same rows")
     func trailingSlashIsTheSameAccount() async throws {
-        // Both spellings derive one issuer, and storage keys are canonicalized,
-        // so the two are one account. Without that, signing out through one and
-        // back in through the other would leave a credential behind under the
-        // spelling nobody used.
+        // Both spellings derive one issuer, so the two are one account. Without
+        // that, signing out through one and back in through the other would
+        // leave a credential behind under the spelling nobody used.
+        //
+        // Note what this does *not* pin any more. Derivation appends a path
+        // component, which absorbs a trailing slash before storage keying is
+        // consulted, so this no longer reaches `OAuthIssuer`'s own strip loop —
+        // it used to, when the caller supplied the issuer directly.
+        // `issuerSpellingsCanonicalizeToOneAccount` below pins that half.
         let storage = InMemoryKeychain()
         let tokensKey = OAuthIssuer.storageKey(
             kind: "tokens", issuer: issuer, clientId: clientId
@@ -106,5 +111,25 @@ struct ClearStoredCredentialsTests {
         )
 
         #expect(try await storage.get(for: tokensKey) == nil)
+    }
+
+    /// The canonicalization the test above used to reach.
+    ///
+    /// Storage keys are computed from the *issuer*, and an issuer can still
+    /// arrive spelled with a trailing slash — a caller handing an entry point
+    /// its own published issuer takes the guarded branch, and a consumer
+    /// computing a key itself takes none of it. Asserted on the key directly
+    /// rather than through a flow, because a flow that derives first can no
+    /// longer produce the input this is about.
+    @Test("two spellings of one issuer address one account")
+    func issuerSpellingsCanonicalizeToOneAccount() {
+        #expect(
+            OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
+                == OAuthIssuer.storageKey(
+                    kind: "tokens",
+                    issuer: URL(string: "\(issuer.absoluteString)/")!,
+                    clientId: clientId
+                )
+        )
     }
 }

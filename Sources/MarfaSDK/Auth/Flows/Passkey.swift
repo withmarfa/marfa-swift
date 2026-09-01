@@ -67,12 +67,31 @@ public enum Passkey {
     /// once a credential is stored against the account. Never throws on
     /// user dismissal — would be misleading given we can't tell success
     /// from cancellation.
+    /// The URL ``enroll(serverURL:presentationContextProvider:callbackURLScheme:)``
+    /// opens.
+    ///
+    /// Extracted only so it can be asserted on. `enroll` opens an
+    /// `ASWebAuthenticationSession`, which no test can drive, so the suite used
+    /// to re-implement this line and assert against its own copy — a test that
+    /// would have kept passing whatever `enroll` actually did.
+    ///
+    /// ``OAuthDiscovery/serverRoot(forSupplied:)`` absorbs an issuer handed to
+    /// a `serverURL:` parameter, for the same reason the sign-in flows do and
+    /// with more at stake here: this call cannot observe its own outcome by
+    /// design, so a caller supplying `https://<host>/auth` would open
+    /// `/auth/auth/passkey/enroll`, take a 404 inside the system browser, and
+    /// be told nothing by the SDK at all.
+    internal nonisolated static func enrollURL(forServer serverURL: URL) -> URL {
+        OAuthDiscovery.serverRoot(forSupplied: serverURL)
+            .appendingPathComponent("auth/passkey/enroll")
+    }
+
     public static func enroll(
         serverURL: URL,
         presentationContextProvider: ASWebAuthenticationPresentationContextProviding,
         callbackURLScheme: String = "marfa-auth-host"
     ) async {
-        let url = serverURL.appendingPathComponent("auth/passkey/enroll")
+        let url = enrollURL(forServer: serverURL)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let session = ASWebAuthenticationSession(
                 url: url,

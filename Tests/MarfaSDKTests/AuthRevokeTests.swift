@@ -46,22 +46,26 @@ final class RevokeStubURLProtocol: URLProtocol, @unchecked Sendable {
         // probe; otherwise return an empty 200 (the revoke endpoint
         // returns no body on success per RFC 7009 §2.2).
         //
-        // The document is built from the URL that was actually asked for, and
-        // it answers the **path-aware** well-known address rather than the root
-        // one. `MarfaAuth` derives its issuer as `<server>/auth`, so RFC 8414 §3
-        // puts the issuer's path after the well-known prefix and §3.3 refuses a
-        // document naming anything else. Each test also mints its own origin, so
-        // a stub answering with a fixed one would be rejected before any revoke
-        // request went out.
+        // It answers the **path-aware** well-known address rather than the root
+        // one: `MarfaAuth` derives its issuer as `<server>/auth`, so RFC 8414 §3
+        // puts the issuer's path after the well-known prefix.
+        //
+        // The origin comes from the request, because each test mints its own and
+        // a stub answering with a fixed one would be refused before any revoke
+        // went out. **The issuer path does not**, and that asymmetry is the
+        // point: publishing `origin + issuerPath` would echo back whatever was
+        // asked for, so §3.3 could never fail against this stub and a flow that
+        // derived `/auth/auth` would sail through it. Publishing `/auth` flatly
+        // means a wrong derivation is refused here exactly as a real server
+        // would refuse it.
         let wellKnown = "/.well-known/oauth-authorization-server"
         let responseBody: Data
         if let url = request.url,
            url.path.hasPrefix(wellKnown),
            var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            let issuerPath = String(url.path.dropFirst(wellKnown.count))
             components.path = ""
             let origin = components.url?.absoluteString ?? ""
-            let issuer = origin + issuerPath
+            let issuer = origin + "/auth"
             let discovery = """
             {"issuer":"\(issuer)","authorization_endpoint":"\(origin)/auth/oauth2/authorize","token_endpoint":"\(origin)/auth/oauth2/token","revocation_endpoint":"\(origin)/auth/oauth2/revoke","device_authorization_endpoint":"\(origin)/auth/device"}
             """

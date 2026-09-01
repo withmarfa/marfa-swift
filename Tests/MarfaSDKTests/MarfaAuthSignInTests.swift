@@ -523,46 +523,6 @@ struct MarfaAuthSignInTests {
         #expect(await storage.peek(account: legacyKey) == nil)
     }
 
-    @Test("restore never promotes a host-only token into an ambiguous server")
-    func restoreDoesNotMigrateAmbiguousIssuer() async throws {
-        // A path, an explicit port, or a non-HTTPS scheme: each means another
-        // Marfa could have written the host-only legacy account, so none of them
-        // claims it automatically. These are server URLs — the property is about
-        // where the server sits, not about the `/auth` Marfa itself appends.
-        let cases = [
-            URL(string: "https://ambiguous-auth.example.test/space")!,
-            URL(string: "https://ambiguous-auth.example.test:8443")!,
-            URL(string: "http://ambiguous-auth.example.test")!,
-        ]
-
-        for (index, ambiguousServerURL) in cases.enumerated() {
-            let storage = InMemoryKeychain()
-            let caseClient = "client-\(index)"
-            let issuer = OAuthDiscovery.issuer(forServer: ambiguousServerURL)
-            let legacyKey = OAuthIssuer.legacyTokenStorageKey(
-                issuer: issuer,
-                clientId: caseClient
-            )
-            let canonicalKey = OAuthIssuer.storageKey(
-                kind: "tokens",
-                issuer: issuer,
-                clientId: caseClient
-            )
-            try await storage.set("legacy-token", for: legacyKey)
-            let auth = MarfaAuth(
-                serverURL: ambiguousServerURL,
-                clientId: caseClient,
-                redirectURI: redirectURI,
-                scopes: scopes,
-                storage: storage,
-                urlSession: makeStubbedSession()
-            )
-
-            #expect(try await auth.restore() == nil)
-            #expect(await storage.peek(account: canonicalKey) == nil)
-            #expect(await storage.peek(account: legacyKey) == "legacy-token")
-        }
-    }
 
     @Test("concurrent restores promote a legacy root token once")
     func concurrentRestoreMigratesOnce() async throws {

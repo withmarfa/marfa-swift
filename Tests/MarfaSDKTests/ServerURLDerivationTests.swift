@@ -23,32 +23,9 @@ struct ServerURLDerivationTests {
 
     private static let token = #"{"access_token":"kept","expires_at":"2099-01-01T00:00:00Z","scope":"","token_type":"Bearer"}"#
 
-    /// The well-known document a deployment at `serverURL` publishes. The
-    /// `issuer` has to be the derived value or RFC 8414 §3.3 refuses it, which
-    /// would fail every test below on the identity check rather than on its own
-    /// subject.
-    private func canned(forServer serverURL: URL) -> MarfaAuthStubURLProtocol.Canned {
-        let base = serverURL.absoluteString
-        let body = """
-        {
-          "issuer": "\(OAuthDiscovery.issuer(forServer: serverURL).absoluteString)",
-          "authorization_endpoint": "\(base)/auth/oauth2/authorize",
-          "token_endpoint": "\(base)/auth/oauth2/token",
-          "revocation_endpoint": "\(base)/auth/oauth2/revoke",
-          "device_authorization_endpoint": "\(base)/auth/device"
-        }
-        """
-        return .init(
-            statusCode: 200,
-            headers: ["Content-Type": "application/json"],
-            body: Data(body.utf8),
-            error: nil
-        )
-    }
-
     private func stubbedSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MarfaAuthStubURLProtocol.self]
+        config.protocolClasses = [DerivationStubURLProtocol.self]
         return URLSession(configuration: config)
     }
 
@@ -85,7 +62,6 @@ struct ServerURLDerivationTests {
         )
         try await storage.set(Self.token, for: keyAsWrittenBefore)
 
-        MarfaAuthStubURLProtocol.reset(with: [canned(forServer: serverURL)])
         let provider = try #require(
             await makeAuth(serverURL: serverURL, storage: storage).restore()
         )
@@ -116,7 +92,6 @@ struct ServerURLDerivationTests {
         )
         try await storage.set(Self.token, for: legacyKey)
 
-        MarfaAuthStubURLProtocol.reset(with: [canned(forServer: serverURL)])
         let provider = try #require(
             await makeAuth(serverURL: serverURL, storage: storage).restore()
         )
@@ -157,7 +132,6 @@ struct ServerURLDerivationTests {
         )
         try await storage.set(Self.token, for: legacyKey)
 
-        MarfaAuthStubURLProtocol.reset(with: [canned(forServer: serverURL)])
         #expect(try await makeAuth(serverURL: serverURL, storage: storage).restore() == nil)
         #expect(await storage.peek(account: canonicalKey) == nil)
         #expect(await storage.peek(account: legacyKey) == Self.token)
@@ -180,9 +154,65 @@ struct ServerURLDerivationTests {
             Self.token,
             for: OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId)
         )
-        MarfaAuthStubURLProtocol.reset(with: [canned(forServer: serverURL)])
         let provider = try #require(await auth.restore())
         #expect(try await provider.currentToken().accessToken == "kept")
+    }
+
+    /// The guard on the three entry points the test above does not reach.
+    ///
+    /// Pinning it on `MarfaAuth.init` alone left it unpinned on the *clear*
+    /// path, which is the one its own rationale names as the reason it exists:
+    /// a sign-in that double-derives fails loudly at discovery, and a clear
+    /// that double-derives deletes nothing and reports success. Reverting any
+    /// of these three to the unguarded `issuer(forServer:)` passed the whole
+    /// suite before this.
+    @Test("an issuer supplied as the server URL is absorbed on every entry point")
+    func everyEntryPointAbsorbsAnIssuer() async throws {
+        let serverURL = uniqueIssuer("derivation-guard-all")
+        let issuer = OAuthDiscovery.issuer(forServer: serverURL)
+        let accounts = [
+            OAuthIssuer.storageKey(kind: "tokens", issuer: issuer, clientId: clientId),
+            OAuthIssuer.storageKey(kind: "pending", issuer: issuer, clientId: clientId),
+        ]
+
+        // MarfaAuth.clearStoredCredentials — supplied the issuer, must still
+        // address the accounts a sign-in wrote under it.
+        let viaClear = InMemoryKeychain()
+        for account in accounts { try await viaClear.set("live", for: account) }
+        try await MarfaAuth.clearStoredCredentials(
+            serverURL: issuer,
+            clientId: clientId,
+            storage: viaClear
+        )
+        for account in accounts {
+            #expect(await viaClear.peek(account: account) == nil, "clearStoredCredentials left \(account)")
+        }
+
+        // MarfaSession.end — same, on the platforms MarfaAuth does not exist.
+        let viaEnd = InMemoryKeychain()
+        for account in accounts { try await viaEnd.set("live", for: account) }
+        _ = try await MarfaSession.end(
+            serverURL: issuer,
+            clientId: clientId,
+            storage: viaEnd
+        )
+        for account in accounts {
+            #expect(await viaEnd.peek(account: account) == nil, "MarfaSession.end left \(account)")
+        }
+
+        // DeviceFlow.start — the handle keys its token account on this.
+        let http = FakeDeviceFlowHTTPClient()
+        try http.enqueueJSON(GuardDiscoveryDoc(serverURL: serverURL))
+        http.enqueueDeviceCodeResponse()
+        let handle = try await DeviceFlow.start(
+            serverURL: issuer,
+            clientId: clientId,
+            scopes: scopes,
+            storage: InMemoryKeychain(),
+            httpClient: http,
+            clock: ManualDeviceFlowClock()
+        )
+        #expect(handle.issuer == issuer, "DeviceFlow double-derived to \(handle.issuer)")
     }
 
     /// The path where getting this wrong says nothing at all: a clear that
@@ -214,6 +244,76 @@ struct ServerURLDerivationTests {
             #expect(await storage.peek(account: account) == nil, "left behind: \(account)")
         }
     }
+}
+
+/// Well-known document for a deployment at `serverURL`, published under the
+/// issuer derived from it.
+private struct GuardDiscoveryDoc: Encodable {
+    let issuer: String
+    let authorization_endpoint: String
+    let token_endpoint: String
+    let revocation_endpoint: String
+    let device_authorization_endpoint: String
+
+    init(serverURL: URL) {
+        let base = serverURL.absoluteString
+        self.issuer = OAuthDiscovery.issuer(forServer: serverURL).absoluteString
+        self.authorization_endpoint = "\(base)/auth/oauth2/authorize"
+        self.token_endpoint = "\(base)/auth/oauth2/token"
+        self.revocation_endpoint = "\(base)/auth/oauth2/revoke"
+        self.device_authorization_endpoint = "\(base)/auth/device"
+    }
+}
+
+/// Serves this suite's discovery documents without a queue, and so without a
+/// shared one.
+///
+/// `MarfaAuthStubURLProtocol` holds its canned responses in a `static` array.
+/// Suites run in parallel, so a second suite reaching for it consumes the
+/// first's responses and both fail against an issuer neither asked about —
+/// intermittently, since it depends which suite gets there first. This one is
+/// stateless: it answers from the request it was handed.
+///
+/// The **origin** comes from the request, because every test here mints its
+/// own. The **issuer path does not**: publishing `origin + <whatever path was
+/// asked for>` would echo the request back, so RFC 8414 §3.3 could never fail
+/// and a flow deriving `/auth/auth` would sail through. `/auth` flatly means a
+/// wrong derivation is refused here exactly as a real server would refuse it.
+private final class DerivationStubURLProtocol: URLProtocol, @unchecked Sendable {
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        components.path = ""
+        let origin = components.url?.absoluteString ?? ""
+        let body = """
+        {
+          "issuer": "\(origin)/auth",
+          "authorization_endpoint": "\(origin)/auth/oauth2/authorize",
+          "token_endpoint": "\(origin)/auth/oauth2/token",
+          "revocation_endpoint": "\(origin)/auth/oauth2/revoke",
+          "device_authorization_endpoint": "\(origin)/auth/device"
+        }
+        """
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
 
 #endif
