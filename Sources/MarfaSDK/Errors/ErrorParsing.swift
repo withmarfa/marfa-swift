@@ -35,7 +35,13 @@ func parseMarfaError(
     }
 
     switch statusCode {
-    case 400: return ValidationError(message: message, details: details)
+    // A 400 keeps the code the server sent, for the same reason a 409 does:
+    // the status says a request was refused and the code says what about it
+    // was wrong. `bulk_atomic_rollback` is the case that forced this — it
+    // arrives as a 400 whose entire content is the code and the `details`
+    // beneath it, and reporting it as `validation_error` left the engine
+    // unable to tell a rolled-back page from any other bad request.
+    case 400: return ValidationError(code: code ?? "validation_error", message: message, details: details)
     case 401: return UnauthorizedError(message: message, details: details)
     case 403: return ForbiddenError(message: message, details: details)
     case 404: return NotFoundError(message: message, details: details)

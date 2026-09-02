@@ -16,6 +16,35 @@ struct ErrorParsingTests {
         #expect(error.message == "Missing field: title")
     }
 
+    @Test("400 carrying a distinct code keeps it rather than being flattened")
+    func validationErrorKeepsADistinctCode() {
+        // Most 400s are the generic validation failure, but some carry their
+        // whole meaning in the code. `bulk_atomic_rollback` is the one that
+        // forced this: it says a page was rolled back and puts the entry and
+        // the reason in `details`, so a caller reading `validation_error`
+        // cannot tell it from any other bad request.
+        let body = #"{"error":{"code":"bulk_atomic_rollback","status":400,"message":"Bulk upsert rolled back on item 1","details":{"index":1,"code":"invalid_type"}}}"#
+        let error = parseMarfaError(data: Data(body.utf8), statusCode: 400)
+
+        #expect(error is ValidationError)
+        #expect(error.status == 400)
+        #expect(error.code == "bulk_atomic_rollback")
+        #expect(error.details?["code"] == .string("invalid_type"))
+        // Still permanent: the status decides that, and nothing here moved it.
+        #expect(error.isPermanent)
+    }
+
+    @Test("400 with no code of its own still reads as validation_error")
+    func validationErrorDefaultsWhenNoCodeIsSent() {
+        // The body a caller gets when the server sent no structured error at
+        // all. The default has to survive, or every unstructured 400 starts
+        // reporting an empty code.
+        let error = parseMarfaError(data: Data("not json".utf8), statusCode: 400)
+
+        #expect(error is ValidationError)
+        #expect(error.code == "validation_error")
+    }
+
     @Test("401 → UnauthorizedError")
     func unauthorized() {
         let body = #"{"error":{"code":"unauthorized","message":"Invalid token"}}"#

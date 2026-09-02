@@ -646,6 +646,14 @@ actor EdgeMintingTransport: Transport {
     private var recordedCalls: [MockTransport.Call] = []
     private var echoes: [Edge] = []
     private var mintCount = 0
+    /// Edge types the server refuses, with the code it answers per entry.
+    private var refusals: [String: (code: String, message: String)] = [:]
+
+    /// Declares that edges of `edgeType` are refused, so the bulk door
+    /// answers an `errored` entry for them the way the route does.
+    func refuse(edgeType: String, code: String, message: String = "refused") {
+        refusals[edgeType] = (code, message)
+    }
 
     struct UnsupportedRequest: Error, CustomStringConvertible {
         let method: String
@@ -705,15 +713,25 @@ actor EdgeMintingTransport: Transport {
             let sent = try JSONDecoder().decode(SentBulkEdges.self, from: bodyData)
             let emit = sent.emitEvents ?? false
             var entries: [BulkEdgeResultEntry] = []
+            var created = 0, errored = 0
             for (index, raw) in sent.edges.enumerated() {
+                if let refusal = refusals[raw.edgeType] {
+                    entries.append(BulkEdgeResultEntry(
+                        index: index, outcome: .errored, id: nil, reason: nil,
+                        error: BulkResultError(code: refusal.code, message: refusal.message)
+                    ))
+                    errored += 1
+                    continue
+                }
                 let edge = store(raw, echo: emit)
                 entries.append(
                     BulkEdgeResultEntry(index: index, outcome: .created, id: edge.id)
                 )
+                created += 1
             }
             let result = BulkEdgeResult(
                 counts: BulkResultCounts(
-                    created: entries.count, updated: 0, skipped: 0, errored: 0
+                    created: created, updated: 0, skipped: 0, errored: errored
                 ),
                 results: entries
             )
@@ -786,9 +804,11 @@ private struct SentBulkItem: Decodable {
 private struct SentBulkItems: Decodable {
     let items: [SentBulkItem]
     let emitEvents: Bool?
+    let mode: String?
+    let atomic: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case items
+        case items, mode, atomic
         case emitEvents = "emit_events"
     }
 }
@@ -818,6 +838,26 @@ actor ItemMintingTransport: Transport {
     private var recordedCalls: [MockTransport.Call] = []
     private var echoes: [Item] = []
     private var mintCount = 0
+    /// Ids this server already holds, so a second page naming one resolves
+    /// rather than creating. Seeded by ``hold(_:)`` and grown by every create.
+    private var held: Set<String> = []
+    /// Types the server refuses, by entry `type`. Keyed on the type because it
+    /// is the field a test can vary per entry without touching ids.
+    private var refusals: [String: Refusal] = [:]
+    /// Ids the server answers with a different id than it was sent.
+    private var resolutions: [String: String] = [:]
+    /// Added to every answered index, so a test can produce the one shape
+    /// nothing else can: an answer that does not line up with the page it
+    /// was sent. A real server would not, which is exactly why the engine's
+    /// guard against it is otherwise unreachable.
+    private var answerIndexOffset = 0
+
+    func answerIndexOffsetForTesting(_ offset: Int) { answerIndexOffset = offset }
+
+    struct Refusal: Sendable {
+        let code: String
+        let message: String
+    }
 
     struct UnsupportedRequest: Error, CustomStringConvertible {
         let method: String
@@ -825,6 +865,37 @@ actor ItemMintingTransport: Transport {
         var description: String {
             "ItemMintingTransport: only the item bulk door is modeled, got \(method) \(path)"
         }
+    }
+
+    /// Declares an id the server already holds, so a page naming it resolves
+    /// to an existing row instead of creating one.
+    func hold(_ id: String) { held.insert(id) }
+
+    /// Declares that an entry sent under `sentId` resolves to a row the
+    /// server holds under a different id, which is what an upsert matching on
+    /// `(source, source_id)` does. Without this the double answered every id
+    /// with itself, so a test could not tell a client that leaves a divergent
+    /// id alone from one that repairs it.
+    func resolve(_ sentId: String, to serverId: String) {
+        resolutions[sentId] = serverId
+        held.insert(sentId)
+    }
+
+    /// Declares that entries of `type` are refused, with the code the route
+    /// would answer per entry.
+    func refuse(type: String, code: String, message: String = "refused") {
+        refusals[type] = Refusal(code: code, message: message)
+    }
+
+    fileprivate func refusal(for item: SentBulkItem) -> Refusal? {
+        refusals[item.type]
+    }
+
+    fileprivate func firstRefusal(in items: [SentBulkItem]) -> (Int, Refusal)? {
+        for (index, item) in items.enumerated() {
+            if let refusal = refusals[item.type] { return (index, refusal) }
+        }
+        return nil
     }
 
     var calls: [MockTransport.Call] { recordedCalls }
@@ -851,6 +922,7 @@ actor ItemMintingTransport: Transport {
             updatedAt: Self.stampedAt,
             version: 1
         )
+        held.insert(item.id)
         if echo { echoes.append(item) }
         return item
     }
@@ -871,21 +943,73 @@ actor ItemMintingTransport: Transport {
 
         let sent = try JSONDecoder().decode(SentBulkItems.self, from: bodyData)
         let emit = sent.emitEvents ?? false
+        let createOnly = sent.mode == "create_only"
+        // `atomic` defaults to true on the route, so a page that says nothing
+        // is atomic and one refused entry rolls the whole thing back.
+        let atomic = sent.atomic ?? true
+
+        // Atomic mode answers the first refusal and writes nothing, so it is
+        // resolved before any row is stored.
+        if atomic, let (index, refusal) = firstRefusal(in: sent.items) {
+            // Built as the body the route writes and parsed the way the real
+            // transport parses it, rather than handed over as a ready-made
+            // error. The difference is the whole point: a hand-built error
+            // skips `parseMarfaError`, which is where a 400's code is
+            // decided, so a test using one passes whether or not the SDK can
+            // read a rollback off the wire at all.
+            let details = "{\"index\":\(index),\"code\":\"\(refusal.code)\",\"message\":\"\(refusal.message)\"}"
+            let body = "{\"error\":{\"code\":\"bulk_atomic_rollback\",\"message\":\"Bulk upsert rolled back on item \(index)\",\"details\":\(details)}}"
+            throw parseMarfaError(data: Data(body.utf8), statusCode: 400)
+        }
+
         var entries: [BulkResultEntry] = []
+        var created = 0, updated = 0, skipped = 0, errored = 0
         for (index, raw) in sent.items.enumerated() {
+            if let refusal = refusal(for: raw) {
+                entries.append(BulkResultEntry(
+                    index: index, outcome: .errored, id: nil, reason: nil,
+                    error: BulkResultError(code: refusal.code, message: refusal.message)
+                ))
+                errored += 1
+                continue
+            }
+            // An id this double already holds is a row that resolves: under
+            // `create_only` the route skips it with `duplicate_id`, otherwise
+            // it updates in place. Neither writes a new row, so neither
+            // echoes one.
+            if let id = raw.id, held.contains(id) {
+                let answered = resolutions[id] ?? id
+                if createOnly {
+                    entries.append(BulkResultEntry(
+                        index: index, outcome: .skipped, id: answered,
+                        reason: "duplicate_id", error: nil
+                    ))
+                    skipped += 1
+                } else {
+                    entries.append(BulkResultEntry(
+                        index: index, outcome: .updated, id: answered,
+                        reason: nil, error: nil
+                    ))
+                    updated += 1
+                }
+                continue
+            }
             let item = store(raw, echo: emit)
-            entries.append(
-                BulkResultEntry(
-                    index: index, outcome: .created, id: item.id,
-                    reason: nil, error: nil
-                )
-            )
+            entries.append(BulkResultEntry(
+                index: index, outcome: .created, id: item.id, reason: nil, error: nil
+            ))
+            created += 1
         }
         let result = BulkResult(
             counts: BulkResultCounts(
-                created: entries.count, updated: 0, skipped: 0, errored: 0
+                created: created, updated: updated, skipped: skipped, errored: errored
             ),
-            results: entries,
+            results: answerIndexOffset == 0 ? entries : entries.map {
+                BulkResultEntry(
+                    index: $0.index + answerIndexOffset, outcome: $0.outcome,
+                    id: $0.id, reason: $0.reason, error: $0.error
+                )
+            },
             blobsImported: nil
         )
         return try JSONDecoder().decode(T.self, from: try JSONEncoder().encode(result))
@@ -931,5 +1055,11 @@ actor ItemMintingTransport: Transport {
         }
     }
 
-    private func pendingEchoes() -> [Item] { echoes }
+    /// Drains rather than reads. An event is delivered once: the server does
+    /// not re-send a create because a client reconnected, and a double that
+    /// did would let a test pass on rows the replay never wrote.
+    private func pendingEchoes() -> [Item] {
+        defer { echoes.removeAll() }
+        return echoes
+    }
 }

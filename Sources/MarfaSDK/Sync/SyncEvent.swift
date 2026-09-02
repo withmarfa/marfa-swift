@@ -111,10 +111,21 @@ public enum SyncEvent: Sendable {
     /// An edge was deleted.
     case edgeDeleted(id: String)
 
-    /// A queued mutation was dropped because the server rejected it with a
-    /// permanent error (`400`, `403`, `404`). The mutation was removed from
-    /// the queue and will not be retried — further retries would get the
-    /// same result.
+    /// A write will not be retried, because repeating it would be answered
+    /// the same way. Two things produce this, and they differ in what
+    /// happened to the call.
+    ///
+    /// **A whole queued mutation was refused** — a `400`, `403` or `404`, or
+    /// a `409` on a create. The request failed, the record is removed from
+    /// the queue, and `error` carries that response's status and code.
+    ///
+    /// **One entry of a bulk call was refused** while the call itself
+    /// succeeded. All three bulk doors answer per entry, so a page can be
+    /// accepted with some of its writes rejected. The record retires through
+    /// the ordinary success path rather than being dropped, one event fires
+    /// per refused entry, and `error` carries the code the server gave that
+    /// entry with `status == 0` — the call answered `200` and the entry's
+    /// refusal never had a status of its own.
     ///
     /// Apps should surface this to the user (e.g., "Some edits couldn't be
     /// saved"). The `error` carries the specific failure (`ValidationError`,

@@ -13,9 +13,11 @@ import SwiftData
 
 /// A live, observable view over the dropped-mutation log.
 ///
-/// Tracks every ``DroppedMutationRecord`` persisted by ``SyncEngine``
-/// when a queued mutation hits a permanent error
-/// (``MarfaError/isPermanent``). Refreshes whenever any
+/// Tracks every ``DroppedMutationRecord`` persisted by ``SyncEngine``: a
+/// queued mutation that hit a failure no retry can clear, and every entry a
+/// bulk call reached the server with and had refused. The second kind
+/// carries `errorStatus == 0`, because the call itself succeeded and the
+/// entry's refusal never had a status of its own. Refreshes whenever any
 /// `ModelContext.save()` fires — `recordDropped`, the cascade insert,
 /// and the dismissal APIs all share the same `didSave` subscription
 /// the other reactive queries use.
