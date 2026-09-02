@@ -9,24 +9,20 @@ public struct ConnectionInstallInput: Codable, Sendable, Hashable {
     public let configuration: [String: JSONValue]?
     public let credentialRef: String?
     public let integrationId: String
-    public let label: String?
 
     public init(
         configuration: [String: JSONValue]? = nil,
         credentialRef: String? = nil,
-        integrationId: String,
-        label: String? = nil
+        integrationId: String
     ) {
         self.configuration = configuration
         self.credentialRef = credentialRef
         self.integrationId = integrationId
-        self.label = label
     }
 
     enum CodingKeys: String, CodingKey {
         case configuration
         case credentialRef = "credential_ref"
         case integrationId = "integration_id"
-        case label
     }
 }

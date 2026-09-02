@@ -7,7 +7,9 @@ import Foundation
 
 public struct Integration: Codable, Sendable, Hashable, Identifiable {
     public let direction: IntegrationDirection
+    public let displayName: String?
     public let id: String
+    public let installedCount: Int
     public let manifest: [String: JSONValue]
     public let manifestName: String
     public let manifestVersion: String
@@ -17,7 +19,9 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
 
     public init(
         direction: IntegrationDirection,
+        displayName: String? = nil,
         id: String,
+        installedCount: Int,
         manifest: [String: JSONValue],
         manifestName: String,
         manifestVersion: String,
@@ -26,7 +30,9 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
         summary: String? = nil
     ) {
         self.direction = direction
+        self.displayName = displayName
         self.id = id
+        self.installedCount = installedCount
         self.manifest = manifest
         self.manifestName = manifestName
         self.manifestVersion = manifestVersion
@@ -37,7 +43,9 @@ public struct Integration: Codable, Sendable, Hashable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case direction
+        case displayName = "display_name"
         case id
+        case installedCount = "installed_count"
         case manifest
         case manifestName = "manifest_name"
         case manifestVersion = "manifest_version"
