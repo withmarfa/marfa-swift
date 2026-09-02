@@ -158,9 +158,10 @@ public struct PendingMutationSummary: Sendable, Identifiable, Equatable {
 ///         }
 ///     }
 ///
-/// Vended by ``MarfaStore/queryPendingMutations()``. Returns `nil`
-/// for network-only clients that have no mutation queue — same
-/// contract as other sync-specific surfaces.
+/// Vended by ``MarfaStore/queryPendingMutations()``, which always returns one:
+/// every store has the table, and a client with no sync engine simply never
+/// puts a row in it. Unlike ``MarfaStore/queryBlobUploads()``, this is not
+/// optional.
 @Observable
 @MainActor
 public final class PendingMutationsQuery {
