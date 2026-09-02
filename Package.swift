@@ -52,7 +52,7 @@ let package = Package(
                 "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
                 "cloudkit-smoke", "PublicSurfaceCore", "public-surface",
                 "public-surface.sh", "public-surface.txt",
-                "consumer-pins.sh", "openapi-source.txt",
+                "consumer-pins.sh", "openapi-source.txt", "spec-drift.sh",
             ],
             sources: ["codegen-wire.swift"]
         ),
@@ -65,7 +65,7 @@ let package = Package(
                 "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
                 "cloudkit-smoke", "PublicSurfaceCore", "public-surface",
                 "public-surface.sh", "public-surface.txt",
-                "consumer-pins.sh", "openapi-source.txt",
+                "consumer-pins.sh", "openapi-source.txt", "spec-drift.sh",
             ],
             sources: ["codegen-domain.swift"]
         ),
