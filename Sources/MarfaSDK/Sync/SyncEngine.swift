@@ -1488,27 +1488,32 @@ public actor SyncEngine {
                     }
                 }
             } catch let marfaError as MarfaError
-                where marfaError.isPermanent
-                    || Self.isUnresolvableCreateConflict(marfaError, kind: record.kind) {
+                where Self.isFinal(marfaError, kind: record.kind) {
                 // Persist the dropped row + remove the live row in one
                 // SQLite transaction. The dropped log is the
                 // ``DroppedMutationsQuery`` source of truth; cascade
                 // orphans land in the same log via
                 // ``MutationQueue/dropMutationsReferencingLocalId(_:droppedAt:error:)``.
                 let droppedAt = Date()
+                // An atomic bulk page arrives as a 400 describing the
+                // rollback, with the refusal that caused it one level down.
+                // The log and the event carry the refusal, because
+                // `bulk_atomic_rollback` tells an app that something was
+                // refused and never which thing.
+                let reported = Self.reportedRefusal(marfaError)
                 try? await mutationQueue.recordDropped(
                     record: record,
                     droppedAt: droppedAt,
-                    error: marfaError
+                    error: reported
                 )
                 logger.log.error(
-                    "sync.mutation.dropped kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) status=\(marfaError.status, privacy: .public) code=\(marfaError.code, privacy: .public)"
+                    "sync.mutation.dropped kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) status=\(reported.status, privacy: .public) code=\(reported.code, privacy: .public)"
                 )
                 emit(.mutationDropped(
                     kind: record.kind.rawValue,
                     itemId: record.localId,
                     attempt: record.attemptCount + 1,
-                    error: marfaError
+                    error: reported
                 ))
 
                 // A refused edge create leaves a local row nothing can ever
@@ -1647,6 +1652,225 @@ public actor SyncEngine {
         case .createItem, .createEdge: return true
         default: return false
         }
+    }
+
+    /// Dead-letters the items a bulk action could not apply.
+    ///
+    /// The third door, and the one whose result is least obviously per-entry:
+    /// the call is driven by a filter rather than a list, so there is no page
+    /// to index into. It still fails per item, and `BulkActionResult.errors`
+    /// names each one with the id it failed on and the code it failed with.
+    /// Discarding that made a job that matched a thousand items and applied
+    /// none of them indistinguishable from one that applied them all.
+    ///
+    /// Keyed by item id rather than position for the same reason: the id is
+    /// what the server reports and the only thing that identifies the entry.
+    private func applyBulkActionResult(
+        _ result: BulkActionResult,
+        record: PendingMutationRecord
+    ) async {
+        guard let errors = result.errors, !errors.isEmpty else { return }
+
+        let refused = errors.map { entry in
+            MutationQueue.DroppedBulkEntry(
+                key: entry.id,
+                localId: entry.id,
+                // The action is what was attempted; there is no per-item
+                // input to keep, because the caller supplied a filter.
+                payloadJson: (try? Self.entryEncoder.encode(["id": entry.id, "action": result.action]))
+                    .flatMap { String(data: $0, encoding: .utf8) } ?? "{}",
+                error: MarfaError(
+                    code: entry.code,
+                    message: entry.message,
+                    status: 0,
+                    details: ["id": .string(entry.id)]
+                )
+            )
+        }
+
+        try? await mutationQueue.recordDroppedBulkEntries(
+            record: record, entries: refused, droppedAt: Date()
+        )
+        for entry in refused {
+            logger.log.error(
+                "sync.bulk_action.entry_dropped item_id=\(entry.key, privacy: .public) code=\(entry.error.code, privacy: .public)"
+            )
+            emit(.mutationDropped(
+                kind: record.kind.rawValue,
+                itemId: entry.localId,
+                attempt: record.attemptCount + 1,
+                error: entry.error
+            ))
+        }
+    }
+
+    /// One entry's answer, flattened out of whichever bulk result carried
+    /// it. The item and edge doors answer in two types with identical
+    /// fields, and everything below treats them the same way, so reading
+    /// them twice would only be two chances to diverge.
+    private struct BulkEntryOutcome {
+        let index: Int
+        let outcome: BulkOutcome
+        let id: String?
+        let error: BulkResultError?
+    }
+
+    /// Encoder for the single entry a dropped row keeps. Separate from the
+    /// transport's so a change to wire encoding cannot quietly reshape what
+    /// is already written into the dead-letter log.
+    private static let entryEncoder = JSONEncoder()
+
+    /// Reads what the server did with each entry of a bulk page.
+    ///
+    /// Two things the replay used to discard entirely. **An entry the server
+    /// refused** was thrown away with the rest of the response, so a page
+    /// where every entry errored left the queue as a clean success: no
+    /// dead-letter row, no event, nothing an app could show, and the writes
+    /// simply gone. Each refusal now lands in the dropped-mutation log under
+    /// its own id and emits ``SyncEvent/mutationDropped``, exactly as a
+    /// single-record mutation does.
+    ///
+    /// **An id the server named differently** is logged rather than
+    /// repaired. Both bulk doors are sent the id each local row was written
+    /// under and answer with the id they stored, so the two agreeing is the
+    /// contract; a create that disagrees means it broke. An upsert resolving
+    /// an existing row by `(source, source_id)` disagrees legitimately, and
+    /// the device then holds a row the server does not — but the answer
+    /// carries an id and not a row, so there is nothing here to adopt, and
+    /// fetching one per entry would turn a page into a page of round trips.
+    /// The catch-up import is what reconciles it; the log line is what makes
+    /// it visible in the meantime.
+    private func applyBulkResult(
+        entries: [BulkEntryOutcome],
+        queuedIds: [String?],
+        queuedPayloads: [String?],
+        record: PendingMutationRecord
+    ) async {
+        var refused: [MutationQueue.DroppedBulkEntry] = []
+
+        for entry in entries {
+            // The server indexes its answer against the page it was sent, so
+            // an index outside it means the two disagree about what was sent.
+            // Nothing here can act on that, and guessing an entry would
+            // attribute a refusal to the wrong row.
+            guard queuedIds.indices.contains(entry.index) else {
+                logger.log.error(
+                    "sync.bulk.entry_index_out_of_range kind=\(record.kind.rawValue, privacy: .public) index=\(entry.index, privacy: .public) sent=\(queuedIds.count, privacy: .public)"
+                )
+                continue
+            }
+            let queuedId = queuedIds[entry.index]
+
+            switch entry.outcome {
+            case .created, .updated:
+                if let queuedId, let served = entry.id, served != queuedId {
+                    logger.log.error(
+                        "sync.bulk.id_not_kept kind=\(record.kind.rawValue, privacy: .public) index=\(entry.index, privacy: .public) outcome=\(entry.outcome.rawValue, privacy: .public) sent=\(queuedId, privacy: .public) returned=\(served, privacy: .public)"
+                    )
+                }
+
+            case .skipped:
+                // A `create_only` page meeting a row that already exists.
+                // Nothing was written and nothing was lost — the row this
+                // entry describes is on the server either way.
+                logger.log.info(
+                    "sync.bulk.entry_skipped kind=\(record.kind.rawValue, privacy: .public) index=\(entry.index, privacy: .public) local_id=\(queuedId ?? "-", privacy: .public)"
+                )
+
+            case .errored:
+                // Status 0 rather than a fabricated HTTP code: the call
+                // itself answered 200 and this entry's refusal never had a
+                // status of its own. `DroppedMutationModel.errorStatus`
+                // reserves 0 for exactly that.
+                let error = MarfaError(
+                    code: entry.error?.code ?? "bulk_entry_errored",
+                    message: entry.error?.message
+                        ?? "The server refused entry \(entry.index) of this bulk page.",
+                    status: 0,
+                    details: ["index": .int(entry.index)]
+                )
+                refused.append(
+                    MutationQueue.DroppedBulkEntry(
+                        key: String(entry.index),
+                        localId: queuedId,
+                        payloadJson: queuedPayloads[entry.index] ?? "{}",
+                        error: error
+                    )
+                )
+            }
+        }
+
+        guard !refused.isEmpty else { return }
+
+        try? await mutationQueue.recordDroppedBulkEntries(
+            record: record,
+            entries: refused,
+            droppedAt: Date()
+        )
+        for entry in refused {
+            logger.log.error(
+                "sync.bulk.entry_dropped kind=\(record.kind.rawValue, privacy: .public) key=\(entry.key, privacy: .public) local_id=\(entry.localId ?? "-", privacy: .public) code=\(entry.error.code, privacy: .public)"
+            )
+            emit(.mutationDropped(
+                kind: record.kind.rawValue,
+                itemId: entry.localId,
+                attempt: record.attemptCount + 1,
+                error: entry.error
+            ))
+        }
+    }
+
+    /// The per-entry refusal inside an atomic rollback, when that is what
+    /// this error is.
+    ///
+    /// `POST /items/bulk` defaults to `atomic: true`, so one refused entry
+    /// rolls the page back and answers `400 bulk_atomic_rollback` carrying
+    /// `{ index, code, message }`. The 400 describes the rollback; the code
+    /// underneath describes what was actually wrong, and it is the only part
+    /// worth reporting to an app.
+    private static func atomicRollbackCode(_ error: MarfaError) -> String? {
+        guard error.code == "bulk_atomic_rollback" else { return nil }
+        return error.details?["code"]?.stringValue
+    }
+
+    /// The error worth reporting for a failure, which for an atomic rollback
+    /// is the refusal it carries rather than the wrapper that delivered it.
+    private static func reportedRefusal(_ error: MarfaError) -> MarfaError {
+        guard let code = atomicRollbackCode(error) else { return error }
+        return MarfaError(
+            code: code,
+            message: error.details?["message"]?.stringValue ?? error.message,
+            status: error.status,
+            details: error.details
+        )
+    }
+
+    /// Whether a replay failure is one no retry can clear.
+    ///
+    /// One place, because a status alone cannot answer it: a `409` is the
+    /// ordinary version conflict on an update and final on a create.
+    ///
+    /// **An atomic rollback needs no clause here, and that is a fact about
+    /// the server rather than an omission.** A rolled-back page arrives as a
+    /// `400`, which is already final, and every reason the route can roll a
+    /// page back on is a validation-class refusal of one entry's content —
+    /// an unknown type, a timestamp that does not parse, a type the
+    /// credential may not write. The codes one might expect to be worth
+    /// retrying cannot reach it: quota is reserved by a path this route does
+    /// not call, rate limits and a suspended space are refused by middleware
+    /// before the route runs, and a version conflict needs a version the
+    /// bulk update never sends. So a rollback is dead-lettered, and what
+    /// makes that safe is that the page wrote nothing.
+    ///
+    /// **Composes with the blocked-state classifier rather than competing
+    /// with it.** This answers "can a retry ever clear this", and only a
+    /// failure it calls final is dead-lettered. A failure it does not is
+    /// still queued, and what happens to it then — retried, or held in a
+    /// blocked state a person has to resolve — is the classifier's question,
+    /// asked after this one. A rollback never reaches it.
+    private static func isFinal(_ error: MarfaError, kind: MutationKind) -> Bool {
+        if error.isPermanent { return true }
+        return isUnresolvableCreateConflict(error, kind: kind)
     }
 
     /// Records the failure that ended a cycle — a replay that could not
@@ -2113,8 +2337,16 @@ public actor SyncEngine {
 
         case .bulk:
             let p = try decoder.decode(BulkPayload.self, from: data)
-            let _: BulkResult = try await transport.request(
+            let result: BulkResult = try await transport.request(
                 method: .post, path: "/items/bulk", body: p.input, query: nil
+            )
+            await applyBulkResult(
+                entries: result.results.map {
+                    BulkEntryOutcome(index: $0.index, outcome: $0.outcome, id: $0.id, error: $0.error)
+                },
+                queuedIds: p.input.items.map(\.id),
+                queuedPayloads: p.input.items.map { (try? Self.entryEncoder.encode($0)).flatMap { String(data: $0, encoding: .utf8) } },
+                record: record
             )
 
         case .bulkAction:
@@ -2126,15 +2358,24 @@ public actor SyncEngine {
             // cancelled / failed). Synced-mode replays never set `dry_run: true`
             // (dry-runs aren't enqueued in the first place), so the inline-200
             // fork is unreachable here.
-            _ = try await BulkActionRunner.runToCompletion(
+            let actionResult = try await BulkActionRunner.runToCompletion(
                 transport: transport,
                 input: p.input
             )
+            await applyBulkActionResult(actionResult, record: record)
 
         case .bulkEdges:
             let p = try decoder.decode(BulkEdgesPayload.self, from: data)
-            let _: BulkEdgeResult = try await transport.request(
+            let result: BulkEdgeResult = try await transport.request(
                 method: .post, path: "/edges/bulk", body: p.input, query: nil
+            )
+            await applyBulkResult(
+                entries: result.results.map {
+                    BulkEntryOutcome(index: $0.index, outcome: $0.outcome, id: $0.id, error: $0.error)
+                },
+                queuedIds: p.input.edges.map(\.id),
+                queuedPayloads: p.input.edges.map { (try? Self.entryEncoder.encode($0)).flatMap { String(data: $0, encoding: .utf8) } },
+                record: record
             )
         }
 

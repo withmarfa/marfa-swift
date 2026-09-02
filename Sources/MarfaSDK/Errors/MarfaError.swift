@@ -84,6 +84,18 @@ public final class ValidationError: MarfaError {
     public init(message: String, details: [String: JSONValue]? = nil) {
         super.init(code: "validation_error", message: message, status: 400, details: details)
     }
+
+    /// A 400 that named a code of its own.
+    ///
+    /// Most 400s are the generic validation failure and the default init
+    /// covers them. Some carry the whole of their meaning in the code
+    /// instead — `bulk_atomic_rollback` is one, and it says only that a page
+    /// was rolled back, with the entry and the reason in `details`. Flattening
+    /// those to `validation_error` at the parser loses the one field a caller
+    /// can act on.
+    public init(code: String, message: String, details: [String: JSONValue]? = nil) {
+        super.init(code: code, message: message, status: 400, details: details)
+    }
 }
 
 /// 401 — invalid or expired credentials.

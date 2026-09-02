@@ -89,8 +89,10 @@ extension PendingMutationModel {
 /// instances must never cross actors, so ``MutationQueue/fetchDropped``
 /// returns these.
 public struct DroppedMutationRecord: Sendable, Codable, Equatable, Identifiable {
-    /// UUIDv4 — preserved from the original ``PendingMutationRecord/id``
-    /// of the live row that was dropped.
+    /// The original ``PendingMutationRecord/id`` of the live row that was
+    /// dropped — a UUIDv4 when a whole record was retired, and that id with
+    /// `#<key>` appended when the row stands for one refused entry of a bulk
+    /// call.
     public var id: String
     public var kind: MutationKind
     public var payloadJson: String
@@ -877,6 +879,54 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
+    /// One entry of a bulk call the server refused, as the engine hands it
+    /// over for dead-lettering.
+    ///
+    /// A bulk call is one queue record carrying many writes, and the server
+    /// answers each of them separately. So the unit that fails is the entry,
+    /// not the record, and the entry is what an app has to be told about —
+    /// it is the row a person will notice is missing.
+    struct DroppedBulkEntry: Sendable {
+        /// What distinguishes this entry's dropped row from its siblings'.
+        /// The list doors have a position in the page; the action door has
+        /// no page and identifies an entry by the item id it failed on.
+        let key: String
+        /// The id the entry's local row was written under, where it had one.
+        let localId: String?
+        /// The entry alone rather than the call it traveled in. A page can
+        /// carry thousands, and the one that was refused is the only part
+        /// worth keeping.
+        let payloadJson: String
+        let error: MarfaError
+    }
+
+    /// Records one dropped row per refused entry of a bulk call, in one save.
+    ///
+    /// The call's own live row is not removed here, and that is the
+    /// difference from ``recordDropped(record:droppedAt:error:)``: the call
+    /// reached the server and is finished, so the ordinary success path
+    /// retires the record. What is dead-lettered is the entries inside it
+    /// that the server refused.
+    ///
+    /// Row ids are `<record id>#<key>` so a call contributing several rows
+    /// does not write them all under one id — ``DroppedMutationRecord`` is
+    /// `Identifiable` over that column, and duplicates there collapse in a
+    /// SwiftUI list built from ``DroppedMutationsQuery``.
+    func recordDroppedBulkEntries(
+        record: PendingMutationRecord,
+        entries: [DroppedBulkEntry],
+        droppedAt: Date
+    ) throws {
+        guard !entries.isEmpty else { return }
+        let stamp = Self.iso8601(droppedAt)
+        for entry in entries {
+            insertDroppedRow(
+                from: record, droppedAt: stamp, error: entry.error, entry: entry
+            )
+        }
+        try modelContext.save()
+    }
+
     public func fetchDropped() throws -> [DroppedMutationRecord] {
         let descriptor = FetchDescriptor<DroppedMutationModel>(
             sortBy: [SortDescriptor(\.droppedAt, order: .reverse)]
@@ -919,20 +969,47 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
-    /// Inserts a single ``DroppedMutationModel`` from a Sendable
-    /// record snapshot and a dropping ``MarfaError``. Caller is
-    /// responsible for the `modelContext.save()` so multiple inserts
-    /// can batch into a single SQLite transaction.
+    /// Inserts a single ``DroppedMutationModel`` from a Sendable record
+    /// snapshot and a dropping ``MarfaError``.
+    ///
+    /// `entry` is present when the row stands for one refused entry of a
+    /// bulk call rather than for the whole record, and it is the only thing
+    /// that varies between the two — the message cap and the details
+    /// encoding below are shared deliberately, so the two shapes cannot
+    /// drift into disagreeing about what a dropped row looks like. The
+    /// caller owns the `modelContext.save()`, so several inserts batch into
+    /// one SQLite transaction.
     private func insertDroppedRow(
         from record: PendingMutationRecord,
         droppedAt: String,
-        error: MarfaError
+        error: MarfaError,
+        entry: DroppedBulkEntry? = nil
     ) {
+        let rowId = entry.map { "\(record.id)#\($0.key)" } ?? record.id
+
+        // Idempotent by id, because the two writes a per-entry drop needs —
+        // the dead-letter rows here, and the removal of the live record by
+        // the caller's success path — are separate saves. A crash between
+        // them leaves the page queued with its rows already written, and the
+        // replay that follows sends the same page, is refused the same way,
+        // and arrives back here with the same ids. Inserting again would
+        // give one refused entry two rows, and an app counting what it has
+        // lost would count it twice.
+        //
+        // The first write wins rather than the last. A refusal that has
+        // already been recorded is the same refusal: the entry is unchanged,
+        // the server's answer is unchanged, and the only field that would
+        // move is `droppedAt`, where the earlier time is the truer one.
+        let existing = #Predicate<DroppedMutationModel> { $0.id == rowId }
+        var descriptor = FetchDescriptor<DroppedMutationModel>(predicate: existing)
+        descriptor.fetchLimit = 1
+        if (try? modelContext.fetch(descriptor).first) ?? nil != nil { return }
+
         let model = DroppedMutationModel()
-        model.id = record.id
+        model.id = rowId
         model.kindRaw = record.kind.rawValue
-        model.payloadJson = record.payloadJson
-        model.localId = record.localId
+        model.payloadJson = entry?.payloadJson ?? record.payloadJson
+        model.localId = entry?.localId ?? record.localId
         model.enqueuedAt = record.createdAt
         model.droppedAt = droppedAt
         model.attemptCount = record.attemptCount + 1
