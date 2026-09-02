@@ -986,13 +986,21 @@ public actor MutationQueue {
             return record.payloadJson
 
         case .bulk, .bulkAction, .bulkEdges:
-            // Bulk payloads don't reference specific in-flight local IDs
-            // that need rewriting: `bulk` items are keyed by
-            // `(source, source_id)`; `bulkAction` resolves matches via a
-            // filter at replay time; `bulkEdges` source/target IDs are
-            // the UUIDv7 stamps the bulk-items path persisted verbatim
-            // to the server. Nothing to rewrite if a createItem's local
-            // ID changes.
+            // Unreachable rather than merely unnecessary, and the reason is
+            // the queue's shape rather than anything about the payloads.
+            // None of the three enqueue a `localId`, and the rewrite loop
+            // fetches on exactly that column, so a bulk record is never
+            // handed to this function. The one caller is the `createItem`
+            // reconcile, which fires only when the server names a row
+            // something other than the id the device sent — and no door
+            // does that any more, on any of these paths.
+            //
+            // Worth stating because the obvious reading is now wrong: bulk
+            // items are no longer keyed only by `(source, source_id)`, since
+            // a synced page carries the primary id of every row the store
+            // wrote. If a future caller ever reaches here with one, these
+            // ids are the rows' own names on both sides and rewriting one
+            // would rename it on the server too.
             return record.payloadJson
         }
 
