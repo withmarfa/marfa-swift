@@ -5,8 +5,9 @@ import MarfaSDKTestSupport
 
 /// The initial sync's refusal to import over work that has not replayed.
 ///
-/// `upsertItem` replaces every column with no version check and `setMetadata`
-/// is replace rather than merge, and the conflict machinery is unreachable from
+/// `upsertItem` replaces every column with no version check and
+/// `upsertMetadata` replaces the whole metadata row, and the conflict
+/// machinery is unreachable from
 /// the import — it only runs on an outbound update meeting a 409. So before
 /// this the import silently preferred the server's older body to a local edit
 /// that had not left the device.

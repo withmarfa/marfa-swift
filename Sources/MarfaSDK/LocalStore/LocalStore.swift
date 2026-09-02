@@ -647,12 +647,20 @@ public actor LocalStore {
         return model.toWireMetadata()
     }
 
-    /// Replaces all metadata for an item (tags only — `extensions` is
-    /// reset to empty; the `setMetadata` contract is replace, not merge).
+    /// Replaces an item's tags with the supplied set, leaving its
+    /// extensions untouched.
+    ///
+    /// Mirrors `PUT /items/{id}/metadata`, which writes the tags column
+    /// and nothing else. A synced client writes here and replays that
+    /// route, so a local write that cleared the sidecar would disagree
+    /// with the server the moment the replay landed — and disagree
+    /// silently, since nothing reads the two back against each other.
     @discardableResult
     public func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
+        try requireItem(itemId)
+        let existing = try fetchMetadata(itemId: itemId)
         let metadata = Metadata(
-            extensions: [:],
+            extensions: existing.extensions,
             itemId: itemId,
             tags: input.tags ?? []
         )
@@ -660,10 +668,23 @@ public actor LocalStore {
         return metadata
     }
 
+    /// Stores a metadata row the server sent, replacing whatever is held
+    /// locally for that item — used by the sync engine.
+    ///
+    /// Tags and extensions are two halves of one row on the wire, and the
+    /// server sends both together on a `metadata.changed` event and on the
+    /// import. Writing them as a unit is what makes a namespace the server
+    /// has dropped go away here too; applying the halves separately leaves
+    /// a removal with no way to express itself.
+    public func upsertMetadata(_ metadata: Metadata) throws {
+        try writeMetadata(metadata, itemId: metadata.itemId)
+    }
+
     /// Merges metadata with existing values (set-union for tags;
     /// extensions are preserved).
     @discardableResult
     func mergeMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
+        try requireItem(itemId)
         let existing = try fetchMetadata(itemId: itemId)
         let merged = Metadata(
             extensions: existing.extensions,
@@ -682,6 +703,7 @@ public actor LocalStore {
 
     /// Removes a single tag from an item.
     func removeTag(itemId: String, tag: String) throws {
+        try requireItem(itemId)
         let existing = try fetchMetadata(itemId: itemId)
         let updated = Metadata(
             extensions: existing.extensions,
@@ -742,6 +764,7 @@ public actor LocalStore {
         namespace: String,
         data: [String: JSONValue]
     ) throws -> [String: [String: JSONValue]] {
+        try requireItem(itemId)
         let existing = try fetchMetadata(itemId: itemId)
         var map = Self.unwrapExtensions(existing.extensions)
         map[namespace] = data
@@ -756,6 +779,7 @@ public actor LocalStore {
 
     /// Removes a namespaced extension from an item.
     func deleteExtension(itemId: String, namespace: String) throws {
+        try requireItem(itemId)
         let existing = try fetchMetadata(itemId: itemId)
         var map = Self.unwrapExtensions(existing.extensions)
         map.removeValue(forKey: namespace)
@@ -779,6 +803,25 @@ public actor LocalStore {
     }
 
     // MARK: - Private helpers
+
+    /// Refuses a metadata or extension write against an item this store does
+    /// not hold, the way every one of those routes refuses it server-side.
+    ///
+    /// Without this the write succeeds and orphans itself: a metadata row is
+    /// attached to its parent only at the moment it is inserted, and
+    /// `upsertItem` never adopts a row already sitting there — so the item
+    /// arriving later does not repair it. The row is then invisible to every
+    /// read that reaches metadata through the item, and no second write fixes
+    /// it either, because the row now exists and the insert path is the only
+    /// one that attaches.
+    private func requireItem(_ itemId: String) throws {
+        let predicate = #Predicate<MarfaItemModel> { $0.id == itemId }
+        var descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard try modelContext.fetch(descriptor).first != nil else {
+            throw NotFoundError(message: "Item \(itemId) not found")
+        }
+    }
 
     /// Upsert path for the metadata row. Looks up by `itemId`, mutates
     /// in place, or inserts a fresh row attached to the parent item if

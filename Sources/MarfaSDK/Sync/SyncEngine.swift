@@ -12,13 +12,13 @@ private struct EdgeEventPayload: Decodable {
 }
 
 private struct MetadataEventPayload: Decodable {
-    let itemId: String
-    let metadata: Metadata
-
-    enum CodingKeys: String, CodingKey {
-        case itemId = "item_id"
-        case metadata
-    }
+    let item: Item
+    // Optional because the server's envelope makes it so: the metadata key is
+    // spread in only when the event carries a row. Requiring it here would put
+    // a publisher that ever omits it straight back to a frame that fails to
+    // decode and is dropped in silence, which is the defect this decoder
+    // already had once.
+    let metadata: Metadata?
 }
 
 // MARK: - SyncEngine
@@ -519,8 +519,8 @@ public actor SyncEngine {
     /// delivers events since the cursor, so without this call a freshly
     /// signed-in app shows an empty store even when the server has history.
     ///
-    /// Safe to call repeatedly — `upsertItem`, `setMetadata` and `upsertEdge`
-    /// are all idempotent.
+    /// Safe to call repeatedly — `upsertItem`, `upsertMetadata` and
+    /// `upsertEdge` are all idempotent.
     ///
     /// - Parameter pageSize: Server-side page size for each request. Clamped
     ///   to 500 for the edge pass, which is that route's ceiling.
@@ -568,7 +568,7 @@ public actor SyncEngine {
     /// Refuses the import while the queue still holds work, rather than
     /// overwriting it. Every row the import receives goes through
     /// `upsertItem`, which replaces all of an item's columns with no version
-    /// check, and `setMetadata`, whose contract is replace rather than merge.
+    /// check, and `upsertMetadata`, which replaces the whole metadata row.
     /// The conflict machinery is unreachable from here — it only runs on an
     /// outbound update meeting a 409. So an edit made offline and still queued
     /// loses to the server's older body, with nothing reporting it.
@@ -619,8 +619,7 @@ public actor SyncEngine {
 
             for pair in page.data {
                 try await localStore.upsertItem(pair.item)
-                let input = MetadataInput(tags: pair.metadata.tags)
-                _ = try await localStore.setMetadata(itemId: pair.item.id, input: input)
+                try await localStore.upsertMetadata(pair.metadata)
                 imported += 1
             }
 
@@ -1185,9 +1184,24 @@ public actor SyncEngine {
 
         case "metadata.changed":
             if let payload = decodeOrLog(MetadataEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                let input = MetadataInput(tags: payload.metadata.tags)
-                _ = try await localStore.setMetadata(itemId: payload.itemId, input: input)
-                emit(.itemUpdated(id: payload.itemId))
+                // The item first, and not only for completeness: a metadata
+                // row is attached to its item when it is written, so storing
+                // the sidecar for an item this device has never seen would
+                // orphan it — present in the store, absent from every read
+                // that reaches it through the item. A tag on another device
+                // is reason enough for this frame to be the first mention of
+                // an item created before this device's cursor.
+                //
+                // The item is applied on every such frame rather than only an
+                // unknown one, which carries the same exposure `item.updated`
+                // already has: a frame landing over an edit this device has
+                // queued replaces the local row with the server's, and the
+                // edit converges when its own replay reaches the server.
+                try await localStore.upsertItem(payload.item)
+                if let metadata = payload.metadata {
+                    try await localStore.upsertMetadata(metadata)
+                }
+                emit(.itemUpdated(id: payload.item.id))
             }
 
         case "catchup_too_old":

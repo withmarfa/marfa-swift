@@ -17,6 +17,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - **An engine started on a `ConnectionStateManager` that is already online opens a stream.** `ConnectionStateManager.start()` is idempotent, so an app that started the manager itself left the engine with no transition to act on and no stream at all until the next network flap.
 
+- **A synced client applies `metadata.changed` events, which it never has.** The engine decoded the event as `{ item_id, metadata }`; the server sends `{ type, item, metadata }`, the same envelope as every other item event. Every such frame failed to decode and was dropped, so nothing another device did to an item's tags or extensions reached a synced client until it re-imported. Nothing exercised the decode against a real frame, which is why the stream looked healthy the whole time.
+
+- **The initial import carries extensions.** `performInitialSync` mapped each row to `MetadataInput(tags:)` and dropped the extensions the wire had already sent, so an app reading sidecar state the server held saw nothing and had no second pass that would ever fill it in.
+
+- **`LocalStore.setMetadata` no longer clears an item's extensions.** It replaced the whole row with a tags-only one. It backs `client.metadata.set`, which replays `PUT /items/{id}/metadata` — a route that writes the tags column and touches nothing else — so the local write disagreed with the server the moment the replay landed, and disagreed silently. Its signature is unchanged; only what it does to extensions is.
+
+- **A metadata or extension write against an item the local store does not hold now throws `NotFoundError` instead of orphaning a row.** `LocalStore.setMetadata`, `mergeMetadata`, `setExtension`, `deleteExtension` and `removeTag` all refuse, mirroring the 404 their routes answer with. `removeTag` is the one that reads as harmless and is not: it fetched an empty row, filtered nothing out of it, and wrote it back, inserting a detached row on behalf of a call whose whole purpose was to take something away. Writing anyway did not merely differ from the server: a metadata row attaches to its item as it is inserted and `upsertItem` never adopts one already sitting there, so the row stayed invisible to every read that reaches metadata through the item, and the item arriving later did not repair it. `addTags` refuses too, through `mergeMetadata`.
+
 ### Changed
 
 - **What an app watches while the first import runs is `SyncEngine.fullSyncState` and `FullSyncStateQuery`.** No sync event was added for it. A store that has never imported reads `notYetSynced` until the import lands — `syncing` while queued writes are replaying — and `synced(at:)` once it does. An import that fails reads `failed(at:error:)`, the stream opens regardless so the device is not also deaf to what happens next, and the next online cycle tries again. The engine takes that retry decision from `SyncEngine.lastFullSyncAt`, which a completed import stamps and nothing else does, rather than from the state it renders.
@@ -24,6 +32,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - **A store that has never completed an import can no longer report `synced(at:)`, and `SyncEvent.synced(at:)` is not emitted for one.** An empty mutation queue on a store with nothing in it is a device that has not started, not a device in sync. Before this, a write queued before the first start reported itself caught up from the drain that runs in front of the import, so an app was told it was up to date while showing an empty library. The first `synced(at:)` a fresh store reports is now the one its import lands. A store that has already imported is unaffected.
 
 - **A failed retention-gap resync now reports `failed(at:error:)` as well as logging.** When the server has discarded the events a device's cursor points at, the resync that follows goes through the same catch-up as every other, so a failure reaches `SyncEngine.fullSyncState` instead of only the log. The two `sync.catchup_too_old` log lines are unchanged.
+
+- **`LocalStoreWriting` drops `LocalStoreWriting.setMetadata` and gains `LocalStoreWriting.upsertMetadata`.** **This breaks every conformer**: a protocol that gains a requirement stops compiling for anyone who implements it, and one that loses a requirement takes the witness with it. The protocol is the seam the sync engine writes through, and the engine no longer performs a tags-only metadata write at all — an event and an import both carry the server's whole row. A conformer replaces `func setMetadata(itemId:input:) async throws -> Metadata` with `func upsertMetadata(_ metadata: Metadata) async throws`.
+
+- **`LocalStore.upsertMetadata` is new**, alongside `upsertItem` and `upsertEdge`: it stores a metadata row the server sent, replacing the local one wholesale. Tags and extensions are two halves of one row on the wire, so writing them as a unit is what lets a namespace the server has dropped go away on the device too. `LocalStore.setMetadata` remains for the tag-replace a consumer asks for.
+
+- **Inbound metadata replaces rather than merges, extensions included.** A `metadata.changed` event and the initial import both make the local row the server's row, so a namespace absent from what the server sent is removed locally, and a namespace the server holds replaces the local one whole rather than merging key by key. An extension written while offline is not lost to this: it replays, the server emits the change, and the row that comes back carries it.
+
+- **A `metadata.changed` frame stores the item it carries, on every such frame rather than only for an unknown item.** A metadata row attaches to its item as it is written, and a tag added elsewhere can be the first this device hears of an item created before its cursor. Applying the item unconditionally carries the same exposure `item.updated` already has — a frame landing over an edit this device has queued replaces the local row with the server's — and it converges the same way, when the queued edit replays.
+
+- **The event's `metadata` is optional.** The server spreads that key into the envelope only when the event carries a row, so a frame without one now stores the item alone rather than failing to decode and being dropped in silence.
 
 ## [15.0.0] — 2026-09-01
 

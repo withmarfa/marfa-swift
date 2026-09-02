@@ -40,9 +40,7 @@ actor FailingLocalStore: LocalStoreWriting {
 
     func deleteEdge(id: String) throws {}
 
-    func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
-        Metadata(extensions: [:], itemId: itemId, tags: input.tags ?? [])
-    }
+    func upsertMetadata(_ metadata: Metadata) throws {}
 
     func purgeItem(id: String) throws {}
 }
