@@ -125,6 +125,22 @@ struct ExtensionsLocalFirstTests {
         #expect(namespace?["foo"] == .string("bar"))
     }
 
+    @Test("MetadataNamespace.set refuses an item the store does not hold")
+    func metadataSetRefusesAnUnknownItem() async throws {
+        let (store, queue) = try await makeStoreAndQueue()
+        let transport = MockTransport()
+        let metadata = MetadataNamespace(transport: transport, localStore: store, mutationQueue: queue)
+
+        // The server answers 404 here, and writing anyway does not merely
+        // differ from it — the row attaches to its item only as it is
+        // inserted and `upsertItem` never adopts one, so the write would be
+        // invisible for good the moment it succeeded.
+        await #expect(throws: NotFoundError.self) {
+            _ = try await metadata.set(itemId: "never-created", input: MetadataInput(tags: ["x"]))
+        }
+        #expect(try await queue.fetchAll().isEmpty)
+    }
+
     // MARK: - Pure-local blobs guard
 
     @Test("Blobs upload throws LocalModeUnsupportedError on local client") func blobsUploadThrowsOnLocalClient() async throws {

@@ -11,16 +11,23 @@ import Testing
 /// on one device reached another only when that device re-imported. So these
 /// tests feed the envelope verbatim — `{ type, item, metadata }`, the same
 /// shape every item event uses — rather than a payload shaped to the decoder.
+///
+/// Each frame goes straight through `_applyEventForTesting`. Nothing here is
+/// about the stream, and driving one through `start()` would put a connection
+/// transition and a poll between the frame and the assertion, so a failure
+/// would arrive as a timeout that a busy machine can produce on its own.
 @Suite("What a metadata.changed event applies", .timeLimit(.minutes(1)))
 struct SyncEngineMetadataEventTests {
 
     // MARK: - Fixtures
 
     /// The server's envelope for a metadata event, encoded as it arrives.
+    /// `metadata` is spread in only when the event carries a row, so it is
+    /// omitted from the JSON entirely when absent rather than sent as null.
     private struct MetadataFrame: Encodable {
         let type: String
         let item: Item
-        let metadata: Metadata
+        let metadata: Metadata?
     }
 
     private func item(_ id: String, body: String = "b") -> Item {
@@ -40,22 +47,23 @@ struct SyncEngineMetadataEventTests {
     }
 
     private func frame(
-        id: String,
         item: Item,
-        tags: [String],
-        extensions: [String: [String: JSONValue]]
+        tags: [String]?,
+        extensions: [String: [String: JSONValue]] = [:]
     ) throws -> SSEEvent {
-        let wrapped = extensions.mapValues { JSONValue.dictionary($0) }
-        let payload = MetadataFrame(
-            type: "metadata.changed",
-            item: item,
-            metadata: Metadata(extensions: wrapped, itemId: item.id, tags: tags)
-        )
-        let data = try JSONEncoder().encode(payload)
+        let metadata = tags.map {
+            Metadata(
+                extensions: extensions.mapValues { JSONValue.dictionary($0) },
+                itemId: item.id,
+                tags: $0
+            )
+        }
+        let payload = MetadataFrame(type: "metadata.changed", item: item, metadata: metadata)
+        let encoder = JSONEncoder()
         return SSEEvent(
-            id: id,
+            id: "evt-1",
             event: "metadata.changed",
-            data: String(data: data, encoding: .utf8) ?? ""
+            data: String(data: try encoder.encode(payload), encoding: .utf8) ?? ""
         )
     }
 
@@ -67,78 +75,58 @@ struct SyncEngineMetadataEventTests {
 
     @Test("the frame the server sends changes the tags and lands the extensions")
     func theRealFrameApplies() async throws {
-        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         let extensions = ExtensionsNamespace(
             transport: transport, localStore: store, mutationQueue: queue
         )
         let stored = try await store.createItem(noteInput())
 
-        transport.enqueueEvents([
+        await engine._applyEventForTesting(
             try frame(
-                id: "evt-1",
                 item: item(stored.id),
                 tags: ["urgent"],
                 extensions: ["app": ["state": .string("from the server")]]
             )
-        ])
+        )
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "the event's tag to reach the local metadata row"
-        ) {
-            (try? await store.fetchMetadata(itemId: stored.id))?.tags.contains("urgent") ?? false
-        }
-
+        #expect(try await store.fetchMetadata(itemId: stored.id).tags == ["urgent"])
         let namespace = try await extensions.get(itemId: stored.id, namespace: "app")
         #expect(namespace?["state"] == .string("from the server"))
-        await engine.stop()
     }
 
-    @Test("an extension the event carries is still there afterwards")
-    func anExtensionTheEventCarriesSurvives() async throws {
-        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+    @Test("the event's value for a namespace replaces the local one whole")
+    func theEventsNamespaceReplacesTheLocalOne() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         let extensions = ExtensionsNamespace(
             transport: transport, localStore: store, mutationQueue: queue
         )
         let stored = try await store.createItem(noteInput())
         _ = try await store.setExtension(
-            itemId: stored.id, namespace: "app", data: ["state": .string("written here")]
+            itemId: stored.id,
+            namespace: "app",
+            data: ["state": .string("written here"), "only-local": .string("x")]
         )
 
-        // The write above reached the server before the tag was added
-        // elsewhere, so the row the event carries holds it. An app that wrote
-        // an extension has no way to know the next tag from anywhere would
-        // take it, which is what made the old behavior silent.
-        transport.enqueueEvents([
+        // A namespace is one value, not a bag of keys to merge into: the
+        // server holds what it holds, and a key another device removed has no
+        // event of its own to announce it. Asserting the value the test wrote
+        // would pass against a handler that ignored extensions entirely.
+        await engine._applyEventForTesting(
             try frame(
-                id: "evt-1",
                 item: item(stored.id),
                 tags: ["tagged-elsewhere"],
-                extensions: ["app": ["state": .string("written here")]]
+                extensions: ["app": ["state": .string("changed elsewhere")]]
             )
-        ])
-
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "the event's tag to reach the local metadata row"
-        ) {
-            (try? await store.fetchMetadata(itemId: stored.id))?.tags.contains("tagged-elsewhere") ?? false
-        }
+        )
 
         let namespace = try await extensions.get(itemId: stored.id, namespace: "app")
-        #expect(namespace?["state"] == .string("written here"))
-        await engine.stop()
+        #expect(namespace?["state"] == .string("changed elsewhere"))
+        #expect(namespace?["only-local"] == nil)
     }
 
     @Test("a namespace the event leaves out is removed")
     func aNamespaceAbsentFromTheEventIsRemoved() async throws {
-        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         let extensions = ExtensionsNamespace(
             transport: transport, localStore: store, mutationQueue: queue
         )
@@ -149,64 +137,57 @@ struct SyncEngineMetadataEventTests {
         // The row is the server's, so a namespace it does not mention is one
         // the server no longer holds — a removal from another device reaches
         // this one as an absence rather than as its own event.
-        transport.enqueueEvents([
-            try frame(
-                id: "evt-1",
-                item: item(stored.id),
-                tags: [],
-                extensions: ["kept": ["k": .string("v")]]
-            )
-        ])
+        await engine._applyEventForTesting(
+            try frame(item: item(stored.id), tags: [], extensions: ["kept": ["k": .string("v")]])
+        )
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "the namespace the event left out to be gone locally"
-        ) {
-            (try? await extensions.get(itemId: stored.id, namespace: "dropped")) == nil
-        }
-
+        #expect(try await extensions.get(itemId: stored.id, namespace: "dropped") == nil)
         let kept = try await extensions.get(itemId: stored.id, namespace: "kept")
         #expect(kept?["k"] == .string("v"))
-        await engine.stop()
     }
 
     @Test("a frame for an item this device has never seen lands both halves")
     func aFrameForAnUnknownItemLandsTheItemToo() async throws {
-        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         let metadata = MetadataNamespace(
             transport: transport, localStore: store, mutationQueue: queue
         )
         let unknown = item("server-never-seen")
 
-        transport.enqueueEvents([
-            try frame(
-                id: "evt-1",
-                item: unknown,
-                tags: ["arrived"],
-                extensions: [:]
-            )
-        ])
+        await engine._applyEventForTesting(
+            try frame(item: unknown, tags: ["arrived"])
+        )
 
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "the item the frame carried to be in the store"
-        ) {
-            (try? await store.fetchItem(id: unknown.id)) != nil
-        }
-
+        #expect(try await store.fetchItem(id: unknown.id).id == unknown.id)
         #expect(try await metadata.get(itemId: unknown.id).tags == ["arrived"])
-        // A metadata row written with no item to attach to contributes no
-        // tags: `listTags` counts only rows whose parent item is present.
-        // This is what tells a stored-both-halves apart from a stored-the-
-        // sidecar-and-orphaned-it.
+        // `listTags` counts only rows whose parent item is present, so this
+        // discriminates the write order rather than the item write itself:
+        // storing the metadata before the item leaves the row detached, and
+        // nothing afterwards attaches it — the tag would be readable through
+        // `metadata.get` and invisible to every aggregate over the store.
         let tags = try await metadata.listTags()
         #expect(tags.contains { $0.tag == "arrived" && $0.count == 1 })
-        await engine.stop()
+    }
+
+    @Test("a frame carrying no metadata stores the item and nothing else")
+    func aFrameWithoutMetadataStoresOnlyTheItem() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        let metadata = MetadataNamespace(
+            transport: transport, localStore: store, mutationQueue: queue
+        )
+        let stored = try await store.createItem(noteInput())
+        _ = try await store.setMetadata(itemId: stored.id, input: MetadataInput(tags: ["kept"]))
+
+        // The server spreads `metadata` into the envelope only when the event
+        // carries a row, so the key is genuinely absent rather than null. A
+        // decoder that required it would fail the frame and drop it silently,
+        // which is exactly how this event came to be ignored in the first
+        // place — so the absence has to be a shape the decoder accepts.
+        await engine._applyEventForTesting(
+            try frame(item: item(stored.id, body: "edited elsewhere"), tags: nil)
+        )
+
+        #expect(try await store.fetchItem(id: stored.id).properties["body"] == .string("edited elsewhere"))
+        #expect(try await metadata.get(itemId: stored.id).tags == ["kept"])
     }
 }

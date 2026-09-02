@@ -23,6 +23,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - **`LocalStore.setMetadata` no longer clears an item's extensions.** It replaced the whole row with a tags-only one. It backs `client.metadata.set`, which replays `PUT /items/{id}/metadata` — a route that writes the tags column and touches nothing else — so the local write disagreed with the server the moment the replay landed, and disagreed silently. Its signature is unchanged; only what it does to extensions is.
 
+- **A metadata or extension write against an item the local store does not hold now throws `NotFoundError` instead of orphaning a row.** `LocalStore.setMetadata`, `mergeMetadata`, `setExtension` and `deleteExtension` all refuse, mirroring the 404 their routes answer with. Writing anyway did not merely differ from the server: a metadata row attaches to its item as it is inserted and `upsertItem` never adopts one already sitting there, so the row stayed invisible to every read that reaches metadata through the item, and the item arriving later did not repair it. `addTags` refuses too, through `mergeMetadata`.
+
 ### Changed
 
 - **What an app watches while the first import runs is `SyncEngine.fullSyncState` and `FullSyncStateQuery`.** No sync event was added for it. A store that has never imported reads `notYetSynced` until the import lands — `syncing` while queued writes are replaying — and `synced(at:)` once it does. An import that fails reads `failed(at:error:)`, the stream opens regardless so the device is not also deaf to what happens next, and the next online cycle tries again. The engine takes that retry decision from `SyncEngine.lastFullSyncAt`, which a completed import stamps and nothing else does, rather than from the state it renders.
@@ -35,7 +37,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - **`LocalStore.upsertMetadata` is new**, alongside `upsertItem` and `upsertEdge`: it stores a metadata row the server sent, replacing the local one wholesale. Tags and extensions are two halves of one row on the wire, so writing them as a unit is what lets a namespace the server has dropped go away on the device too. `LocalStore.setMetadata` remains for the tag-replace a consumer asks for.
 
-- **Inbound metadata replaces rather than merges, extensions included.** A `metadata.changed` event and the initial import both make the local row the server's row, so a namespace absent from what the server sent is removed locally. An extension written while offline is not lost to this: it replays, the server emits the change, and the row that comes back carries it. A `metadata.changed` frame for an item the device has not seen now stores the item it carries as well as the metadata, rather than leaving a row attached to nothing.
+- **Inbound metadata replaces rather than merges, extensions included.** A `metadata.changed` event and the initial import both make the local row the server's row, so a namespace absent from what the server sent is removed locally, and a namespace the server holds replaces the local one whole rather than merging key by key. An extension written while offline is not lost to this: it replays, the server emits the change, and the row that comes back carries it.
+
+- **A `metadata.changed` frame stores the item it carries, on every such frame rather than only for an unknown item.** A metadata row attaches to its item as it is written, and a tag added elsewhere can be the first this device hears of an item created before its cursor. Applying the item unconditionally carries the same exposure `item.updated` already has — a frame landing over an edit this device has queued replaces the local row with the server's — and it converges the same way, when the queued edit replays.
+
+- **The event's `metadata` is optional.** The server spreads that key into the envelope only when the event carries a row, so a frame without one now stores the item alone rather than failing to decode and being dropped in silence.
 
 ## [15.0.0] — 2026-09-01
 

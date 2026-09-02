@@ -117,6 +117,33 @@ struct SyncEngineInitialSyncImportTests {
         #expect(namespace?["state"] == .string("held by the server"))
     }
 
+    @Test("a namespace the imported row leaves out is gone afterwards")
+    func importRemovesANamespaceTheServerNoLongerHolds() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        let extensions = ExtensionsNamespace(
+            transport: transport, localStore: store, mutationQueue: queue
+        )
+        try await store.upsertItem(item("i1"))
+        _ = try await store.setExtension(itemId: "i1", namespace: "stale", data: ["k": .string("v")])
+        transport.enqueue(
+            PaginatedResult<ItemWithMetadata>(
+                data: [pair("i1", extensions: ["current": ["k": .string("v")]])],
+                cursor: nil,
+                hasMore: false
+            )
+        )
+        transport.enqueue(noEdges())
+
+        _ = try await engine.performInitialSync()
+
+        // Landing the namespaces the row carries is not the whole contract:
+        // a write that set each of them in turn would pass the test above and
+        // still leave a namespace the server has dropped alive here, where a
+        // re-import is the one thing that would otherwise clear it.
+        #expect(try await extensions.get(itemId: "i1", namespace: "stale") == nil)
+        #expect(try await extensions.get(itemId: "i1", namespace: "current") != nil)
+    }
+
     @Test("it keeps paging until the server says there is no more")
     func importsPastTheFirstPage() async throws {
         let (store, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()

@@ -13,7 +13,12 @@ private struct EdgeEventPayload: Decodable {
 
 private struct MetadataEventPayload: Decodable {
     let item: Item
-    let metadata: Metadata
+    // Optional because the server's envelope makes it so: the metadata key is
+    // spread in only when the event carries a row. Requiring it here would put
+    // a publisher that ever omits it straight back to a frame that fails to
+    // decode and is dropped in silence, which is the defect this decoder
+    // already had once.
+    let metadata: Metadata?
 }
 
 // MARK: - SyncEngine
@@ -1186,8 +1191,16 @@ public actor SyncEngine {
                 // that reaches it through the item. A tag on another device
                 // is reason enough for this frame to be the first mention of
                 // an item created before this device's cursor.
+                //
+                // The item is applied on every such frame rather than only an
+                // unknown one, which carries the same exposure `item.updated`
+                // already has: a frame landing over an edit this device has
+                // queued replaces the local row with the server's, and the
+                // edit converges when its own replay reaches the server.
                 try await localStore.upsertItem(payload.item)
-                try await localStore.upsertMetadata(payload.metadata)
+                if let metadata = payload.metadata {
+                    try await localStore.upsertMetadata(metadata)
+                }
                 emit(.itemUpdated(id: payload.item.id))
             }
 
