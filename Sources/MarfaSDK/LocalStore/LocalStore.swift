@@ -703,6 +703,7 @@ public actor LocalStore {
 
     /// Removes a single tag from an item.
     func removeTag(itemId: String, tag: String) throws {
+        try requireItem(itemId)
         let existing = try fetchMetadata(itemId: itemId)
         let updated = Metadata(
             extensions: existing.extensions,

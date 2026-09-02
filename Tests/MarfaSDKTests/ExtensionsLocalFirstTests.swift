@@ -141,6 +141,22 @@ struct ExtensionsLocalFirstTests {
         #expect(try await queue.fetchAll().isEmpty)
     }
 
+    @Test("MetadataNamespace.removeTag refuses an item the store does not hold")
+    func metadataRemoveTagRefusesAnUnknownItem() async throws {
+        let (store, queue) = try await makeStoreAndQueue()
+        let transport = MockTransport()
+        let metadata = MetadataNamespace(transport: transport, localStore: store, mutationQueue: queue)
+
+        // Removing a tag from an item that is not here reads as a no-op and is
+        // not one: the row is fetched empty, filtered to nothing, and then
+        // written — inserting a detached row on the way out, for a call whose
+        // whole purpose was to take something away.
+        await #expect(throws: NotFoundError.self) {
+            try await metadata.removeTag(itemId: "never-created", tag: "x")
+        }
+        #expect(try await queue.fetchAll().isEmpty)
+    }
+
     // MARK: - Pure-local blobs guard
 
     @Test("Blobs upload throws LocalModeUnsupportedError on local client") func blobsUploadThrowsOnLocalClient() async throws {
