@@ -1611,13 +1611,36 @@ public actor SyncEngine {
 
         case .createEdge:
             let p = try decoder.decode(CreateEdgePayload.self, from: data)
+            // The id the local store minted when the app made this edge. It
+            // lives in the record's own column rather than the payload —
+            // `enqueueCreateEdge` puts it there and the cascade logic already
+            // reads it as the edge's id. Sending it is what keeps the
+            // server's row under the id this device has already written, so
+            // the `edge.created` echo that follows updates that row instead
+            // of inserting a second one beside it.
             let body = CreateEdgeBody(
+                id: record.localId,
                 sourceId: p.source, targetId: p.target,
                 edgeType: p.edgeType, properties: p.properties
             )
-            let _: EdgeResponse = try await transport.request(
+            let response: EdgeResponse = try await transport.request(
                 method: .post, path: "/edges", body: body, query: nil
             )
+            // The route keeps the id it is given, so a different one coming
+            // back means that contract broke. Nothing here can repair it —
+            // the local row is already under the old id and the app may hold
+            // that id — but a duplicate row appearing with no trace of why is
+            // what made this defect expensive to find, so say so.
+            if let localId = record.localId, response.edge.id != localId {
+                logger.log.error(
+                    "sync.edge.id_not_kept sent=\(localId, privacy: .public) returned=\(response.edge.id, privacy: .public)"
+                )
+            }
+            // Adopt the server's copy, which carries the space and the
+            // timestamps the local mint could not know. A repeat the server
+            // acknowledges answers with the row it already holds and lands
+            // here the same way.
+            try await localStore.upsertEdge(response.edge)
 
         case .updateEdge:
             let p = try decoder.decode(UpdateEdgePayload.self, from: data)

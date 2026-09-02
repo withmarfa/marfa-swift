@@ -441,6 +441,269 @@ struct SyncEngineReplayTests {
         await engine.stop()
     }
 
+    // MARK: - Edge create replay
+
+    /// The tests below are one contract seen from several sides: an edge the
+    /// device wrote keeps its id all the way to the server, so the row the
+    /// device holds is the row the server holds.
+    ///
+    /// They build the edge through ``EdgesNamespace`` rather than by enqueuing
+    /// a record directly, because the id under test is the one the local store
+    /// writes the row under. A hand-written queue record would assert against
+    /// an id the test chose, which is the one value that cannot be wrong.
+    ///
+    /// The ones that need a server whose answer depends on the request run
+    /// against ``EdgeMintingTransport``; see that type for why a canned answer
+    /// cannot see this defect. The upsert tests deliberately use
+    /// `MockTransport` instead, because it delivers no echo — an echo re-lands
+    /// the same row under the same id, so a test that receives one stays green
+    /// with the replay's own upsert deleted.
+    private func syncedEdges(
+        transport: any Transport, store: LocalStore, queue: MutationQueue
+    ) -> EdgesNamespace {
+        EdgesNamespace(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            maxBackrefBatchConcurrency: 8
+        )
+    }
+
+    private func mintingFixture() async throws -> (
+        LocalStore, MutationQueue, EdgeMintingTransport, ConnectionStateManager, SyncEngine
+    ) {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        try await SyncEngineTestKit.markImported(queue)
+        let transport = EdgeMintingTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+        return (store, queue, transport, connManager, engine)
+    }
+
+    /// The server's copy of a row the device wrote: the same id, carrying a
+    /// space and a timestamp the local mint cannot produce.
+    private func serverCopy(of edge: Edge) -> Edge {
+        Edge(
+            createdAt: EdgeMintingTransport.stampedAt,
+            edgeType: edge.edgeType,
+            id: edge.id,
+            properties: edge.properties,
+            sourceId: edge.sourceId,
+            spaceId: EdgeMintingTransport.spaceId,
+            targetId: edge.targetId,
+            updatedAt: EdgeMintingTransport.stampedAt
+        )
+    }
+
+    @Test("the replayed edge create carries the id the device minted")
+    func edgeReplaySendsTheMintedId() async throws {
+        let (store, queue, transport, connManager, engine) = try await mintingFixture()
+        let edges = syncedEdges(transport: transport, store: store, queue: queue)
+
+        let created = try await edges.create(
+            source: "src", target: "tgt", edgeType: "about"
+        )
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
+            (try? await queue.isEmpty) == true
+        }
+
+        let post = try #require(
+            await transport.calls.first { $0.method == .post && $0.path == "/edges" }
+        )
+        let sent = try JSONSerialization.jsonObject(
+            with: try #require(post.body)
+        ) as? [String: Any]
+        #expect(sent?["id"] as? String == created.id)
+        await engine.stop()
+    }
+
+    @Test("an edge created here is one row here once the server echoes it back")
+    func edgeCreatedHereStaysOneRow() async throws {
+        let (store, queue, transport, connManager, engine) = try await mintingFixture()
+        let edges = syncedEdges(transport: transport, store: store, queue: queue)
+
+        let created = try await edges.create(
+            source: "src", target: "tgt", edgeType: "about"
+        )
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        // The echo is what puts a second row in the store, so wait for it to
+        // land rather than racing it: a count taken before it arrives passes
+        // for the wrong reason and stays green after a fix that changed
+        // nothing. The cursor moving is the device having applied it.
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-1\""
+        ) {
+            (try? await queue.loadSyncState(key: "last_event_id")) == "evt-1"
+        }
+
+        let local = try await store.fetchEdgesFromSource(
+            sourceId: "src", edgeType: "about", cursor: nil, limit: nil
+        )
+        #expect(
+            local.data.count == 1,
+            "local edge ids from that source: \(local.data.map(\.id))"
+        )
+        #expect(local.data.first?.id == created.id)
+        await engine.stop()
+    }
+
+    @Test("a bulk edge create keeps the ids the device wrote its rows under")
+    func bulkEdgeReplayKeepsLocalIds() async throws {
+        let (store, queue, transport, connManager, engine) = try await mintingFixture()
+        let edges = syncedEdges(transport: transport, store: store, queue: queue)
+
+        // One edge the caller names itself and one it leaves to the store.
+        // Both have local rows before anything reaches the network, and both
+        // have to reach the server under those ids. `emitEvents` is on
+        // because the echo is the half that duplicates the row, and the bulk
+        // route publishes nothing unless the caller asks.
+        let callerId = "01a06000-0000-7000-8000-00000000000a"
+        let result = try await edges.bulk(
+            BulkEdgeInput(
+                edges: [
+                    BulkEdgeInputItem(
+                        id: callerId, sourceId: "src", targetId: "tgt-1", edgeType: "about"
+                    ),
+                    BulkEdgeInputItem(
+                        sourceId: "src", targetId: "tgt-2", edgeType: "about"
+                    ),
+                ],
+                emitEvents: true
+            )
+        )
+        let named = try #require(result.results.first { $0.index == 0 })
+        let unnamed = try #require(result.results.first { $0.index == 1 })
+        // The caller's own id names the local row, rather than being dropped
+        // in favor of a mint the caller never sees.
+        #expect(named.id == callerId)
+        let mintedId = try #require(unnamed.id)
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-2\""
+        ) {
+            (try? await queue.loadSyncState(key: "last_event_id")) == "evt-2"
+        }
+
+        let local = try await store.fetchEdgesFromSource(
+            sourceId: "src", edgeType: "about", cursor: nil, limit: nil
+        )
+        #expect(
+            local.data.count == 2,
+            "local edge ids from that source: \(local.data.map(\.id))"
+        )
+        #expect(Set(local.data.map(\.id)) == Set([callerId, mintedId]))
+
+        let post = try #require(
+            await transport.calls.first { $0.method == .post && $0.path == "/edges/bulk" }
+        )
+        let body = try JSONSerialization.jsonObject(
+            with: try #require(post.body)
+        ) as? [String: Any]
+        let sentIds = (body?["edges"] as? [[String: Any]])?.map { $0["id"] as? String }
+        #expect(sentIds == [callerId, mintedId])
+        await engine.stop()
+    }
+
+    @Test("the edge replay adopts the server's copy of the row")
+    func edgeReplayAdoptsTheServerCopy() async throws {
+        // No echo on this fixture, deliberately. With one, the event re-lands
+        // the same row under the same id and the assertion below holds with
+        // the replay's own upsert deleted — so the test would pin the SSE
+        // path rather than the replay.
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+        let edges = syncedEdges(transport: transport, store: store, queue: queue)
+
+        let created = try await edges.create(
+            source: "src", target: "tgt", edgeType: "about"
+        )
+        // The local write knows no space and stamps its own clock, so a row
+        // carrying either of the server's values came from the response.
+        #expect(created.spaceId == nil)
+
+        transport.enqueueEvents([])
+        transport.enqueue(EdgeResponse(edge: serverCopy(of: created)))
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
+            (try? await queue.isEmpty) == true
+        }
+
+        let stored = try await store.fetchEdge(id: created.id)
+        #expect(stored.spaceId == EdgeMintingTransport.spaceId)
+        #expect(stored.createdAt == EdgeMintingTransport.stampedAt)
+        await engine.stop()
+    }
+
+    @Test("a repeat the server acknowledges is success, not a decode failure")
+    func acknowledgedEdgeRepeatDrainsTheQueue() async throws {
+        let (store, queue, transport, connManager, engine) = try await SyncEngineTestKit.makeFixture()
+        await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+        let edges = syncedEdges(transport: transport, store: store, queue: queue)
+
+        let created = try await edges.create(
+            source: "src", target: "tgt", edgeType: "about"
+        )
+
+        // What the server answers when this create already reached it and the
+        // response was lost: 200 carrying the stored row and `acknowledged`,
+        // where a first arrival gets a 201 carrying the row alone. The test
+        // above pins the upsert on the 201 shape; this one pins that the
+        // extra key does not turn the answer into a decode failure, which
+        // would leave the mutation queued and retrying against a row the
+        // server already holds. The server publishes no event for a repeat,
+        // so no echo follows and none is modeled — the same as items.
+        struct AcknowledgedEdge: Encodable {
+            let edge: Edge
+            let acknowledged: Bool
+        }
+        transport.enqueueEvents([])
+        transport.enqueue(
+            AcknowledgedEdge(edge: serverCopy(of: created), acknowledged: true)
+        )
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.isEmpty) == true"
+        ) {
+            (try? await queue.isEmpty) == true
+        }
+
+        #expect(try await queue.fetchAll().isEmpty)
+        let stored = try await store.fetchEdge(id: created.id)
+        #expect(stored.spaceId == EdgeMintingTransport.spaceId)
+        await engine.stop()
+    }
+
     // MARK: - Cascade drop on permanent createItem failure
 
     @Test("permanent createItem drop cascades to dependent mutations and purges the local row")

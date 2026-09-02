@@ -8,7 +8,10 @@ import Foundation
 /// a duplicate triple replaces properties in place; in `createOnly` mode
 /// it surfaces as ``BulkOutcome/skipped`` with reason `"duplicate_edge"`.
 public struct BulkEdgeInputItem: Codable, Sendable {
-    /// Optional server-id override. Server-generated UUIDv7 otherwise.
+    /// The caller's own id for this edge. A synced client writes the local
+    /// row under it and sends it on replay, so it names the row on both
+    /// sides. Omitted, the id is minted — locally by the store on a synced
+    /// client, by the server otherwise.
     public var id: String?
     public var sourceId: String
     public var targetId: String

@@ -72,6 +72,10 @@ struct EdgesTests {
 
         let bodyJSON = try JSONSerialization.jsonObject(with: mock.calls[0].body!) as? [String: Any]
         #expect(bodyJSON?["properties"] == nil)
+        // A network-only client names no id, and the key has to be absent
+        // rather than null: the route's `id` is optional, which admits a
+        // missing key and refuses an explicit null.
+        #expect(bodyJSON?.keys.contains("id") == false)
     }
 
     // MARK: - update

@@ -563,3 +563,191 @@ actor HeldOpenStreamTransport: Transport {
         openStreamCount += 1
     }
 }
+
+/// Envelope for the single-edge shapes this file's doubles emit — the
+/// response body of an edge create, and the `edge.created` event payload.
+private struct EdgeEnvelope: Codable {
+    let edge: Edge
+}
+
+/// The edge-create body as it arrives on the wire, so a double can answer
+/// the request it was actually sent. `id` is optional because the whole
+/// question a test puts to this transport is whether it was there.
+private struct SentEdgeCreate: Decodable {
+    let id: String?
+    let sourceId: String
+    let targetId: String
+    let edgeType: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case sourceId = "source_id"
+        case targetId = "target_id"
+        case edgeType = "edge_type"
+    }
+}
+
+/// The bulk-edge body, read for the same reason.
+private struct SentBulkEdges: Decodable {
+    let edges: [SentEdgeCreate]
+    let emitEvents: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case edges
+        case emitEvents = "emit_events"
+    }
+}
+
+/// A server that keeps the ids it is given, and mints one where it is not.
+///
+/// `MockTransport` answers with whatever the test enqueued, which leaves the
+/// id on the wire and the id in the answer independent of each other — and
+/// the two diverging is the entire defect, so a test built on canned answers
+/// passes whether or not the request carried an id. This double derives its
+/// answer from the request the way the routes do: a create carrying an `id`
+/// is stored under it, one without gets a server-minted id, and the
+/// `edge.created` echo carries whichever was used. A store fed by this
+/// transport can end up holding two rows for one edge, which is what the
+/// defect looks like from the device.
+///
+/// Both edge-create doors are modeled, because both had the defect.
+/// `POST /edges/bulk` echoes only when the call set `emit_events`, as the
+/// route does — a double that echoed regardless would be asserting against
+/// events a real server never sends.
+///
+/// Echoes are delivered when the stream opens rather than concurrently,
+/// which is the real order: coming online drains the queue before it
+/// subscribes, so every create this transport has seen has already happened
+/// by the time it is asked for a stream.
+actor EdgeMintingTransport: Transport {
+
+    /// Stamped onto every answer. The local store mints neither, so either
+    /// one appearing in a row proves the row came from the server's copy.
+    static let spaceId = "space-1"
+    static let stampedAt = "2026-09-02T00:00:00.000Z"
+
+    private var recordedCalls: [MockTransport.Call] = []
+    private var echoes: [Edge] = []
+    private var mintCount = 0
+
+    struct UnsupportedRequest: Error, CustomStringConvertible {
+        let method: String
+        let path: String
+        var description: String {
+            "EdgeMintingTransport: only the edge-create doors are modeled, got \(method) \(path)"
+        }
+    }
+
+    var calls: [MockTransport.Call] { recordedCalls }
+
+    /// Sequential rather than random, so a failing run names the same id
+    /// every time and a diff of the message is readable.
+    private func mintId() -> String {
+        mintCount += 1
+        return String(format: "01a00000-0000-7000-8000-%012d", mintCount)
+    }
+
+    private func store(_ sent: SentEdgeCreate, echo: Bool) -> Edge {
+        let edge = Edge(
+            createdAt: Self.stampedAt,
+            edgeType: sent.edgeType,
+            id: sent.id ?? mintId(),
+            properties: [:],
+            sourceId: sent.sourceId,
+            spaceId: Self.spaceId,
+            targetId: sent.targetId,
+            updatedAt: Self.stampedAt
+        )
+        if echo { echoes.append(edge) }
+        return edge
+    }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
+        recordedCalls.append(
+            MockTransport.Call(method: method, path: path, body: bodyData, query: query)
+        )
+        guard method == .post, let bodyData else {
+            throw UnsupportedRequest(method: method.rawValue, path: path)
+        }
+
+        switch path {
+        case "/edges":
+            let sent = try JSONDecoder().decode(SentEdgeCreate.self, from: bodyData)
+            let edge = store(sent, echo: true)
+            return try JSONDecoder().decode(
+                T.self, from: try JSONEncoder().encode(EdgeEnvelope(edge: edge))
+            )
+
+        case "/edges/bulk":
+            let sent = try JSONDecoder().decode(SentBulkEdges.self, from: bodyData)
+            let emit = sent.emitEvents ?? false
+            var entries: [BulkEdgeResultEntry] = []
+            for (index, raw) in sent.edges.enumerated() {
+                let edge = store(raw, echo: emit)
+                entries.append(
+                    BulkEdgeResultEntry(index: index, outcome: .created, id: edge.id)
+                )
+            }
+            let result = BulkEdgeResult(
+                counts: BulkResultCounts(
+                    created: entries.count, updated: 0, skipped: 0, errored: 0
+                ),
+                results: entries
+            )
+            return try JSONDecoder().decode(
+                T.self, from: try JSONEncoder().encode(result)
+            )
+
+        default:
+            throw UnsupportedRequest(method: method.rawValue, path: path)
+        }
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        .success(try await request(method: method, path: path, body: body, query: query))
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        throw UnsupportedRequest(method: method.rawValue, path: path)
+    }
+
+    nonisolated func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                for (index, edge) in await self.pendingEchoes().enumerated() {
+                    guard
+                        let data = try? JSONEncoder().encode(EdgeEnvelope(edge: edge)),
+                        let text = String(data: data, encoding: .utf8)
+                    else { continue }
+                    continuation.yield(
+                        SSEEvent(id: "evt-\(index + 1)", event: "edge.created", data: text)
+                    )
+                }
+                continuation.finish()
+            }
+        }
+    }
+
+    private func pendingEchoes() -> [Edge] { echoes }
+}
