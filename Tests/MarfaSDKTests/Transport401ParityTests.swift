@@ -180,7 +180,7 @@ private func parityTransport(
         retryPolicy: retryPolicy
     )
     return URLSessionTransport(
-        configuration: configuration, session: parityStubbedSession()
+        configuration: configuration, protocolClasses: [ParityStubURLProtocol.self]
     )
 }
 

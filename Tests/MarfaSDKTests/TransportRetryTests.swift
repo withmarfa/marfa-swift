@@ -84,16 +84,15 @@ private func makeStubbedTransport(
     retryPolicy: RetryPolicy = .default,
     debugLogging: Bool = false
 ) -> URLSessionTransport {
-    let config = URLSessionConfiguration.ephemeral
-    config.protocolClasses = [StubURLProtocol.self]
-    let session = URLSession(configuration: config)
     let clientConfig = ClientConfiguration(
         url: URL(string: "http://test")!,
         apiKey: "k",
         debugLogging: debugLogging,
         retryPolicy: retryPolicy
     )
-    return URLSessionTransport(configuration: clientConfig, session: session)
+    return URLSessionTransport(
+        configuration: clientConfig, protocolClasses: [StubURLProtocol.self]
+    )
 }
 
 @Suite("Transport retry behavior", .serialized)

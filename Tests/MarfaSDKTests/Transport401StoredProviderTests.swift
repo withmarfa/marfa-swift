@@ -167,7 +167,9 @@ private func makeTransport(provider: any TokenProvider) -> URLSessionTransport {
         tokenProvider: provider,
         retryPolicy: RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, jitter: 0)
     )
-    return URLSessionTransport(configuration: configuration, session: stubbedSession())
+    return URLSessionTransport(
+        configuration: configuration, protocolClasses: [StoredProvider401StubURLProtocol.self]
+    )
 }
 
 /// A token with an hour of clock life left. The proactive refresh window

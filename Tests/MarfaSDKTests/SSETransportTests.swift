@@ -70,11 +70,10 @@ final class SSEStubURLProtocol: URLProtocol, @unchecked Sendable {
 }
 
 private func makeTransport() -> URLSessionTransport {
-    let config = URLSessionConfiguration.ephemeral
-    config.protocolClasses = [SSEStubURLProtocol.self]
-    let session = URLSession(configuration: config)
     let clientConfig = ClientConfiguration(url: URL(string: "http://test")!, apiKey: "k")
-    return URLSessionTransport(configuration: clientConfig, session: session)
+    return URLSessionTransport(
+        configuration: clientConfig, protocolClasses: [SSEStubURLProtocol.self]
+    )
 }
 
 @Suite("SSE transport", .serialized)
