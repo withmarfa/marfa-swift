@@ -164,6 +164,7 @@ jobs:
         env:
           ALERT_URL: ${{ vars.ALERT_WEBHOOK_URL }}
           ALERT_TOKEN: ${{ secrets.ALERT_WEBHOOK_TOKEN }}
+          RESULTS: ${{ join(needs.*.result, ',') }}
           VERDICT: ${{ needs.pins.outputs.verdict }}
           DETAIL: ${{ needs.pins.outputs.detail }}
           CONSUMERS: ${{ needs.pins.outputs.consumers }}
@@ -175,6 +176,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+
+          # A cancelled run reached no conclusion about anything, and this
+          # workflow cancels in progress — so dispatching it while the
+          # schedule is mid-run kills that run. Reporting the cancellation
+          # somebody just caused as a check that could not run is noise.
+          case ",$RESULTS," in
+            *,cancelled,*) exit 0 ;;
+          esac
 
           # `failure` is the ordinary case here rather than a fault: the
           # script exits non-zero when a consumer is behind, which is a
