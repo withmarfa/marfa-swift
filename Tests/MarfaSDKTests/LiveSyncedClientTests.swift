@@ -44,11 +44,9 @@ private struct LiveServerNotConfigured: Error {}
 private final class LiveFixture {
 
     private var itemIds: [String] = []
-    private var edgeIds: [String] = []
     private var clients: [MarfaClient] = []
 
     func track(item id: String) { itemIds.append(id) }
-    func track(edge id: String) { edgeIds.append(id) }
 
     /// Registers a synced client whose engine must stop before the test
     /// returns. A running engine outlives the body otherwise and keeps writing
@@ -64,15 +62,23 @@ private final class LiveFixture {
         }
         clients.removeAll()
 
-        for id in edgeIds {
-            try? await client.edges.delete(id: id)
+        for id in itemIds {
+            // Edges are swept by asking the server what hangs off each item
+            // this test created, rather than by remembering ids as they are
+            // minted. A test that fails partway through has usually failed at
+            // the wait that would have told it the server's edge id, and
+            // `references` orphans rather than cascades, so an id-tracking
+            // teardown leaks exactly the edge whose test went wrong.
+            let outbound = try? await client.edges.listFromSource(sourceId: id)
+            for edge in outbound?.data ?? [] {
+                try? await client.edges.delete(id: edge.id)
+            }
         }
-        edgeIds.removeAll()
 
         for id in itemIds {
-            // Purge only accepts an item already in the trash, and only from a
-            // key carrying `admin:purge`. The trash is the half that always
-            // lands; the purge is what leaves the shared space with no rows.
+            // Purge only accepts an item already in the trash, and the route is
+            // space-admin gated. The trash is the half that always lands; the
+            // purge is what leaves the shared space with no rows.
             try? await client.items.delete(id: id)
             try? await client.items.purge(id: id)
         }
@@ -97,7 +103,13 @@ private final class LiveFixture {
     .enabled(
         if: LiveServer.isConfigured,
         "set MARFA_API_URL and MARFA_API_KEY to run this suite against a live server"
-    )
+    ),
+    // Every test here holds an SSE stream open for as long as it runs, and a
+    // server caps how many viewers one space may have at once. Run in parallel
+    // these tests compete for that cap, and a client refused a stream reads as
+    // a device that never received an event — which is what half of them are
+    // about, so the failure would look exactly like the defect.
+    .serialized
 )
 @MainActor
 struct LiveSyncedClientTests {
@@ -195,15 +207,24 @@ struct LiveSyncedClientTests {
                 url: credentials.url, apiKey: credentials.apiKey, storePath: path
             )
             fixture.stopOnExit(device)
+            let engine = try #require(device.syncEngine)
 
             // `start()` and nothing else, because that is the setup the README
             // and the published SDK page show. A device that has to be told
             // separately to import is a device whose first screen is empty for
             // everyone who followed them.
-            await device.syncEngine?.start()
+            await engine.start()
 
+            // The longest wait in the file, and it is sized for the work a
+            // hydration does rather than for the defect. An import pages items
+            // 200 at a time and then pages the edges, writing each row through
+            // SwiftData at tens of milliseconds a row; the demo space this runs
+            // against is small only because each run empties it, and a run
+            // arriving after a busy one pays for what it finds. A bound tight
+            // enough to be quick here would report on how much history the
+            // space happened to hold.
             try await waitUntil(
-                timeout: .seconds(30),
+                timeout: .seconds(60),
                 description: "the two items the other device created to reach this device's store"
             ) {
                 let page = try await device.items.list(filters: recentNotes())
@@ -259,6 +280,71 @@ struct LiveSyncedClientTests {
                 itemId: item.id, namespace: Self.extensionNamespace
             )
             #expect(stored?["state"] == .string("written here"))
+        }
+    }
+
+    @Test("an extension written offline is on both devices once this one reconnects")
+    func offlineExtensionWriteConverges() async throws {
+        let credentials = try credentials()
+        let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
+        let path = storePath()
+        defer { removeStore(at: path) }
+
+        try await withFixture(cleaningUpThrough: other) { fixture in
+            let run = runMarker()
+            let device = try await MarfaClient.synced(
+                url: credentials.url, apiKey: credentials.apiKey, storePath: path
+            )
+            fixture.stopOnExit(device)
+            let engine = try #require(device.syncEngine)
+            await engine.start()
+
+            let item = try await device.items.create(note("offline extension holder", run: run))
+            fixture.track(item: item.id)
+            try await waitForDrain(engine, description: "the create to replay to the server")
+
+            // Offline from here. This is the case the sync contract is actually
+            // about, and it is why the test above must not be read as "the
+            // local copy wins": metadata converges on the server, and what
+            // rescues an offline write is that the writer replays it and the
+            // server then tells everyone. Asserting that both ends hold it
+            // pins the outcome without naming which half delivers it.
+            await engine.stop()
+            _ = try await device.extensions.set(
+                itemId: item.id,
+                namespace: Self.extensionNamespace,
+                data: ["state": .string("written offline")]
+            )
+
+            let tag = "live-\(run)"
+            _ = try await other.metadata.addTags(itemId: item.id, tags: [tag])
+
+            await engine.start()
+
+            // Waited for separately, and named separately, so a failure says
+            // which of two different things went wrong. A queue that never
+            // drains after a restart is not the same defect as a write that
+            // drained and then got overwritten, and a single combined wait
+            // would report them identically.
+            try await waitForDrain(
+                engine,
+                timeout: .seconds(60),
+                description: "the queued offline write to replay once the device is back"
+            )
+
+            try await waitUntil(
+                timeout: .seconds(60),
+                description: "the offline extension write to be readable on this device and at the server"
+            ) {
+                let local = try await device.extensions.get(
+                    itemId: item.id, namespace: Self.extensionNamespace
+                )
+                let remote = try await other.extensions.get(
+                    itemId: item.id, namespace: Self.extensionNamespace
+                )
+                return local?["state"] == .string("written offline")
+                    && remote?["state"] == .string("written offline")
+            }
         }
     }
 
@@ -337,7 +423,6 @@ struct LiveSyncedClientTests {
                 serverEdgeId = edge.id
                 return true
             }
-            fixture.track(edge: serverEdgeId)
 
             // The echo is what puts a second row in the store, so wait for it
             // to land rather than racing it: a count taken before it arrives
@@ -403,7 +488,6 @@ struct LiveSyncedClientTests {
                 serverEdgeId = edge.id
                 return true
             }
-            fixture.track(edge: serverEdgeId)
 
             _ = try await other.edges.update(id: serverEdgeId, properties: ["position": .int(2)])
 
@@ -480,13 +564,15 @@ struct LiveSyncedClientTests {
                 throw error
             }
 
-            // One item, under the id the client minted. A resolution that
-            // reconciled onto a server-assigned id instead would purge the
-            // local row and leave any view holding that id pointing at nothing.
-            let page = try await device.items.list(filters: recentNotes())
-            #expect(page.data.filter { $0.id == item.id }.count == 1)
-            let remote = try await other.items.get(id: item.id)
-            #expect(remote.id == item.id)
+            // Draining is not the same as resolving. A fix that classed this
+            // 409 as permanent would empty the queue by moving the row to the
+            // dropped-mutation log, which satisfies the wait above and loses
+            // the write, so the wait alone would call that a pass.
+            let dropped = try await queue.fetchDropped()
+            #expect(
+                dropped.isEmpty,
+                "dropped instead of resolved: \(dropped.map { "\($0.kind) \($0.errorCode)" })"
+            )
         }
     }
 }
