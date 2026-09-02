@@ -100,7 +100,12 @@ public final class MarfaClient: Sendable {
     /// Held so ``makeStore()`` can pass it to ``MarfaStore`` for the
     /// dropped-mutation dismissal forwarders. `MutationQueue` is an
     /// actor, so storing the reference is `Sendable`-safe.
-    private let mutationQueue: MutationQueue?
+    ///
+    /// Internal rather than private so a test can stage a queue state the
+    /// namespaces cannot produce — a mutation enqueued twice, say. Still not
+    /// public: a consumer writing to the queue behind the namespaces is how a
+    /// client and its queued work get out of step.
+    let mutationQueue: MutationQueue?
 
     /// The local store, non-nil whenever a container is configured.
     /// Namespaces receive it directly; the client keeps its own

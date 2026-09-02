@@ -349,7 +349,9 @@ public struct ItemsNamespace: Sendable {
     /// Permanently removes a trashed item. Irreversible.
     ///
     /// The item must already be in the `trashed` state — call ``delete(id:)``
-    /// first if needed. Requires the `admin:purge` scope on the API key.
+    /// first if needed. The route is space-admin gated, so a key without that
+    /// role is refused. There is no purge *scope* to grant — naming one here
+    /// sends a caller looking for something to add that does not exist.
     ///
     /// - Parameter id: The item id.
     public func purge(id: String) async throws {
