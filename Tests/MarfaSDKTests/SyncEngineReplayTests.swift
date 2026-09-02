@@ -539,6 +539,8 @@ struct SyncEngineReplayTests {
             source: "src", target: "tgt", edgeType: "about"
         )
 
+        // Subscribed before the cycle starts so the echo's event is caught.
+        let events = engine.events
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
@@ -561,7 +563,21 @@ struct SyncEngineReplayTests {
             "local edge ids from that source: \(local.data.map(\.id))"
         )
         #expect(local.data.first?.id == created.id)
-        await engine.stop()
+
+        // What the echo is announced as, and not only that a row landed. Both
+        // edge events apply through the same upsert, so a case that handled
+        // the two together and published one name would leave every stored-row
+        // assertion in this repository green while telling an app that an edge
+        // it has just seen created was edited instead.
+        let published = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        #expect(
+            published.contains { if case .edgeCreated(created.id) = $0 { return true } else { return false } },
+            "expected .edgeCreated(\(created.id)), got \(published)"
+        )
+        #expect(
+            !published.contains { if case .edgeUpdated = $0 { return true } else { return false } },
+            "a create echo announced as an edit: \(published)"
+        )
     }
 
     @Test("a bulk edge create keeps the ids the device wrote its rows under")

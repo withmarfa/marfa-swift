@@ -56,7 +56,7 @@ private struct MetadataEventPayload: Decodable {
 /// 3. **Applies SSE events** — each server-sent event is decoded and written
 ///    into the local store via ``LocalStore`` upsert helpers. Supported event
 ///    types: `item.created`, `item.updated`, `item.deleted`, `item.restored`,
-///    `item.state_changed`, `edge.created`, `edge.deleted`,
+///    `item.state_changed`, `edge.created`, `edge.updated`, `edge.deleted`,
 ///    `metadata.changed`.
 ///
 /// 4. **Persists the Last-Event-ID cursor** — after, and only after, the
@@ -1173,6 +1173,18 @@ public actor SyncEngine {
             if let payload = decodeOrLog(EdgeEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
                 try await localStore.upsertEdge(payload.edge)
                 emit(.edgeCreated(id: payload.edge.id))
+            }
+
+        case "edge.updated":
+            // Same envelope as `edge.created`, carrying the whole edge rather
+            // than the fields that moved, so the upsert is the apply. It also
+            // stores an edge this device has never seen: the create can have
+            // landed before this cursor, which makes the edit the first
+            // mention of it, and dropping the frame would leave the
+            // relationship missing until the next import.
+            if let payload = decodeOrLog(EdgeEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
+                try await localStore.upsertEdge(payload.edge)
+                emit(.edgeUpdated(id: payload.edge.id))
             }
 
         case "edge.deleted":
