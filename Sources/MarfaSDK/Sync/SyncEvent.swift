@@ -68,8 +68,15 @@ public enum SyncEvent: Sendable {
     /// ``ConnectionStateManager/stateUpdates`` directly.
     case syncing
 
-    /// A sync round failed. The error is the last one observed before
-    /// the engine returned to the idle / offline state.
+    /// A sync round failed: the cycle could not drain. The error is the last
+    /// one observed before the engine returned to the idle / offline state.
+    ///
+    /// A row that is *blocked* does not produce this. The engine has stopped
+    /// retrying it, so it is not work the cycle failed to do — a cycle whose
+    /// only outstanding rows are blocked reports ``SyncEvent/synced(at:)``.
+    /// Watch ``SyncEvent/mutationBlocked(kind:itemId:reason:)`` and
+    /// ``PendingMutationStatus/blocked(reason:attemptCount:lastError:)`` for
+    /// those.
     case failed(error: Error)
 
     /// The mutation-queue replay auto-merged a server conflict using
@@ -118,6 +125,22 @@ public enum SyncEvent: Sendable {
     /// `itemId` is the target item ID (or edge ID / local ID, depending on
     /// the mutation); `nil` for records that don't carry one.
     case mutationDropped(kind: String, itemId: String?, attempt: Int, error: MarfaError)
+
+    /// A queued mutation stopped, because its last failure is one no retry can
+    /// clear until the app does something. Fires once, as the row becomes
+    /// blocked.
+    ///
+    /// Distinct from ``SyncEvent/mutationDropped`` in the half that matters to
+    /// a person: the write is still there. It is skipped by the drain rather
+    /// than discarded, it does not make the cycle report
+    /// ``SyncEvent/failed(error:)``, and ``SyncEngine/retry(id:)`` returns it
+    /// to the queue once the obstacle is gone. A `resolverMissing` block needs
+    /// no call at all — registering a resolver is enough.
+    ///
+    /// `kind` is the raw value of ``MutationKind``, matching
+    /// ``SyncEvent/mutationDropped``'s field. `itemId` is the target item, edge
+    /// or local id, and `nil` for records that carry none.
+    case mutationBlocked(kind: String, itemId: String?, reason: PendingMutationBlockReason)
 
     /// A blob upload has started. Fires once per upload attempt, before
     /// any bytes hit the network. `totalBytes` comes from the queued

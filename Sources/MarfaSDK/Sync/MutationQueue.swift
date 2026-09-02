@@ -18,8 +18,15 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var localId: String?
     public var createdAt: String
     public var attemptCount: Int
+    /// The most recent failure message, with any block-reason prefix already
+    /// removed — see ``blockedReason``.
     public var lastError: String?
     public var state: PendingMutationState
+
+    /// Why this row is blocked, or `nil` when it is not. Parsed out of the
+    /// stored `lastError` at the actor boundary so no consumer meets the
+    /// encoding.
+    public var blockedReason: PendingMutationBlockReason?
 
     public init(
         id: String,
@@ -30,7 +37,8 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         createdAt: String,
         attemptCount: Int = 0,
         lastError: String? = nil,
-        state: PendingMutationState = .pending
+        state: PendingMutationState = .pending,
+        blockedReason: PendingMutationBlockReason? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -41,13 +49,23 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         self.attemptCount = attemptCount
         self.lastError = lastError
         self.state = state
+        self.blockedReason = blockedReason
     }
 }
 
 extension PendingMutationModel {
     /// Snapshots this `@Model` row into a Sendable wire DTO.
+    /// The block reason and the human-readable message, split out of the single
+    /// stored column. The one place either is decoded — ``toRecord()`` and
+    /// ``MutationQueue/clearBlock(id:)`` both read it here rather than parsing
+    /// the column themselves.
+    var decodedError: (reason: PendingMutationBlockReason?, message: String?) {
+        BlockedErrorEncoding.decode(lastError)
+    }
+
     func toRecord() -> PendingMutationRecord {
-        PendingMutationRecord(
+        let decoded = decodedError
+        return PendingMutationRecord(
             id: id,
             kind: kind,
             payloadJson: payloadJson,
@@ -55,22 +73,10 @@ extension PendingMutationModel {
             localId: localId,
             createdAt: createdAt,
             attemptCount: attemptCount,
-            lastError: lastError,
-            state: state
+            lastError: decoded.message,
+            state: state,
+            blockedReason: state == .blocked ? (decoded.reason ?? .retriesExhausted) : nil
         )
-    }
-
-    /// Mutates this model in place from a record. Used by re-write paths.
-    func apply(_ record: PendingMutationRecord) {
-        id = record.id
-        kindRaw = record.kind.rawValue
-        payloadJson = record.payloadJson
-        sourceId = record.sourceId
-        localId = record.localId
-        createdAt = record.createdAt
-        attemptCount = record.attemptCount
-        lastError = record.lastError
-        stateRaw = record.state.rawValue
     }
 }
 
@@ -551,6 +557,55 @@ public actor MutationQueue {
         model.lastError = error
         model.state = .pending
         try modelContext.save()
+    }
+
+    /// Records a failure that no retry can clear. Increments `attemptCount`
+    /// like ``recordFailure(id:error:)`` so the count still says how many
+    /// attempts it took, stamps the reason into the message, and parks the row
+    /// in `.blocked` where the drain will skip it.
+    func recordBlocked(
+        id: String,
+        reason: PendingMutationBlockReason,
+        error: String
+    ) throws {
+        let predicate = #Predicate<PendingMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        model.attemptCount += 1
+        model.lastError = BlockedErrorEncoding.encode(reason: reason, message: error)
+        model.state = .blocked
+        try modelContext.save()
+    }
+
+    /// Returns a blocked row to the queue: the block goes, the attempt count
+    /// starts again, and the message keeps its text without the reason prefix
+    /// so a consumer can still read what went wrong last time.
+    ///
+    /// Emits a drain request, as every other write to this queue does. A
+    /// `retry` that only changed a column would sit untouched until something
+    /// unrelated happened to wake the engine, which is not what the name says.
+    ///
+    /// **On a row that is not blocked, only the attempt count is reset.** The
+    /// state and the message are left exactly as they are, because the row the
+    /// caller is most likely to hit by accident is one the engine is replaying
+    /// right now: writing `.pending` over `.inFlight` would announce through
+    /// ``PendingMutationsQuery`` that a request in flight is not, and rewriting
+    /// the message would discard the failure a consumer is displaying. Resetting
+    /// the count is the part that means "try this again as if it were new", and
+    /// it is safe whatever the row is doing.
+    func clearBlock(id: String) throws {
+        let predicate = #Predicate<PendingMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return }
+        if model.state == .blocked {
+            model.lastError = model.decodedError.message
+            model.state = .pending
+        }
+        model.attemptCount = 0
+        try modelContext.save()
+        emitDrainRequest()
     }
 
     /// Flips a pending record's `state` to `.inFlight` immediately

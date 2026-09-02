@@ -97,6 +97,12 @@ public actor SyncEngine {
     /// typed burst, short enough to feel instant.
     private let drainDebounceInterval: Duration
 
+    /// How many times a replay failure that is neither permanent nor
+    /// self-evidently unresolvable is retried before the row is blocked.
+    /// Network-class failures are exempt and never counted — see
+    /// ``PendingMutationBlockReason/classify(error:kind:attemptCount:ceiling:)``.
+    private let maxReplayAttempts: Int
+
     // MARK: - Internals
 
     private var streamTask: Task<Void, Never>?
@@ -139,6 +145,11 @@ public actor SyncEngine {
     /// flag, a ping arriving mid-replay would kick off a second cycle
     /// against the same records. Set on entry, released in `defer`.
     private var draining = false
+
+    /// Set when a drain request arrives while a cycle is already running, and
+    /// consumed by ``fireProactiveDrain()`` to run one more cycle once that one
+    /// ends. Without it such a request is simply lost.
+    private var drainRequestedDuringCycle = false
 
     /// Detached task that sleeps for the reconnect back-off and then flips
     /// ``ConnectionStateManager`` back to `.connecting`. Detached so the
@@ -334,7 +345,8 @@ public actor SyncEngine {
         mutationQueue: MutationQueue,
         connectionManager: ConnectionStateManager,
         drainDebounceInterval: Duration = .milliseconds(150),
-        conflictResolvers: ConflictResolverRegistry? = nil
+        conflictResolvers: ConflictResolverRegistry? = nil,
+        maxReplayAttempts: Int = 5
     ) {
         self.transport = transport
         self.localStore = localStore
@@ -342,6 +354,41 @@ public actor SyncEngine {
         self.connectionManager = connectionManager
         self.drainDebounceInterval = drainDebounceInterval
         self.conflictResolvers = conflictResolvers
+        // A ceiling below one would block a write on its first failure,
+        // including the network-class failures that are meant to be exempt —
+        // an offline device would park every write it made.
+        precondition(maxReplayAttempts >= 1, "maxReplayAttempts must be at least 1")
+        self.maxReplayAttempts = maxReplayAttempts
+    }
+
+    // MARK: - Blocked mutations
+
+    /// Returns a blocked mutation to the queue and asks for a drain.
+    ///
+    /// The block goes and the attempt count starts again, so a row blocked by
+    /// ``PendingMutationBlockReason/conflictUnresolved`` or
+    /// ``PendingMutationBlockReason/retriesExhausted`` replays once the app has
+    /// dealt with whatever stopped it. A
+    /// ``PendingMutationBlockReason/resolverMissing`` block needs no call —
+    /// registering a resolver is enough, and the next drain carries it.
+    ///
+    /// Calling this on a row that is not blocked resets its attempt count and
+    /// asks for a drain, which is what the name promises and costs nothing. An
+    /// id the queue does not hold is a no-op, matching every other id-addressed
+    /// call on the queue.
+    public func retry(id: String) async throws {
+        try await mutationQueue.clearBlock(id: id)
+        // `clearBlock` pings the drain-request stream, and that ping is enough
+        // only when a listener is attached and idle. Ask here as well, so the
+        // promise this method's name makes does not depend on either: a cycle
+        // already running takes the row on the pass that follows it, and an
+        // idle engine schedules one through the ordinary debounce rather than
+        // blocking the caller for a whole drain.
+        if draining {
+            drainRequestedDuringCycle = true
+        } else {
+            scheduleProactiveDrain()
+        }
     }
 
     // MARK: - Lifecycle
@@ -820,10 +867,26 @@ public actor SyncEngine {
     /// On fire, follows the same shape as the SSE-close path: replay,
     /// then mark online if still running.
     private func fireProactiveDrain() async {
-        guard running, !draining else { return }
+        guard running else { return }
+        guard !draining else {
+            // A request arriving while a cycle is running used to be dropped,
+            // so a write enqueued mid-drain waited for an unrelated wake-up —
+            // the next enqueue, a network transition, or a stream close that a
+            // live server never delivers. Remember it and run one more cycle
+            // when this one ends. `SyncEngine.retry(id:)` promises a drain, and
+            // an app calling it while the engine happens to be busy is the
+            // likeliest moment for it to be called at all.
+            drainRequestedDuringCycle = true
+            return
+        }
         let state = connectionManager.state
         guard state == .online else { return }
-        await replayMutations()
+        // Each extra pass runs only because a request arrived during the one
+        // before it, so this drains a burst rather than spinning.
+        repeat {
+            drainRequestedDuringCycle = false
+            await replayMutations()
+        } while drainRequestedDuringCycle && running
         if running { await connectionManager.markOnline() }
     }
 
@@ -1310,14 +1373,18 @@ public actor SyncEngine {
         // generation, so it cannot establish a clean drain.
         guard running else { return }
 
-        let pending: [PendingMutationRecord]
+        let cycle: (replayable: [PendingMutationRecord], blockedSince: [String: String])
         do {
-            pending = try await mutationQueue.fetchAll()
+            cycle = try await replayableRecords()
         } catch {
             recordSyncFailure(error)
             return
         }
-        guard !pending.isEmpty else {
+        // A queue holding nothing but blocked rows is not a cycle. Entering one
+        // would emit `.syncing`, walk the rows, skip every one and emit again
+        // next time — a device flapping through a syncing state forever over a
+        // write the engine has already stopped asking about.
+        guard !cycle.replayable.isEmpty else {
             await recordCleanDrainIfQueueIsEmpty()
             return
         }
@@ -1331,33 +1398,57 @@ public actor SyncEngine {
         // `.mutationDropped` — they don't mean "sync failed," they mean
         // "this mutation will never succeed, don't keep trying."
         var transientError: Error?
-        var remaining = pending
+        var remaining = cycle.replayable
 
-        // Item IDs whose `createItem` failed transiently in this cycle.
-        // Any downstream item-scoped mutation keyed on the same ID is skipped
-        // for the remainder of this cycle.
+        // Item ids this cycle must not run ahead of. Two things put an id here
+        // and both are the queue's per-item ordering being kept.
         //
-        // Without this guard: `deleteItem(A)` fires immediately after
-        // `createItem(A)` fails transiently. The server returns 404 (the item
-        // never landed), which is permanent — the record is dropped. On the
-        // next cycle `createItem(A)` succeeds, leaving the server with an item
-        // the client has already deleted. `pendingCreateIds` prevents that by
-        // deferring all follow-on mutations until `createItem` actually lands.
-        var pendingCreateIds = Set<String>()
+        // A `createItem` that failed transiently: `deleteItem(A)` fired
+        // straight after would 404, because the item never landed, and a 404 is
+        // permanent — so the delete would be dropped, and the next cycle's
+        // successful `createItem(A)` would leave the server holding an item the
+        // client has already deleted.
+        //
+        // A blocked row: replaying a later edit to the same item over an
+        // earlier one that has not landed applies the two out of order, and
+        // whatever the blocked edit was carrying is silently lost. Unrelated
+        // items are untouched either way — holding the whole queue behind one
+        // blocked row would reproduce the defect this state exists to fix.
+        var blockedSince = cycle.blockedSince
+
+        // Items stopped during *this* cycle. Membership alone defers, with no
+        // timestamp comparison: the loop walks the queue in order, so anything
+        // still to come is by definition queued after the row that stopped.
+        // `blockedSince` answers the other half — rows blocked in an earlier
+        // cycle, where the queue holds writes on both sides of the block.
+        var stoppedThisCycle = Set<String>()
+
+        // Records this cycle chose not to attempt. The clean-drain decision
+        // reads it: a row deferred behind a blocked one is not outstanding work
+        // the cycle failed to do, and counting it as such is what withheld
+        // `.synced` forever from the very shape this feature creates.
+        var deferredRecordIds = Set<String>()
 
         while !remaining.isEmpty {
             let record = remaining.removeFirst()
             guard running else { return }
 
-            // Defer item-scoped mutations whose createItem is still pending a
-            // transient retry. Replaying them now would 404 (item absent on
-            // server) and produce a permanent drop before createItem has a
-            // chance to succeed on the next cycle.
+            // Hold back an item-scoped mutation queued after the row that
+            // stopped for this item — a `createItem` still awaiting a transient
+            // retry, or a blocked row. Replaying it now would either 404 (the
+            // item never landed, and a 404 is permanent, so the row would be
+            // dropped before the create got another chance) or apply two edits
+            // out of order and lose what the stopped one carried. A row queued
+            // *before* the one that stopped is not out of order with it and
+            // keeps being attempted.
             if let localId = record.localId,
                record.kind != .createItem,
-               pendingCreateIds.contains(localId) {
+               stoppedThisCycle.contains(localId)
+                   || blockedSince[localId].map({ record.createdAt >= $0 }) == true {
+                deferredRecordIds.insert(record.id)
+                let cause = stoppedThisCycle.contains(localId) ? "stopped_this_cycle" : "blocked"
                 logger.log.info(
-                    "sync.mutation.deferred kind=\(record.kind.rawValue, privacy: .public) item_id=\(localId, privacy: .public) reason=pending_create"
+                    "sync.mutation.deferred kind=\(record.kind.rawValue, privacy: .public) item_id=\(localId, privacy: .public) reason=\(cause, privacy: .public)"
                 )
                 continue
             }
@@ -1380,7 +1471,17 @@ public actor SyncEngine {
                     // payloads — re-fetch so the next iteration uses the
                     // rewritten ids.
                     do {
-                        remaining = try await mutationQueue.fetchAll()
+                        // Re-partition rather than re-fetch: a plain fetch
+                        // returns blocked rows too, and putting one back into
+                        // `remaining` would replay the very row the drain has
+                        // undertaken to skip. Take the recomputed cut-off with
+                        // it — dropping it would leave the rest of the cycle
+                        // deferring on in-cycle membership alone, so a row
+                        // blocked in an earlier cycle would stop holding back
+                        // the writes queued after it.
+                        let repartitioned = try await replayableRecords()
+                        remaining = repartitioned.replayable
+                        blockedSince = repartitioned.blockedSince
                     } catch {
                         recordSyncFailure(error)
                         return
@@ -1455,24 +1556,59 @@ public actor SyncEngine {
                     // In-memory replay list is now stale — refetch so we
                     // don't try to replay the cascade-deleted rows.
                     do {
-                        remaining = try await mutationQueue.fetchAll()
+                        // Re-partition rather than re-fetch: a plain fetch
+                        // returns blocked rows too, and putting one back into
+                        // `remaining` would replay the very row the drain has
+                        // undertaken to skip. Take the recomputed cut-off with
+                        // it — dropping it would leave the rest of the cycle
+                        // deferring on in-cycle membership alone, so a row
+                        // blocked in an earlier cycle would stop holding back
+                        // the writes queued after it.
+                        let repartitioned = try await replayableRecords()
+                        remaining = repartitioned.replayable
+                        blockedSince = repartitioned.blockedSince
                     } catch {
                         recordSyncFailure(error)
                         return
                     }
                 }
             } catch {
-                transientError = error
-                try? await mutationQueue.recordFailure(id: record.id, error: formatLastError(error))
-                logger.log.info(
-                    "sync.mutation.failed kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
-                )
-                // A transient createItem failure means the item doesn't exist on
-                // the server yet. Mark its ID so downstream mutations are skipped
-                // for the rest of this cycle — they'd 404 and drop permanently
-                // before createItem gets a chance to succeed on the next retry.
-                if record.kind == .createItem, let localId = record.localId {
-                    pendingCreateIds.insert(localId)
+                // One question, asked once: can the next drain do any better?
+                if let reason = PendingMutationBlockReason.classify(
+                    error: error,
+                    kind: record.kind,
+                    attemptCount: record.attemptCount,
+                    ceiling: maxReplayAttempts
+                ) {
+                    try? await mutationQueue.recordBlocked(
+                        id: record.id, reason: reason, error: formatLastError(error)
+                    )
+                    logger.log.error(
+                        "sync.mutation.blocked kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(reason.rawValue, privacy: .public)"
+                    )
+                    emit(.mutationBlocked(
+                        kind: record.kind.rawValue, itemId: record.localId, reason: reason
+                    ))
+
+                    // Deliberately does not set `transientError`. The engine
+                    // has stopped asking about this row, so it is not something
+                    // the cycle failed to do — and one such row used to make
+                    // every later cycle report failure, which is the half of
+                    // this defect an app actually saw.
+                    if let localId = record.localId {
+                        stoppedThisCycle.insert(localId)
+                    }
+                } else {
+                    transientError = error
+                    try? await mutationQueue.recordFailure(
+                        id: record.id, error: formatLastError(error)
+                    )
+                    logger.log.info(
+                        "sync.mutation.failed kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
+                    )
+                    if record.kind == .createItem, let localId = record.localId {
+                        stoppedThisCycle.insert(localId)
+                    }
                 }
             }
         }
@@ -1480,7 +1616,7 @@ public actor SyncEngine {
         if let transientError {
             recordSyncFailure(transientError)
         } else {
-            await recordCleanDrainIfQueueIsEmpty()
+            await recordCleanDrainIfQueueIsEmpty(skipped: deferredRecordIds)
         }
     }
 
@@ -1535,17 +1671,32 @@ public actor SyncEngine {
     /// import — an app told it was up to date while showing an empty library —
     /// and the first `.synced` a fresh store reports is now the one its import
     /// lands.
-    private func recordCleanDrainIfQueueIsEmpty() async {
+    private func recordCleanDrainIfQueueIsEmpty(skipped: Set<String> = []) async {
         guard running else { return }
         guard await lastFullSyncAt != nil else { return }
-        let queueIsEmpty: Bool
+        // What counts as outstanding is what this cycle could have attempted and
+        // did not finish — not simply what is left in the queue. Blocked rows
+        // are excluded because the drain will not attempt them, and so are rows
+        // this cycle deferred behind one, because those are held back by the
+        // block rather than by a failure.
+        //
+        // Asking the queue for a count instead is the bug this replaces: a SQL
+        // count cannot see the per-cycle deferral, so a blocked row on an item
+        // with any later write to that item left one row outstanding forever.
+        // That withheld `.synced` permanently and, on the retries-exhausted
+        // path, left the `.failed` from the attempt before the block standing in
+        // `fullSyncState` for good, since a clean drain is the only thing that
+        // clears it.
+        let outstanding: [PendingMutationRecord]
         do {
-            queueIsEmpty = try await mutationQueue.isEmpty
+            outstanding = try await mutationQueue.fetchAll().filter {
+                $0.state != .blocked && !skipped.contains($0.id)
+            }
         } catch {
             recordSyncFailure(error)
             return
         }
-        guard running, queueIsEmpty else { return }
+        guard running, outstanding.isEmpty else { return }
         await recordCleanDrain()
     }
 
@@ -1571,6 +1722,53 @@ public actor SyncEngine {
         lastFailedError = nil
         lastFailedAt = nil
         emit(.synced(at: now))
+    }
+
+    /// Splits the queue into the rows this cycle will attempt and the item ids
+    /// it must not run ahead of.
+    ///
+    /// A blocked row is skipped rather than replayed, with one exception that
+    /// is the whole of its recovery story: a row blocked only because no
+    /// conflict resolver was registered becomes replayable the moment one is,
+    /// with no call from the app and nothing to notify. Asking the registry
+    /// here is what makes that true, and it is asked once per cycle rather than
+    /// per row.
+    private func replayableRecords() async throws
+        -> (replayable: [PendingMutationRecord], blockedSince: [String: String]) {
+        let all = try await mutationQueue.fetchAll()
+        let hasResolver = await conflictResolvers?.current() != nil
+
+        var replayable: [PendingMutationRecord] = []
+        var blockedSince: [String: String] = [:]
+        for record in all {
+            guard record.state == .blocked else {
+                replayable.append(record)
+                continue
+            }
+            if record.blockedReason == .resolverMissing, hasResolver {
+                replayable.append(record)
+                continue
+            }
+            // Keyed by the earliest blocked row for the item, so only writes
+            // queued after it wait. A row queued *before* a blocked one is not
+            // out of order with it and must keep being attempted — otherwise a
+            // write taking 503s beside a later blocked sibling would be skipped
+            // forever while still projecting `.retrying` on a frozen count.
+            //
+            // `createdAt` has millisecond resolution, so two writes made inside
+            // one millisecond tie. The comparison is `>=`, which makes a tie
+            // wait: ordering is worth more here than liveness, because letting
+            // a same-millisecond sibling replay over an earlier blocked edit is
+            // exactly the out-of-order loss this deferral exists to prevent.
+            // What the tie costs is that such a sibling waits for the block to
+            // clear even though nothing can prove it was queued later.
+            if let localId = record.localId {
+                blockedSince[localId] = min(
+                    blockedSince[localId] ?? record.createdAt, record.createdAt
+                )
+            }
+        }
+        return (replayable, blockedSince)
     }
 
     /// Returns `true` if the replay rewrote a local-id in the queue, signaling
