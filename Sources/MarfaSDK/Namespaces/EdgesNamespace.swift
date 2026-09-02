@@ -105,8 +105,10 @@ public struct EdgesNamespace: Sendable {
     ///   surfaces as ``BulkOutcome/errored``. No upsert path locally —
     ///   local edges have no cross-client properties contract to replace.
     /// - **Synced** — iterates locally for immediate feedback AND enqueues
-    ///   the full input as a single ``MutationKind/bulkEdges`` record so
-    ///   replay POSTs the identical call when the client reconnects.
+    ///   a single ``MutationKind/bulkEdges`` record so replay POSTs the
+    ///   whole call when the client reconnects. Each queued edge carries the
+    ///   id its local row was written under, so the server stores the same
+    ///   rows rather than minting a second set beside them.
     /// - **Network-only** — round-trips the server response straight
     ///   through.
     ///
@@ -121,19 +123,35 @@ public struct EdgesNamespace: Sendable {
             var results: [BulkEdgeResultEntry] = []
             results.reserveCapacity(input.edges.count)
 
+            // What the replay will send: the same call, with every edge
+            // named by the id its local row was written under. Replaying the
+            // caller's input verbatim let the server mint a second id for
+            // each edge, and the echo then landed beside the local row
+            // instead of on it.
+            var stamped: [BulkEdgeInputItem] = []
+            stamped.reserveCapacity(input.edges.count)
+
             for (index, raw) in input.edges.enumerated() {
                 do {
                     let edge = try await store.createEdge(
+                        id: raw.id,
                         source: raw.sourceId,
                         target: raw.targetId,
                         edgeType: raw.edgeType,
                         properties: raw.properties
                     )
+                    var item = raw
+                    item.id = edge.id
+                    stamped.append(item)
                     results.append(BulkEdgeResultEntry(
                         index: index, outcome: .created, id: edge.id
                     ))
                     created += 1
                 } catch {
+                    // No local row was written, so there is nothing here for a
+                    // server-minted id to duplicate. The item travels as the
+                    // caller wrote it and the server names it.
+                    stamped.append(raw)
                     results.append(BulkEdgeResultEntry(
                         index: index, outcome: .errored,
                         error: BulkResultError(
@@ -145,7 +163,9 @@ public struct EdgesNamespace: Sendable {
                 }
             }
 
-            try await mutationQueue?.enqueueBulkEdges(input)
+            var replayed = input
+            replayed.edges = stamped
+            try await mutationQueue?.enqueueBulkEdges(replayed)
 
             return BulkEdgeResult(
                 counts: BulkResultCounts(

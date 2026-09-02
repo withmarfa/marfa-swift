@@ -1626,6 +1626,16 @@ public actor SyncEngine {
             let response: EdgeResponse = try await transport.request(
                 method: .post, path: "/edges", body: body, query: nil
             )
+            // The route keeps the id it is given, so a different one coming
+            // back means that contract broke. Nothing here can repair it —
+            // the local row is already under the old id and the app may hold
+            // that id — but a duplicate row appearing with no trace of why is
+            // what made this defect expensive to find, so say so.
+            if let localId = record.localId, response.edge.id != localId {
+                logger.log.error(
+                    "sync.edge.id_not_kept sent=\(localId, privacy: .public) returned=\(response.edge.id, privacy: .public)"
+                )
+            }
             // Adopt the server's copy, which carries the space and the
             // timestamps the local mint could not know. A repeat the server
             // acknowledges answers with the row it already holds and lands

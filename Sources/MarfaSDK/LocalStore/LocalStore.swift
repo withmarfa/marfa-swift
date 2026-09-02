@@ -424,7 +424,14 @@ public actor LocalStore {
     // MARK: - Edge CRUD
 
     /// Creates a new edge between two items.
+    ///
+    /// `id` is the caller's own name for the edge, honored so that the row
+    /// written here is the row the caller already refers to; a bulk call
+    /// carries one per edge. Omitted, the store mints a UUIDv7. Either way
+    /// the id is what a synced replay sends, so the server stores the edge
+    /// under it too.
     func createEdge(
+        id: String? = nil,
         source: String,
         target: String,
         edgeType: String,
@@ -434,7 +441,7 @@ public actor LocalStore {
         let edge = Edge(
             createdAt: now,
             edgeType: edgeType,
-            id: newId(),
+            id: id ?? newId(),
             properties: properties ?? [:],
             sourceId: source,
             spaceId: nil,

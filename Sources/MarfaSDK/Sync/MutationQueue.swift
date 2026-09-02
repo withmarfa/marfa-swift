@@ -655,6 +655,14 @@ public actor MutationQueue {
             // `createItem` is the source of truth for its own local id —
             // leave it untouched. Belt-and-braces: the reconciler only
             // calls us after `createItem` has been removed from the queue.
+            //
+            // `createEdge` is not skipped, and its `localId` is no longer
+            // only a local handle: the replay sends that column as the
+            // edge's id on the wire, so rewriting it here would rename the
+            // row on the server too. Nothing reaches this with an edge id —
+            // the column holds an edge's UUIDv7 and `oldId` is an item's,
+            // and the only caller is the `createItem` reconcile — but the
+            // column is load-bearing now and a future caller should know it.
             if model.kind == .createItem { continue }
             let rewritten = try Self.rewritePayload(record: model.toRecord(), from: oldId, to: newId)
             model.localId = newId
