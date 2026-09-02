@@ -31,10 +31,18 @@ struct SyncEngineInitialSyncImportTests {
         )
     }
 
-    private func pair(_ id: String, tags: [String] = []) -> ItemWithMetadata {
+    private func pair(
+        _ id: String,
+        tags: [String] = [],
+        extensions: [String: [String: JSONValue]] = [:]
+    ) -> ItemWithMetadata {
         ItemWithMetadata(
             item: item(id),
-            metadata: Metadata(extensions: [:], itemId: id, tags: tags)
+            metadata: Metadata(
+                extensions: extensions.mapValues { JSONValue.dictionary($0) },
+                itemId: id,
+                tags: tags
+            )
         )
     }
 
@@ -82,6 +90,31 @@ struct SyncEngineInitialSyncImportTests {
         // is indistinguishable to a reader from a tag nobody set.
         let meta = try await store.fetchMetadata(itemId: "i1")
         #expect(meta.tags == ["reading"])
+    }
+
+    @Test("the extensions the wire carried are in the store afterwards")
+    func importsExtensionsIntoTheStore() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        let extensions = ExtensionsNamespace(
+            transport: transport, localStore: store, mutationQueue: queue
+        )
+        transport.enqueue(
+            PaginatedResult<ItemWithMetadata>(
+                data: [pair("i1", tags: ["reading"], extensions: ["app": ["state": .string("held by the server")]])],
+                cursor: nil,
+                hasMore: false
+            )
+        )
+        transport.enqueue(noEdges())
+
+        _ = try await engine.performInitialSync()
+
+        // Tags and extensions are two halves of one row on the wire, and the
+        // import used to take only the first: an app reading sidecar state the
+        // server already held saw nothing, with no second pass that would ever
+        // fill it in.
+        let namespace = try await extensions.get(itemId: "i1", namespace: "app")
+        #expect(namespace?["state"] == .string("held by the server"))
     }
 
     @Test("it keeps paging until the server says there is no more")

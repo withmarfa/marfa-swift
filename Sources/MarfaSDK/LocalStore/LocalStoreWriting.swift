@@ -28,8 +28,8 @@ public protocol LocalStoreWriting: Sendable {
     /// Removes an edge. Idempotent — deleting an absent edge is a no-op.
     func deleteEdge(id: String) async throws
 
-    /// Replaces an item's metadata and returns what was stored.
-    func setMetadata(itemId: String, input: MetadataInput) async throws -> Metadata
+    /// Stores the metadata row the server sent, replacing the local one.
+    func upsertMetadata(_ metadata: Metadata) async throws
 
     /// Permanently removes an item. Idempotent — purging an absent item is a
     /// no-op.

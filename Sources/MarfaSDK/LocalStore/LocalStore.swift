@@ -647,17 +647,36 @@ public actor LocalStore {
         return model.toWireMetadata()
     }
 
-    /// Replaces all metadata for an item (tags only — `extensions` is
-    /// reset to empty; the `setMetadata` contract is replace, not merge).
+    /// Replaces an item's tags with the supplied set, leaving its
+    /// extensions untouched.
+    ///
+    /// Mirrors `PUT /items/{id}/metadata`, which writes the tags column
+    /// and nothing else. A synced client writes here and replays that
+    /// route, so a local write that cleared the sidecar would disagree
+    /// with the server the moment the replay landed — and disagree
+    /// silently, since nothing reads the two back against each other.
     @discardableResult
     public func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata {
+        let existing = try fetchMetadata(itemId: itemId)
         let metadata = Metadata(
-            extensions: [:],
+            extensions: existing.extensions,
             itemId: itemId,
             tags: input.tags ?? []
         )
         try writeMetadata(metadata, itemId: itemId)
         return metadata
+    }
+
+    /// Stores a metadata row the server sent, replacing whatever is held
+    /// locally for that item — used by the sync engine.
+    ///
+    /// Tags and extensions are two halves of one row on the wire, and the
+    /// server sends both together on a `metadata.changed` event and on the
+    /// import. Writing them as a unit is what makes a namespace the server
+    /// has dropped go away here too; applying the halves separately leaves
+    /// a removal with no way to express itself.
+    public func upsertMetadata(_ metadata: Metadata) throws {
+        try writeMetadata(metadata, itemId: metadata.itemId)
     }
 
     /// Merges metadata with existing values (set-union for tags;
