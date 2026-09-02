@@ -115,9 +115,9 @@ jobs:
           # the log and change these together, or give the script the output
           # directly and delete this.
           latest=$(sed -n 's/^swift-sdk latest: //p' "$log" | head -1)
-          findings=$(sed -n \
-            -e 's|^  [^/]*/\([^:]*\): \([0-9][^ ]*\) — behind .*|\1 on \2|p' \
-            -e 's|^  [^/]*/\([^:]*\): pin could not be read.*|\1 pin unreadable|p' \
+          behind=$(sed -n 's|^  [^/]*/\([^:]*\): \([0-9][^ ]*\) — behind .*|\1 on \2|p' \
+            "$log" | awk 'NR > 1 { printf ", " } { printf "%s", $0 } END { print "" }')
+          unreadable=$(sed -n 's|^  [^/]*/\([^:]*\): pin could not be read.*|\1 pin unreadable|p' \
             "$log" | awk 'NR > 1 { printf ", " } { printf "%s", $0 } END { print "" }')
           consumers=$(sed -n \
             -e 's|^  \([^ :]*/[^:]*\): [0-9][^ ]* — behind .*|\1|p' \
@@ -130,15 +130,26 @@ jobs:
             *) verdict=error ;;
           esac
 
-          # The script only ever exits 1 after printing at least one consumer
-          # line, so a failure that parsed to nothing is the log format
-          # having moved rather than a consumer having fallen behind.
-          # Reported as inconclusive: an alert titled "Swift consumers:" with
-          # nothing after the colon is the empty alert this work removed.
+          # `latest is ...` only earns its place beside a pin that was
+          # actually compared against it. A pin nothing could read has no
+          # version to be behind, so naming the newest release next to it
+          # describes a comparison that never happened.
           detail=""
-          if [ -n "$findings" ]; then
-            detail="$findings, latest is ${latest:-unknown}"
-          elif [ "$verdict" = behind ]; then
+          if [ -n "$behind" ]; then
+            detail="$behind, latest is ${latest:-unknown}"
+          fi
+          if [ -n "$unreadable" ]; then
+            detail="${detail:+$detail; }$unreadable"
+          fi
+
+          # A non-zero exit that named no consumer at all is not a consumer
+          # falling behind. The script runs under `set -euo pipefail`, so a
+          # `gh api` call that fails takes it down at exit 1 before it has
+          # printed a single consumer line — the credential-shaped failure,
+          # and the likeliest one. Reported as inconclusive, because the
+          # alternative is an alert reading "Swift consumers:" with nothing
+          # after the colon, which is the empty alert this work removed.
+          if [ -z "$detail" ] && [ "$verdict" = behind ]; then
             verdict=error
           fi
 
