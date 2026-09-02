@@ -24,6 +24,10 @@ struct BlobUploadReplayTests {
         engine: SyncEngine
     ) {
         let (localStore, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        // A device that has been running, not a cold start: without the
+        // stamp the engine imports when it comes online and this suite's
+        // response queue answers a call it never meant to make.
+        try await SyncEngineTestKit.markImported(queue)
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         let engine = SyncEngine(

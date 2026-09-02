@@ -292,6 +292,10 @@ public final class MarfaClient: Sendable {
     ///     let client = try await MarfaClient.synced(url: serverURL, apiKey: key, storePath: dbPath)
     ///     await client.syncEngine?.start()
     ///
+    /// That is the whole of it. Starting the engine catches the store up
+    /// before it subscribes to live events: anything queued replays, and a
+    /// store that has never synced imports what the server already holds.
+    ///
     /// - Parameters:
     ///   - url: Base URL of the Marfa API.
     ///   - apiKey: API key for authentication.

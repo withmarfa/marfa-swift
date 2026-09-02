@@ -41,33 +41,41 @@ private struct MetadataEventPayload: Decodable {
 /// ## What the engine does
 ///
 /// 1. **Watches ``ConnectionStateManager``** — when the path goes from offline
-///    to connecting, the engine opens a `GET /events` SSE stream with the last
-///    persisted `Last-Event-ID` cursor so it receives only events since the
-///    previous session.
+///    to connecting, the engine catches up and then opens a `GET /events` SSE
+///    stream with the last persisted `Last-Event-ID` cursor so it receives only
+///    events since the previous session.
 ///
-/// 2. **Applies SSE events** — each server-sent event is decoded and written
+/// 2. **Catches up before it subscribes** — the stream carries only what
+///    happens after it opens, so coming online drains the mutation queue if
+///    anything is in it and then imports the library if this store has never
+///    completed an import. Without that step a freshly signed-in app shows an
+///    empty store, and a write queued while the engine was stopped is never
+///    replayed. One catch-up runs at a time; an explicit
+///    ``performInitialSync(pageSize:)`` issued while one is in flight joins it.
+///
+/// 3. **Applies SSE events** — each server-sent event is decoded and written
 ///    into the local store via ``LocalStore`` upsert helpers. Supported event
 ///    types: `item.created`, `item.updated`, `item.deleted`, `item.restored`,
 ///    `item.state_changed`, `edge.created`, `edge.deleted`,
 ///    `metadata.changed`.
 ///
-/// 3. **Persists the Last-Event-ID cursor** — after, and only after, the
+/// 4. **Persists the Last-Event-ID cursor** — after, and only after, the
 ///    event has been written to the local store. Reconnection resumes strictly
 ///    after the cursor, so an event the cursor has passed is never sent again;
 ///    recording progress first would mean a failed write loses the event for
 ///    good. A write the store refuses ends the stream, because a later event
 ///    would otherwise carry the cursor past the one that never landed.
 ///
-/// 4. **Replays the mutation queue** — once the catch-up SSE stream reaches
-///    idle (no events received for a short interval, or the stream signals
-///    normal completion), the engine drains ``MutationQueue`` by sending each
-///    pending mutation to the server. On success the record is removed; on
-///    failure the attempt count is incremented and the engine retries on the
-///    next reconnection cycle.
+/// 5. **Replays the mutation queue** — on coming online, within a short
+///    debounce of any new enqueue, and again when the stream closes, the
+///    engine drains ``MutationQueue`` by sending each pending mutation to the
+///    server. On success the record is removed; on failure the attempt count
+///    is incremented and the engine retries on the next cycle.
 ///
-/// 5. **Coordinates state** — the engine calls ``ConnectionStateManager``
-///    `.markSyncing()` while replaying mutations and `.markOnline()` when the
-///    queue is empty and the SSE stream is idle.
+/// 6. **Coordinates state** — the engine calls ``ConnectionStateManager``
+///    `.markSyncing()` while replaying mutations and `.markOnline()` once the
+///    stream is open, so everything gated on being online stays reachable for
+///    as long as it stays open rather than only after it closes.
 public actor SyncEngine {
 
     // MARK: - Dependencies
@@ -140,9 +148,13 @@ public actor SyncEngine {
     /// Cancelled and replaced on every reconnect cycle and on `stop()`.
     private var reconnectTask: Task<Void, Never>?
 
-    // Prevents overlapping `performInitialSync` runs when multiple
-    // `catchup_too_old` events land during reconnection churn.
-    private var resyncing = false
+    /// The import currently in flight, if any. One catch-up at a time: a
+    /// reconnect, a retention-gap resync and a consumer's own
+    /// ``performInitialSync(pageSize:)`` all join whichever run is already
+    /// going rather than paging the library again beside it. Both shipping
+    /// apps call the import themselves today, and those calls do not
+    /// disappear the day the engine starts making it too.
+    private var importTask: Task<Int, Error>?
 
     // Sync-state keys stored in the mutation-queue's sync_state table.
     private let cursorKey = "last_event_id"
@@ -339,6 +351,13 @@ public actor SyncEngine {
     /// is itself idempotent) so `NWPathMonitor` begins delivering reachability
     /// updates; without this the engine's run loop would await on an inert
     /// stream stuck at `.offline`.
+    ///
+    /// This is the whole of the setup a synced client needs. Coming online
+    /// catches the store up — queued writes replay and a store that has never
+    /// synced imports the library — before the event stream opens, so there is
+    /// no second call to remember and none to forget. Watch
+    /// ``fullSyncState`` or ``MarfaStore/queryFullSyncState()`` to render
+    /// progress while a first import runs.
     public func start() async {
         while let stoppingTask {
             await stoppingTask.value
@@ -352,6 +371,26 @@ public actor SyncEngine {
         lifecycleGeneration = generation
         starting = true
         await connectionManager.start()
+        // A manager the app started itself may already be sitting on
+        // `.online`, and `ConnectionStateManager.start()` is idempotent, so
+        // the call above installs no second monitor and no fresh path update
+        // arrives to move it. `runLoop` opens a stream on `.connecting` and
+        // only there, deliberately — that is its one entry, and the state the
+        // engine publishes on an open stream is `.online`, so treating that as
+        // an entry too would reopen the stream it just opened. Nudge instead,
+        // exactly as the reconnect path does.
+        if connectionManager.state == .online {
+            await connectionManager.markConnecting()
+        }
+        // Subscribe to the drain pings before `start()` returns rather than
+        // from inside the listener task. `MutationQueue.drainRequests`
+        // registers its continuation synchronously with the access precisely
+        // so a subscription cannot race the first enqueue, and taking the
+        // stream inside the task hands that race straight back one level up:
+        // the task's own first suspension is that access, so a write made
+        // while it is still pending emits a ping with nobody registered, and
+        // late subscribers never see a past one.
+        let drainRequests = await mutationQueue.drainRequests
         await suspendStartPublicationIfNeededForTesting()
         guard starting, lifecycleGeneration == generation else { return }
         starting = false
@@ -360,7 +399,7 @@ public actor SyncEngine {
             await self?.runLoop()
         }
         drainListenerTask = Task { [weak self] in
-            await self?.drainListenerLoop()
+            await self?.drainListenerLoop(drainRequests)
         }
     }
 
@@ -383,6 +422,12 @@ public actor SyncEngine {
     /// issued during a stop waits for that barrier before opening a new
     /// lifecycle.
     ///
+    /// An import in flight is one of those tasks. It is unstructured and can
+    /// run for as long as a library takes to page, so it is cancelled with the
+    /// rest rather than awaited to completion — otherwise `stop()` blocks for a
+    /// whole import and the paragraph above is not true. A cancelled import
+    /// stamps nothing, so the next cycle runs it again.
+    ///
     /// The wait is bounded by the transport honoring cancellation on its
     /// in-flight request. ``URLSessionTransport`` does; a custom ``Transport``
     /// that ignores cancellation can hold `stop()` open for as long as its
@@ -400,6 +445,9 @@ public actor SyncEngine {
         let drainListenerTask = self.drainListenerTask
         let drainDebounceTask = self.drainDebounceTask
         let reconnectTask = self.reconnectTask
+        let importTask = self.importTask
+        importTask?.cancel()
+        self.importTask = nil
         streamTask?.cancel()
         self.streamTask = nil
         drainListenerTask?.cancel()
@@ -420,6 +468,7 @@ public actor SyncEngine {
             await drainListenerTask?.value
             await drainDebounceTask?.value
             await reconnectTask?.value
+            _ = try? await importTask?.value
             await self.drainResidualLifecycleTasks()
             self.finishEventSubscribers()
         }
@@ -445,18 +494,23 @@ public actor SyncEngine {
     private func drainResidualLifecycleTasks() async {
         while hasLifecycleTasks {
             let residual = [streamTask, drainListenerTask, drainDebounceTask, reconnectTask]
+            let residualImport = importTask
             streamTask = nil
             drainListenerTask = nil
             drainDebounceTask = nil
             reconnectTask = nil
+            importTask = nil
             for task in residual { task?.cancel() }
+            residualImport?.cancel()
             for task in residual { await task?.value }
+            _ = try? await residualImport?.value
         }
     }
 
     private var hasLifecycleTasks: Bool {
         streamTask != nil || drainListenerTask != nil
             || drainDebounceTask != nil || reconnectTask != nil
+            || importTask != nil
     }
 
     /// Performs a one-shot catch-up import: paginates through `GET
@@ -476,38 +530,83 @@ public actor SyncEngine {
     ///   report a number no caller currently asks for.
     /// - Throws: Transport errors from the pagination requests, or upsert
     ///   errors from the local store.
+    /// Counts callers currently inside ``performInitialSync(pageSize:)``,
+    /// owner and joiners alike. A test proving that two callers share one
+    /// import has to know both have arrived before it releases the first, and
+    /// every other way of knowing that is a sleep racing the thing it measures.
+    internal private(set) var importCallerCountForTesting = 0
+
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
-        // Refuse rather than overwrite. Every row this function receives goes
-        // through `upsertItem`, which replaces all of an item's columns with no
-        // version check, and `setMetadata`, whose contract is replace rather
-        // than merge. The conflict machinery is unreachable from here — it only
-        // runs on an outbound update meeting a 409. So an edit made offline and
-        // still queued loses to the server's older body, with nothing reporting
-        // it.
-        //
-        // The check belongs here rather than in the caller, and that is the
-        // whole point of the change. A consumer cannot ask this question at the
-        // moment it needs to: `hasPendingMutations` hangs off this engine, and
-        // the caller deciding whether to import is typically holding a local
-        // client that has neither an engine nor a queue. What it writes instead
-        // is `syncEngine?.hasPendingMutations ?? false`, which answers "safe"
-        // because there was nothing to ask — a presence check standing in for a
-        // liveness check, and one that reads as correct. Here the queue is in
-        // hand, so the answer cannot be right by accident.
-        //
-        // Per-row skipping was the other option and it cannot be made
-        // complete: a mutation carries an optional `localId`, and the three
-        // bulk enqueues set none at all, so a bulk write is invisible to any
-        // "does item X have a pending edit" test.
+        importCallerCountForTesting += 1
+        defer { importCallerCountForTesting -= 1 }
+
+        // Join a run already going, or publish this one — with nothing
+        // suspending between the two, so a caller entering on actor reentry
+        // finds the task rather than starting a second one beside it. The
+        // refusal moves inside the task for exactly that reason: asking the
+        // queue first would open a gap between the check and the publication,
+        // and a caller arriving mid-catch-up is asking for the import that is
+        // already happening rather than for a fresh decision about it.
+        if let importTask {
+            // The refusal runs inside the owner's task, so a joiner would slip
+            // past it. Ask again here: a caller that has queued work since the
+            // import began is still asking to overwrite it, and arriving late
+            // is not consent.
+            try await refuseIfWorkIsStillQueued()
+            return try await importTask.value
+        }
+        let task = Task { [self] in
+            try await refuseIfWorkIsStillQueued()
+            return try await importPasses(pageSize: pageSize)
+        }
+        importTask = task
+        defer { if importTask == task { importTask = nil } }
+        return try await task.value
+    }
+
+    /// Refuses the import while the queue still holds work, rather than
+    /// overwriting it. Every row the import receives goes through
+    /// `upsertItem`, which replaces all of an item's columns with no version
+    /// check, and `setMetadata`, whose contract is replace rather than merge.
+    /// The conflict machinery is unreachable from here — it only runs on an
+    /// outbound update meeting a 409. So an edit made offline and still queued
+    /// loses to the server's older body, with nothing reporting it.
+    ///
+    /// The check belongs here rather than in the caller. A consumer cannot ask
+    /// this question at the moment it needs to: `hasPendingMutations` hangs off
+    /// this engine, and the caller deciding whether to import is typically
+    /// holding a local client that has neither an engine nor a queue. What it
+    /// writes instead is `syncEngine?.hasPendingMutations ?? false`, which
+    /// answers "safe" because there was nothing to ask — a presence check
+    /// standing in for a liveness check, and one that reads as correct. Here
+    /// the queue is in hand, so the answer cannot be right by accident.
+    ///
+    /// Per-row skipping was the other option and it cannot be made complete: a
+    /// mutation carries an optional `localId`, and the three bulk enqueues set
+    /// none at all, so a bulk write is invisible to any "does item X have a
+    /// pending edit" test.
+    ///
+    /// The engine's own catch-up drains before it asks, which is what clears
+    /// the way rather than working around this.
+    private func refuseIfWorkIsStillQueued() async throws {
         let pending = try await mutationQueue.pendingCount
         if pending > 0 {
             throw InitialSyncError.pendingMutations(count: pending)
         }
+    }
 
+    /// The import itself, with no refusal and no coalescing — both belong to
+    /// the callers above, which is what lets the catch-up drain first and then
+    /// reach the same passes an explicit caller reaches.
+    private func importPasses(pageSize: Int) async throws -> Int {
         var cursor: String? = nil
         var imported = 0
         repeat {
+            // `stop()` cancels this task, and a page loop that never asks
+            // would keep paging a whole library past the teardown that was
+            // meant to end it.
+            try Task.checkCancellation()
             var query: [(String, String)] = [
                 ("limit", String(pageSize)),
                 ("include", "metadata"),
@@ -549,6 +648,7 @@ public actor SyncEngine {
         var edgeCursor: String? = nil
         var edgesImported = 0
         repeat {
+            try Task.checkCancellation()
             // 500 is the route's own ceiling; a larger `limit` is refused
             // rather than clamped.
             var query: [(String, String)] = [("limit", String(min(pageSize, 500)))]
@@ -601,13 +701,92 @@ public actor SyncEngine {
         }
     }
 
+    // MARK: - Catch-up
+
+    /// Brings the local store level with the server. Runs whenever the engine
+    /// comes online, before the event stream opens, and again from the
+    /// retention-gap branch below.
+    ///
+    /// Two things can be behind and they settle in this order. Writes made
+    /// while the engine was down replay first, because the import replaces
+    /// every row it receives with no version check and would otherwise
+    /// overwrite them — which is also why the import refuses outright over a
+    /// queue that has not drained, and why draining is the only thing that can
+    /// clear the way for it. Then the library itself is pulled, but only for a
+    /// store that has never completed an import: nothing else ever fills a
+    /// fresh one, and a store that has been filled must not re-page the whole
+    /// library on every reconnect.
+    ///
+    /// **The import decision reads `last_full_sync_at`, not
+    /// ``fullSyncState``**, and the difference is load-bearing in both
+    /// directions. The drain above stamps a clean drain, so `fullSyncState`
+    /// would already read `.synced` by the time the import was considered and
+    /// a fresh store with a queued write would never be filled. And a clean
+    /// drain following a *failed* import clears the failure, so a device whose
+    /// import failed would read `.synced` on the next cycle and never try
+    /// again. `last_full_sync_at` is stamped by a completed import and by
+    /// nothing else, which is the question actually being asked.
+    ///
+    /// - Parameter forceImport: import even for a store that has completed one
+    ///   before. The retention-gap branch sets it: the server has discarded
+    ///   the events this device's cursor points at, so the store is behind by
+    ///   an unknown amount and only a fresh import closes that.
+    @discardableResult
+    private func catchUp(forceImport: Bool = false) async -> Error? {
+        // A queue that cannot be read is drained rather than skipped:
+        // `replayMutations` reports the storage failure, where assuming empty
+        // would walk into an import that overwrites whatever is in there.
+        let queueIsEmpty = (try? await mutationQueue.isEmpty) ?? false
+        if !queueIsEmpty {
+            await replayMutations()
+            // A drain leaves the manager on `.syncing`. Everything gated on
+            // `.online` has to be reachable again once it is over, and when
+            // this runs mid-stream from the retention-gap branch nothing
+            // else will put it back.
+            if running { await connectionManager.markOnline() }
+
+            // A drain that did not empty the queue leaves work the import
+            // refuses over, and that refusal would replace the drain's error
+            // in ``fullSyncState`` with one about the import — reporting the
+            // consequence and hiding the cause. Leave the cause standing and
+            // let the next cycle try again.
+            let drained = (try? await mutationQueue.isEmpty) ?? false
+            guard drained else {
+                logger.log.info("sync.catch_up.import_skipped reason=queue_not_drained")
+                return nil
+            }
+        }
+
+        let hasImported = await lastFullSyncAt != nil
+        guard forceImport || !hasImported else { return nil }
+
+        do {
+            _ = try await performInitialSync()
+            // The queue is empty and the library is level, which is what a
+            // clean drain already means; this is the existing check, asked at
+            // one more point rather than a second definition. Without it the
+            // state would sit at `.notYetSynced` until something closed the
+            // stream, and against a live server nothing does.
+            await recordCleanDrainIfQueueIsEmpty()
+            return nil
+        } catch {
+            // Recorded and left visible rather than escalated. The caller
+            // opens the stream after this returns either way: a device whose
+            // import failed should not also be deaf to what happens next, and
+            // the next online cycle asks again because the import stamped
+            // nothing. Returned as well as recorded so a caller with more
+            // context than this can say where it happened.
+            recordSyncFailure(error)
+            return error
+        }
+    }
+
     // MARK: - Proactive drain on enqueue
 
     /// Listens to `mutationQueue.drainRequests` for the lifetime of the
     /// engine. Each ping schedules a debounced proactive drain — bursts
     /// of enqueues collapse into one replay cycle at the end.
-    private func drainListenerLoop() async {
-        let stream = await mutationQueue.drainRequests
+    private func drainListenerLoop(_ stream: AsyncStream<Void>) async {
         for await _ in stream {
             guard running else { break }
             scheduleProactiveDrain()
@@ -669,6 +848,12 @@ public actor SyncEngine {
     // MARK: - SSE stream
 
     private func openStream() async {
+        // Level the store before subscribing to what happens next. The stream
+        // carries only events after it opens, so anything the store is behind
+        // by has to be fetched rather than waited for.
+        await catchUp()
+        guard running else { return }
+
         let cursor = try? await mutationQueue.loadSyncState(key: cursorKey)
 
         var query: [(String, String)] = []
@@ -679,6 +864,34 @@ public actor SyncEngine {
             query: query.isEmpty ? nil : query,
             lastEventID: cursor
         )
+
+        // Online from the moment the stream is asked for rather than from the
+        // moment it closes. Everything gated on `.online` — the proactive
+        // drain above all — was unreachable for as long as a stream stayed
+        // open, which against a live server is the whole session, so a write
+        // made while the app was running sat in the queue until something else
+        // happened to it.
+        //
+        // The transport cannot report that the stream opened, and that is not
+        // an oversight to route around here: a healthy open sends an SSE
+        // comment, which the parser drops by design, so nothing reaches this
+        // layer until the first real event and a quiet stream has none.
+        // Assuming the open is the accurate half of the trade — being wrong
+        // costs one replay attempt that fails transiently and is retried,
+        // while waiting costs every write until the stream closes.
+        guard running else { return }
+        await connectionManager.markOnline()
+
+        // A request to drain that arrived while the engine was coming online
+        // was dropped rather than deferred: the proactive drain fires only on
+        // `.online`, and everything between `start()` and this line reads
+        // `.connecting`. That window is not narrow — it spans the first
+        // import, which pages the whole library — so a write made as the app
+        // opened lands in it and its ping is spent on a gate that refuses.
+        // Ask again for anything still queued rather than leaving it to
+        // whatever happens next.
+        let queueIsEmpty = (try? await mutationQueue.isEmpty) ?? false
+        if !queueIsEmpty { scheduleProactiveDrain() }
 
         var eventsConsumed = 0
         var errored = false
@@ -983,38 +1196,25 @@ public actor SyncEngine {
             // our cursor and run a fresh full resync so the next reconnect
             // opens a stream with no cursor.
             //
-            // The `resyncing` guard is checked and set *before* the first
-            // suspension point (`clearSyncState` hops to MutationQueue) so
-            // that a concurrent `catchup_too_old` entering on actor reentry
-            // observes the guard as already taken.
-            guard !resyncing else {
-                logger.log.info("sync.catchup_too_old — resync already in progress, skipping")
-                break
-            }
-            resyncing = true
             logger.log.info("sync.catchup_too_old — clearing cursor and triggering full resync")
             try? await mutationQueue.clearSyncState(key: cursorKey)
-            // Drain before importing, because the import now refuses on a
-            // non-empty queue and this is the one call site that can do
-            // something about it: the engine is running here, which is what
-            // `replayMutations` requires, whereas an outside caller holding a
-            // local client has no engine to drain. Skipping this would leave
-            // the store stale with no route back — the cursor is already
-            // cleared, so a reconnect resumes from nothing and only this branch
-            // ever asks for a full import.
-            await replayMutations()
-            do {
-                _ = try await performInitialSync()
-            } catch let error as InitialSyncError {
-                // Distinct from a transport failure. Reaching here means the
-                // drain above did not empty the queue — a write enqueued in
-                // between, or one that keeps failing — so the gap persists
-                // until a later drain succeeds and something asks again.
-                logger.log.error("sync.catchup_too_old.resync_refused reason=\(String(describing: error), privacy: .public)")
-            } catch {
-                logger.log.error("sync.catchup_too_old.resync_failed reason=\(String(describing: type(of: error)), privacy: .public)")
+            // The same catch-up the engine runs when it comes online, forced
+            // past the never-imported test because this store has imported
+            // before and still needs another one. It drains before importing
+            // for the same reason it always does, and two of these events
+            // landing on actor reentry share one import through the slot the
+            // catch-up publishes rather than racing over the store.
+            if let error = await catchUp(forceImport: true) {
+                if error is InitialSyncError {
+                    // Distinct from a transport failure. Reaching here means a
+                    // write landed between the drain and the import, so the gap
+                    // persists until a later drain succeeds and something asks
+                    // again.
+                    logger.log.error("sync.catchup_too_old.resync_refused reason=\(String(describing: error), privacy: .public)")
+                } else {
+                    logger.log.error("sync.catchup_too_old.resync_failed reason=\(String(describing: type(of: error)), privacy: .public)")
+                }
             }
-            resyncing = false
             // SSE stream was closed by the server; outer reconnect loop will
             // reopen it with no `Last-Event-ID` header.
 
@@ -1088,7 +1288,7 @@ public actor SyncEngine {
         do {
             pending = try await mutationQueue.fetchAll()
         } catch {
-            recordReplayFailure(error)
+            recordSyncFailure(error)
             return
         }
         guard !pending.isEmpty else {
@@ -1156,7 +1356,7 @@ public actor SyncEngine {
                     do {
                         remaining = try await mutationQueue.fetchAll()
                     } catch {
-                        recordReplayFailure(error)
+                        recordSyncFailure(error)
                         return
                     }
                 }
@@ -1212,7 +1412,7 @@ public actor SyncEngine {
                     do {
                         remaining = try await mutationQueue.fetchAll()
                     } catch {
-                        recordReplayFailure(error)
+                        recordSyncFailure(error)
                         return
                     }
                 }
@@ -1233,13 +1433,16 @@ public actor SyncEngine {
         }
 
         if let transientError {
-            recordReplayFailure(transientError)
+            recordSyncFailure(transientError)
         } else {
             await recordCleanDrainIfQueueIsEmpty()
         }
     }
 
-    private func recordReplayFailure(_ error: Error) {
+    /// Records the failure that ended a cycle — a replay that could not
+    /// finish, or a catch-up import that did not land — so ``fullSyncState``
+    /// reports `.failed` until the next clean drain replaces it.
+    private func recordSyncFailure(_ error: Error) {
         guard running else { return }
         lastFailedError = error
         lastFailedAt = Date()
@@ -1249,13 +1452,23 @@ public actor SyncEngine {
     /// Re-reads the queue after a replay cycle before claiming success. A
     /// failed storage read, shutdown, or surviving row is an unknown or
     /// incomplete state, not a clean drain.
+    ///
+    /// **A store that has never completed an import cannot be caught up**,
+    /// whatever its queue says, and this is the one place that decides it. An
+    /// empty queue on a store with nothing in it is not a device in sync; it is
+    /// a device that has not started. Without this a write queued before the
+    /// first start reported `.synced` from the drain that runs in front of the
+    /// import — an app told it was up to date while showing an empty library —
+    /// and the first `.synced` a fresh store reports is now the one its import
+    /// lands.
     private func recordCleanDrainIfQueueIsEmpty() async {
         guard running else { return }
+        guard await lastFullSyncAt != nil else { return }
         let queueIsEmpty: Bool
         do {
             queueIsEmpty = try await mutationQueue.isEmpty
         } catch {
-            recordReplayFailure(error)
+            recordSyncFailure(error)
             return
         }
         guard running, queueIsEmpty else { return }
@@ -1275,7 +1488,7 @@ public actor SyncEngine {
         do {
             try await mutationQueue.saveSyncState(key: cleanDrainKey, value: stamp)
         } catch {
-            recordReplayFailure(error)
+            recordSyncFailure(error)
             return
         }
         // stop() may have begun while the persistence write was in flight.

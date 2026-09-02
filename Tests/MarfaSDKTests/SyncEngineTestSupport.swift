@@ -17,8 +17,24 @@ enum SyncEngineTestKit {
         return (store, queue)
     }
 
+    /// Stamps the store as one that has already completed a full import.
+    ///
+    /// The engine imports when it comes online and this timestamp is absent,
+    /// so a store without it fetches the item and edge pages before opening
+    /// the stream — which lands in the middle of whatever response sequence a
+    /// test queued. Most suites here are about a device that has been running
+    /// for a while, and this is what that device's store looks like.
+    static func markImported(_ queue: MutationQueue) async throws {
+        let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        try await queue.saveSyncState(key: "last_full_sync_at", value: stamp)
+    }
+
     // Build a full synced client fixture.
-    static func makeFixture() async throws -> (
+    //
+    // `hasImportedBefore` defaults to the device that has already imported,
+    // because that is the shape nearly every suite in this file is about. Pass
+    // `false` for the cold-start shape, where coming online pulls the library.
+    static func makeFixture(hasImportedBefore: Bool = true) async throws -> (
         store: LocalStore,
         queue: MutationQueue,
         transport: MockTransport,
@@ -26,6 +42,7 @@ enum SyncEngineTestKit {
         engine: SyncEngine
     ) {
         let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        if hasImportedBefore { try await markImported(queue) }
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         let engine = SyncEngine(
@@ -39,7 +56,9 @@ enum SyncEngineTestKit {
 
     /// Fixture variant for the proactive-drain tests — short debounce so
     /// assertions don't need to sleep for the 150 ms default.
-    static func makeFixtureWithShortDebounce() async throws -> (
+    static func makeFixtureWithShortDebounce(
+        hasImportedBefore: Bool = true
+    ) async throws -> (
         store: LocalStore,
         queue: MutationQueue,
         transport: MockTransport,
@@ -47,6 +66,7 @@ enum SyncEngineTestKit {
         engine: SyncEngine
     ) {
         let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        if hasImportedBefore { try await markImported(queue) }
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         let engine = SyncEngine(
@@ -360,5 +380,186 @@ actor BlockingSuccessfulReplayTransport: Transport {
         AsyncThrowingStream { continuation in
             continuation.finish()
         }
+    }
+}
+
+/// A transport whose event stream stays open until the test closes it.
+///
+/// `MockTransport` finishes every stream the instant it is created, and that
+/// difference is why this whole class of defect was invisible from a unit
+/// test: everything the engine does after the stream closes — the queue
+/// drain above all — ran immediately, so a write that only a stream close
+/// would have replayed looked replayed. A live server holds the stream open
+/// for the session, and on that server nothing behind the close ever runs.
+///
+/// Responses and errors are a single FIFO each, matching `MockTransport`, so
+/// a test enqueues them in the order the engine will ask.
+actor HeldOpenStreamTransport: Transport {
+
+    private var responses: [Data] = []
+    private var errors: [Error?] = []
+    private var recordedCalls: [MockTransport.Call] = []
+    private var streamContinuations: [AsyncThrowingStream<SSEEvent, Error>.Continuation] = []
+    private(set) var openStreamCount = 0
+    private(set) var openStreamsFinished = false
+    private var held: (method: HTTPMethod, path: String)?
+    private var heldContinuation: CheckedContinuation<Void, Never>?
+    private(set) var heldRequestReached = false
+    private var concurrencyGuard: (method: HTTPMethod, path: String)?
+    private var inFlightGuarded = 0
+
+    struct NoResponseQueued: Error, CustomStringConvertible {
+        let method: String
+        let path: String
+        var description: String {
+            "HeldOpenStreamTransport: no response queued for \(method) \(path)"
+        }
+    }
+
+    var calls: [MockTransport.Call] { recordedCalls }
+
+    // MARK: - Configuration
+
+    func enqueue<T: Encodable>(_ response: T) throws {
+        responses.append(try JSONEncoder().encode(response))
+    }
+
+    func enqueueError(_ error: Error) {
+        errors.append(error)
+    }
+
+    /// Suspends the next `method` request to `path` until
+    /// ``releaseHeldRequest()``. The engine's coming-online phase is
+    /// microseconds wide against a mock and seconds wide against a real
+    /// library, and this is what lets a test stand inside it.
+    ///
+    /// Matched on the verb as well as the path, because `/items` is both the
+    /// import's page fetch and a queued create's replay, and holding the wrong
+    /// one silently tests something else.
+    func holdNextRequest(method: HTTPMethod, path: String) {
+        held = (method, path)
+    }
+
+    /// Records an issue if a second `method` request to `path` is ever in
+    /// flight while the first still is. Cheaper than a window a test has to
+    /// wait out, and it fails for the right reason: two imports running at
+    /// once rather than two arriving eventually.
+    func failOnConcurrentRequest(method: HTTPMethod, path: String) {
+        concurrencyGuard = (method, path)
+    }
+
+    func releaseHeldRequest() {
+        heldContinuation?.resume()
+        heldContinuation = nil
+    }
+
+    func yieldEvent(_ event: SSEEvent) {
+        for continuation in streamContinuations { continuation.yield(event) }
+    }
+
+    /// Closes every open stream, which is what a server-side idle timeout
+    /// looks like to the engine.
+    func finishOpenStreams() {
+        for continuation in streamContinuations { continuation.finish() }
+        streamContinuations.removeAll()
+        openStreamsFinished = true
+    }
+
+    // MARK: - Transport
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
+        recordedCalls.append(
+            MockTransport.Call(method: method, path: path, body: bodyData, query: query)
+        )
+        let guarded = concurrencyGuard.map { $0.method == method && $0.path == path } ?? false
+        if guarded {
+            inFlightGuarded += 1
+            if inFlightGuarded > 1 {
+                Issue.record(
+                    "a second \(method.rawValue) \(path) ran while one was still in flight"
+                )
+            }
+        }
+        defer { if guarded { inFlightGuarded -= 1 } }
+
+        if let held, held.method == method, held.path == path {
+            self.held = nil
+            heldRequestReached = true
+            // Cancellable, because a real transport is: `URLSession` ends an
+            // in-flight request when its task is cancelled, and a double that
+            // holds on regardless would make `stop()` look like it blocks on
+            // work it has already cancelled.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    heldContinuation = continuation
+                }
+            } onCancel: {
+                Task { await self.releaseHeldRequest() }
+            }
+            try Task.checkCancellation()
+        }
+        if !errors.isEmpty, let error = errors.removeFirst() { throw error }
+        guard !responses.isEmpty else {
+            throw NoResponseQueued(method: method.rawValue, path: path)
+        }
+        return try JSONDecoder().decode(T.self, from: responses.removeFirst())
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        .success(try await request(method: method, path: path, body: body, query: query))
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        fatalError("HeldOpenStreamTransport: rawRequest not supported")
+    }
+
+    nonisolated func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            // Nothing finishes this continuation until the test asks, so the
+            // stream models a live one rather than one that closes at once.
+            Task {
+                await self.registerStream(
+                    continuation, path: path, query: query, lastEventID: lastEventID
+                )
+            }
+        }
+    }
+
+    private func registerStream(
+        _ continuation: AsyncThrowingStream<SSEEvent, Error>.Continuation,
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) {
+        recordedCalls.append(
+            MockTransport.Call(
+                method: .get, path: path, body: nil, query: query, lastEventID: lastEventID
+            )
+        )
+        // A stream registered after the test closed the previous ones is a
+        // reconnect, and the test drives those explicitly; leave it open too.
+        streamContinuations.append(continuation)
+        openStreamCount += 1
     }
 }

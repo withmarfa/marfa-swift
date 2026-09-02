@@ -7,6 +7,22 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Fixed
+
+- **A synced client fills itself and replays what it owes when it comes online, rather than when its event stream closes.** `SyncEngine.start()` began watching the network, opened `GET /events` and did nothing else, and two defects shared that one absence. A store that had never synced stayed empty, because the stream carries only what happens after it opens and `SyncEngine.performInitialSync` was a separate call the documented setup never made — so an app built by following the README opened on a blank first screen against a server full of content. And a write queued while the engine was stopped was never replayed, because the only two things that drained the queue were a ping from a fresh enqueue, which a listener that has not yet subscribed never receives, and the stream closing, which against a live server does not happen. Coming online now runs one catch-up step before the stream opens: drain the queue if anything is in it, then import if this store has never completed an import, then subscribe. **Consumers that call `SyncEngine.performInitialSync` themselves keep working and can drop the call where it was only standing in for this** — it still refuses over a queue that has not drained, still imports on demand, and a call that lands while the engine is catching up joins that run instead of paging the library a second time.
+
+- **The engine reports itself online while its stream is open, not only once it has closed.** `ConnectionState` reached `.online` after the SSE stream ended, so for the life of an open stream — against a live server, the whole session — it read `.connecting`, and the proactive drain fires only on `.online`. A write made while the app was simply running therefore sat in the queue until something else happened to it. A drain request that arrives while the engine is still coming online is now honoured once it is, rather than spent against a gate that refuses it.
+
+- **An engine started on a `ConnectionStateManager` that is already online opens a stream.** `ConnectionStateManager.start()` is idempotent, so an app that started the manager itself left the engine with no transition to act on and no stream at all until the next network flap.
+
+### Changed
+
+- **What an app watches while the first import runs is `SyncEngine.fullSyncState` and `FullSyncStateQuery`.** No sync event was added for it. A store that has never imported reads `notYetSynced` until the import lands — `syncing` while queued writes are replaying — and `synced(at:)` once it does. An import that fails reads `failed(at:error:)`, the stream opens regardless so the device is not also deaf to what happens next, and the next online cycle tries again. The engine takes that retry decision from `SyncEngine.lastFullSyncAt`, which a completed import stamps and nothing else does, rather than from the state it renders.
+
+- **A store that has never completed an import can no longer report `synced(at:)`, and `SyncEvent.synced(at:)` is not emitted for one.** An empty mutation queue on a store with nothing in it is a device that has not started, not a device in sync. Before this, a write queued before the first start reported itself caught up from the drain that runs in front of the import, so an app was told it was up to date while showing an empty library. The first `synced(at:)` a fresh store reports is now the one its import lands. A store that has already imported is unaffected.
+
+- **A failed retention-gap resync now reports `failed(at:error:)` as well as logging.** When the server has discarded the events a device's cursor points at, the resync that follows goes through the same catch-up as every other, so a failure reaches `SyncEngine.fullSyncState` instead of only the log. The two `sync.catchup_too_old` log lines are unchanged.
+
 ## [15.0.0] — 2026-09-01
 
 Major, and every breaking change in it is a name that meant the wrong thing.

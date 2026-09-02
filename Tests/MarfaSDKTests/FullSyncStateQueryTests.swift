@@ -21,6 +21,11 @@ struct FullSyncStateQueryTests {
         engine: SyncEngine
     ) {
         let (localStore, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        // A device that has already imported. A store that never has cannot
+        // record a clean drain — an empty queue on an empty store is a device
+        // that has not started, not one in sync — and every test here is about
+        // what a drain does afterwards.
+        try await SyncEngineTestKit.markImported(queue)
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         let engine = SyncEngine(
