@@ -455,7 +455,7 @@ struct SyncEngineSSEAndCursorTests {
             result: PaginatedResult<ItemWithMetadata>(data: [], cursor: nil, hasMore: false)
         )
 
-        _ = try await (first, second)
+        _ = await (first, second)
 
         let count = await transport.itemsCallCount
         #expect(count == 1, "expected exactly one resync; got \(count)")

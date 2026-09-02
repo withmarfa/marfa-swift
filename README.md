@@ -15,7 +15,7 @@ Or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/withmarfa/swift-sdk", from: "15.0.0"),
+    .package(url: "https://github.com/withmarfa/swift-sdk", from: "16.0.0"),
 ]
 ```
 

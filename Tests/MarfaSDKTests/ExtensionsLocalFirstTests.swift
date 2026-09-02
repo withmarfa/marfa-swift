@@ -85,7 +85,7 @@ struct ExtensionsLocalFirstTests {
         #expect(pending[0].localId == item.id)
 
         // Transport untouched
-        #expect(await transport.calls.isEmpty)
+        #expect(transport.calls.isEmpty)
     }
 
     @Test("ExtensionsNamespace.delete removes locally and enqueues") func namespaceDeleteEnqueues() async throws {

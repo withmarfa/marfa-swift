@@ -22,9 +22,15 @@ public struct WaitUntilTimeoutError: Error, CustomStringConvertible {
 /// far coarser than these sub-second waits.
 ///
 /// The 5s default absorbs CI hosts that run 5-10x slower than local
-/// Apple silicon — a 500ms ceiling produced flakes on CI without ever
-/// firing locally. Pass a tighter `timeout:` when an assertion depends
-/// on one; nothing relies on the default.
+/// Apple silicon — a 500ms *default* produced flakes on CI without ever
+/// firing locally. That is a claim about the default, not a floor for the
+/// argument, and the distinction is worth keeping straight: sub-second
+/// bounds are passed deliberately all over this repository, most of them
+/// to `SyncEngineTestKit.waitUntil`, which requires `timeout:` precisely
+/// so each call site states its own. Pass a tighter `timeout:` here when
+/// an assertion depends on one, derived from the constant it is testing
+/// rather than from what the machine usually manages; nothing relies on
+/// the default.
 ///
 /// **There is a second wait helper in this repository, and that is
 /// deliberate.** `SyncEngineTestKit.waitUntil` is `nonisolated` and takes

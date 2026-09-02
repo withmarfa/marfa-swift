@@ -7,6 +7,59 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [16.0.0] — 2026-09-02
+
+Major, and the breaking changes are the smaller half. **A synced client did not
+sync.** Several independent defects, each sufficient on its own: it never
+applied `metadata.changed` or `edge.updated`; it wrote a second copy of every
+edge it created, and of every bulk item it created without naming an id itself,
+which is the ordinary case rather than the corner because the store mints an id
+for exactly those; its event stream was torn down every two minutes and
+replayed from the cursor; and a store that had never imported stayed empty,
+because the only thing that would fill it was a separate call the documented
+setup never made. An app built by following the README opened on a blank first
+screen against a server full of content, and the stream above it looked healthy
+throughout.
+
+Fixing that is what moves the surface. `LocalStoreWriting` drops `setMetadata`
+for `upsertMetadata` and **stops every conformer compiling**: an event and an
+import both carry the server's whole metadata row, so the engine no longer
+performs a tags-only write at all. Inbound metadata now replaces rather than
+merges, extensions included, which means a namespace the server has dropped
+goes away on the device too. `SyncEvent` gains two cases, `edgeUpdated(id:)`
+and `mutationBlocked(kind:itemId:reason:)`, while `PendingMutationStatus` and
+`PendingMutationState` gain one each, so an exhaustive switch over any of them
+needs a new branch.
+
+Two further breaks are unrelated to sync and share one cause: the vendored spec
+these shapes are generated from had stopped tracking the platform.
+`connections.install` loses `label:` and `ConnectionInstallResult` loses
+`credentialId`, because the route dropped both while the SDK went on sending
+the one and requiring the other — so every install failed to decode a call the
+server had already carried out. `Integration.installedCount` arrives with the
+same refresh, non-optional and with no default, so an `Integration(...)` built
+in a fixture or a preview has to pass one.
+
+**The changes the compiler will not find for you are the ones to read.** A 400
+and a 409 now carry the code the server sent, rather than being flattened to
+`validation_error` and `server_error`, so a consumer branching on
+`MarfaError.code` will meet codes it has never seen before.
+`DroppedMutationRecord.id` is no longer always the dead record's UUIDv4, and a
+bulk row no longer always carries a `nil` `localId`. `SyncEvent.synced(at:)` is
+no longer emitted for a store that has never completed an import, because an
+empty queue on an empty store is a device that has not started rather than one
+in sync. And a queued write that cannot succeed until the app does something is
+now blocked rather than replayed forever — worth reading in full if you write
+offline, because a queue whose remaining rows are all blocked also holds off
+the first import.
+
+`admin.platformTypes` is a new sub-namespace over two new public types,
+`AdminPlatformTypesNamespace` and `DriftedPlatformType`. A platform-type row is
+what makes items of that type resolve, so a build that stops shipping a type
+leaves its rows behind; `drift()` lists them with a live item count and what
+inherits from each, and `remove(_:)` deletes one where the server agrees
+nothing still depends on it. Platform-admin only.
+
 ### Added
 
 - **`SyncEvent` gains `edgeUpdated(id:)`, and an exhaustive switch over it stops compiling.** A closed enum gaining a case breaks every switch that enumerates it, which is why this is reported as the enum rather than as the case. Add the branch and the switch compiles again; there is no behavior to migrate. The event fires when an edge edited on another device reaches this one, which until now nothing announced because nothing applied it.
@@ -48,7 +101,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - **A synced client fills itself and replays what it owes when it comes online, rather than when its event stream closes.** `SyncEngine.start()` began watching the network, opened `GET /events` and did nothing else, and two defects shared that one absence. A store that had never synced stayed empty, because the stream carries only what happens after it opens and `SyncEngine.performInitialSync` was a separate call the documented setup never made — so an app built by following the README opened on a blank first screen against a server full of content. And a write queued while the engine was stopped was never replayed, because the only two things that drained the queue were a ping from a fresh enqueue, which a listener that has not yet subscribed never receives, and the stream closing, which against a live server does not happen. Coming online now runs one catch-up step before the stream opens: drain the queue if anything is in it, then import if this store has never completed an import, then subscribe. **Consumers that call `SyncEngine.performInitialSync` themselves keep working and can drop the call where it was only standing in for this** — it still refuses over a queue that has not drained, still imports on demand, and a call that lands while the engine is catching up joins that run instead of paging the library a second time.
 
-- **The engine reports itself online while its stream is open, not only once it has closed.** `ConnectionState` reached `.online` after the SSE stream ended, so for the life of an open stream — against a live server, the whole session — it read `.connecting`, and the proactive drain fires only on `.online`. A write made while the app was simply running therefore sat in the queue until something else happened to it. A drain request that arrives while the engine is still coming online is now honoured once it is, rather than spent against a gate that refuses it.
+- **The engine reports itself online while its stream is open, not only once it has closed.** `ConnectionState` reached `.online` after the SSE stream ended, so for the life of an open stream — against a live server, the whole session — it read `.connecting`, and the proactive drain fires only on `.online`. A write made while the app was simply running therefore sat in the queue until something else happened to it. A drain request that arrives while the engine is still coming online is now honored once it is, rather than spent against a gate that refuses it.
 
 - **An engine started on a `ConnectionStateManager` that is already online opens a stream.** `ConnectionStateManager.start()` is idempotent, so an app that started the manager itself left the engine with no transition to act on and no stream at all until the next network flap.
 

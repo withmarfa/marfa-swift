@@ -50,7 +50,11 @@ AdminAccountDeletionNamespace	struct	struct AdminAccountDeletionNamespace
 AdminAccountDeletionNamespace.purgeNow()	method	@discardableResult func purgeNow() async throws -> PurgeNowResult
 AdminNamespace	struct	struct AdminNamespace
 AdminNamespace.accountDeletion	property	var accountDeletion: AdminAccountDeletionNamespace { get }
+AdminNamespace.platformTypes	property	var platformTypes: AdminPlatformTypesNamespace { get }
 AdminNamespace.spaces	property	var spaces: AdminSpacesNamespace { get }
+AdminPlatformTypesNamespace	struct	struct AdminPlatformTypesNamespace
+AdminPlatformTypesNamespace.drift()	method	func drift() async throws -> [DriftedPlatformType]
+AdminPlatformTypesNamespace.remove(_:)	method	func remove(_ id: String) async throws
 AdminSpacesNamespace	struct	struct AdminSpacesNamespace
 AdminSpacesNamespace.get(id:)	method	func get(id: String) async throws -> SpaceDetail
 AdminSpacesNamespace.keys(id:)	method	func keys(id: String) async throws -> [SpaceApiKeySummary]
@@ -353,11 +357,12 @@ ClientConfiguration.cdnBaseURL	property	var cdnBaseURL: URL?
 ClientConfiguration.conflictStrategy	property	var conflictStrategy: ConflictStrategy
 ClientConfiguration.debugLogging	property	var debugLogging: Bool
 ClientConfiguration.fromEnvironment()	type.method	static func fromEnvironment() -> ClientConfiguration?
-ClientConfiguration.init(url:apiKey:conflictStrategy:timeoutInterval:resourceTimeout:cdnBaseURL:debugLogging:retryPolicy:maxBackrefBatchConcurrency:)	init	init(url: URL, apiKey: String, conflictStrategy: ConflictStrategy = .auto, timeoutInterval: TimeInterval = 30, resourceTimeout: TimeInterval = 120, cdnBaseURL: URL? = nil, debugLogging: Bool = false, retryPolicy: RetryPolicy = .default, maxBackrefBatchConcurrency: Int = 8)
-ClientConfiguration.init(url:tokenProvider:conflictStrategy:timeoutInterval:resourceTimeout:cdnBaseURL:debugLogging:retryPolicy:maxBackrefBatchConcurrency:)	init	init(url: URL, tokenProvider: any TokenProvider, conflictStrategy: ConflictStrategy = .auto, timeoutInterval: TimeInterval = 30, resourceTimeout: TimeInterval = 120, cdnBaseURL: URL? = nil, debugLogging: Bool = false, retryPolicy: RetryPolicy = .default, maxBackrefBatchConcurrency: Int = 8)
+ClientConfiguration.init(url:apiKey:conflictStrategy:timeoutInterval:resourceTimeout:streamTimeout:cdnBaseURL:debugLogging:retryPolicy:maxBackrefBatchConcurrency:)	init	init(url: URL, apiKey: String, conflictStrategy: ConflictStrategy = .auto, timeoutInterval: TimeInterval = 30, resourceTimeout: TimeInterval = 120, streamTimeout: TimeInterval = 60, cdnBaseURL: URL? = nil, debugLogging: Bool = false, retryPolicy: RetryPolicy = .default, maxBackrefBatchConcurrency: Int = 8)
+ClientConfiguration.init(url:tokenProvider:conflictStrategy:timeoutInterval:resourceTimeout:streamTimeout:cdnBaseURL:debugLogging:retryPolicy:maxBackrefBatchConcurrency:)	init	init(url: URL, tokenProvider: any TokenProvider, conflictStrategy: ConflictStrategy = .auto, timeoutInterval: TimeInterval = 30, resourceTimeout: TimeInterval = 120, streamTimeout: TimeInterval = 60, cdnBaseURL: URL? = nil, debugLogging: Bool = false, retryPolicy: RetryPolicy = .default, maxBackrefBatchConcurrency: Int = 8)
 ClientConfiguration.maxBackrefBatchConcurrency	property	var maxBackrefBatchConcurrency: Int
 ClientConfiguration.resourceTimeout	property	var resourceTimeout: TimeInterval
 ClientConfiguration.retryPolicy	property	var retryPolicy: RetryPolicy
+ClientConfiguration.streamTimeout	property	var streamTimeout: TimeInterval
 ClientConfiguration.timeoutInterval	property	var timeoutInterval: TimeInterval
 ClientConfiguration.url	property	let url: URL
 ConflictAutoMergedPayload	struct	struct ConflictAutoMergedPayload
@@ -480,16 +485,14 @@ ConnectionInstallInput	struct	struct ConnectionInstallInput
 ConnectionInstallInput.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 ConnectionInstallInput.configuration	property	let configuration: [String : JSONValue]?
 ConnectionInstallInput.credentialRef	property	let credentialRef: String?
-ConnectionInstallInput.init(configuration:credentialRef:integrationId:label:)	init	init(configuration: [String : JSONValue]? = nil, credentialRef: String? = nil, integrationId: String, label: String? = nil)
+ConnectionInstallInput.init(configuration:credentialRef:integrationId:)	init	init(configuration: [String : JSONValue]? = nil, credentialRef: String? = nil, integrationId: String)
 ConnectionInstallInput.init(from:)	init	init(from decoder: any Decoder) throws
 ConnectionInstallInput.integrationId	property	let integrationId: String
-ConnectionInstallInput.label	property	let label: String?
 ConnectionInstallResult	struct	struct ConnectionInstallResult
 ConnectionInstallResult.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 ConnectionInstallResult.activityId	property	let activityId: String
 ConnectionInstallResult.connectionId	property	let connectionId: String
-ConnectionInstallResult.credentialId	property	let credentialId: String
-ConnectionInstallResult.init(activityId:connectionId:credentialId:)	init	init(activityId: String, connectionId: String, credentialId: String)
+ConnectionInstallResult.init(activityId:connectionId:)	init	init(activityId: String, connectionId: String)
 ConnectionInstallResult.init(from:)	init	init(from decoder: any Decoder) throws
 ConnectionKind	enum	enum ConnectionKind
 ConnectionKind.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
@@ -545,7 +548,7 @@ ConnectionUninstallResult.upstreamCredential	property	let upstreamCredential: [S
 ConnectionsNamespace	struct	struct ConnectionsNamespace
 ConnectionsNamespace.get(_:)	method	func get(_ id: String) async throws -> Connection
 ConnectionsNamespace.inboundWebhooks	property	let inboundWebhooks: InboundWebhooksNamespace
-ConnectionsNamespace.install(integrationId:label:)	method	@discardableResult func install(integrationId: String, label: String? = nil) async throws -> ConnectionInstallResult
+ConnectionsNamespace.install(integrationId:credentialRef:configuration:)	method	@discardableResult func install(integrationId: String, credentialRef: String? = nil, configuration: [String : JSONValue]? = nil) async throws -> ConnectionInstallResult
 ConnectionsNamespace.leaseTokens	property	let leaseTokens: LeaseTokensNamespace
 ConnectionsNamespace.list(kind:state:limit:cursor:)	method	func list(kind: ConnectionKind? = nil, state: ItemState? = nil, limit: Int? = nil, cursor: String? = nil) async throws -> PaginatedResult<Connection>
 ConnectionsNamespace.previewEvent(_:)	method	func previewEvent(_ input: PreviewEventRequest) async throws -> PreviewEventResult
@@ -1369,6 +1372,14 @@ DeviceFlowHandle.verificationURI	property	nonisolated let verificationURI: URL
 DeviceFlowHandle.verificationURIComplete	property	nonisolated let verificationURIComplete: URL?
 DeviceFlowHandle.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T where E : Error, T : ~Copyable
 DeviceFlowHandle.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T where E : Error, T : ~Copyable
+DriftedPlatformType	struct	struct DriftedPlatformType
+DriftedPlatformType.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+DriftedPlatformType.childTypes	property	let childTypes: [String]
+DriftedPlatformType.id	property	let id: String
+DriftedPlatformType.init(childTypes:id:itemCount:removable:)	init	init(childTypes: [String], id: String, itemCount: Int, removable: Bool)
+DriftedPlatformType.init(from:)	init	init(from decoder: any Decoder) throws
+DriftedPlatformType.itemCount	property	let itemCount: Int
+DriftedPlatformType.removable	property	let removable: Bool
 DroppedMutationRecord	struct	struct DroppedMutationRecord
 DroppedMutationRecord.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 DroppedMutationRecord.attemptCount	property	var attemptCount: Int
@@ -1582,9 +1593,11 @@ InitialSyncError.recoverySuggestion	property	var recoverySuggestion: String? { g
 Integration	struct	struct Integration
 Integration.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 Integration.direction	property	let direction: IntegrationDirection
+Integration.displayName	property	let displayName: String?
 Integration.id	property	let id: String
-Integration.init(direction:id:manifest:manifestName:manifestVersion:publisher:registeredAt:summary:)	init	init(direction: IntegrationDirection, id: String, manifest: [String : JSONValue], manifestName: String, manifestVersion: String, publisher: String, registeredAt: String, summary: String? = nil)
+Integration.init(direction:displayName:id:installedCount:manifest:manifestName:manifestVersion:publisher:registeredAt:summary:)	init	init(direction: IntegrationDirection, displayName: String? = nil, id: String, installedCount: Int, manifest: [String : JSONValue], manifestName: String, manifestVersion: String, publisher: String, registeredAt: String, summary: String? = nil)
 Integration.init(from:)	init	init(from decoder: any Decoder) throws
+Integration.installedCount	property	let installedCount: Int
 Integration.manifest	property	let manifest: [String : JSONValue]
 Integration.manifestName	property	let manifestName: String
 Integration.manifestVersion	property	let manifestVersion: String
@@ -1614,8 +1627,9 @@ Item.device	property	let device: String?
 Item.edges	property	let edges: [String : ItemEdgeGroup]?
 Item.extensions	property	let extensions: [String : [String : JSONValue]]?
 Item.id	property	let id: String
-Item.init(captureLatitude:captureLongitude:createdAt:device:edges:extensions:id:properties:schemaVersion:source:sourceId:spaceId:state:tier:timestamp:type:updatedAt:version:)	init	init(captureLatitude: Double? = nil, captureLongitude: Double? = nil, createdAt: String, device: String? = nil, edges: [String : ItemEdgeGroup]? = nil, extensions: [String : [String : JSONValue]]? = nil, id: String, properties: [String : JSONValue], schemaVersion: Int, source: String, sourceId: String? = nil, spaceId: String? = nil, state: ItemState, tier: Tier? = nil, timestamp: String, type: String, updatedAt: String, version: Int)
+Item.init(captureLatitude:captureLongitude:createdAt:device:edges:extensions:id:orphaned:properties:schemaVersion:source:sourceId:spaceId:state:tier:timestamp:type:updatedAt:version:)	init	init(captureLatitude: Double? = nil, captureLongitude: Double? = nil, createdAt: String, device: String? = nil, edges: [String : ItemEdgeGroup]? = nil, extensions: [String : [String : JSONValue]]? = nil, id: String, orphaned: Bool? = nil, properties: [String : JSONValue], schemaVersion: Int, source: String, sourceId: String? = nil, spaceId: String? = nil, state: ItemState, tier: Tier? = nil, timestamp: String, type: String, updatedAt: String, version: Int)
 Item.init(from:)	init	init(from decoder: any Decoder) throws
+Item.orphaned	property	let orphaned: Bool?
 Item.properties	property	let properties: [String : JSONValue]
 Item.schemaVersion	property	let schemaVersion: Int
 Item.source	property	let source: String
@@ -1811,6 +1825,7 @@ LocalStore.subscript(_:as:)	subscript	subscript<T>(id: PersistentIdentifier, as 
 LocalStore.unownedExecutor	property	nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 LocalStore.upsertEdge(_:)	method	func upsertEdge(_ edge: Edge) throws
 LocalStore.upsertItem(_:)	method	func upsertItem(_ item: Item) throws
+LocalStore.upsertMetadata(_:)	method	func upsertMetadata(_ metadata: Metadata) throws
 LocalStore.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T where E : Error, T : ~Copyable
 LocalStore.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T where E : Error, T : ~Copyable
 LocalStoreError	enum	enum LocalStoreError
@@ -1821,9 +1836,9 @@ LocalStoreError.modelMissing(id:)	enum.case	case modelMissing(id: String)
 LocalStoreWriting	protocol	protocol LocalStoreWriting : Sendable
 LocalStoreWriting.deleteEdge(id:)	method	func deleteEdge(id: String) async throws
 LocalStoreWriting.purgeItem(id:)	method	func purgeItem(id: String) async throws
-LocalStoreWriting.setMetadata(itemId:input:)	method	func setMetadata(itemId: String, input: MetadataInput) async throws -> Metadata
 LocalStoreWriting.upsertEdge(_:)	method	func upsertEdge(_ edge: Edge) async throws
 LocalStoreWriting.upsertItem(_:)	method	func upsertItem(_ item: Item) async throws
+LocalStoreWriting.upsertMetadata(_:)	method	func upsertMetadata(_ metadata: Metadata) async throws
 MarfaAccountIdentity	struct	struct MarfaAccountIdentity
 MarfaAccountIdentity.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 MarfaAccountIdentity.init(from:)	init	init(from decoder: any Decoder) throws
@@ -1877,8 +1892,8 @@ MarfaClient.spaces	property	let spaces: SpacesNamespace
 MarfaClient.storeOwnership(for:)	method	func storeOwnership(for identity: MarfaAccountIdentity) async throws -> StoreOwnership
 MarfaClient.storeOwnership(resolvedWith:)	method	func storeOwnership(resolvedWith credentialClient: MarfaClient) async throws -> StoreOwnership
 MarfaClient.syncEngine	property	let syncEngine: SyncEngine?
-MarfaClient.synced(url:apiKey:storePath:connectionManager:)	type.method	static func synced(url: URL, apiKey: String, storePath: String, connectionManager: ConnectionStateManager = ConnectionStateManager()) async throws -> MarfaClient
-MarfaClient.synced(url:tokenProvider:storePath:connectionManager:)	type.method	static func synced(url: URL, tokenProvider: any TokenProvider, storePath: String, connectionManager: ConnectionStateManager = ConnectionStateManager()) async throws -> MarfaClient
+MarfaClient.synced(url:apiKey:storePath:connectionManager:maxReplayAttempts:)	type.method	static func synced(url: URL, apiKey: String, storePath: String, connectionManager: ConnectionStateManager = ConnectionStateManager(), maxReplayAttempts: Int = 5) async throws -> MarfaClient
+MarfaClient.synced(url:tokenProvider:storePath:connectionManager:maxReplayAttempts:)	type.method	static func synced(url: URL, tokenProvider: any TokenProvider, storePath: String, connectionManager: ConnectionStateManager = ConnectionStateManager(), maxReplayAttempts: Int = 5) async throws -> MarfaClient
 MarfaClient.types	property	let types: TypesNamespace
 MarfaClient.webhooks	property	let webhooks: WebhooksNamespace
 MarfaError	class	class MarfaError
@@ -2099,6 +2114,17 @@ Occurrence.item	property	let item: Item
 Occurrence.replaces	property	let replaces: String?
 Occurrence.seriesId	property	let seriesId: String?
 Occurrence.startsAt	property	let startsAt: String
+OccurrenceScan	struct	struct OccurrenceScan
+OccurrenceScan.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+OccurrenceScan.eventsRead	property	let eventsRead: Int
+OccurrenceScan.init(from:)	init	init(from decoder: any Decoder) throws
+OccurrenceScan.maxOccurrences	property	let maxOccurrences: Int
+OccurrenceScan.maxSeriesErrors	property	let maxSeriesErrors: Int
+OccurrenceScan.maxUnproductiveIterations	property	let maxUnproductiveIterations: Int
+OccurrenceScan.occurrences	property	let occurrences: Int
+OccurrenceScan.seriesErrors	property	let seriesErrors: Int
+OccurrenceScan.seriesUnexpanded	property	let seriesUnexpanded: Int
+OccurrenceScan.unproductiveIterations	property	let unproductiveIterations: Int
 OccurrenceSeriesError	struct	struct OccurrenceSeriesError
 OccurrenceSeriesError.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 OccurrenceSeriesError.init(from:)	init	init(from decoder: any Decoder) throws
@@ -2111,8 +2137,11 @@ OccurrenceWindow.init(from:)	init	init(from decoder: any Decoder) throws
 OccurrenceWindow.to	property	let to: String
 OccurrencesResponse	struct	struct OccurrencesResponse
 OccurrencesResponse.data	property	let data: [Occurrence]
+OccurrencesResponse.expansionIncomplete	property	let expansionIncomplete: Bool?
 OccurrencesResponse.init(from:)	init	init(from decoder: any Decoder) throws
+OccurrencesResponse.scan	property	let scan: OccurrenceScan
 OccurrencesResponse.seriesErrors	property	let seriesErrors: [OccurrenceSeriesError]?
+OccurrencesResponse.seriesErrorsTruncated	property	let seriesErrorsTruncated: Bool?
 OccurrencesResponse.window	property	let window: OccurrenceWindow
 PKCE	enum	enum PKCE
 PKCE.computeCodeChallenge(verifier:)	type.method	static func computeCodeChallenge(verifier: String) -> String
@@ -2174,13 +2203,24 @@ PasskeyError.Code.userCancelled	enum.case	case userCancelled
 PasskeyError.Code.verificationFailed	enum.case	case verificationFailed
 PasskeyError.init(rawCode:message:details:)	init	init(rawCode: String, message: String, details: [String : JSONValue]? = nil)
 PasskeyError.passkeyCode	property	let passkeyCode: PasskeyError.Code
+PendingMutationBlockReason	enum	enum PendingMutationBlockReason
+PendingMutationBlockReason.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+PendingMutationBlockReason.conflictUnresolved	enum.case	case conflictUnresolved
+PendingMutationBlockReason.encode(to:)	method	func encode(to encoder: any Encoder) throws
+PendingMutationBlockReason.hash(into:)	method	func hash(into hasher: inout Hasher)
+PendingMutationBlockReason.hashValue	property	var hashValue: Int { get }
+PendingMutationBlockReason.init(from:)	init	init(from decoder: any Decoder) throws
+PendingMutationBlockReason.init(rawValue:)	init	init?(rawValue: String)
+PendingMutationBlockReason.resolverMissing	enum.case	case resolverMissing
+PendingMutationBlockReason.retriesExhausted	enum.case	case retriesExhausted
 PendingMutationRecord	struct	struct PendingMutationRecord
 PendingMutationRecord.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 PendingMutationRecord.attemptCount	property	var attemptCount: Int
+PendingMutationRecord.blockedReason	property	var blockedReason: PendingMutationBlockReason?
 PendingMutationRecord.createdAt	property	var createdAt: String
 PendingMutationRecord.id	property	var id: String
 PendingMutationRecord.init(from:)	init	init(from decoder: any Decoder) throws
-PendingMutationRecord.init(id:kind:payloadJson:sourceId:localId:createdAt:attemptCount:lastError:state:)	init	init(id: String, kind: MutationKind, payloadJson: String, sourceId: String? = nil, localId: String? = nil, createdAt: String, attemptCount: Int = 0, lastError: String? = nil, state: PendingMutationState = .pending)
+PendingMutationRecord.init(id:kind:payloadJson:sourceId:localId:createdAt:attemptCount:lastError:state:blockedReason:)	init	init(id: String, kind: MutationKind, payloadJson: String, sourceId: String? = nil, localId: String? = nil, createdAt: String, attemptCount: Int = 0, lastError: String? = nil, state: PendingMutationState = .pending, blockedReason: PendingMutationBlockReason? = nil)
 PendingMutationRecord.kind	property	var kind: MutationKind
 PendingMutationRecord.lastError	property	var lastError: String?
 PendingMutationRecord.localId	property	var localId: String?
@@ -2189,6 +2229,7 @@ PendingMutationRecord.sourceId	property	var sourceId: String?
 PendingMutationRecord.state	property	var state: PendingMutationState
 PendingMutationState	enum	enum PendingMutationState
 PendingMutationState.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+PendingMutationState.blocked	enum.case	case blocked
 PendingMutationState.encode(to:)	method	func encode(to encoder: any Encoder) throws
 PendingMutationState.hash(into:)	method	func hash(into hasher: inout Hasher)
 PendingMutationState.hashValue	property	var hashValue: Int { get }
@@ -2198,6 +2239,7 @@ PendingMutationState.init(rawValue:)	init	init?(rawValue: String)
 PendingMutationState.pending	enum.case	case pending
 PendingMutationStatus	enum	enum PendingMutationStatus
 PendingMutationStatus.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+PendingMutationStatus.blocked(reason:attemptCount:lastError:)	enum.case	case blocked(reason: PendingMutationBlockReason, attemptCount: Int, lastError: String)
 PendingMutationStatus.inFlight	enum.case	case inFlight
 PendingMutationStatus.pending	enum.case	case pending
 PendingMutationStatus.retrying(attemptCount:lastError:)	enum.case	case retrying(attemptCount: Int, lastError: String)
@@ -2613,11 +2655,12 @@ SyncEngine.assumeIsolated(_:file:line:)	method	nonisolated func assumeIsolated<T
 SyncEngine.events	property	nonisolated var events: AsyncStream<SyncEvent> { get }
 SyncEngine.fullSyncState	property	var fullSyncState: FullSyncState { get async }
 SyncEngine.hasPendingMutations	property	var hasPendingMutations: Bool { get async throws }
-SyncEngine.init(transport:localStore:mutationQueue:connectionManager:drainDebounceInterval:conflictResolvers:)	init	init(transport: any Transport, localStore: any LocalStoreWriting, mutationQueue: MutationQueue, connectionManager: ConnectionStateManager, drainDebounceInterval: Duration = .milliseconds(150), conflictResolvers: ConflictResolverRegistry? = nil)
+SyncEngine.init(transport:localStore:mutationQueue:connectionManager:drainDebounceInterval:conflictResolvers:maxReplayAttempts:)	init	init(transport: any Transport, localStore: any LocalStoreWriting, mutationQueue: MutationQueue, connectionManager: ConnectionStateManager, drainDebounceInterval: Duration = .milliseconds(150), conflictResolvers: ConflictResolverRegistry? = nil, maxReplayAttempts: Int = 5)
 SyncEngine.lastCleanDrainAt	property	var lastCleanDrainAt: Date? { get async }
 SyncEngine.lastFullSyncAt	property	var lastFullSyncAt: Date? { get async }
 SyncEngine.performInitialSync(pageSize:)	method	@discardableResult func performInitialSync(pageSize: Int = 200) async throws -> Int
 SyncEngine.preconditionIsolated(_:file:line:)	method	@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0) nonisolated func preconditionIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)
+SyncEngine.retry(id:)	method	func retry(id: String) async throws
 SyncEngine.start()	method	func start() async
 SyncEngine.stop()	method	func stop() async
 SyncEngine.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T where E : Error, T : ~Copyable
@@ -2630,10 +2673,12 @@ SyncEvent.blobUploadStarted(hash:totalBytes:)	enum.case	case blobUploadStarted(h
 SyncEvent.conflictAutoMerged(payload:)	enum.case	case conflictAutoMerged(payload: ConflictAutoMergedPayload)
 SyncEvent.edgeCreated(id:)	enum.case	case edgeCreated(id: String)
 SyncEvent.edgeDeleted(id:)	enum.case	case edgeDeleted(id: String)
+SyncEvent.edgeUpdated(id:)	enum.case	case edgeUpdated(id: String)
 SyncEvent.failed(error:)	enum.case	case failed(error: any Error)
 SyncEvent.itemCreated(id:)	enum.case	case itemCreated(id: String)
 SyncEvent.itemDeleted(id:)	enum.case	case itemDeleted(id: String)
 SyncEvent.itemUpdated(id:)	enum.case	case itemUpdated(id: String)
+SyncEvent.mutationBlocked(kind:itemId:reason:)	enum.case	case mutationBlocked(kind: String, itemId: String?, reason: PendingMutationBlockReason)
 SyncEvent.mutationDropped(kind:itemId:attempt:error:)	enum.case	case mutationDropped(kind: String, itemId: String?, attempt: Int, error: MarfaError)
 SyncEvent.synced(at:)	enum.case	case synced(at: Date)
 SyncEvent.syncing	enum.case	case syncing
@@ -2788,6 +2833,7 @@ UpdateWebhookInput.init(url:events:typeFilter:active:)	init	init(url: String? = 
 UpdateWebhookInput.typeFilter	property	var typeFilter: String?
 UpdateWebhookInput.url	property	var url: String?
 ValidationError	class	final class ValidationError
+ValidationError.init(code:message:details:)	init	init(code: String, message: String, details: [String : JSONValue]? = nil)
 ValidationError.init(message:details:)	init	init(message: String, details: [String : JSONValue]? = nil)
 Version	struct	struct Version
 Version.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
