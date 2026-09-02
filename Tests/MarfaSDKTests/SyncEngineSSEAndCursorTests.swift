@@ -195,6 +195,11 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStreamSuspendedForTesting
         }
 
+        // Opening the stream transitions the manager online, so the count is
+        // already non-zero here and the invariant is that teardown adds
+        // nothing to it rather than that nothing was ever called.
+        let beforeStop = await connManager.markOnlineCallCountForTesting
+
         let stopTask = Task { await engine.stop() }
         try await SyncEngineTestKit.waitUntil(timeout: .seconds(2), description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
@@ -205,7 +210,7 @@ struct SyncEngineSSEAndCursorTests {
         // `markOnline` is a no-op once the manager is offline, so the state
         // machine records nothing either way; the call count is what proves
         // the stopped engine kept its hands off a manager it no longer owns.
-        #expect(await connManager.markOnlineCallCountForTesting == 0)
+        #expect(await connManager.markOnlineCallCountForTesting == beforeStop)
     }
 
     @Test("stop finishes every open event stream")

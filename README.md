@@ -41,6 +41,8 @@ let synced = try await MarfaClient.synced(url: url, apiKey: key, storePath: "/pa
 await synced.syncEngine?.start()
 ```
 
+`start()` is the whole of the synced setup: a store that has never synced fills itself from the server, and writes queued while the engine was stopped replay, before the client subscribes to live events.
+
 SwiftUI-ready reactive queries are available on the pure-local and synced clients via `client.makeStore()`. See the [Swift SDK guide](https://docs.marfa.so/sdks/swift) for reactive queries, custom-type codegen, and the full API surface.
 
 ## Build and test

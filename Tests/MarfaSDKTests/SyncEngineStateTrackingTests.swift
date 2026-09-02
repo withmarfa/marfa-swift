@@ -40,7 +40,8 @@ struct SyncEngineStateTrackingTests {
 
     @Test("lastFullSyncAt is nil on a fresh store")
     func lastFullSyncAtNilOnFreshStore() async throws {
-        let (_, _, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        let (_, _, _, _, engine) =
+            try await SyncEngineTestKit.makeFixture(hasImportedBefore: false)
         let stamped = await engine.lastFullSyncAt
         #expect(stamped == nil)
     }
