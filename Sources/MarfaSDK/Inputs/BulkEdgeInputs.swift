@@ -48,9 +48,11 @@ public struct BulkEdgeInput: Codable, Sendable {
     public var mode: BulkMode?
     /// Defaults to `true` on the server — set `false` for best-effort ingest.
     public var atomic: Bool?
-    /// Per-edge `edge_created` events default to OFF on bulk calls unless
-    /// the caller opts in. Property replaces (outcome `updated`) emit
-    /// nothing regardless; the pubsub enum has no `edge_updated` variant.
+    /// Per-edge events default to OFF on bulk calls unless the caller opts
+    /// in. When set, the call fires `edge.created` for each edge it created
+    /// and `edge.updated` for each upsert that replaced an existing edge's
+    /// properties, so a subscriber cannot tell a bulk edit from one made
+    /// through `PATCH /edges/{id}`. Outcomes that wrote nothing emit nothing.
     public var emitEvents: Bool?
 
     public init(

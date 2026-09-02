@@ -3,11 +3,9 @@ import Foundation
 @testable import MarfaSDK
 @testable import MarfaSDKTestSupport
 
-// Shared fixtures and helpers for the split SyncEngine test files
-// (MutationQueueTests, MutationQueueUtilityTests, SyncEngineConnectionStateTests,
-// SyncEngineSSEAndCursorTests, SyncEngineReplayTests, SyncEngineStateTrackingTests,
-// SyncEngineProactiveDrainTests). Namespaced under an enum to avoid colliding
-// with same-named private helpers in unrelated suites.
+// Shared fixtures and helpers for the split SyncEngine test files. Namespaced
+// under an enum to avoid colliding with same-named private helpers in
+// unrelated suites.
 enum SyncEngineTestKit {
 
     // Pair-builder: shared `ModelContainer` so the queue and store
@@ -77,6 +75,25 @@ enum SyncEngineTestKit {
             drainDebounceInterval: .milliseconds(20)
         )
         return (store, queue, transport, connManager, engine)
+    }
+
+    /// Everything the engine published to `stream`, read back after `stop()`
+    /// has finished it.
+    ///
+    /// Stopping first is what makes this finite: the buffer is unbounded, so
+    /// every event emitted beforehand is still delivered, and the finish is
+    /// what ends the iteration. Reading a live stream instead would block for
+    /// the whole suite budget in exactly the case worth naming, where the
+    /// engine published nothing, and report a time limit rather than the
+    /// absence itself.
+    static func publishedEvents(
+        from stream: AsyncStream<SyncEvent>,
+        closing engine: SyncEngine
+    ) async -> [SyncEvent] {
+        await engine.stop()
+        var collected: [SyncEvent] = []
+        for await event in stream { collected.append(event) }
+        return collected
     }
 
     /// Thrown by `waitUntil` when `condition` never becomes true before the

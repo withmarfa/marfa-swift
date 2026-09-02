@@ -96,6 +96,11 @@ public enum SyncEvent: Sendable {
     /// An edge was created.
     case edgeCreated(id: String)
 
+    /// An edge's properties were edited on another device, and the local row
+    /// has been replaced with the server's. The endpoints and the id are
+    /// unchanged — an edit that moved either would be a different edge.
+    case edgeUpdated(id: String)
+
     /// An edge was deleted.
     case edgeDeleted(id: String)
 
