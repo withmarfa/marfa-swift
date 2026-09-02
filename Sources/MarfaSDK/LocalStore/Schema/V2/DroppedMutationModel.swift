@@ -12,9 +12,12 @@ import SwiftData
 /// Persistent log of mutations the engine dropped permanently.
 ///
 /// Inserted by ``MutationQueue/recordDropped(record:droppedAt:error:)``
-/// when ``SyncEngine`` observes a permanent error (`MarfaError.isPermanent`)
-/// during replay, atomically with removal of the live `PendingMutationModel`
-/// row in the same `modelContext.save()`. Cascade orphans (downstream
+/// when ``SyncEngine`` observes a failure during replay that no retry can
+/// clear, atomically with removal of the live `PendingMutationModel` row in
+/// the same `modelContext.save()`. That is `MarfaError.isPermanent` plus one
+/// case the status alone cannot express: a `409` on a create, which the
+/// engine classes permanent because the server acknowledges a repeat of the
+/// caller's own id rather than refusing it. Cascade orphans (downstream
 /// mutations dropped because their parent `createItem` was rejected) land
 /// here too — see `MutationQueue.dropMutationsReferencingLocalId`.
 ///
@@ -61,14 +64,14 @@ final class DroppedMutationModel {
     /// ``errorCode`` / ``errorMessage``.
     var attemptCount: Int = 0
 
-    /// HTTP status code from the dropping error (typically 400, 403,
-    /// 404). `0` is reserved for non-HTTP permanent failures (e.g. the
-    /// blob-data-missing `ValidationError` synthesized inside the
+    /// HTTP status code from the dropping error (typically 400, 403, 404,
+    /// or 409 on a create). `0` is reserved for non-HTTP permanent failures
+    /// (e.g. the blob-data-missing `ValidationError` synthesized inside the
     /// engine).
     var errorStatus: Int = 0
 
     /// ``MarfaError/code`` string (e.g. `"validation_error"`,
-    /// `"not_found"`).
+    /// `"not_found"`, `"conflict"`, `"type_mismatch"`).
     var errorCode: String = ""
 
     /// ``MarfaError/message``. Capped at 1024 characters by

@@ -1374,7 +1374,9 @@ public actor SyncEngine {
                         return
                     }
                 }
-            } catch let marfaError as MarfaError where marfaError.isPermanent {
+            } catch let marfaError as MarfaError
+                where marfaError.isPermanent
+                    || Self.isUnresolvableCreateConflict(marfaError, kind: record.kind) {
                 // Persist the dropped row + remove the live row in one
                 // SQLite transaction. The dropped log is the
                 // ``DroppedMutationsQuery`` source of truth; cascade
@@ -1396,6 +1398,15 @@ public actor SyncEngine {
                     error: marfaError
                 ))
 
+                // A refused edge create leaves a local row nothing can ever
+                // reconcile, so it goes with the mutation. Every permanent
+                // refusal rather than only a conflict: what refused the
+                // create does not change the fact that the row can never
+                // reach the server.
+                if record.kind == .createEdge, let localId = record.localId {
+                    try? await localStore.deleteEdge(id: localId)
+                }
+
                 // Cascade: if a createItem was dropped, every downstream
                 // mutation keyed off its local id would 404 on replay. Drop
                 // them together and purge the ghost local row so the UI
@@ -1411,6 +1422,14 @@ public actor SyncEngine {
                     )) ?? []
                     try? await localStore.purgeItem(id: localId)
                     for ghost in cascaded {
+                        // An orphaned edge create has a local row too, and it
+                        // now points at an item that has just been purged.
+                        // The direct path above never sees these: they are
+                        // dropped by the cascade rather than by a refusal of
+                        // their own.
+                        if ghost.kind == .createEdge, let ghostId = ghost.localId {
+                            try? await localStore.deleteEdge(id: ghostId)
+                        }
                         logger.log.error(
                             "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
                         )
@@ -1450,6 +1469,35 @@ public actor SyncEngine {
             recordSyncFailure(transientError)
         } else {
             await recordCleanDrainIfQueueIsEmpty()
+        }
+    }
+
+    /// Whether a replay failure is a create meeting a 409, which no retry
+    /// can clear.
+    ///
+    /// A synced client names a row before the server has seen it and sends
+    /// that id with the create, so a lost response is retried under the same
+    /// id. The server answers a repeat of an id this caller already holds
+    /// with the row itself rather than a refusal. What is left when a 409
+    /// does arrive is an id belonging to a space this caller cannot see, or a
+    /// row whose type is not the one declared — and the identical request
+    /// will be answered identically for as long as it is sent. Retrying it
+    /// strands the item, and the queue's ordering strands every later edit to
+    /// it behind the retry.
+    ///
+    /// Decided here rather than in ``MarfaError/isPermanent`` because the
+    /// status alone cannot decide it: the same 409 on an *update* is the
+    /// ordinary version conflict, which resolves through the conflict
+    /// strategy and must keep doing so. What makes it permanent is the pair —
+    /// this status, on a create.
+    private static func isUnresolvableCreateConflict(
+        _ error: MarfaError,
+        kind: MutationKind
+    ) -> Bool {
+        guard error.status == 409 else { return false }
+        switch kind {
+        case .createItem, .createEdge: return true
+        default: return false
         }
     }
 
@@ -1526,6 +1574,33 @@ public actor SyncEngine {
             let response: ItemResponse = try await transport.request(
                 method: .post, path: "/items", body: p.input, query: nil
             )
+            // Adopt the row the server answered with, as the edge path does.
+            // It carries what the local mint could not know — the space, the
+            // version, the server's timestamps — and on a repeat it is not
+            // the echo of this request at all: the server recognizes an id it
+            // already holds, writes nothing, and hands back the row as it
+            // stands. That is the state this device should be showing.
+            //
+            // The metadata row travels with it and is adopted the same way.
+            // The item first: a metadata row attaches to its item as it is
+            // written, so storing the sidecar for an item the store does not
+            // hold would orphan it.
+            //
+            // A write queued behind this create replays after it, so the
+            // adopted row can be momentarily older than the local one until
+            // that write lands and the server echoes it — the same exposure
+            // an inbound `item.updated` frame already carries, converging the
+            // same way.
+            //
+            // Thrown rather than swallowed, as the edge path throws: a store
+            // that refuses the write has not adopted anything, and treating
+            // that as success would remove the mutation from the queue and
+            // leave the device holding the row it minted with nothing left to
+            // correct it. Throwing keeps the record queued for the next drain.
+            try await localStore.upsertItem(response.item)
+            if let metadata = response.metadata {
+                try await localStore.upsertMetadata(metadata)
+            }
             // Reconcile local-id → server-id in the local store and in any
             // dependent queued mutations. Under the current flow this branch
             // never fires — `ItemsNamespace.create` stamps the local UUIDv7
@@ -1534,7 +1609,6 @@ public actor SyncEngine {
             // callers that bypass the namespace.
             if let localId = record.localId, localId != response.item.id {
                 try await mutationQueue.rewriteLocalId(from: localId, to: response.item.id)
-                try? await localStore.upsertItem(response.item)
                 try? await localStore.purgeItem(id: localId)
                 return true
             }

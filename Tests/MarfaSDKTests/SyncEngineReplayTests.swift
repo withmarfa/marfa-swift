@@ -730,6 +730,19 @@ struct SyncEngineReplayTests {
             updatedAt: now, version: 1
         )
         try await store.upsertItem(survivor)
+        // The edge the app spun off, as the local store holds it. Without the
+        // row there is nothing for the cascade to remove and the assertion
+        // below would pass against an absence that was always there.
+        try await store.upsertEdge(Edge(
+            createdAt: now,
+            edgeType: "in-thread",
+            id: "E-AX",
+            properties: [:],
+            sourceId: "A",
+            spaceId: nil,
+            targetId: "X",
+            updatedAt: now
+        ))
 
         let createInput = CreateItemInput(
             type: "core.note", properties: ["body": .string("")], id: "A"
@@ -786,6 +799,12 @@ struct SyncEngineReplayTests {
         #expect(ghostFetch == nil)
         let survivorFetch = try await store.fetchItem(id: "Y")
         #expect(survivorFetch.id == "Y")
+
+        // The cascaded edge's local row goes too. Its queue record is dropped
+        // rather than refused on its own, so the direct removal path never
+        // sees it — and left behind it points at an item that no longer
+        // exists on either side.
+        #expect((try? await store.fetchEdge(id: "E-AX")) == nil)
 
         let collected = await collector.value
         let drops = collected.compactMap { event -> (String, String?)? in

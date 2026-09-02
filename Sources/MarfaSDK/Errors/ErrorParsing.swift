@@ -39,6 +39,15 @@ func parseMarfaError(
     case 401: return UnauthorizedError(message: message, details: details)
     case 403: return ForbiddenError(message: message, details: details)
     case 404: return NotFoundError(message: message, details: details)
+    // A 409 reaching here is one the caller could not read as a version
+    // conflict: `URLSessionTransport` decodes `ConflictResponse` first and
+    // only falls through when the body carries none. What is left is a
+    // plain refusal whose whole content is its code — `conflict`,
+    // `type_mismatch`, `source_id_conflict` — which is what tells a caller
+    // whether the id is somebody else's or the type disagrees. Substituting
+    // a generic code here loses the only thing the response said, and the
+    // dropped-mutation log stores this code for an app to show.
+    case 409: return MarfaError(code: code ?? "conflict", message: message, status: 409, details: details)
     default: return MarfaError(code: "server_error", message: message, status: statusCode, details: details)
     }
 }
