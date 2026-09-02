@@ -119,7 +119,15 @@ swift build
 swift test
 ```
 
-Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path. Integration tests point at staging via `MARFA_API_URL` and `MARFA_API_KEY`. Never run conformance or integration tests against production.
+Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path.
+
+**One suite talks to a real server.** `LiveSyncedClientTests` is gated on `MARFA_API_URL` and `MARFA_API_KEY`, and when either is unset it is reported as skipped with every test named rather than silently absent — so a `--filter` that matched nothing cannot be mistaken for a run that passed.
+
+```bash
+MARFA_API_URL=… MARFA_API_KEY=… swift test --filter LiveSyncedClient
+```
+
+Each test there asserts a contract a consumer depends on rather than a shape of the code, so a failure names the behavior that is missing instead of a refactor that moved something. It writes items and edges into whatever space the key reaches and deletes them again through a second client on every exit path, which means it needs a space whose data is disposable. **Never run it, or conformance, against production.**
 
 ## CI
 

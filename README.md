@@ -50,11 +50,14 @@ swift build
 swift test
 ```
 
-Integration tests against a running server opt in via environment variables:
+One suite talks to a real server and is skipped unless you point it at one:
 
 ```bash
-MARFA_API_URL=… MARFA_API_KEY=… swift test
+MARFA_API_URL=… MARFA_API_KEY=… swift test --filter LiveSyncedClient
 ```
+
+It creates items and edges and deletes them again on the way out, so give it a
+space whose data is disposable. Never point it at production.
 
 ## Documentation
 
