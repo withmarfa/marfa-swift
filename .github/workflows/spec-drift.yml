@@ -90,8 +90,16 @@ jobs:
             exit 0
           fi
 
+          # A step's default shell is `bash -e`, so a bare call here ended the
+          # step the moment the comparison found drift — before the verdict
+          # below was ever written. The notifier then read no verdict at all
+          # and reported "did not run" for the one outcome this guard exists
+          # to announce. Disabled around the call alone; the exit code is
+          # re-raised below, so the job status is unchanged.
+          set +e
           scripts/spec-drift.sh
           code=$?
+          set -e
 
           # 0 match, 1 drift, anything else the script could not answer. The
           # output is written before the exit so it survives a failing step.

@@ -43,9 +43,24 @@ jobs:
     # rely on.
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The findings, so the alert can state them. A job result is one bit and
+    # every consumer, version and reason collapses into it: the notifier
+    # used to receive the literal string `failure` and could say no more
+    # than "a consumer is behind".
+    #
+    # `verdict` carries the distinction the job result cannot. A consumer
+    # sitting behind and a report that never ran both fail the job, and they
+    # want different responses — one names the version to move to, the other
+    # says only that nobody currently knows.
+    outputs:
+      verdict: ${{ steps.pins.outputs.verdict }}
+      detail: ${{ steps.pins.outputs.detail }}
+      consumers: ${{ steps.pins.outputs.consumers }}
+      latest: ${{ steps.pins.outputs.latest }}
     steps:
       - uses: actions/checkout@v5
       - name: Compare each consumer's pin against the newest tag
+        id: pins
         env:
           # The built-in token cannot answer this question. It is scoped to
           # this repository alone, and both consumers are private, so the
@@ -67,18 +82,85 @@ jobs:
           # is the same position the spec-drift guard takes.
           GH_TOKEN: ${{ secrets.SHIPPING_GAP_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           if [ -z "${GH_TOKEN:-}" ]; then
             if [ "${GITHUB_REPOSITORY}" = "${PINS_CANONICAL_REPO}" ]; then
+              echo "verdict=error" >> "$GITHUB_OUTPUT"
               echo "::error title=Pin report cannot run::SHIPPING_GAP_TOKEN is not set on ${GITHUB_REPOSITORY}, so no consumer's pin was read. Failing rather than passing, and rather than falling back to a token that cannot see the consumers and would report every one of them as behind."
               exit 1
             fi
+            echo "verdict=skipped" >> "$GITHUB_OUTPUT"
             echo "::warning title=Cross-repo check skipped::SHIPPING_GAP_TOKEN is not set on ${GITHUB_REPOSITORY}, which is not ${PINS_CANONICAL_REPO}."
             exit 0
           fi
 
-          scripts/consumer-pins.sh
+          # A step's default shell is `bash -e`, so a bare call to a script
+          # that exits non-zero ends the step right there — before any of the
+          # lines below run, and those lines are the whole reason the alert
+          # can name a consumer. Disabled around the call alone, and the
+          # script's own exit code is re-raised at the end, so the job status
+          # is exactly what it was.
+          log="${RUNNER_TEMP}/consumer-pins.log"
+          set +e
+          scripts/consumer-pins.sh 2>&1 | tee "$log"
+          code=${PIPESTATUS[0]}
+          set -e
+
+          # **The script's stdout is an interface now.** These values exist
+          # nowhere else — the script reports to the run log and returns an
+          # exit code — so the three patterns below read that log, and
+          # tidying a line in `scripts/consumer-pins.sh` empties the alert
+          # without breaking anything a test or a lint would notice. Change
+          # the log and change these together, or give the script the output
+          # directly and delete this.
+          latest=$(sed -n 's/^swift-sdk latest: //p' "$log" | head -1)
+          behind=$(sed -n 's|^  [^/]*/\([^:]*\): \([0-9][^ ]*\) — behind .*|\1 on \2|p' \
+            "$log" | awk 'NR > 1 { printf ", " } { printf "%s", $0 } END { print "" }')
+          unreadable=$(sed -n 's|^  [^/]*/\([^:]*\): pin could not be read.*|\1 pin unreadable|p' \
+            "$log" | awk 'NR > 1 { printf ", " } { printf "%s", $0 } END { print "" }')
+          consumers=$(sed -n \
+            -e 's|^  \([^ :]*/[^:]*\): [0-9][^ ]* — behind .*|\1|p' \
+            -e 's|^  \([^ :]*/[^:]*\): pin could not be read.*|\1|p' \
+            "$log" | awk 'NR > 1 { printf " " } { printf "%s", $0 } END { print "" }')
+
+          case "$code" in
+            0) verdict=current ;;
+            1) verdict=behind ;;
+            *) verdict=error ;;
+          esac
+
+          # `latest is ...` only earns its place beside a pin that was
+          # actually compared against it. A pin nothing could read has no
+          # version to be behind, so naming the newest release next to it
+          # describes a comparison that never happened.
+          detail=""
+          if [ -n "$behind" ]; then
+            detail="$behind, latest is ${latest:-unknown}"
+          fi
+          if [ -n "$unreadable" ]; then
+            detail="${detail:+$detail; }$unreadable"
+          fi
+
+          # A non-zero exit that named no consumer at all is not a consumer
+          # falling behind. The script runs under `set -euo pipefail`, so a
+          # `gh api` call that fails takes it down at exit 1 before it has
+          # printed a single consumer line — the credential-shaped failure,
+          # and the likeliest one. Reported as inconclusive, because the
+          # alternative is an alert reading "Swift consumers:" with nothing
+          # after the colon, which is the empty alert this work removed.
+          if [ -z "$detail" ] && [ "$verdict" = behind ]; then
+            verdict=error
+          fi
+
+          {
+            echo "verdict=$verdict"
+            echo "detail=$detail"
+            echo "consumers=$consumers"
+            echo "latest=$latest"
+          } >> "$GITHUB_OUTPUT"
+
+          exit "$code"
 
   notify:
     needs: [pins]
@@ -93,30 +175,57 @@ jobs:
         env:
           ALERT_URL: ${{ vars.ALERT_WEBHOOK_URL }}
           ALERT_TOKEN: ${{ secrets.ALERT_WEBHOOK_TOKEN }}
-          RESULT: ${{ needs.pins.result }}
+          RESULTS: ${{ join(needs.*.result, ',') }}
+          VERDICT: ${{ needs.pins.outputs.verdict }}
+          DETAIL: ${{ needs.pins.outputs.detail }}
+          CONSUMERS: ${{ needs.pins.outputs.consumers }}
+          LATEST: ${{ needs.pins.outputs.latest }}
           WORKFLOW: ${{ github.workflow }}
           REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          RUN_NUMBER: ${{ github.run_number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
 
+          # A cancelled run reached no conclusion about anything, and this
+          # workflow cancels in progress — so dispatching it while the
+          # schedule is mid-run kills that run. Reporting the cancellation
+          # somebody just caused as a check that could not run is noise.
+          case ",$RESULTS," in
+            *,cancelled,*) exit 0 ;;
+          esac
+
           # `failure` is the ordinary case here rather than a fault: the
           # script exits non-zero when a consumer is behind, which is a
-          # finding and not a broken job. The two are separated so the
-          # alert says which, because "a consumer is behind" and "the
-          # check could not run" want different responses.
-          case "$RESULT" in
-            success)
-              STATE=resolved
-              TITLE="Every Swift consumer is on the newest SDK"
-              ;;
-            failure)
+          # finding and not a broken job. The verdict leads, because the job
+          # result cannot separate the two and they want different responses
+          # — "a consumer is behind" names the consumer, the version it sits
+          # on and the version to move to, while "the check could not run"
+          # says nothing about any consumer and must not be dressed up as
+          # though it did.
+          case "$VERDICT" in
+            behind)
               STATE=open
-              TITLE="A Swift consumer is behind the newest SDK"
+              TITLE="Swift consumers: $DETAIL"
+              ;;
+            current)
+              STATE=resolved
+              TITLE="Swift consumers: current"
+              ;;
+            skipped)
+              # A checkout with no credential compared nothing and has no
+              # opinion on consumers it never read. Silence rather than a
+              # third state: this alert is the canonical repository's, and
+              # there an unset credential fails loudly instead.
+              echo "The pin comparison did not run here; sending nothing."
+              exit 0
               ;;
             *)
+              # `error`, or no verdict at all because the job was cancelled
+              # or died before the step wrote one.
               STATE=open
-              TITLE="The Swift consumer pin report did not run"
+              TITLE="Swift consumer check: inconclusive"
               ;;
           esac
 
@@ -128,13 +237,33 @@ jobs:
             AUTH=(-H "Authorization: Bearer $ALERT_TOKEN")
           fi
 
+          # Titles stay plain prose, so everything the title names is linked
+          # here instead. The consumers are a space-separated list of full
+          # repository names; the title carries their short names.
+          CONSUMER_LINKS=""
+          read -ra consumer_list <<< "$CONSUMERS"
+          for consumer in "${consumer_list[@]}"; do
+            CONSUMER_LINKS="${CONSUMER_LINKS:+$CONSUMER_LINKS, }[${consumer##*/}]($SERVER_URL/$consumer)"
+          done
+
           # Keyed on the estate's state rather than per run, so one alert
           # opens when a consumer falls behind and the next run that finds
           # everything current resolves it.
+          #
+          # **`github.workflow` is this workflow's display name, not its
+          # filename.** Renaming `name:` at the top of this file re-keys
+          # every alert it sends: whatever it had open can no longer be
+          # resolved, and downstream filtering on the old string stops
+          # matching without anything reporting that it has.
           jq -n --arg t "$TITLE" --arg s "$STATE" --arg k "github/$REPO/$WORKFLOW" \
-                --arg u "$RUN_URL" --arg r "$REPO" --arg w "$WORKFLOW" --arg j "$RESULT" \
+                --arg u "$RUN_URL" --arg w "$WORKFLOW" \
+                --arg r "[$REPO]($SERVER_URL/$REPO)" \
+                --arg n "[#$RUN_NUMBER]($RUN_URL)" \
+                --arg c "${CONSUMER_LINKS:-none}" \
+                --arg l "${LATEST:-unknown}" \
+                --arg v "${VERDICT:-none}" \
             '{source:"github",severity:"warning",title:$t,state:$s,key:$k,link:$u,
-              fields:{Repository:$r,Workflow:$w,Report:$j}}' \
+              fields:{Repository:$r,Workflow:$w,Run:$n,Consumers:$c,Latest:$l,Verdict:$v}}' \
           | curl -sS --fail-with-body --max-time 20 -X POST "$ALERT_URL" \
               "${AUTH[@]}" \
               -H "Content-Type: application/json" --data @- \
