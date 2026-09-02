@@ -118,6 +118,33 @@ struct ErrorTypeAssertionsTests {
         }
     }
 
+    @Test("a 409 that carries no conflict body keeps the server's own code")
+    func conflictWithoutVersionData() async throws {
+        // What `POST /items` answers when the id names a row in a space this
+        // caller cannot see. There is no version conflict to describe, so the
+        // body is an ordinary error envelope — and its `code` is the whole of
+        // what the server said, the thing that separates somebody else's row
+        // from a type that disagrees. The sync engine stores it on the
+        // dropped-mutation row for an app to show, so losing it here leaves
+        // the app with a refusal it cannot explain.
+        let body = #"""
+        {"error":{"code":"conflict","message":"Item with id=019d already exists"}}
+        """#
+        ErrorAssertionsStubURLProtocol.setHTTP(status: 409, body: Data(body.utf8))
+        let transport = makeStubbedTransport()
+
+        do {
+            let _: ItemResponse = try await transport.request(
+                method: .post, path: "/items", body: nil, query: nil
+            )
+            Issue.record("expected the 409 to throw")
+        } catch let error as MarfaError {
+            #expect(error.status == 409)
+            #expect(error.code == "conflict")
+            #expect(error.message == "Item with id=019d already exists")
+        }
+    }
+
     @Test("404 response parses as NotFoundError")
     func notFoundError() async throws {
         let body = #"""
