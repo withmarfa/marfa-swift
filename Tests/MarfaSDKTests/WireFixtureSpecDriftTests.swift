@@ -152,6 +152,48 @@ struct WireFixtureSpecDriftTests {
         assertFields(try fixture("space_config"), against: schema, path: "space_config")
     }
 
+    /// `ConnectionInstallResult` is generated rather than hand-written, so
+    /// the regen and its diff already keep it honest — but only on `main`,
+    /// where `freshness` runs. This is here for a narrower reason: the route
+    /// dropped a *required* `credential_id` and the SDK went on demanding it,
+    /// which made every install fail to decode against a current server. The
+    /// fixture is the body the route actually returns, so if that field ever
+    /// reappears in the spec this fires and drags the fixture, the round-trip
+    /// and the model along behind it — on a pull request, rather than after
+    /// the merge.
+    @Test("ConnectionInstallResult")
+    func connectionInstallResult() throws {
+        let schema = try #require(
+            (((spec()["paths"] as? [String: Any])?["/connections/install"]
+                as? [String: Any])?["post"] as? [String: Any])
+                .flatMap { $0["responses"] as? [String: Any] }
+                .flatMap { $0["201"] as? [String: Any] }
+                .flatMap { $0["content"] as? [String: Any] }
+                .flatMap { $0["application/json"] as? [String: Any] }?["schema"],
+            "POST /connections/install declares no 201 response schema")
+
+        let declared = try #require(
+            (schema as? [String: Any])?["properties"] as? [String: Any],
+            "the 201 schema declares no properties, so there is nothing to compare")
+        #expect(declared.count >= 2, "the install result lost fields rather than gaining them")
+
+        // Named rather than left to the count above. This is the field whose
+        // presence was the defect, so a schema that regains it should fail
+        // saying so, not fail as an arithmetic mismatch.
+        #expect(
+            declared["credential_id"] == nil,
+            """
+            the install result declares `credential_id` again. The SDK required it \
+            once and could not decode a single successful install; if the platform \
+            has genuinely brought it back, refresh the snapshot and let the regen \
+            retype `ConnectionInstallResult` rather than editing anything by hand.
+            """)
+
+        assertFields(
+            try fixture("connection_install_result"), against: schema,
+            path: "connection_install_result")
+    }
+
     // `PaginatedResult` is the other hand-written model with a fixture, and it
     // is deliberately not checked here: it is generic over its element and the
     // spec inlines its shape at every paginated path rather than naming it

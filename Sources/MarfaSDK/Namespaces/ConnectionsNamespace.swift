@@ -91,16 +91,32 @@ public struct ConnectionsNamespace: Sendable {
     /// admins install into their own space scope.
     ///
     /// `integrationId` references a `system.integration` item registered
-    /// via ``IntegrationsNamespace/register(manifest:)``. `label` is
-    /// optional; the server defaults to `"<manifest_name> <manifest_version>"`
-    /// when omitted.
+    /// via ``IntegrationsNamespace/register(manifest:)``.
+    ///
+    /// `credentialRef` names an existing `system.credential` to bind the
+    /// connection to instead of provisioning a fresh one, which is how two
+    /// integrations against the same upstream — `google/calendar` and
+    /// `google/tasks`, say — share a single OAuth client configuration.
+    /// Create one through ``CredentialsNamespace``.
+    ///
+    /// `configuration` seeds the connection's `properties.configuration`
+    /// bag, so per-integration settings land in the same round trip rather
+    /// than in a follow-on update. The server validates the keys against the
+    /// manifest's declared contract and refuses the install with a
+    /// ``ValidationError`` naming any key the integration does not declare,
+    /// so this is not a free-form bag despite its type.
     @discardableResult
     public func install(
         integrationId: String,
-        label: String? = nil
+        credentialRef: String? = nil,
+        configuration: [String: JSONValue]? = nil
     ) async throws -> ConnectionInstallResult {
         try ensureRemote("connections.install")
-        let input = ConnectionInstallInput(integrationId: integrationId, label: label)
+        let input = ConnectionInstallInput(
+            configuration: configuration,
+            credentialRef: credentialRef,
+            integrationId: integrationId
+        )
         return try await transport.request(
             method: .post, path: "/connections/install", body: input, query: nil
         )

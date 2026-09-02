@@ -16,7 +16,9 @@ struct IntegrationsNamespaceTests {
     func sampleIntegration() -> Integration {
         Integration(
             direction: .read,
+            displayName: "Acme Calendar Sync",
             id: "int-1",
+            installedCount: 2,
             manifest: ["name": .string("acme.calendar-sync")],
             manifestName: "acme.calendar-sync",
             manifestVersion: "1.0.0",

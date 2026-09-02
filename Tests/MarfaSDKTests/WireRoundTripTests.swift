@@ -53,6 +53,10 @@ struct WireRoundTripTests {
 
     @Test("Item") func item() throws { try assertRoundTrip(Item.self, fixture: "item") }
 
+    @Test("ConnectionInstallResult") func connectionInstallResult() throws {
+        try assertRoundTrip(ConnectionInstallResult.self, fixture: "connection_install_result")
+    }
+
     @Test("Metadata") func metadata() throws { try assertRoundTrip(Metadata.self, fixture: "metadata") }
 
     @Test("Version") func version() throws { try assertRoundTrip(Version.self, fixture: "version") }
