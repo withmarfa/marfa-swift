@@ -403,16 +403,16 @@ struct SyncEngineSSEAndCursorTests {
 
     @Test("catchup_too_old concurrency guard short-circuits a reentrant call")
     func catchupTooOldConcurrencyGuard() async throws {
-        // The `resyncing` guard exists to protect against actor-reentry:
-        // if `applyEvent` is suspended inside `performInitialSync()` on
-        // a real network call, a second `applyEvent` that enters on the
-        // same actor must observe the guard as set and short-circuit.
+        // Two retention-gap events landing on actor reentry must produce one
+        // import between them. The engine publishes the import into a shared
+        // slot before its first suspension point, so the second call finds it
+        // and joins rather than paging the library again beside the first.
         //
-        // The single SSE for-await loop consumes events serially, so we
-        // can't trigger reentry from a single stream in the mock harness.
-        // Instead we drive two concurrent `applyEvent` invocations via
-        // the internal test seam `_applyEventForTesting` and assert only
-        // one `GET /items` is issued.
+        // The single SSE for-await loop consumes events serially, so reentry
+        // cannot be triggered from one stream in the mock harness. Instead we
+        // drive two concurrent `applyEvent` invocations via the internal test
+        // seam `_applyEventForTesting` and assert only one `GET /items` is
+        // issued.
         let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
         let transport = BlockingTransport()
         let connManager = ConnectionStateManager()

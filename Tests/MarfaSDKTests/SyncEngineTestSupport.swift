@@ -402,9 +402,11 @@ actor HeldOpenStreamTransport: Transport {
     private var streamContinuations: [AsyncThrowingStream<SSEEvent, Error>.Continuation] = []
     private(set) var openStreamCount = 0
     private(set) var openStreamsFinished = false
-    private var heldPath: String?
+    private var held: (method: HTTPMethod, path: String)?
     private var heldContinuation: CheckedContinuation<Void, Never>?
     private(set) var heldRequestReached = false
+    private var concurrencyGuard: (method: HTTPMethod, path: String)?
+    private var inFlightGuarded = 0
 
     struct NoResponseQueued: Error, CustomStringConvertible {
         let method: String
@@ -426,12 +428,24 @@ actor HeldOpenStreamTransport: Transport {
         errors.append(error)
     }
 
-    /// Suspends the next request to `path` until ``releaseHeldRequest()``.
-    /// The engine's coming-online phase is microseconds wide against a mock
-    /// and seconds wide against a real library, and this is what lets a test
-    /// stand inside it.
-    func holdNextRequest(path: String) {
-        heldPath = path
+    /// Suspends the next `method` request to `path` until
+    /// ``releaseHeldRequest()``. The engine's coming-online phase is
+    /// microseconds wide against a mock and seconds wide against a real
+    /// library, and this is what lets a test stand inside it.
+    ///
+    /// Matched on the verb as well as the path, because `/items` is both the
+    /// import's page fetch and a queued create's replay, and holding the wrong
+    /// one silently tests something else.
+    func holdNextRequest(method: HTTPMethod, path: String) {
+        held = (method, path)
+    }
+
+    /// Records an issue if a second `method` request to `path` is ever in
+    /// flight while the first still is. Cheaper than a window a test has to
+    /// wait out, and it fails for the right reason: two imports running at
+    /// once rather than two arriving eventually.
+    func failOnConcurrentRequest(method: HTTPMethod, path: String) {
+        concurrencyGuard = (method, path)
     }
 
     func releaseHeldRequest() {
@@ -463,12 +477,32 @@ actor HeldOpenStreamTransport: Transport {
         recordedCalls.append(
             MockTransport.Call(method: method, path: path, body: bodyData, query: query)
         )
-        if path == heldPath {
-            heldPath = nil
-            heldRequestReached = true
-            await withCheckedContinuation { continuation in
-                heldContinuation = continuation
+        let guarded = concurrencyGuard.map { $0.method == method && $0.path == path } ?? false
+        if guarded {
+            inFlightGuarded += 1
+            if inFlightGuarded > 1 {
+                Issue.record(
+                    "a second \(method.rawValue) \(path) ran while one was still in flight"
+                )
             }
+        }
+        defer { if guarded { inFlightGuarded -= 1 } }
+
+        if let held, held.method == method, held.path == path {
+            self.held = nil
+            heldRequestReached = true
+            // Cancellable, because a real transport is: `URLSession` ends an
+            // in-flight request when its task is cancelled, and a double that
+            // holds on regardless would make `stop()` look like it blocks on
+            // work it has already cancelled.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    heldContinuation = continuation
+                }
+            } onCancel: {
+                Task { await self.releaseHeldRequest() }
+            }
+            try Task.checkCancellation()
         }
         if !errors.isEmpty, let error = errors.removeFirst() { throw error }
         guard !responses.isEmpty else {

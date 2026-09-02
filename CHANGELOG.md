@@ -17,7 +17,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
-- **What an app watches while the first import runs is `SyncEngine.fullSyncState` and `FullSyncStateQuery`.** No sync event was added for it. A store that has never imported reads `notYetSynced` for the duration and `synced(at:)` when the import lands; an import that fails reads `failed(at:error:)`, the stream opens regardless so the device is not also deaf to what happens next, and the next online cycle tries again. The engine takes that retry decision from `SyncEngine.lastFullSyncAt`, which a completed import stamps and nothing else does. `fullSyncState` is what an app renders, deliberately not what the engine decides from: a drain stamps a clean drain, so deciding from it would skip the import on a fresh store that had a write queued, and clear the failure on a device whose import had just failed.
+- **What an app watches while the first import runs is `SyncEngine.fullSyncState` and `FullSyncStateQuery`.** No sync event was added for it. A store that has never imported reads `notYetSynced` until the import lands — `syncing` while queued writes are replaying — and `synced(at:)` once it does. An import that fails reads `failed(at:error:)`, the stream opens regardless so the device is not also deaf to what happens next, and the next online cycle tries again. The engine takes that retry decision from `SyncEngine.lastFullSyncAt`, which a completed import stamps and nothing else does, rather than from the state it renders.
+
+- **A store that has never completed an import can no longer report `synced(at:)`, and `SyncEvent.synced(at:)` is not emitted for one.** An empty mutation queue on a store with nothing in it is a device that has not started, not a device in sync. Before this, a write queued before the first start reported itself caught up from the drain that runs in front of the import, so an app was told it was up to date while showing an empty library. The first `synced(at:)` a fresh store reports is now the one its import lands. A store that has already imported is unaffected.
+
+- **A failed retention-gap resync now reports `failed(at:error:)` as well as logging.** When the server has discarded the events a device's cursor points at, the resync that follows goes through the same catch-up as every other, so a failure reaches `SyncEngine.fullSyncState` instead of only the log. The two `sync.catchup_too_old` log lines are unchanged.
 
 ## [15.0.0] — 2026-09-01
 

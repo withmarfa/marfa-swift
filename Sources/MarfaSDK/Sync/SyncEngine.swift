@@ -382,6 +382,15 @@ public actor SyncEngine {
         if connectionManager.state == .online {
             await connectionManager.markConnecting()
         }
+        // Subscribe to the drain pings before `start()` returns rather than
+        // from inside the listener task. `MutationQueue.drainRequests`
+        // registers its continuation synchronously with the access precisely
+        // so a subscription cannot race the first enqueue, and taking the
+        // stream inside the task hands that race straight back one level up:
+        // the task's own first suspension is that access, so a write made
+        // while it is still pending emits a ping with nobody registered, and
+        // late subscribers never see a past one.
+        let drainRequests = await mutationQueue.drainRequests
         await suspendStartPublicationIfNeededForTesting()
         guard starting, lifecycleGeneration == generation else { return }
         starting = false
@@ -390,7 +399,7 @@ public actor SyncEngine {
             await self?.runLoop()
         }
         drainListenerTask = Task { [weak self] in
-            await self?.drainListenerLoop()
+            await self?.drainListenerLoop(drainRequests)
         }
     }
 
@@ -413,6 +422,12 @@ public actor SyncEngine {
     /// issued during a stop waits for that barrier before opening a new
     /// lifecycle.
     ///
+    /// An import in flight is one of those tasks. It is unstructured and can
+    /// run for as long as a library takes to page, so it is cancelled with the
+    /// rest rather than awaited to completion — otherwise `stop()` blocks for a
+    /// whole import and the paragraph above is not true. A cancelled import
+    /// stamps nothing, so the next cycle runs it again.
+    ///
     /// The wait is bounded by the transport honoring cancellation on its
     /// in-flight request. ``URLSessionTransport`` does; a custom ``Transport``
     /// that ignores cancellation can hold `stop()` open for as long as its
@@ -430,6 +445,9 @@ public actor SyncEngine {
         let drainListenerTask = self.drainListenerTask
         let drainDebounceTask = self.drainDebounceTask
         let reconnectTask = self.reconnectTask
+        let importTask = self.importTask
+        importTask?.cancel()
+        self.importTask = nil
         streamTask?.cancel()
         self.streamTask = nil
         drainListenerTask?.cancel()
@@ -450,6 +468,7 @@ public actor SyncEngine {
             await drainListenerTask?.value
             await drainDebounceTask?.value
             await reconnectTask?.value
+            _ = try? await importTask?.value
             await self.drainResidualLifecycleTasks()
             self.finishEventSubscribers()
         }
@@ -475,18 +494,23 @@ public actor SyncEngine {
     private func drainResidualLifecycleTasks() async {
         while hasLifecycleTasks {
             let residual = [streamTask, drainListenerTask, drainDebounceTask, reconnectTask]
+            let residualImport = importTask
             streamTask = nil
             drainListenerTask = nil
             drainDebounceTask = nil
             reconnectTask = nil
+            importTask = nil
             for task in residual { task?.cancel() }
+            residualImport?.cancel()
             for task in residual { await task?.value }
+            _ = try? await residualImport?.value
         }
     }
 
     private var hasLifecycleTasks: Bool {
         streamTask != nil || drainListenerTask != nil
             || drainDebounceTask != nil || reconnectTask != nil
+            || importTask != nil
     }
 
     /// Performs a one-shot catch-up import: paginates through `GET
@@ -506,8 +530,17 @@ public actor SyncEngine {
     ///   report a number no caller currently asks for.
     /// - Throws: Transport errors from the pagination requests, or upsert
     ///   errors from the local store.
+    /// Counts callers currently inside ``performInitialSync(pageSize:)``,
+    /// owner and joiners alike. A test proving that two callers share one
+    /// import has to know both have arrived before it releases the first, and
+    /// every other way of knowing that is a sleep racing the thing it measures.
+    internal private(set) var importCallerCountForTesting = 0
+
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
+        importCallerCountForTesting += 1
+        defer { importCallerCountForTesting -= 1 }
+
         // Join a run already going, or publish this one — with nothing
         // suspending between the two, so a caller entering on actor reentry
         // finds the task rather than starting a second one beside it. The
@@ -515,7 +548,14 @@ public actor SyncEngine {
         // queue first would open a gap between the check and the publication,
         // and a caller arriving mid-catch-up is asking for the import that is
         // already happening rather than for a fresh decision about it.
-        if let importTask { return try await importTask.value }
+        if let importTask {
+            // The refusal runs inside the owner's task, so a joiner would slip
+            // past it. Ask again here: a caller that has queued work since the
+            // import began is still asking to overwrite it, and arriving late
+            // is not consent.
+            try await refuseIfWorkIsStillQueued()
+            return try await importTask.value
+        }
         let task = Task { [self] in
             try await refuseIfWorkIsStillQueued()
             return try await importPasses(pageSize: pageSize)
@@ -563,6 +603,10 @@ public actor SyncEngine {
         var cursor: String? = nil
         var imported = 0
         repeat {
+            // `stop()` cancels this task, and a page loop that never asks
+            // would keep paging a whole library past the teardown that was
+            // meant to end it.
+            try Task.checkCancellation()
             var query: [(String, String)] = [
                 ("limit", String(pageSize)),
                 ("include", "metadata"),
@@ -604,6 +648,7 @@ public actor SyncEngine {
         var edgeCursor: String? = nil
         var edgesImported = 0
         repeat {
+            try Task.checkCancellation()
             // 500 is the route's own ceiling; a larger `limit` is refused
             // rather than clamped.
             var query: [(String, String)] = [("limit", String(min(pageSize, 500)))]
@@ -686,7 +731,8 @@ public actor SyncEngine {
     ///   before. The retention-gap branch sets it: the server has discarded
     ///   the events this device's cursor points at, so the store is behind by
     ///   an unknown amount and only a fresh import closes that.
-    private func catchUp(forceImport: Bool = false) async {
+    @discardableResult
+    private func catchUp(forceImport: Bool = false) async -> Error? {
         // A queue that cannot be read is drained rather than skipped:
         // `replayMutations` reports the storage failure, where assuming empty
         // would walk into an import that overwrites whatever is in there.
@@ -698,10 +744,21 @@ public actor SyncEngine {
             // this runs mid-stream from the retention-gap branch nothing
             // else will put it back.
             if running { await connectionManager.markOnline() }
+
+            // A drain that did not empty the queue leaves work the import
+            // refuses over, and that refusal would replace the drain's error
+            // in ``fullSyncState`` with one about the import — reporting the
+            // consequence and hiding the cause. Leave the cause standing and
+            // let the next cycle try again.
+            let drained = (try? await mutationQueue.isEmpty) ?? false
+            guard drained else {
+                logger.log.info("sync.catch_up.import_skipped reason=queue_not_drained")
+                return nil
+            }
         }
 
         let hasImported = await lastFullSyncAt != nil
-        guard forceImport || !hasImported else { return }
+        guard forceImport || !hasImported else { return nil }
 
         do {
             _ = try await performInitialSync()
@@ -711,13 +768,16 @@ public actor SyncEngine {
             // state would sit at `.notYetSynced` until something closed the
             // stream, and against a live server nothing does.
             await recordCleanDrainIfQueueIsEmpty()
+            return nil
         } catch {
             // Recorded and left visible rather than escalated. The caller
             // opens the stream after this returns either way: a device whose
             // import failed should not also be deaf to what happens next, and
             // the next online cycle asks again because the import stamped
-            // nothing.
+            // nothing. Returned as well as recorded so a caller with more
+            // context than this can say where it happened.
             recordSyncFailure(error)
+            return error
         }
     }
 
@@ -726,8 +786,7 @@ public actor SyncEngine {
     /// Listens to `mutationQueue.drainRequests` for the lifetime of the
     /// engine. Each ping schedules a debounced proactive drain — bursts
     /// of enqueues collapse into one replay cycle at the end.
-    private func drainListenerLoop() async {
-        let stream = await mutationQueue.drainRequests
+    private func drainListenerLoop(_ stream: AsyncStream<Void>) async {
         for await _ in stream {
             guard running else { break }
             scheduleProactiveDrain()
@@ -1145,7 +1204,17 @@ public actor SyncEngine {
             // for the same reason it always does, and two of these events
             // landing on actor reentry share one import through the slot the
             // catch-up publishes rather than racing over the store.
-            await catchUp(forceImport: true)
+            if let error = await catchUp(forceImport: true) {
+                if error is InitialSyncError {
+                    // Distinct from a transport failure. Reaching here means a
+                    // write landed between the drain and the import, so the gap
+                    // persists until a later drain succeeds and something asks
+                    // again.
+                    logger.log.error("sync.catchup_too_old.resync_refused reason=\(String(describing: error), privacy: .public)")
+                } else {
+                    logger.log.error("sync.catchup_too_old.resync_failed reason=\(String(describing: type(of: error)), privacy: .public)")
+                }
+            }
             // SSE stream was closed by the server; outer reconnect loop will
             // reopen it with no `Last-Event-ID` header.
 
@@ -1383,8 +1452,18 @@ public actor SyncEngine {
     /// Re-reads the queue after a replay cycle before claiming success. A
     /// failed storage read, shutdown, or surviving row is an unknown or
     /// incomplete state, not a clean drain.
+    ///
+    /// **A store that has never completed an import cannot be caught up**,
+    /// whatever its queue says, and this is the one place that decides it. An
+    /// empty queue on a store with nothing in it is not a device in sync; it is
+    /// a device that has not started. Without this a write queued before the
+    /// first start reported `.synced` from the drain that runs in front of the
+    /// import — an app told it was up to date while showing an empty library —
+    /// and the first `.synced` a fresh store reports is now the one its import
+    /// lands.
     private func recordCleanDrainIfQueueIsEmpty() async {
         guard running else { return }
+        guard await lastFullSyncAt != nil else { return }
         let queueIsEmpty: Bool
         do {
             queueIsEmpty = try await mutationQueue.isEmpty
