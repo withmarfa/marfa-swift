@@ -16,8 +16,8 @@
                 "id": "edg_01PARENT",
                 "properties": {},
                 "source_id": "itm_01JABCXYZ",
-                "target_id": "itm_01PARENT",
                 "space_id": "tnt_01",
+                "target_id": "itm_01PARENT",
                 "updated_at": "2026-04-14T10:01:00Z"
               }
             ],
@@ -31,10 +31,11 @@
           }
         },
         "id": "itm_01JABCXYZ",
+        "orphaned": false,
         "properties": {
-          "title": "Hello",
+          "active": true,
           "count": 3,
-          "active": true
+          "title": "Hello"
         },
         "schema_version": 1,
         "source": "mobile",
@@ -52,12 +53,24 @@
       "starts_at": "2026-04-20T09:00:00Z"
     }
   ],
+  "expansion_incomplete": false,
+  "scan": {
+    "events_read": 412,
+    "max_occurrences": 5000,
+    "max_series_errors": 50,
+    "max_unproductive_iterations": 1000,
+    "occurrences": 1,
+    "series_errors": 1,
+    "series_unexpanded": 0,
+    "unproductive_iterations": 7
+  },
   "series_errors": [
     {
       "item_id": "itm_01BADRULE",
       "message": "recurrence rule could not be parsed"
     }
   ],
+  "series_errors_truncated": false,
   "window": {
     "from": "2026-04-01T00:00:00Z",
     "to": "2026-05-01T00:00:00Z"

@@ -13,7 +13,8 @@
     "daily_snapshot_days",
     "weekly_snapshot_days",
     "max_versions",
-    "feed_days"
+    "feed_days",
+    "item_count"
   ],
   "types": [
     {
@@ -334,6 +335,17 @@
         "Sendable",
         "Hashable"
       ]
+    },
+    {
+      "name": "DriftedPlatformType",
+      "pointer": "/paths/~1admin~1platform-types~1drift/get/responses/200/content/application~1json/schema/properties/types/items",
+      "conformances": [
+        "Codable",
+        "Sendable",
+        "Hashable",
+        "Identifiable"
+      ],
+      "identifiableKey": "id"
     }
   ]
 }

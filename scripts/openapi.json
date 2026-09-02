@@ -23,6 +23,11 @@
           },
           "mapping": {
             "nullable": true
+          },
+          "reapply_until": {
+            "type": "string",
+            "nullable": true,
+            "description": "While this instant is in the future, the connection's runs bring items already stored onto the type this mapping names. Null when no answer stands."
           }
         },
         "required": [
@@ -73,7 +78,7 @@
           "Items"
         ],
         "summary": "Create an item",
-        "description": "Creates an item, validating its properties against the registered type schema before the write; a schema failure rejects the whole item. The server stamps identity, timestamps, version, and the source credential, so passing a `source_id` that already exists for that source upserts the existing item and returns 200 instead of 201.",
+        "description": "Creates an item, validating its properties against the registered type schema before the write; a schema failure rejects the whole item. The server stamps identity, timestamps, version, and the source credential, so passing a `source_id` that already exists for that source upserts the existing item and returns 200 instead of 201. Passing an `id` the caller already created is treated the same way: the create is a repeat of one the server has performed, so nothing is written, no event is published, and the stored item comes back with `acknowledged: true`.",
         "security": [
           {
             "bearerAuth": []
@@ -150,7 +155,7 @@
         },
         "responses": {
           "200": {
-            "description": "Item updated via natural-key upsert. Returned when both `source` (stamped from the credential) and request `source_id` resolve an item in the caller's space — the request is treated as an idempotent re-sync of the upstream entry. When the resolved item has been trashed the response carries `acknowledged: true` and nothing is written: the deletion stands, and the re-sync is accepted rather than refused forever.",
+            "description": "The request resolved an item that already exists, by one of two keys, and there are three answers. **Natural-key upsert:** both `source` (stamped from the credential) and request `source_id` resolve a live item in the caller's space, and it is updated in place — an idempotent re-sync of the upstream entry. **Acknowledged re-sync:** the same natural key resolves an item the user has trashed, so the response carries `acknowledged: true` and nothing is written; the deletion stands rather than the re-sync being refused forever. **Acknowledged repeat:** the request carries an `id` the caller already created, so the create is a second arrival of that client's own write; the stored row comes back with `acknowledged: true`, in whatever state it holds including trashed, and nothing is written or published. On every one of the three the resolved item's `type` decides the shape, so a request naming a different one is refused with 409 `type_mismatch` rather than reinterpreted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -202,6 +207,9 @@
                         },
                         "source_id": {
                           "type": "string"
+                        },
+                        "orphaned": {
+                          "type": "boolean"
                         },
                         "device": {
                           "type": "string"
@@ -397,6 +405,9 @@
                         },
                         "source_id": {
                           "type": "string"
+                        },
+                        "orphaned": {
+                          "type": "boolean"
                         },
                         "device": {
                           "type": "string"
@@ -664,6 +675,47 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "`type_mismatch`: the request resolved an existing item — by the `(source, source_id)` natural key or by a repeated `id` — whose type is not the one declared. Re-typing an item is a deliberate operation, not something a re-sync does in passing. `conflict`: the `id` is held by an item in a space this caller cannot see, so it is somebody else's row rather than a repeat of this caller's own create.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict",
+                            "type_mismatch",
+                            "provenance_collision"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       },
@@ -883,6 +935,9 @@
                               "source_id": {
                                 "type": "string"
                               },
+                              "orphaned": {
+                                "type": "boolean"
+                              },
                               "device": {
                                 "type": "string"
                               },
@@ -1056,6 +1111,9 @@
                                   },
                                   "source_id": {
                                     "type": "string"
+                                  },
+                                  "orphaned": {
+                                    "type": "boolean"
                                   },
                                   "device": {
                                     "type": "string"
@@ -1610,11 +1668,27 @@
         "tags": [
           "Items"
         ],
-        "summary": "Get item counts by state",
-        "description": "Returns a count of items per lifecycle state for the space. The counts are scoped to the caller's type permissions, so a credential sees only the types it can read.",
+        "summary": "Get item counts",
+        "description": "Returns a count of items for the space, grouped on one axis. `by=state` (the default) counts per lifecycle state; `by=type` names the types the space actually uses, which is otherwise unanswerable without paging every row. Both groupings cover the same rows, so their totals agree. The counts are scoped to the caller's type permissions, so a credential sees only the types it can read.",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "state",
+                "type"
+              ],
+              "description": "Grouping axis. Defaults to `state`, which is what this route has always returned."
+            },
+            "required": false,
+            "description": "Grouping axis. Defaults to `state`, which is what this route has always returned.",
+            "name": "by",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1762,6 +1836,9 @@
                         },
                         "source_id": {
                           "type": "string"
+                        },
+                        "orphaned": {
+                          "type": "boolean"
                         },
                         "device": {
                           "type": "string"
@@ -2006,6 +2083,9 @@
                               },
                               "source_id": {
                                 "type": "string"
+                              },
+                              "orphaned": {
+                                "type": "boolean"
                               },
                               "device": {
                                 "type": "string"
@@ -2283,7 +2363,7 @@
           "Items"
         ],
         "summary": "Update an item",
-        "description": "Updates an item's properties, tier, timestamp, edges, or natural key. Properties merge shallowly with existing values while tier and timestamp replace; passing `version` opts into optimistic concurrency and a stale value returns 409 with the conflict context to resolve.",
+        "description": "Updates an item's properties, tier, timestamp, edges, or natural key. Properties merge shallowly with existing values by default, or become the item's properties outright when `properties_mode` is `replace`, while tier and timestamp always replace; passing `version` opts into optimistic concurrency and a stale value returns 409 with the conflict context to resolve. An item's `type` is not updatable here by default: sending one that matches the item is accepted and ignored, and sending a different one is refused with 409 `type_mismatch` rather than silently dropped. Passing `retype: true` alongside a different `type` moves the item to it — that requires write on the type being entered as well as the one being left, and the resulting properties are validated against the destination.",
         "security": [
           {
             "bearerAuth": []
@@ -2312,6 +2392,19 @@
                     "additionalProperties": {
                       "nullable": true
                     }
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "properties_mode": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "replace"
+                    ]
+                  },
+                  "retype": {
+                    "type": "boolean"
                   },
                   "version": {
                     "type": "integer",
@@ -2401,6 +2494,9 @@
                         },
                         "source_id": {
                           "type": "string"
+                        },
+                        "orphaned": {
+                          "type": "boolean"
                         },
                         "device": {
                           "type": "string"
@@ -2667,7 +2763,7 @@
             }
           },
           "409": {
-            "description": "Version conflict (optimistic-concurrency mismatch on `properties`) or `source_id_conflict` (target natural key already in use by another item under the item's `source`).",
+            "description": "Version conflict (optimistic-concurrency mismatch on `properties`), `source_id_conflict` (target natural key already in use by another item under the item's `source`), or `type_mismatch` (the request declared a `type` that is not this item's).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2778,7 +2874,9 @@
                             "code": {
                               "type": "string",
                               "enum": [
-                                "source_id_conflict"
+                                "source_id_conflict",
+                                "type_mismatch",
+                                "provenance_collision"
                               ]
                             },
                             "message": {
@@ -2814,7 +2912,7 @@
           "Items"
         ],
         "summary": "Soft delete an item",
-        "description": "Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead.",
+        "description": "Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. A live `system.connection` is refused: uninstall it first, so its runtime credentials are revoked with it.",
         "security": [
           {
             "bearerAuth": []
@@ -2854,6 +2952,45 @@
               }
             }
           },
+          "400": {
+            "description": "The item is a live `system.connection`. Uninstall it first — removing the row here would leave its runtime credentials behind with nothing naming their owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -2868,6 +3005,45 @@
                           "type": "string",
                           "enum": [
                             "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An integration may only destroy what it wrote. The row's recorded writer is another connection that is still installed, so the gesture is refused; the response names the owning connection. A row whose writer has been uninstalled is not refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "provenance_collision"
                           ]
                         },
                         "message": {
@@ -2975,6 +3151,9 @@
                         },
                         "source_id": {
                           "type": "string"
+                        },
+                        "orphaned": {
+                          "type": "boolean"
                         },
                         "device": {
                           "type": "string"
@@ -3194,6 +3373,45 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "An integration may only destroy what it wrote. The row's recorded writer is another connection that is still installed, so the gesture is refused; the response names the owning connection. A row whose writer has been uninstalled is not refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "provenance_collision"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -3299,6 +3517,9 @@
                         },
                         "source_id": {
                           "type": "string"
+                        },
+                        "orphaned": {
+                          "type": "boolean"
                         },
                         "device": {
                           "type": "string"
@@ -3536,6 +3757,45 @@
                           "type": "string",
                           "enum": [
                             "item_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An integration may only destroy what it wrote. The row's recorded writer is another connection that is still installed, so the gesture is refused; the response names the owning connection. A row whose writer has been uninstalled is not refused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "provenance_collision"
                           ]
                         },
                         "message": {
@@ -4492,7 +4752,7 @@
           "Items"
         ],
         "summary": "Permanently delete an item",
-        "description": "Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible and admin-only. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead.",
+        "description": "Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible and admin-only. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused: uninstall it first, so its runtime credentials are revoked with it.",
         "security": [
           {
             "bearerAuth": []
@@ -4527,6 +4787,45 @@
                   },
                   "required": [
                     "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The item is a live `system.connection`. Uninstall it first — removing the row here would leave its runtime credentials behind with nothing naming their owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }
@@ -4572,7 +4871,7 @@
             }
           },
           "403": {
-            "description": "Admin required",
+            "description": "Admin required, or the item is in a reserved namespace this credential may not write. The second reads `type_not_permitted` and is the answer for an untrashed row: purging is trash-then-purge, and a credential refused at the trash door would otherwise be told only that the item is not trashed, which describes an ordering mistake it did not make.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4584,7 +4883,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "forbidden"
+                            "forbidden",
+                            "type_not_permitted"
                           ]
                         },
                         "message": {
@@ -4777,7 +5077,7 @@
           "Items"
         ],
         "summary": "Bulk upsert items",
-        "description": "Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`. Atomic by default; `source` is server-stamped from the credential, so any caller-supplied value is overwritten. Requires write access to each item's type (admin / space_admin bypass; members need the per-type permission), and operates only within the caller's space.",
+        "description": "Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`. Atomic by default; `source` is server-stamped from the credential, so any caller-supplied value is overwritten. Requires write access to each item's type (admin / space_admin bypass; members need the per-type permission), and operates only within the caller's space.\n\nAn entry that resolves a row of a different type is refused with `type_mismatch` — a write does not re-type the row it lands on. Passing `retype: true` for the batch moves those rows instead, which is how a corpus is brought onto a type a mapping now names. It is opt-in rather than inferred from a differing type, because a declared type accompanies nearly every write and inferring would move a corpus on an ordinary sync bug. Each move requires write on the type being entered as well as the one being left, and the resulting properties are validated against the destination: an item the destination type cannot accept is reported as an `errored` entry naming why, and the rest of the batch proceeds.",
         "security": [
           {
             "bearerAuth": []
@@ -4865,6 +5165,9 @@
                     "type": "boolean"
                   },
                   "emit_events": {
+                    "type": "boolean"
+                  },
+                  "retype": {
                     "type": "boolean"
                   }
                 },
@@ -4961,7 +5264,7 @@
             }
           },
           "400": {
-            "description": "Validation error or atomic rollback",
+            "description": "Validation error, or an atomic rollback. `atomic` defaults to true, so a single refused entry aborts the whole page and the per-entry reason travels in `details.code` — `type_mismatch` among them, when an entry declares a `type` that is not the type of the row its natural key or id resolved. Send `atomic: false` to have each entry reported on its own instead; the runtime SDK's bulk helper does exactly that.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6479,6 +6782,9 @@
                           "source_id": {
                             "type": "string"
                           },
+                          "orphaned": {
+                            "type": "boolean"
+                          },
                           "device": {
                             "type": "string"
                           },
@@ -7098,7 +7404,7 @@
           "Extensions"
         ],
         "summary": "Replace an extension namespace",
-        "description": "Replaces the JSON payload for one extension namespace on the item, requiring `write` on that namespace. The body is capped at 100KB; reserved namespaces such as `connection.runtime` carry additional write constraints.",
+        "description": "Replaces the JSON payload for one extension namespace on the item, requiring `write` on that namespace. The body is capped at 100KB; reserved namespaces such as `connection.runtime` carry additional write constraints. A successful write publishes `metadata.changed` carrying the item and its whole metadata row, so realtime subscribers and webhooks hear it as they do a tag change. Namespaces under the reserved `connection.` root are the exception and stay silent: they carry per-Connection runtime state written on the machine's behalf.",
         "security": [
           {
             "bearerAuth": []
@@ -7329,7 +7635,7 @@
           "Extensions"
         ],
         "summary": "Delete an extension namespace",
-        "description": "Removes one extension namespace from the item, requiring `write` on that namespace. Idempotent — deleting a namespace that doesn't exist returns 200 with the unchanged extensions response.",
+        "description": "Removes one extension namespace from the item, requiring `write` on that namespace. Idempotent — deleting a namespace that doesn't exist returns 200 with the unchanged extensions response. Every call publishes `metadata.changed` carrying the item and its whole metadata row, including one that removes nothing, exactly as a tag write that changes nothing still publishes. Namespaces under the reserved `connection.` root stay silent.",
         "security": [
           {
             "bearerAuth": []
@@ -8160,7 +8466,7 @@
           "Edges"
         ],
         "summary": "Create an edge",
-        "description": "Creates a single typed edge between two existing items in the space. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time.",
+        "description": "Creates a single typed edge between two existing items in the space. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time. A caller may supply the edge `id`, as `POST /items` allows for an item, so a client that mints ids locally keeps its own identifier for the row; omit it and the server mints one. An `id` already naming this exact edge is treated as a repeat of a create the server already performed: nothing is written, no event is published, and the stored edge comes back with `acknowledged: true` and status 200. An `id` naming a different edge is refused with 409 `conflict`.",
         "security": [
           {
             "bearerAuth": []
@@ -8172,6 +8478,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Client-supplied edge id. Omit to have the server mint one."
+                  },
                   "source_id": {
                     "type": "string"
                   },
@@ -8198,6 +8508,67 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "The supplied `id` already names this exact edge — same source, target and type — so the create is treated as a repeat of one the server already performed. Nothing is written and no event is published; the stored edge is returned with `acknowledged: true`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edge": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "space_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "source_id": {
+                          "type": "string"
+                        },
+                        "target_id": {
+                          "type": "string"
+                        },
+                        "edge_type": {
+                          "type": "string"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source_id",
+                        "target_id",
+                        "edge_type",
+                        "properties",
+                        "created_at",
+                        "updated_at"
+                      ]
+                    },
+                    "acknowledged": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "edge",
+                    "acknowledged"
+                  ]
+                }
+              }
+            }
+          },
           "201": {
             "description": "Edge created",
             "content": {
@@ -8352,6 +8723,45 @@
                           "enum": [
                             "item_not_found",
                             "edge_type_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The supplied `id` is taken by an edge that is not the one this request describes — a different source, target or type — or by one in a space the caller cannot see. An id naming this exact edge is a repeat and answers 200 instead. The response names the id as `existing_id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
                           ]
                         },
                         "message": {
@@ -9866,7 +10276,7 @@
           "Types"
         ],
         "summary": "Get a type",
-        "description": "Returns the full schema for a single type, resolving inheritance so the response reflects the effective fields and policies. Works for both core and space-registered custom types.",
+        "description": "Returns the full schema for a single type, resolving inheritance so the response reflects the effective fields and policies. Works for both core and space-registered custom types.\n\nA type whose stored inheritance chain cannot be resolved — circular, or deeper than any resolution walk follows — answers `409 type_chain_unresolvable` rather than a server fault. Correcting it through `PUT /types/{id}` still works, because that route reads the stored schema directly instead of resolving it.",
         "security": [
           {
             "bearerAuth": []
@@ -10065,6 +10475,45 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Stored inheritance chain cannot be resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "type_chain_unresolvable"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       },
@@ -10207,10 +10656,51 @@
                         "fields",
                         "version"
                       ]
+                    },
+                    "broken_mappings": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connection_id": {
+                            "type": "string"
+                          },
+                          "integration_ref": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "issues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string"
+                                },
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "field",
+                                "message"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "connection_id",
+                          "integration_ref",
+                          "issues"
+                        ]
+                      },
+                      "description": "Stored connection mappings this change left invalid. Each is also reported as an `action_required` system.activity row on its connection. An empty array means the check ran and found none; `null` means the check could not run, which is not the same answer."
                     }
                   },
                   "required": [
-                    "type"
+                    "type",
+                    "broken_mappings"
                   ]
                 }
               }
@@ -10302,7 +10792,7 @@
           "Types"
         ],
         "summary": "Delete a custom type",
-        "description": "Removes a custom type registration. Admin-only — core types are immutable. Deletion is rejected if any item of the type still exists, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 invalid_type`).",
+        "description": "Removes a custom type registration. Admin-only — platform-shipped types are immutable.\n\nRejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.\n\nRejected with `409 type_in_use` if any item of the type still exists, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 invalid_type`).",
         "security": [
           {
             "bearerAuth": []
@@ -10326,10 +10816,10 @@
                 "true",
                 "false"
               ],
-              "description": "Delete and orphan existing items when `true`."
+              "description": "Delete and orphan existing items when `true`. Has no effect on the subtype check."
             },
             "required": false,
-            "description": "Delete and orphan existing items when `true`.",
+            "description": "Delete and orphan existing items when `true`. Has no effect on the subtype check.",
             "name": "force",
             "in": "query"
           }
@@ -10347,10 +10837,51 @@
                       "enum": [
                         true
                       ]
+                    },
+                    "broken_mappings": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connection_id": {
+                            "type": "string"
+                          },
+                          "integration_ref": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "issues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string"
+                                },
+                                "message": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "field",
+                                "message"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "connection_id",
+                          "integration_ref",
+                          "issues"
+                        ]
+                      },
+                      "description": "Stored connection mappings this change left invalid. Each is also reported as an `action_required` system.activity row on its connection. An empty array means the check ran and found none; `null` means the check could not run, which is not the same answer."
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "broken_mappings"
                   ]
                 }
               }
@@ -10435,7 +10966,7 @@
             }
           },
           "409": {
-            "description": "Type in use",
+            "description": "Type still has subtypes, or items",
             "content": {
               "application/json": {
                 "schema": {
@@ -10447,7 +10978,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "type_in_use"
+                            "type_in_use",
+                            "type_has_subtypes"
                           ]
                         },
                         "message": {
@@ -10660,6 +11192,9 @@
                               "source_id": {
                                 "type": "string"
                               },
+                              "orphaned": {
+                                "type": "boolean"
+                              },
                               "device": {
                                 "type": "string"
                               },
@@ -10866,7 +11401,7 @@
           "Items"
         ],
         "summary": "List event occurrences in a window",
-        "description": "Returns the events that fall inside a time window, expanding recurring series from their rules at read time rather than storing occurrences. Single events appear by their own times; a series contributes one entry per occurrence in the window, carrying `series_id`; a stored exception replaces the occurrence it was recorded against and carries `replaces`. The window is required and bounded — a request wider than the cap is refused rather than silently trimmed. A series that cannot expand (a malformed rule, or one that floods the window) is reported in `series_errors` while the rest of the calendar still returns.",
+        "description": "Returns the events that fall inside a time window, expanding recurring series from their rules at read time rather than storing occurrences. Single events appear by their own times; a series contributes one entry per occurrence in the window, carrying `series_id`; a stored exception replaces the occurrence it was recorded against and carries `replaces`. A row is shown at the times its own item carries; only a computed series occurrence, whose time the item does not hold, is shown at the time the rule produced. Two bounds refuse rather than silently trimming: the window may not be longer than `max_days`, and the assembled result may not exceed `max_occurrences`. The second depends on what the window holds, so a window well inside the length limit can still be refused for being too full; `scan.max_occurrences` is reported on every successful read so the ceiling is visible before it is reached. Its refusal carries `max_occurrences` and `found` in `details`, and `expansion_incomplete` with `series_unexpanded` as well when expansion had already been truncated — worth branching on, because the refusal says to narrow the window and those two say that narrowing it returns a calendar that is partial for a second reason. A rule that cannot be read or cannot be fully applied is reported in `series_errors` while the rest of the calendar still returns. Entries there are failures rather than rows: one row can carry two, and `item_id` is what a caller groups on. That list alone is capped rather than refused, at `scan.max_series_errors`: it is a diagnostic beside the calendar and nothing in `data` depends on it, so a capped list sets `series_errors_truncated` while `scan.series_errors` still carries the true total for the event types the request read — not for the space, which a request narrowed by `type` or a credential permissioned for one event type never sees all of. Expansion itself is bounded too: a request spends at most `scan.max_unproductive_iterations` rule iterations on expansions that return no occurrence, and one that reaches that ceiling stops expanding, sets `expansion_incomplete` and reports `scan.series_unexpanded`, rather than running for as long as the space gives it work.",
         "security": [
           {
             "bearerAuth": []
@@ -10969,6 +11504,9 @@
                               },
                               "source_id": {
                                 "type": "string"
+                              },
+                              "orphaned": {
+                                "type": "boolean"
                               },
                               "device": {
                                 "type": "string"
@@ -11102,6 +11640,53 @@
                         "to"
                       ]
                     },
+                    "scan": {
+                      "type": "object",
+                      "properties": {
+                        "events_read": {
+                          "type": "integer",
+                          "description": "Event rows this request read, summed across its passes. Two of the three cannot be narrowed by the window, so this grows with the size of the calendar rather than with the window asked for."
+                        },
+                        "occurrences": {
+                          "type": "integer",
+                          "description": "Occurrences returned, the length of `data`."
+                        },
+                        "max_occurrences": {
+                          "type": "integer",
+                          "description": "Ceiling `occurrences` is refused at. Reported on every successful read so a calendar approaching it is visible before a request is refused, rather than only once one is."
+                        },
+                        "series_errors": {
+                          "type": "integer",
+                          "description": "Failures this request found in recurrence rules, in the same unit as the `series_errors` array on the envelope: entries, not rows. One row can account for two — an unreadable line dropped from its rule is one failure, and expanding what was left then failing is another — so this is an upper bound on the number of rows to go and look at, and `item_id` is what a caller groups on to get the exact number. Counted across the event types this request read, and scoped to those and not to the space: a request narrowed by `type`, or a credential permissioned for one event type, is told about the rules it read and nothing about the ones it did not, so a zero here is not a statement that the rest of the space is healthy. It counts everything this read detected, even when the array lists fewer, which is what lets a caller tell a handful of broken rules from a corrupt import without receiving the bytes of the larger one. Read it as a floor rather than as a certificate: it counts the ways of being broken this route knows how to recognize."
+                        },
+                        "max_series_errors": {
+                          "type": "integer",
+                          "description": "Longest list of failures the response will carry, counted in entries. Past this the list is capped and `series_errors_truncated` says so; the read still succeeds, because the list is a diagnostic beside the calendar and nothing in `data` depends on it. Entries rather than rows is the unit that matters here as well: a row reported twice consumes two of these."
+                        },
+                        "unproductive_iterations": {
+                          "type": "integer",
+                          "description": "Rule iterations this request spent on expansions that returned no occurrence: a rule that ended before the window or produced nothing in it, one too frequent to reach the window before the per-series iteration ceiling, and one refused for flooding the window — that last having produced occurrences the refusal then discarded, so this is what the expansion returned rather than what the rule computed. It is not a count of what reached `data`, which is assembled later behind a filter this does not consult. Only iterations are counted, so a series that fails before it iterates — an unreadable rule, a timezone that does not resolve — is reported in `series_errors` and charges nothing here. The unit the expansion ceiling is denominated in, reported on every successful read so a calendar approaching it is visible before it truncates one."
+                        },
+                        "max_unproductive_iterations": {
+                          "type": "integer",
+                          "description": "Ceiling `unproductive_iterations` stops expanding at. Iterations spent on series that do produce occurrences are not counted against it, so crossing it cannot be caused by a calendar having many meetings in it."
+                        },
+                        "series_unexpanded": {
+                          "type": "integer",
+                          "description": "Series left unexpanded because `max_unproductive_iterations` was reached before they were reached. Zero on any read that finished expanding; above zero, `expansion_incomplete` is set on the envelope and `data` may be missing occurrences these series would have contributed."
+                        }
+                      },
+                      "required": [
+                        "events_read",
+                        "occurrences",
+                        "max_occurrences",
+                        "series_errors",
+                        "max_series_errors",
+                        "unproductive_iterations",
+                        "max_unproductive_iterations",
+                        "series_unexpanded"
+                      ]
+                    },
                     "series_errors": {
                       "type": "array",
                       "items": {
@@ -11118,19 +11703,29 @@
                           "item_id",
                           "message"
                         ]
-                      }
+                      },
+                      "description": "One entry per failure found in a recurrence rule: a malformed rule, one that floods the window, one with no start to unfold from, a timezone that does not resolve, or a `recurrence` holding something that is not an RFC 5545 property line. Absent when there were none. `item_id` names the row, and one row can appear more than once — a dropped rule line and a failure expanding what was left are two entries against the same id. A reported row may still appear in `data`: a rule that could not be applied leaves the row rendering as the single event its own times describe, and a rule missing one unreadable line still contributes every occurrence the rest of it produces. This reports on rules rather than on which rows are missing."
+                    },
+                    "series_errors_truncated": {
+                      "type": "boolean",
+                      "description": "Present and true when `series_errors` lists fewer failures than the request found. Both are counted in entries, so the comparison is exact. The array is capped at `scan.max_series_errors` rather than the read refused, so this is how the response says the list is partial; `scan.series_errors` carries the real total."
+                    },
+                    "expansion_incomplete": {
+                      "type": "boolean",
+                      "description": "Present and true when the request stopped expanding series before it had walked them all, having spent `scan.max_unproductive_iterations` on expansions that returned no occurrence. `data` may be missing occurrences the unexpanded series held, and `scan.series_unexpanded` says how many were left. A narrower window does not recover it — the budget is spent walking rules from their own start, before the window is reached — so the moves are narrowing by `type` or fixing the rules `series_errors` names."
                     }
                   },
                   "required": [
                     "data",
-                    "window"
+                    "window",
+                    "scan"
                   ]
                 }
               }
             }
           },
           "400": {
-            "description": "Missing, unreadable, inverted, or over-long window",
+            "description": "A missing, unreadable or inverted window; a window longer than `max_days`; an invalid type identifier; or a window whose occurrences exceed `max_occurrences`. The last of these can refuse a window that is otherwise perfectly valid, because it depends on what the window holds rather than on how long it is. It carries `max_occurrences` and `found`, where `found` is the count assembly stopped at rather than the window's total: the read is abandoned as soon as the ceiling is crossed instead of continuing in order to report how far past it the window went. When expansion had already been truncated before the ceiling was crossed, the details also carry `expansion_incomplete` and `series_unexpanded`, because narrowing the window returns a calendar that is partial for that second reason and the caller would otherwise not learn it until after acting on this one. Broken rules do not cause this refusal on their own: that list is capped and the read succeeds however many of them there are. They do not exempt a space from it either — the ceiling counts the occurrences the window's healthy rows produce and is indifferent to how many rules failed, so a space holding both enough broken rules to cap the list and enough events to fill the window is refused on the second, exactly as a space with no broken rules would be.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12588,7 +13183,7 @@
                   "role": {
                     "type": "string",
                     "enum": [
-                      "admin",
+                      "instance_admin",
                       "space_admin",
                       "member"
                     ]
@@ -12680,7 +13275,7 @@
                     "role": {
                       "type": "string",
                       "enum": [
-                        "admin",
+                        "instance_admin",
                         "space_admin",
                         "member"
                       ]
@@ -13249,7 +13844,7 @@
                     "role": {
                       "type": "string",
                       "enum": [
-                        "admin",
+                        "instance_admin",
                         "space_admin",
                         "member"
                       ]
@@ -14195,6 +14790,9 @@
                     "manifest_version": {
                       "type": "string"
                     },
+                    "display_name": {
+                      "type": "string"
+                    },
                     "publisher": {
                       "type": "string"
                     },
@@ -14212,6 +14810,10 @@
                     "registered_at": {
                       "type": "string"
                     },
+                    "installed_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "manifest": {
                       "type": "object",
                       "additionalProperties": {
@@ -14226,6 +14828,7 @@
                     "publisher",
                     "direction",
                     "registered_at",
+                    "installed_count",
                     "manifest"
                   ]
                 }
@@ -14397,7 +15000,7 @@
           "Integrations"
         ],
         "summary": "List integrations",
-        "description": "Returns every registered integration manifest. Filter by `manifest_name` to enumerate the registered versions of one integration.",
+        "description": "Returns every registered integration manifest, with the number of connections this space already holds for each. Pass `latest=true` for the catalog view, one row per integration. Filter by `manifest_name` to enumerate the registered versions of one integration.",
         "security": [
           {
             "bearerAuth": []
@@ -14412,6 +15015,20 @@
             "required": false,
             "description": "Filter to versions of a single integration by name.",
             "name": "manifest_name",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "Return only the newest registered version of each integration. This is what a catalog wants; the default returns every version, which is what enumerating one integration's history wants."
+            },
+            "required": false,
+            "description": "Return only the newest registered version of each integration. This is what a catalog wants; the default returns every version, which is what enumerating one integration's history wants.",
+            "name": "latest",
             "in": "query"
           },
           {
@@ -14449,6 +15066,9 @@
                           "manifest_version": {
                             "type": "string"
                           },
+                          "display_name": {
+                            "type": "string"
+                          },
                           "publisher": {
                             "type": "string"
                           },
@@ -14466,6 +15086,10 @@
                           "registered_at": {
                             "type": "string"
                           },
+                          "installed_count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "manifest": {
                             "type": "object",
                             "additionalProperties": {
@@ -14480,6 +15104,7 @@
                           "publisher",
                           "direction",
                           "registered_at",
+                          "installed_count",
                           "manifest"
                         ]
                       }
@@ -14577,6 +15202,9 @@
                     "manifest_version": {
                       "type": "string"
                     },
+                    "display_name": {
+                      "type": "string"
+                    },
                     "publisher": {
                       "type": "string"
                     },
@@ -14594,6 +15222,10 @@
                     "registered_at": {
                       "type": "string"
                     },
+                    "installed_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "manifest": {
                       "type": "object",
                       "additionalProperties": {
@@ -14608,6 +15240,7 @@
                     "publisher",
                     "direction",
                     "registered_at",
+                    "installed_count",
                     "manifest"
                   ]
                 }
@@ -15820,6 +16453,347 @@
                           "type": "string",
                           "enum": [
                             "local_runtime_not_available"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/platform-types/drift": {
+      "get": {
+        "operationId": "adminListPlatformTypeDrift",
+        "summary": "Shipped types this instance carries that the build does not",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Lists platform type rows this instance still carries that the running build no longer ships, each with how many items across every space still carry the identifier. `/health` publishes the count of these as `platform_types`, a report that carries no status and never degrades the response; this is where the identifiers live, because that endpoint is unauthenticated. The count is read live rather than cached at boot: it is the part that changes without a restart, and a removal reasoning from a stale copy is the failure worth avoiding. Platform-admin only.",
+        "responses": {
+          "200": {
+            "description": "The drifted rows, with their live item counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "types": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "item_count": {
+                            "type": "number"
+                          },
+                          "child_types": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "removable": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "item_count",
+                          "child_types",
+                          "removable"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "types"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a platform admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/platform-types/{id}/remove": {
+      "post": {
+        "operationId": "adminRemovePlatformType",
+        "summary": "Remove one shipped type the build no longer carries",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Removes exactly one platform type row this build does not ship. Refused with `409` when the identifier is one the build still ships, so this can never remove a live type, and refused with `409` when items still carry it: the row is what makes those items resolve, and orphaning readable data to tidy a registry is the wrong trade. The item count is recomputed inside the request rather than read from the boot-time report. The type stops resolving on the next restart, since the in-memory registry is filled from the rows at boot. Platform-admin only.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The row is gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "removed",
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a platform admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No platform row with this identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The build still ships this type, or items still carry the identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
                           ]
                         },
                         "message": {
@@ -17768,7 +18742,7 @@
           "Connections"
         ],
         "summary": "Set a connection's user mapping",
-        "description": "Stores the user's routing for this connection: conditions on the incoming record choose the target type, and fields are assigned onto that type's schema. The document is validated wholesale — target types must resolve in the space (reserved namespaces refused), every assigned field must exist on its target, and required target fields must be covered. Shipped write families stay the default for records no rule matches.",
+        "description": "Stores the user's routing for this connection: conditions on the incoming record choose the target type, and fields are assigned onto that type's schema. The document is validated wholesale — target types must resolve in the space (reserved namespaces refused), every assigned field must exist on its target, and required target fields must be covered. Shipped write families stay the default for records no rule matches.\n\nA mapping applies to what arrives next. `reapply=true` also brings the items already stored: the connection's next runs re-type the rows they resolve onto the type the mapping now names, instead of being refused as a type mismatch. Both answers are correct — declining leaves the older items where they are, which is a legitimate end state.\n\n**It re-types what the connection re-syncs, not the whole corpus.** A mapping's conditions read the upstream record, which is not stored anywhere, so nothing can replay a mapping against items already written; the items brought along are the ones the next runs fetch again. A record the upstream no longer returns keeps its old type.\n\nThe answer expires — see `reapply_until` in the response — rather than persisting until something clears it. A sweep that parks and never resumes, or a connection paused mid-run, would otherwise leave every future run re-typing a corpus nobody asked it to.",
         "security": [
           {
             "bearerAuth": []
@@ -17785,6 +18759,20 @@
             "description": "Connection item id",
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "Bring the items already stored onto the type this mapping names. Omitted or `false` clears any answer still standing."
+            },
+            "required": false,
+            "description": "Bring the items already stored onto the type this mapping names. Omitted or `false` clears any answer still standing.",
+            "name": "reapply",
+            "in": "query"
           }
         ],
         "requestBody": {
@@ -18065,9 +19053,6 @@
                   "integration_id": {
                     "type": "string"
                   },
-                  "label": {
-                    "type": "string"
-                  },
                   "credential_ref": {
                     "type": "string"
                   },
@@ -18087,7 +19072,7 @@
         },
         "responses": {
           "201": {
-            "description": "Connection installed. Returns the new connection id, seed credential id, and activity id.",
+            "description": "Connection installed. Returns the new connection id and activity id.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18096,16 +19081,12 @@
                     "connection_id": {
                       "type": "string"
                     },
-                    "credential_id": {
-                      "type": "string"
-                    },
                     "activity_id": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "connection_id",
-                    "credential_id",
                     "activity_id"
                   ]
                 }
@@ -19854,6 +20835,46 @@
               }
             }
           },
+          "400": {
+            "description": "The connection carries no integration reference, or the manifest it resolves no longer validates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error",
+                            "missing_required_field"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized.",
             "content": {
@@ -20064,7 +21085,7 @@
             }
           },
           "400": {
-            "description": "Not an integration connection, revoked, already current, or its settings do not satisfy the newer manifest.",
+            "description": "Not an integration connection, revoked, already current, carrying no integration reference, or its settings do not satisfy the newer manifest.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20076,7 +21097,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "validation_error"
+                            "validation_error",
+                            "missing_required_field"
                           ]
                         },
                         "message": {
@@ -20194,6 +21216,497 @@
                           "type": "string",
                           "enum": [
                             "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The move would strand this connection's stored user mapping, because the newer version does not support mappings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/upgrades/pending": {
+      "get": {
+        "operationId": "listConnectionUpgradesPendingConsent",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "List connections held back because moving them would grant more",
+        "description": "Connections whose newest registered manifest version reaches further than the one they were installed against. The automatic pass moves everything that takes the same or less and leaves these, so this is the list that needs a person. `consent_lines` says what each move would newly allow, in the same words the install consent screen uses. Approve one with `POST /connections/{id}/upgrade/approve`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connections awaiting a decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pending": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "connection_id": {
+                            "type": "string"
+                          },
+                          "manifest_name": {
+                            "type": "string"
+                          },
+                          "from_version": {
+                            "type": "string"
+                          },
+                          "to_version": {
+                            "type": "string"
+                          },
+                          "consent_lines": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "connection_id",
+                          "manifest_name",
+                          "from_version",
+                          "to_version",
+                          "consent_lines"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "pending"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/{id}/upgrade/approve": {
+      "post": {
+        "operationId": "approveConnectionUpgrade",
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Approve a move that would grant a connection more than it has",
+        "description": "The decision `POST /connections/{id}/upgrade` refuses to make on its own. `to_version` names the version the caller was shown, and the move is refused with 409 if that is no longer the candidate, so an approval cannot carry over to a widening nobody read. Everything else about the move is identical to the ordinary upgrade, including keeping the cursor state and revoking runtime credentials.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Id of the connection to uninstall."
+            },
+            "required": true,
+            "description": "Id of the connection to uninstall.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "to_version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The version the caller was shown. The approval applies to that version and no other: a newer one registered since is refused rather than silently approved."
+                  }
+                },
+                "required": [
+                  "to_version"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The connection now resolves the newer manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection_id": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "object",
+                      "properties": {
+                        "manifest_name": {
+                          "type": "string"
+                        },
+                        "manifest_version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "manifest_name",
+                        "manifest_version"
+                      ]
+                    },
+                    "to": {
+                      "type": "object",
+                      "properties": {
+                        "manifest_name": {
+                          "type": "string"
+                        },
+                        "manifest_version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "manifest_name",
+                        "manifest_version"
+                      ]
+                    },
+                    "integration_ref": {
+                      "type": "string"
+                    },
+                    "revoked_credential_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "activity_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connection_id",
+                    "from",
+                    "to",
+                    "integration_ref",
+                    "revoked_credential_ids",
+                    "activity_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed body, or a connection that is not an integration, is revoked, carries no integration reference, or whose settings do not satisfy the newer manifest. A connection found to be already current before the move starts answers 409; one that another caller moves first, while this one waits for the connection's lock, answers 400 because the approved version is no longer ahead of it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error",
+                            "missing_required_field"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not an admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "connection_not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The candidate version is not the one the caller approved, the connection is already on the newest version, the move no longer widens, or it would strand this connection's stored user mapping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
                           ]
                         },
                         "message": {
@@ -20513,7 +22026,19 @@
                   "events": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "item.created",
+                        "item.updated",
+                        "item.deleted",
+                        "item.restored",
+                        "item.state_changed",
+                        "metadata.changed",
+                        "edge.created",
+                        "edge.updated",
+                        "edge.deleted",
+                        "*"
+                      ]
                     },
                     "minItems": 1
                   },
@@ -20661,6 +22186,46 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "`forbidden`: the credential is not a space admin. `scoped_credential_not_permitted`: it is, but its reach is narrower than the space — an OAuth token held to the scopes a user granted an app. A subscription is space-level and carries no credential, so a delivery cannot be narrowed to a grant; only a credential covering the whole space may register or re-point one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden",
+                            "scoped_credential_not_permitted"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       },
@@ -20751,6 +22316,45 @@
                           "type": "string",
                           "enum": [
                             "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The credential is not a space admin. Reading a space's webhook configuration is a space-admin operation like registering one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
                           ]
                         },
                         "message": {
@@ -20893,6 +22497,45 @@
               }
             }
           },
+          "403": {
+            "description": "The credential is not a space admin. Reading a space's webhook configuration is a space-admin operation like registering one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "404": {
             "description": "Webhook not found",
             "content": {
@@ -20970,7 +22613,19 @@
                   "events": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "item.created",
+                        "item.updated",
+                        "item.deleted",
+                        "item.restored",
+                        "item.state_changed",
+                        "metadata.changed",
+                        "edge.created",
+                        "edge.updated",
+                        "edge.deleted",
+                        "*"
+                      ]
                     },
                     "minItems": 1
                   },
@@ -21115,6 +22770,46 @@
               }
             }
           },
+          "403": {
+            "description": "`forbidden`: the credential is not a space admin. `scoped_credential_not_permitted`: it is, but its reach is narrower than the space — an OAuth token held to the scopes a user granted an app. A subscription is space-level and carries no credential, so a delivery cannot be narrowed to a grant; only a credential covering the whole space may register or re-point one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden",
+                            "scoped_credential_not_permitted"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
           "404": {
             "description": "Webhook not found",
             "content": {
@@ -21216,6 +22911,46 @@
                           "type": "string",
                           "enum": [
                             "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`forbidden`: the credential is not a space admin. `scoped_credential_not_permitted`: it is, but its reach is narrower than the space — an OAuth token held to the scopes a user granted an app. A subscription is space-level and carries no credential, so a delivery cannot be narrowed to a grant; only a credential covering the whole space may create, re-point or destroy one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden",
+                            "scoped_credential_not_permitted"
                           ]
                         },
                         "message": {
@@ -21395,6 +23130,45 @@
                           "type": "string",
                           "enum": [
                             "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The credential is not a space admin. Reading a space's webhook configuration is a space-admin operation like registering one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
                           ]
                         },
                         "message": {
@@ -21977,7 +23751,7 @@
                   "role": {
                     "type": "string",
                     "enum": [
-                      "admin",
+                      "instance_admin",
                       "space_admin",
                       "member"
                     ]
@@ -22062,7 +23836,7 @@
                     "role": {
                       "type": "string",
                       "enum": [
-                        "admin",
+                        "instance_admin",
                         "space_admin",
                         "member"
                       ]
@@ -23105,7 +24879,7 @@
           "Auth"
         ],
         "summary": "Update the current user's handle",
-        "description": "Claims or changes the handle on the authenticated user. The handle is the user's public identifier — the same string that namespaces published types as `<handle>.<type>`. Lowercase alphanumeric and hyphens, 3–32 characters, no leading/trailing hyphens, no consecutive hyphens.\n\nReserved roots (`core`, `system`, `app`, `user`, `marfa`) and a list of structural words (`admin`, `api`, etc.) are rejected with `400 handle_reserved`. Case-insensitive collision with another user returns `409 conflict`. See [Handles and publishers](/guides/identity/handles-and-publishers).\n\n**Auth mode:** served only by deployments running `AUTH_MODE=hosted`. Instances in any other auth mode do not expose this endpoint.",
+        "description": "Claims or changes the handle on the authenticated user. The handle is the user's public identifier — the same string that namespaces published types as `<handle>.<type>`. Lowercase alphanumeric and hyphens, 3–32 characters, no leading/trailing hyphens, no consecutive hyphens.\n\nReserved roots (`core`, `system`, `app`, `user`, `marfa`, `capability`) are rejected with `400 handle_reserved` — they are the type grammar's own first segments, and a handle is never a route. Case-insensitive collision with another user returns `409 conflict`. See [Handles and publishers](/guides/identity/handles-and-publishers).\n\n**Auth mode:** served only by deployments running `AUTH_MODE=hosted`. Instances in any other auth mode do not expose this endpoint.",
         "security": [
           {
             "bearerAuth": []

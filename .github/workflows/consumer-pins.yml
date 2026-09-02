@@ -28,6 +28,12 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The repository this check is mandatory on. A fork cannot hold the
+  # credential, so it skips rather than failing on something it has no way
+  # to fix.
+  PINS_CANONICAL_REPO: withmarfa/swift-sdk
+
 jobs:
   pins:
     name: Report each consumer's pin
@@ -41,8 +47,38 @@ jobs:
       - uses: actions/checkout@v5
       - name: Compare each consumer's pin against the newest tag
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/consumer-pins.sh
+          # The built-in token cannot answer this question. It is scoped to
+          # this repository alone, and both consumers are private, so the
+          # contents read that recovers each pin 404s — which the script
+          # cannot distinguish from a project file that moved, so it reports
+          # every consumer as unreadable and fails. That is a false finding
+          # on the one check whose whole purpose is to be believed.
+          #
+          # `SHIPPING_GAP_TOKEN` is an organization secret visible to every
+          # private repository in the org and already reaches both consumers:
+          # the workbench's shipping-gap guard reads their tags and commits
+          # through it, under the same Contents permission the contents
+          # endpoint needs.
+          #
+          # **No fallback to the built-in token.** Falling back would re-arm
+          # exactly the false finding this replaced: the run would look
+          # configured, read nothing, and report both consumers as behind.
+          # An unset credential fails here and skips everywhere else, which
+          # is the same position the spec-drift guard takes.
+          GH_TOKEN: ${{ secrets.SHIPPING_GAP_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            if [ "${GITHUB_REPOSITORY}" = "${PINS_CANONICAL_REPO}" ]; then
+              echo "::error title=Pin report cannot run::SHIPPING_GAP_TOKEN is not set on ${GITHUB_REPOSITORY}, so no consumer's pin was read. Failing rather than passing, and rather than falling back to a token that cannot see the consumers and would report every one of them as behind."
+              exit 1
+            fi
+            echo "::warning title=Cross-repo check skipped::SHIPPING_GAP_TOKEN is not set on ${GITHUB_REPOSITORY}, which is not ${PINS_CANONICAL_REPO}."
+            exit 0
+          fi
+
+          scripts/consumer-pins.sh
 
   notify:
     needs: [pins]

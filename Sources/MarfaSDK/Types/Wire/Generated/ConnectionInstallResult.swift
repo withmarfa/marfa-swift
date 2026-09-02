@@ -8,21 +8,17 @@ import Foundation
 public struct ConnectionInstallResult: Codable, Sendable, Hashable {
     public let activityId: String
     public let connectionId: String
-    public let credentialId: String
 
     public init(
         activityId: String,
-        connectionId: String,
-        credentialId: String
+        connectionId: String
     ) {
         self.activityId = activityId
         self.connectionId = connectionId
-        self.credentialId = credentialId
     }
 
     enum CodingKeys: String, CodingKey {
         case activityId = "activity_id"
         case connectionId = "connection_id"
-        case credentialId = "credential_id"
     }
 }

@@ -7,9 +7,7 @@ import Foundation
 /// **Declared but not wrapped.** An operation the platform adds reaches the
 /// vendored snapshot on the next sync and then stops. No generator consumes
 /// `paths`, so nothing notices; the wrapper is written when somebody happens
-/// to need it, or never. Twenty-four operations sit here today — against the
-/// snapshot. See the note on the snapshot below for why the honest figure is
-/// twenty-eight.
+/// to need it, or never. Twenty-six operations sit here today.
 ///
 /// **Called but not declared.** The more interesting direction, and the one
 /// nothing was reporting. Fourteen paths the SDK calls appear nowhere in the
@@ -22,27 +20,28 @@ import Foundation
 ///
 /// A one-directional check would have been worse than useless here. "SDK
 /// paths are a subset of spec paths" fails on all fourteen at once for a
-/// reason unrelated to route coverage, and buries the twenty-four it was
+/// reason unrelated to route coverage, and buries the twenty-six it was
 /// built to find. The two directions are reported separately.
 ///
 /// **What the comparison is against.** `scripts/openapi.json`, the snapshot
 /// committed to this repository, because that is the only spec a test here
-/// can read. The snapshot trails the monorepo's committed `openapi.json`:
-/// it declares 102 operations against that document's 106, missing
-/// `GET /admin/platform-types/drift`, `GET /connections/upgrades/pending`,
-/// `POST /admin/platform-types/{id}/remove` and
-/// `POST /connections/{id}/upgrade/approve`. All four are unwrapped and none
-/// appears in either map below, so the real count of unwrapped operations is
-/// twenty-eight rather than the twenty-four this file can see. Both are
-/// committed documents; neither was compared against a running server, so
-/// twenty-eight is a floor rather than a settled figure.
+/// can read. Everything this file reports is therefore measured against what
+/// was last synced, and the sync is a step somebody performs by hand.
 ///
-/// Nothing closes that on its own. `scripts/sync-openapi.sh` is run by hand,
-/// and the `freshness` CI job re-runs codegen *against the committed
-/// snapshot* rather than re-syncing it — so a snapshot that trails stays
-/// green indefinitely and this check under-reports by however far it has
-/// drifted. That is a real limit of the check, not a detail: it measures
-/// drift against what was last synced, and the sync is the unwatched step.
+/// That limit used to be unbounded, and it is the reason this paragraph is
+/// worth reading rather than skipping. The snapshot sat four operations and
+/// five schemas behind the platform, `freshness` re-ran codegen against the
+/// committed copy rather than re-syncing it, and this check compared the SDK
+/// against that same stale copy — so all of it was green over an install
+/// route the SDK could not call. The gap is now watched from outside: the
+/// `Spec drift` workflow compares the snapshot against the monorepo's
+/// `openapi.json` daily and reports when they diverge. This file still
+/// measures against the snapshot; what changed is that the snapshot falling
+/// behind is now something that reports itself rather than something a
+/// consumer discovers.
+///
+/// Neither document has been compared against a running server, so the
+/// counts here describe two committed files rather than a deployment.
 @Suite("SDK route coverage tracks the vendored spec")
 struct RouteCoverageTests {
 
@@ -136,6 +135,12 @@ struct RouteCoverageTests {
 
         "POST /connections/{}/upgrade":
             "No decision on record. Performs the manifest move the GET above previews.",
+
+        "GET /connections/upgrades/pending":
+            "Unwrapped with the rest of the upgrade surface above, rather than on its own account. Lists the connections the automatic pass left behind because moving them would grant more than they hold. Wrapping the consent half of a family whose ordinary half is unwrapped would leave a caller able to see what needs approving and unable to preview or perform the move itself, which is a worse surface than neither.",
+
+        "POST /connections/{}/upgrade/approve":
+            "Same decision as the listing above and the pair it belongs to: the whole upgrade surface is unwrapped or none of it is. The platform's TypeScript SDK wraps no part of it either, so this is not a Swift-side parity gap.",
 
         "POST /admin/spaces":
             "No decision on record. Wrapped by the TypeScript SDK. Creation is not destructive, so the reversibility boundary that explains the delete entries above does not apply here.",
@@ -1156,19 +1161,19 @@ struct RouteCoverageTests {
         let called = try routesCalledBySDK()
         let declared = try routesDeclaredInSpec()
         #expect(
-            called.count >= 88,
+            called.count >= 90,
             """
             the scan read \(called.count) routes out of the SDK sources, under the floor \
-            of 88 that 92 wrapped routes sat behind. Two things look identical from here \
+            of 90 that 94 wrapped routes sat behind. Two things look identical from here \
             and this cannot separate them: the scan has stopped seeing call sites, or the \
             SDK genuinely wraps fewer routes than it did. Check that a namespace's calls \
             are still being found before lowering the floor to match.
             """)
         #expect(
-            declared.count >= 100,
+            declared.count >= 104,
             """
-            the snapshot yielded \(declared.count) operations, under the floor of 100 that \
-            102 declared operations sat behind. Either it is being read wrongly, or the \
+            the snapshot yielded \(declared.count) operations, under the floor of 104 that \
+            106 declared operations sat behind. Either it is being read wrongly, or the \
             platform withdrew operations and the snapshot has since been synced. Open \
             `scripts/openapi.json` before lowering the floor.
             """)

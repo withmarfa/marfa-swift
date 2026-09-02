@@ -27,6 +27,81 @@ public struct AdminNamespace: Sendable {
     public var accountDeletion: AdminAccountDeletionNamespace {
         AdminAccountDeletionNamespace(transport: transport, isLocalMode: isLocalMode)
     }
+
+    /// Platform type rows this instance carries that the running build no
+    /// longer ships, and the removal of one.
+    public var platformTypes: AdminPlatformTypesNamespace {
+        AdminPlatformTypesNamespace(transport: transport, isLocalMode: isLocalMode)
+    }
+}
+
+// MARK: - Platform types
+
+/// The gap between the types a build ships and the type rows an instance
+/// holds. A row is what makes items of that type resolve, so a build that
+/// stops shipping a type leaves its rows behind rather than dropping them —
+/// a rollback is the ordinary way this happens, where the older build simply
+/// does not know about rows the newer one wrote.
+///
+/// `/health` publishes the count of these and nothing else about them,
+/// because it is unauthenticated. This is where the identifiers live.
+public struct AdminPlatformTypesNamespace: Sendable {
+
+    let transport: any Transport
+    let isLocalMode: Bool
+
+    private func ensureRemote(_ operation: String) throws {
+        if isLocalMode {
+            throw LocalModeUnsupportedError(operation: operation)
+        }
+    }
+
+    /// Every platform type row the running build no longer ships, each with
+    /// how many items across every space still carry the identifier, the
+    /// types that inherit from it, and whether it can be removed.
+    ///
+    /// A report rather than a prune. The count is read live rather than from
+    /// the boot-time report, because it is the part that changes without a
+    /// restart and reasoning about a removal from a stale copy is the
+    /// mistake worth avoiding. Platform-admin only.
+    public func drift() async throws -> [DriftedPlatformType] {
+        try ensureRemote("admin.platformTypes.drift")
+        let response: PlatformTypeDriftResponse = try await transport.request(
+            method: .get,
+            path: "/admin/platform-types/drift",
+            body: nil,
+            query: nil
+        )
+        return response.types
+    }
+
+    /// Remove exactly one platform type row this build does not ship.
+    ///
+    /// Instance-wide and not undoable from here: a build that no longer
+    /// ships the type cannot re-seed the row. It is wrapped nonetheless,
+    /// where account and space deletion are not, because the server refuses
+    /// it in every case where something still depends on it — `409` when the
+    /// build still ships the identifier, when items still carry it, or when
+    /// another type declares it as a parent, and `404` when no platform row
+    /// holds it. It cannot orphan readable data, which is the property that
+    /// puts the two deletions out of reach and this within it.
+    ///
+    /// The type keeps resolving until the next restart, since the in-memory
+    /// registry is filled from the rows at boot.
+    ///
+    /// Returns nothing: the route's body carries a constant `true` and an
+    /// echo of `id`, so a caller learns nothing from it that it did not
+    /// already have. What it needs to know arrives as a thrown error.
+    /// Platform-admin only.
+    public func remove(_ id: String) async throws {
+        try ensureRemote("admin.platformTypes.remove")
+        let _: EmptyResponse = try await transport.request(
+            method: .post,
+            path: "/admin/platform-types/\(id)/remove",
+            body: nil,
+            query: nil
+        )
+    }
 }
 
 // MARK: - Spaces
@@ -332,5 +407,9 @@ struct SpaceListResponse: Codable, Sendable {
 
 struct SpaceApiKeysResponse: Codable, Sendable {
     let data: [SpaceApiKeySummary]
+}
+
+struct PlatformTypeDriftResponse: Codable, Sendable {
+    let types: [DriftedPlatformType]
 }
 

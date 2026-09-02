@@ -13,25 +13,73 @@ struct ConnectionsNamespaceTests {
         return (client, mock)
     }
 
-    @Test("install sends POST /connections/install with input body")
-    func install() async throws {
+    /// The request body, read off the wire rather than inferred from the
+    /// input type. The key set is asserted whole because what must not be
+    /// there is the half nothing else can see: the route's request schema is
+    /// a plain object that strips keys it does not declare, so a field the
+    /// SDK sends of its own accord is dropped in silence — the install
+    /// succeeds, the response says nothing, and only the bytes on the wire
+    /// record that it was sent at all. That is exactly how `label` survived
+    /// here after the route stopped taking it.
+    ///
+    /// The `configuration` bag is the one part the server does police, and
+    /// against the integration's manifest rather than against this schema:
+    /// a key the manifest does not declare is refused with a validation
+    /// error naming it.
+    @Test("install sends the fields the route accepts, and nothing else")
+    func installSendsCurrentInput() async throws {
         let (client, mock) = makeClient()
-        mock.enqueue(ConnectionInstallResult(
-            activityId: "act-1",
-            connectionId: "conn-1",
-            credentialId: "cred-1"
-        ))
+        mock.enqueue(["connection_id": "conn-1", "activity_id": "act-1"])
 
-        let result = try await client.connections.install(
+        try await client.connections.install(
             integrationId: "int-1",
-            label: "My Label"
+            credentialRef: "cred-1",
+            configuration: ["feed_urls": .array([.string("https://example.com/feed")])]
         )
 
-        #expect(result.connectionId == "conn-1")
-        #expect(result.credentialId == "cred-1")
         #expect(mock.calls[0].method == .post)
         #expect(mock.calls[0].path == "/connections/install")
-        #expect(mock.calls[0].body != nil)
+
+        let body = try #require(mock.calls[0].body)
+        let sent = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(Set(sent.keys) == ["integration_id", "credential_ref", "configuration"])
+        #expect(sent["integration_id"] as? String == "int-1")
+        #expect(sent["credential_ref"] as? String == "cred-1")
+        #expect(
+            sent["configuration"] as? [String: [String]]
+                == ["feed_urls": ["https://example.com/feed"]])
+    }
+
+    /// Omitted optionals stay off the wire rather than traveling as nulls,
+    /// which is what lets a caller install against a manifest that declares
+    /// no configuration at all.
+    @Test("install omits what the caller did not supply")
+    func installOmitsUnsuppliedFields() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(["connection_id": "conn-1", "activity_id": "act-1"])
+
+        try await client.connections.install(integrationId: "int-1")
+
+        let body = try #require(mock.calls[0].body)
+        let sent = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(Set(sent.keys) == ["integration_id"])
+    }
+
+    /// The body a current server actually answers `POST /connections/install`
+    /// with, keyed exactly as the route returns it. Verified against a running
+    /// instance rather than read off a document: the route returns the
+    /// connection and the activity and nothing else.
+    @Test("install decodes the result the route returns")
+    func installDecodesCurrentResult() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(["connection_id": "conn-1", "activity_id": "act-1"])
+
+        let result = try await client.connections.install(integrationId: "int-1")
+
+        #expect(result.connectionId == "conn-1")
+        #expect(result.activityId == "act-1")
     }
 
     @Test("uninstall sends POST /connections/{id}/uninstall")
@@ -215,7 +263,7 @@ struct ConnectionsNamespaceTests {
         let client = try await MarfaClient.local(path: ":memory:")
 
         await #expect(throws: LocalModeUnsupportedError.self) {
-            _ = try await client.connections.install(integrationId: "int-1", label: nil)
+            _ = try await client.connections.install(integrationId: "int-1")
         }
         await #expect(throws: LocalModeUnsupportedError.self) {
             _ = try await client.connections.uninstall("conn-1")

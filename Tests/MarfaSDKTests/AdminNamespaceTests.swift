@@ -138,6 +138,97 @@ struct AdminNamespaceTests {
         #expect(mock.calls[0].path == "/admin/account-deletion/purge-now")
     }
 
+    // MARK: - platformTypes
+
+    /// The response is written as raw JSON rather than as `DriftedPlatformType`
+    /// values. Encoding the type to produce the fixture would put its own
+    /// `CodingKeys` on both sides of the assertion, so a wrong wire key —
+    /// `itemCount` spelled `itemcount`, say — would round-trip through the
+    /// mock and pass while failing against the server. The keys here are the
+    /// ones the route sends.
+    @Test("platformTypes.drift unwraps the types envelope")
+    func platformTypeDrift() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(JSONValue.dictionary([
+            "types": .array([
+                .dictionary([
+                    "id": .string("acme.deal"),
+                    "item_count": .int(12),
+                    "child_types": .array([.string("acme.deal.won")]),
+                    "removable": .bool(false),
+                ]),
+                .dictionary([
+                    "id": .string("acme.lead"),
+                    "item_count": .int(0),
+                    "child_types": .array([]),
+                    "removable": .bool(true),
+                ]),
+            ]),
+        ]))
+
+        let drifted = try await client.admin.platformTypes.drift()
+
+        #expect(drifted.map(\.id) == ["acme.deal", "acme.lead"])
+        // The two fields a caller decides on: whether removing is allowed at
+        // all, and how much still depends on the row.
+        #expect(drifted[0].removable == false)
+        #expect(drifted[0].itemCount == 12)
+        #expect(drifted[0].childTypes == ["acme.deal.won"])
+        #expect(mock.calls[0].method == .get)
+        #expect(mock.calls[0].path == "/admin/platform-types/drift")
+    }
+
+    /// The realistic input: an identifier that came back from ``drift()``, and
+    /// type identifiers are dotted by convention, so this is what the route
+    /// is addressed with in practice.
+    @Test("platformTypes.remove posts to the identified row")
+    func platformTypeRemove() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(JSONValue.dictionary([
+            "removed": .bool(true),
+            "id": .string("acme.lead"),
+        ]))
+
+        try await client.admin.platformTypes.remove("acme.lead")
+
+        #expect(mock.calls[0].method == .post)
+        #expect(mock.calls[0].path == "/admin/platform-types/acme.lead/remove")
+        #expect(mock.calls[0].body == nil)
+    }
+
+    /// **A limitation, pinned rather than described.** The id is interpolated
+    /// into the path raw, so a character that means something in a URL is not
+    /// escaped and the request addresses a different route than the caller
+    /// asked for. The platform's TypeScript SDK percent-encodes this same
+    /// argument, so the two clients genuinely differ here.
+    ///
+    /// Left as it is rather than fixed at this call site. Every namespace in
+    /// this SDK interpolates ids raw — items, spaces, edges, connections —
+    /// so encoding one wrapper would leave the inconsistency and hide it;
+    /// the fix belongs in `buildURL`, which is where the whole surface would
+    /// gain it at once. In the meantime the exposure is small: an id reaches
+    /// this method from ``drift()`` rather than from a caller's imagination,
+    /// and platform type identifiers are dotted.
+    ///
+    /// This test asserts the wrong behavior on purpose. Closing the gap
+    /// fails it, which is the point — it should be updated then, not deleted.
+    @Test("an id carrying a path character is not escaped, and the request goes elsewhere")
+    func platformTypeRemoveDoesNotEscapeTheId() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(JSONValue.dictionary([
+            "removed": .bool(true),
+            "id": .string("acme/deal?x=1"),
+        ]))
+
+        try await client.admin.platformTypes.remove("acme/deal?x=1")
+
+        // Percent-encoded this would be one segment,
+        // `acme%2Fdeal%3Fx%3D1`. Raw, the slash opens a segment and the
+        // question mark opens a query string, so neither the path nor the
+        // verb the server sees is the one intended.
+        #expect(mock.calls[0].path == "/admin/platform-types/acme/deal?x=1/remove")
+    }
+
     // MARK: - Pure-local rejection
 
     @Test("Pure-local rejects every admin method")
@@ -164,6 +255,12 @@ struct AdminNamespaceTests {
         }
         await #expect(throws: LocalModeUnsupportedError.self) {
             _ = try await client.admin.accountDeletion.purgeNow()
+        }
+        await #expect(throws: LocalModeUnsupportedError.self) {
+            _ = try await client.admin.platformTypes.drift()
+        }
+        await #expect(throws: LocalModeUnsupportedError.self) {
+            try await client.admin.platformTypes.remove("acme.deal")
         }
     }
 }
