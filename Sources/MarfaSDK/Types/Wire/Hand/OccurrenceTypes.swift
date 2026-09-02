@@ -55,6 +55,51 @@ public struct OccurrenceSeriesError: Codable, Sendable, Hashable {
     }
 }
 
+/// What one `GET /occurrences` read cost, and how close it came to the
+/// ceilings that would have truncated it.
+///
+/// Reported on every successful read rather than only on a refused one,
+/// which is the point: a calendar approaching a limit is visible before a
+/// request starts failing, instead of after.
+public struct OccurrenceScan: Codable, Sendable, Hashable {
+    /// Event rows read across every pass. Most of this cannot be narrowed by
+    /// the window, so it grows with the calendar rather than with the range
+    /// asked for.
+    public let eventsRead: Int
+    /// Occurrences returned — the length of `data`.
+    public let occurrences: Int
+    /// The ceiling `occurrences` is refused at.
+    public let maxOccurrences: Int
+    /// Failures found in recurrence rules, counted in entries rather than
+    /// rows, so one bad row can account for two. A floor rather than a
+    /// certificate: it counts the ways of being broken this route
+    /// recognizes, across the event types this request actually read.
+    public let seriesErrors: Int
+    /// The longest ``OccurrencesResponse/seriesErrors`` list a response will
+    /// carry. Past it the list is capped and the read still succeeds.
+    public let maxSeriesErrors: Int
+    /// Rule iterations spent on expansions that produced no occurrence.
+    public let unproductiveIterations: Int
+    /// The ceiling expansion stops at. Iterations on series that do produce
+    /// occurrences are not counted against it, so a busy calendar cannot
+    /// cross it on volume alone.
+    public let maxUnproductiveIterations: Int
+    /// Series left unexpanded because the ceiling was reached first. Zero on
+    /// any read that finished.
+    public let seriesUnexpanded: Int
+
+    enum CodingKeys: String, CodingKey {
+        case eventsRead = "events_read"
+        case occurrences
+        case maxOccurrences = "max_occurrences"
+        case seriesErrors = "series_errors"
+        case maxSeriesErrors = "max_series_errors"
+        case unproductiveIterations = "unproductive_iterations"
+        case maxUnproductiveIterations = "max_unproductive_iterations"
+        case seriesUnexpanded = "series_unexpanded"
+    }
+}
+
 /// Envelope for `GET /occurrences`.
 public struct OccurrencesResponse: Codable, Sendable {
     public let data: [Occurrence]
@@ -64,10 +109,23 @@ public struct OccurrencesResponse: Codable, Sendable {
     /// Series the server could not expand. Absent when every series in the
     /// window expanded cleanly.
     public let seriesErrors: [OccurrenceSeriesError]?
+    /// What the read cost and how near the ceilings it came.
+    public let scan: OccurrenceScan
+    /// True when expansion stopped early, having spent its budget on series
+    /// that yielded nothing. `data` may be missing occurrences the
+    /// unexpanded series held, and `scan.seriesUnexpanded` counts them.
+    /// Narrowing the window does not help — the budget is spent walking
+    /// rules from their own start, before the window is reached.
+    public let expansionIncomplete: Bool?
+    /// True when ``seriesErrors`` lists fewer failures than the read found.
+    /// `scan.seriesErrors` carries the real total.
+    public let seriesErrorsTruncated: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case data, window
+        case data, window, scan
         case seriesErrors = "series_errors"
+        case expansionIncomplete = "expansion_incomplete"
+        case seriesErrorsTruncated = "series_errors_truncated"
     }
 }
 
