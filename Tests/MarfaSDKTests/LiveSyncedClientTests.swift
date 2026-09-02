@@ -35,6 +35,77 @@ private enum LiveServer {
 /// without a force unwrap.
 private struct LiveServerNotConfigured: Error {}
 
+/// Wraps a transport and counts the event streams opened through it.
+///
+/// The engine has no way to report how many times it has subscribed, and
+/// that count is the whole question below: a stream torn down and reopened
+/// on a timer looks, from every other angle, exactly like one that was held.
+private final class StreamCountingTransport: Transport, @unchecked Sendable {
+
+    private let inner: any Transport
+    private let lock = NSLock()
+    private var opens = 0
+
+    var streamOpens: Int { lock.withLock { opens } }
+
+    init(wrapping inner: any Transport) { self.inner = inner }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        try await inner.request(method: method, path: path, body: body, query: query)
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        try await inner.requestWithConflict(
+            method: method, path: path, body: body, query: query
+        )
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await inner.rawRequest(
+            method: method, path: path, body: body, contentType: contentType, query: query
+        )
+    }
+
+    func rawUpload(
+        method: HTTPMethod,
+        path: String,
+        body: Data,
+        contentType: String?,
+        query: [(String, String)]?,
+        onBytesSent: @Sendable @escaping (Int64, Int64) -> Void
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await inner.rawUpload(
+            method: method, path: path, body: body, contentType: contentType,
+            query: query, onBytesSent: onBytesSent
+        )
+    }
+
+    func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        lock.withLock { opens += 1 }
+        return inner.eventStream(path: path, query: query, lastEventID: lastEventID)
+    }
+}
+
 /// Tracks what a test created and what has to be shut down, so both happen on
 /// the failing path as well as the passing one.
 ///
@@ -574,5 +645,62 @@ struct LiveSyncedClientTests {
                 "dropped instead of resolved: \(dropped.map { "\($0.kind) \($0.errorCode)" })"
             )
         }
+    }
+    // MARK: - Stream lifetime
+
+    @Test("one event stream is held open well past the ordinary resource timeout")
+    func oneStreamIsHeldPastTheResourceTimeout() async throws {
+        let credentials = try credentials()
+        let path = storePath()
+        defer { removeStore(at: path) }
+
+        let configuration = ClientConfiguration(
+            url: credentials.url, apiKey: credentials.apiKey
+        )
+        let transport = StreamCountingTransport(
+            wrapping: URLSessionTransport(configuration: configuration)
+        )
+        let container = try MarfaModelContainer.make(path: path)
+        let store = await Task.detached { LocalStore(modelContainer: container) }.value
+        let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: ConnectionStateManager()
+        )
+
+        await engine.start()
+        do {
+            // The engine catches the store up before it subscribes, so the
+            // first stream appears only once the initial import has landed.
+            try await waitUntil(
+                timeout: .seconds(120),
+                description: "the engine opened its first event stream"
+            ) {
+                transport.streamOpens >= 1
+            }
+            #expect(transport.streamOpens == 1)
+
+            // Hold past the bound that used to end a healthy stream.
+            // `resourceTimeout` is exactly what a stream request no longer
+            // carries, so the wait is derived from it rather than written as
+            // a number, with a quarter of it again as margin.
+            let hold = configuration.resourceTimeout * 1.25
+            try await Task.sleep(for: .seconds(hold))
+
+            #expect(
+                transport.streamOpens == 1,
+                """
+                the stream was reopened \(transport.streamOpens - 1) time(s) \
+                while held for \(hold)s, past the \(configuration.resourceTimeout)s \
+                resource timeout an ordinary request carries
+                """
+            )
+        } catch {
+            await engine.stop()
+            throw error
+        }
+        await engine.stop()
     }
 }

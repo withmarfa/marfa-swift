@@ -7,6 +7,7 @@ final class URLSessionTransport: Transport {
     private let baseURL: URL
     private let tokenProvider: any TokenProvider
     private let session: URLSession
+    private let streamSession: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
     private let logger: MarfaLogger
@@ -18,18 +19,55 @@ final class URLSessionTransport: Transport {
     private let forcedRefreshLatch: ForcedRefreshLatch
 
     convenience init(configuration: ClientConfiguration) {
-        let urlConfig = URLSessionConfiguration.default
-        urlConfig.timeoutIntervalForRequest = configuration.timeoutInterval
-        urlConfig.timeoutIntervalForResource = configuration.resourceTimeout
-        self.init(configuration: configuration, session: URLSession(configuration: urlConfig))
+        self.init(configuration: configuration, protocolClasses: nil)
     }
 
-    /// Internal init for test harnesses — injects a pre-built URLSession
-    /// so tests can route through a `URLProtocol` stub.
-    init(configuration: ClientConfiguration, session: URLSession) {
+    /// Ordinary requests and event streams run on two `URLSession`s, and
+    /// that is forced rather than chosen. `timeoutIntervalForResource`
+    /// bounds a request's whole life and has no `URLRequest` counterpart, so
+    /// a single request cannot opt out of the session's value. An event
+    /// stream is a request with no natural end — it is meant to be held for
+    /// as long as the client runs — while an ordinary call wants exactly
+    /// that bound, so the two cannot share a session. Sharing one is what
+    /// made a healthy stream end every two minutes and reconnect, replaying
+    /// from its cursor, for no reason the server had given.
+    ///
+    /// The stream session leaves `timeoutIntervalForResource` at the
+    /// URLSession default and relies on `timeoutIntervalForRequest`, which
+    /// measures silence rather than elapsed time: the server's heartbeat
+    /// resets it on a live stream, and nothing resets it on a dead one.
+    ///
+    /// `protocolClasses` installs a `URLProtocol` stub; a test harness is the
+    /// only caller that passes one. Both configurations are built in here
+    /// rather than handed in, because the split depends on the two sessions
+    /// holding two distinct configuration objects: a seam that took a
+    /// caller's configuration would let one object reach both sessions and
+    /// quietly restore the shared-session behavior this exists to remove.
+    ///
+    /// A session carrying an injected protocol handler is ephemeral, so a
+    /// suite's stubbed responses never touch the process's shared URL cache
+    /// or cookie jar. The timeouts that distinguish the two sessions are
+    /// applied identically either way, so a stubbed test exercises the same
+    /// split the shipped client runs.
+    init(configuration: ClientConfiguration, protocolClasses: [AnyClass]?) {
+        func baseConfiguration() -> URLSessionConfiguration {
+            guard let protocolClasses else { return .default }
+            let stubbed = URLSessionConfiguration.ephemeral
+            stubbed.protocolClasses = protocolClasses
+            return stubbed
+        }
+
+        let requestConfig = baseConfiguration()
+        requestConfig.timeoutIntervalForRequest = configuration.timeoutInterval
+        requestConfig.timeoutIntervalForResource = configuration.resourceTimeout
+
+        let streamConfig = baseConfiguration()
+        streamConfig.timeoutIntervalForRequest = configuration.streamTimeout
+
         self.baseURL = configuration.url
         self.tokenProvider = configuration.tokenProvider
-        self.session = session
+        self.session = URLSession(configuration: requestConfig)
+        self.streamSession = URLSession(configuration: streamConfig)
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
         self.logger = MarfaLogger(category: "transport")
@@ -37,6 +75,17 @@ final class URLSessionTransport: Transport {
         self.retryPolicy = configuration.retryPolicy
         self.rateLimitState = RateLimitState()
         self.forcedRefreshLatch = ForcedRefreshLatch()
+    }
+
+    /// `URLSession` holds its owner alive until it is invalidated, so a
+    /// transport that simply goes out of scope leaks its sessions and their
+    /// connection pools for the life of the process. Two sessions now, and
+    /// the leak predates the second one. `finishTasksAndInvalidate` rather
+    /// than `invalidateAndCancel` so an upload or a stream still in flight
+    /// completes instead of being cut off by an unrelated deallocation.
+    deinit {
+        session.finishTasksAndInvalidate()
+        streamSession.finishTasksAndInvalidate()
     }
 
     // MARK: - Transport Protocol
@@ -508,7 +557,7 @@ final class URLSessionTransport: Transport {
                             statusCode: { $0.1.statusCode }
                         ) { attemptRequest in
                             let (bytes, response) =
-                                try await self.session.bytes(for: attemptRequest)
+                                try await self.streamSession.bytes(for: attemptRequest)
                             guard let httpResponse = response as? HTTPURLResponse
                             else {
                                 throw NetworkError(URLError(.badServerResponse))

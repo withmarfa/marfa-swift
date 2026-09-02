@@ -31,8 +31,28 @@ public struct ClientConfiguration: Sendable {
     /// Timeout for individual HTTP requests in seconds.
     public var timeoutInterval: TimeInterval
 
-    /// Timeout for resource loading (large uploads/downloads) in seconds.
+    /// Timeout bounding the whole life of an ordinary request, in seconds —
+    /// what a large upload or download is allowed to take.
+    ///
+    /// It does not govern the event stream. A stream is a request with no
+    /// natural end, so it carries no resource timeout at all and is bounded
+    /// by silence instead. See ``streamTimeout``.
     public var resourceTimeout: TimeInterval
+
+    /// Inactivity timeout for the event stream, in seconds.
+    ///
+    /// This measures silence rather than duration: every frame the server
+    /// sends resets it, and a stream that is delivering is never ended by
+    /// it. Since the stream carries no resource timeout, this is the only
+    /// thing that ends one the server has stopped feeding.
+    ///
+    /// The default is twice the server's thirty-second heartbeat, which is
+    /// also the bound the realtime guide publishes for any SSE client: a
+    /// stream is declared dead only once a whole ping interval has passed
+    /// unheard, so one late or dropped heartbeat does not tear it down.
+    /// Raise it for a deployment whose proxy batches SSE frames. A value
+    /// below the server's heartbeat interval tears down healthy streams.
+    public var streamTimeout: TimeInterval
 
     /// Optional CDN base URL for blob retrieval. Falls back to `url` if `nil`.
     public var cdnBaseURL: URL?
@@ -60,6 +80,7 @@ public struct ClientConfiguration: Sendable {
         conflictStrategy: ConflictStrategy = .auto,
         timeoutInterval: TimeInterval = 30,
         resourceTimeout: TimeInterval = 120,
+        streamTimeout: TimeInterval = 60,
         cdnBaseURL: URL? = nil,
         debugLogging: Bool = false,
         retryPolicy: RetryPolicy = .default,
@@ -71,6 +92,7 @@ public struct ClientConfiguration: Sendable {
         self.conflictStrategy = conflictStrategy
         self.timeoutInterval = timeoutInterval
         self.resourceTimeout = resourceTimeout
+        self.streamTimeout = streamTimeout
         self.cdnBaseURL = cdnBaseURL
         self.debugLogging = debugLogging
         self.retryPolicy = retryPolicy
@@ -87,6 +109,7 @@ public struct ClientConfiguration: Sendable {
         conflictStrategy: ConflictStrategy = .auto,
         timeoutInterval: TimeInterval = 30,
         resourceTimeout: TimeInterval = 120,
+        streamTimeout: TimeInterval = 60,
         cdnBaseURL: URL? = nil,
         debugLogging: Bool = false,
         retryPolicy: RetryPolicy = .default,
@@ -98,6 +121,7 @@ public struct ClientConfiguration: Sendable {
         self.conflictStrategy = conflictStrategy
         self.timeoutInterval = timeoutInterval
         self.resourceTimeout = resourceTimeout
+        self.streamTimeout = streamTimeout
         self.cdnBaseURL = cdnBaseURL
         self.debugLogging = debugLogging
         self.retryPolicy = retryPolicy

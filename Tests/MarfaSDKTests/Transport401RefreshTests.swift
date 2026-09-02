@@ -85,9 +85,6 @@ private actor RotatingTokenProvider: TokenProvider {
 }
 
 private func makeStubbedTransport(provider: any TokenProvider) -> URLSessionTransport {
-    let urlConfig = URLSessionConfiguration.ephemeral
-    urlConfig.protocolClasses = [RefreshStubURLProtocol.self]
-    let session = URLSession(configuration: urlConfig)
     // The 401-refresh-once mechanism shares the attempt counter with the
     // retry loop, so the policy needs at least two attempts available
     // for the refresh to consume one. Match the SDK's default shape.
@@ -96,7 +93,9 @@ private func makeStubbedTransport(provider: any TokenProvider) -> URLSessionTran
         tokenProvider: provider,
         retryPolicy: RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, jitter: 0)
     )
-    return URLSessionTransport(configuration: clientConfig, session: session)
+    return URLSessionTransport(
+        configuration: clientConfig, protocolClasses: [RefreshStubURLProtocol.self]
+    )
 }
 
 @Suite("Transport 401 refresh-once behavior", .serialized)

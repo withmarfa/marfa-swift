@@ -53,15 +53,14 @@ final class ErrorAssertionsStubURLProtocol: URLProtocol, @unchecked Sendable {
 }
 
 private func makeStubbedTransport() -> URLSessionTransport {
-    let urlConfig = URLSessionConfiguration.ephemeral
-    urlConfig.protocolClasses = [ErrorAssertionsStubURLProtocol.self]
-    let session = URLSession(configuration: urlConfig)
     let config = ClientConfiguration(
         url: URL(string: "http://test")!,
         apiKey: "k",
         retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, jitter: 0)
     )
-    return URLSessionTransport(configuration: config, session: session)
+    return URLSessionTransport(
+        configuration: config, protocolClasses: [ErrorAssertionsStubURLProtocol.self]
+    )
 }
 
 @Suite("Typed error projection", .serialized)
