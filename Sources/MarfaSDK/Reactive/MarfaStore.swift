@@ -249,15 +249,21 @@ public final class MarfaStore {
     /// Creates a live query over the pending-mutation queue.
     ///
     /// Surfaces every queued mutation with its projected
-    /// ``PendingMutationStatus`` — `.pending`, `.inFlight`, or
-    /// `.retrying(...)`. Apps use this to render richer offline UX
-    /// than ``SyncEngine/hasPendingMutations`` allows: per-item badges,
-    /// queue visualizations, retry banners.
+    /// ``PendingMutationStatus`` — `.pending`, `.inFlight`, `.retrying(...)`,
+    /// or `.blocked(...)`. Apps use this to render richer offline UX than
+    /// ``SyncEngine/hasPendingMutations`` allows: per-item badges, queue
+    /// visualizations, retry banners.
+    ///
+    /// `.blocked` is the one worth building for. The others describe a queue
+    /// doing its job, which a boolean already covers; a blocked row is one the
+    /// engine has stopped retrying, and this is the only way to find out which
+    /// row it is and what it needs.
     ///
     /// Updates whenever any mutation is enqueued, transitions to
-    /// `.inFlight`, records a transient failure, or is removed after
-    /// successful replay. Shares the same `ModelContext.didSave`
-    /// observation and 50 ms debounce as every other reactive query.
+    /// `.inFlight`, records a transient failure, is blocked, is released by
+    /// ``SyncEngine/retry(id:)``, or is removed after successful replay. Shares
+    /// the same `ModelContext.didSave` observation and 50 ms debounce as every
+    /// other reactive query.
     public func queryPendingMutations() -> PendingMutationsQuery {
         PendingMutationsQuery(container: container)
     }
