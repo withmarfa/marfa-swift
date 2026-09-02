@@ -751,3 +751,168 @@ actor EdgeMintingTransport: Transport {
 
     private func pendingEchoes() -> [Edge] { echoes }
 }
+
+/// Envelope for the single-item shapes this file's doubles emit — the
+/// `item.created` event payload the bulk route publishes when asked to.
+private struct ItemEnvelope: Codable {
+    let item: Item
+}
+
+/// The bulk-item body as it arrives on the wire, so a double can answer the
+/// request it was actually sent. `id` is optional because the whole question
+/// a test puts to this transport is whether it was there.
+private struct SentBulkItem: Decodable {
+    let id: String?
+    let type: String
+}
+
+private struct SentBulkItems: Decodable {
+    let items: [SentBulkItem]
+    let emitEvents: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case emitEvents = "emit_events"
+    }
+}
+
+/// A server that keeps the item ids it is given, and mints one where it is
+/// not.
+///
+/// The item counterpart to ``EdgeMintingTransport``, and it exists for the
+/// same reason: `MockTransport` answers with whatever the test enqueued, which
+/// leaves the id on the wire and the id in the answer independent of each
+/// other — and the two diverging is the entire defect, so a test built on
+/// canned answers passes whether or not the request carried an id. This double
+/// derives its answer from the request the way the route does.
+///
+/// `POST /items/bulk` echoes only when the call set `emit_events`, as the
+/// route does: it defaults off so a bulk page does not fan out per-item
+/// webhooks. Echoes are delivered when the stream opens rather than
+/// concurrently, which is the real order — coming online drains the queue
+/// before it subscribes.
+actor ItemMintingTransport: Transport {
+
+    /// Stamped onto every answer. The local store mints neither, so either
+    /// one appearing in a row proves the row came from the server's copy.
+    static let spaceId = "space-1"
+    static let stampedAt = "2026-09-02T00:00:00.000Z"
+
+    private var recordedCalls: [MockTransport.Call] = []
+    private var echoes: [Item] = []
+    private var mintCount = 0
+
+    struct UnsupportedRequest: Error, CustomStringConvertible {
+        let method: String
+        let path: String
+        var description: String {
+            "ItemMintingTransport: only the item bulk door is modeled, got \(method) \(path)"
+        }
+    }
+
+    var calls: [MockTransport.Call] { recordedCalls }
+
+    /// Sequential rather than random, so a failing run names the same id every
+    /// time and a diff of the message is readable.
+    private func mintId() -> String {
+        mintCount += 1
+        return String(format: "01b00000-0000-7000-8000-%012d", mintCount)
+    }
+
+    private func store(_ sent: SentBulkItem, echo: Bool) -> Item {
+        let item = Item(
+            createdAt: Self.stampedAt,
+            id: sent.id ?? mintId(),
+            properties: [:],
+            schemaVersion: 1,
+            source: "test",
+            spaceId: Self.spaceId,
+            state: .active,
+            tier: .feed,
+            timestamp: Self.stampedAt,
+            type: sent.type,
+            updatedAt: Self.stampedAt,
+            version: 1
+        )
+        if echo { echoes.append(item) }
+        return item
+    }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> T {
+        let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
+        recordedCalls.append(
+            MockTransport.Call(method: method, path: path, body: bodyData, query: query)
+        )
+        guard method == .post, path == "/items/bulk", let bodyData else {
+            throw UnsupportedRequest(method: method.rawValue, path: path)
+        }
+
+        let sent = try JSONDecoder().decode(SentBulkItems.self, from: bodyData)
+        let emit = sent.emitEvents ?? false
+        var entries: [BulkResultEntry] = []
+        for (index, raw) in sent.items.enumerated() {
+            let item = store(raw, echo: emit)
+            entries.append(
+                BulkResultEntry(
+                    index: index, outcome: .created, id: item.id,
+                    reason: nil, error: nil
+                )
+            )
+        }
+        let result = BulkResult(
+            counts: BulkResultCounts(
+                created: entries.count, updated: 0, skipped: 0, errored: 0
+            ),
+            results: entries,
+            blobsImported: nil
+        )
+        return try JSONDecoder().decode(T.self, from: try JSONEncoder().encode(result))
+    }
+
+    func requestWithConflict<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?
+    ) async throws -> ConflictResult<T> {
+        .success(try await request(method: method, path: path, body: body, query: query))
+    }
+
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        throw UnsupportedRequest(method: method.rawValue, path: path)
+    }
+
+    nonisolated func eventStream(
+        path: String,
+        query: [(String, String)]?,
+        lastEventID: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                for (index, item) in await self.pendingEchoes().enumerated() {
+                    guard
+                        let data = try? JSONEncoder().encode(ItemEnvelope(item: item)),
+                        let text = String(data: data, encoding: .utf8)
+                    else { continue }
+                    continuation.yield(
+                        SSEEvent(id: "evt-\(index + 1)", event: "item.created", data: text)
+                    )
+                }
+                continuation.finish()
+            }
+        }
+    }
+
+    private func pendingEchoes() -> [Item] { echoes }
+}

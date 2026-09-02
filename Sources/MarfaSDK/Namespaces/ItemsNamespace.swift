@@ -415,19 +415,39 @@ public struct ItemsNamespace: Sendable {
 
     /// Creates or upserts many items in one call (admin-only).
     ///
-    /// Pure-local mode iterates the items through ``LocalStore/createItem(_:)``
-    /// and returns best-effort per-item outcomes — no dedup on
-    /// `(source, source_id)` at the local layer because local stores
-    /// don't carry that uniqueness constraint. Synced mode enqueues
-    /// the full input as a single ``MutationKind/bulk`` record; replay
-    /// POSTs verbatim. Network-only mode round-trips the server
-    /// response straight through.
+    /// Dispatches per client mode:
+    /// - **Pure-local** — iterates the items through
+    ///   ``LocalStore/createItem(_:)`` and returns best-effort per-item
+    ///   outcomes. No dedup on `(source, source_id)` at the local layer,
+    ///   because local stores do not carry that uniqueness constraint.
+    /// - **Synced** — iterates locally for immediate feedback AND enqueues
+    ///   a single ``MutationKind/bulk`` record so replay POSTs the whole
+    ///   call when the client reconnects. Each queued entry carries the id
+    ///   its local row was written under, so the server stores the same rows
+    ///   rather than minting a second set beside them.
+    /// - **Network-only** — round-trips the server response straight
+    ///   through.
     public func bulk(_ input: BulkInput) async throws -> BulkResult {
         if let store = localStore {
             var created = 0
             var errored = 0
             var results: [BulkResultEntry] = []
             results.reserveCapacity(input.items.count)
+
+            // What the replay will send: the same page, with every entry named
+            // by the id its local row was written under. Replaying the caller's
+            // input verbatim let the server mint a second id for each entry the
+            // caller had not named, and the row that came back then landed
+            // beside the local one instead of on it.
+            //
+            // Seeded from the caller's own page and mutated in place, so it
+            // stays index-aligned with both `input.items` and the `results`
+            // the caller is handed, by construction. Building it by appending
+            // would put that alignment in the hands of every exit path in the
+            // loop below, the one where a local write fails included — and an
+            // entry missing there does not lose one row, it shifts every later
+            // entry onto the wrong result.
+            var stampedItems = input.items
 
             for (index, raw) in input.items.enumerated() {
                 var stamped = CreateItemInput(
@@ -448,6 +468,11 @@ public struct ItemsNamespace: Sendable {
                 if stamped.id == nil { stamped.id = UUIDv7.generateString() }
                 do {
                     let item = try await store.createItem(stamped)
+                    // The store's id names the local row, so it is the one the
+                    // replay has to send. An entry whose write failed keeps the
+                    // caller's own value untouched: there is no local row for a
+                    // server-minted id to duplicate.
+                    stampedItems[index].id = item.id
                     results.append(BulkResultEntry(
                         index: index, outcome: .created, id: item.id,
                         reason: nil, error: nil
@@ -465,7 +490,9 @@ public struct ItemsNamespace: Sendable {
                 }
             }
 
-            try await mutationQueue?.enqueueBulk(input)
+            var replayed = input
+            replayed.items = stampedItems
+            try await mutationQueue?.enqueueBulk(replayed)
 
             return BulkResult(
                 counts: BulkResultCounts(

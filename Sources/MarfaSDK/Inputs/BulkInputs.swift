@@ -10,6 +10,10 @@ import Foundation
 /// accepts verbatim. `CreateItemInput` carries the same shape for the same
 /// reason.
 public struct BulkItemInput: Codable, Sendable {
+    /// The caller's own id for this item. A synced client writes the local
+    /// row under it and sends it on replay, so it names the row on both
+    /// sides. Omitted, the id is minted — locally by the store on a synced
+    /// client, by the server otherwise.
     public var id: String?
     public var type: String
     public var properties: [String: JSONValue]?

@@ -625,6 +625,78 @@ struct SyncEngineReplayTests {
         await engine.stop()
     }
 
+    @Test("a bulk item create keeps the ids the device wrote its rows under")
+    func bulkItemReplayKeepsLocalIds() async throws {
+        let (store, queue) = try await SyncEngineTestKit.makeStoreAndQueue()
+        try await SyncEngineTestKit.markImported(queue)
+        let transport = ItemMintingTransport()
+        let connManager = ConnectionStateManager()
+        let engine = SyncEngine(
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        await engine.setReconnectDelaysForTesting(base: 0.01, max: 0.05)
+        let items = ItemsNamespace(
+            transport: transport,
+            defaultConflictStrategy: .auto,
+            localStore: store,
+            mutationQueue: queue
+        )
+
+        // One entry the caller names itself and one it leaves to the store.
+        // Both have local rows before anything reaches the network, and both
+        // have to reach the server under those ids. `emitEvents` is on because
+        // the echo is the half that duplicates the row, and the bulk route
+        // publishes nothing unless the caller asks.
+        let callerId = "01b06000-0000-7000-8000-00000000000a"
+        let result = try await items.bulk(
+            BulkInput(
+                items: [
+                    BulkItemInput(id: callerId, type: "core.note"),
+                    BulkItemInput(type: "core.note"),
+                ],
+                emitEvents: true
+            )
+        )
+        let named = try #require(result.results.first { $0.index == 0 })
+        let unnamed = try #require(result.results.first { $0.index == 1 })
+        #expect(named.id == callerId)
+        let mintedId = try #require(unnamed.id)
+
+        await engine.start()
+        await connManager.applyStateForTesting(.connecting)
+
+        try await SyncEngineTestKit.waitUntil(
+            timeout: .milliseconds(500),
+            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-2\""
+        ) {
+            (try? await queue.loadSyncState(key: "last_event_id")) == "evt-2"
+        }
+
+        // Two rows in, two rows out. Before the fix the replay sent the
+        // caller's input verbatim, so the entry the store had named was minted
+        // again server-side and the echo inserted a third and fourth row
+        // beside the two already there.
+        let local = try await store.fetchItems(filters: ListFilters(type: "core.note"))
+        #expect(
+            local.data.count == 2,
+            "local item ids: \(local.data.map(\.id))"
+        )
+        #expect(Set(local.data.map(\.id)) == Set([callerId, mintedId]))
+
+        let post = try #require(
+            await transport.calls.first { $0.method == .post && $0.path == "/items/bulk" }
+        )
+        let body = try JSONSerialization.jsonObject(
+            with: try #require(post.body)
+        ) as? [String: Any]
+        let sentIds = (body?["items"] as? [[String: Any]])?.map { $0["id"] as? String }
+        #expect(sentIds == [callerId, mintedId])
+        await engine.stop()
+    }
+
     @Test("the edge replay adopts the server's copy of the row")
     func edgeReplayAdoptsTheServerCopy() async throws {
         // No echo on this fixture, deliberately. With one, the event re-lands
