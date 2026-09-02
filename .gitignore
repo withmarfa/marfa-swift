@@ -12,3 +12,7 @@ Package.resolved
 .claude/plans/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+
+# SQLite sidecars beside a store fixture — derived state, never committed
+*.sqlite-wal
+*.sqlite-shm
