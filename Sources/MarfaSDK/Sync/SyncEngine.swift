@@ -1398,6 +1398,15 @@ public actor SyncEngine {
                     error: marfaError
                 ))
 
+                // A refused edge create leaves a local row nothing can ever
+                // reconcile, so it goes with the mutation. Every permanent
+                // refusal rather than only a conflict: what refused the
+                // create does not change the fact that the row can never
+                // reach the server.
+                if record.kind == .createEdge, let localId = record.localId {
+                    try? await localStore.deleteEdge(id: localId)
+                }
+
                 // Cascade: if a createItem was dropped, every downstream
                 // mutation keyed off its local id would 404 on replay. Drop
                 // them together and purge the ghost local row so the UI
@@ -1405,16 +1414,6 @@ public actor SyncEngine {
                 // call also persists each orphan as a
                 // ``DroppedMutationModel`` row (one save) — the engine
                 // emits the per-orphan event from the returned snapshot.
-                // A create that will never land leaves a local row nothing
-                // can ever reconcile. The item path purges its ghost below;
-                // an edge has no dependents to cascade to, so removing the
-                // row is the whole of it. Every permanent refusal, not only a
-                // conflict — what refused the create does not change the fact
-                // that the row cannot sync.
-                if record.kind == .createEdge, let localId = record.localId {
-                    try? await localStore.deleteEdge(id: localId)
-                }
-
                 if record.kind == .createItem, let localId = record.localId {
                     let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(
                         localId,
@@ -1423,6 +1422,14 @@ public actor SyncEngine {
                     )) ?? []
                     try? await localStore.purgeItem(id: localId)
                     for ghost in cascaded {
+                        // An orphaned edge create has a local row too, and it
+                        // now points at an item that has just been purged.
+                        // The direct path above never sees these: they are
+                        // dropped by the cascade rather than by a refusal of
+                        // their own.
+                        if ghost.kind == .createEdge, let ghostId = ghost.localId {
+                            try? await localStore.deleteEdge(id: ghostId)
+                        }
                         logger.log.error(
                             "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
                         )
@@ -1584,9 +1591,15 @@ public actor SyncEngine {
             // that write lands and the server echoes it — the same exposure
             // an inbound `item.updated` frame already carries, converging the
             // same way.
-            try? await localStore.upsertItem(response.item)
+            //
+            // Thrown rather than swallowed, as the edge path throws: a store
+            // that refuses the write has not adopted anything, and treating
+            // that as success would remove the mutation from the queue and
+            // leave the device holding the row it minted with nothing left to
+            // correct it. Throwing keeps the record queued for the next drain.
+            try await localStore.upsertItem(response.item)
             if let metadata = response.metadata {
-                try? await localStore.upsertMetadata(metadata)
+                try await localStore.upsertMetadata(metadata)
             }
             // Reconcile local-id → server-id in the local store and in any
             // dependent queued mutations. Under the current flow this branch

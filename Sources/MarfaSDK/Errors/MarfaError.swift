@@ -47,6 +47,16 @@ open class MarfaError: Error, @unchecked Sendable {
     /// registration). Transient: everything else — network failures, `5xx`,
     /// timeouts, `401` (credentials may be refreshed), `409` (resolvable via
     /// conflict strategy), `429` (rate-limited, caller should retry).
+    ///
+    /// This is context-free by design: it sees a status, not what the request
+    /// was trying to do. `409` is the case where that matters. On an update it
+    /// is the ordinary version conflict and belongs to the conflict strategy,
+    /// but on a *create* nothing can resolve it — a repeat of the caller's own
+    /// id is acknowledged by the server rather than refused, so a 409 that
+    /// does arrive names somebody else's row or a type that disagrees.
+    /// ``SyncEngine`` therefore drops a create meeting a 409 without consulting
+    /// this property. A caller reasoning about a queued create should do the
+    /// same rather than reading `isPermanent` as the whole rule.
     public var isPermanent: Bool {
         if self is SchemaVersionMismatchError { return true }
         switch status {
