@@ -1611,13 +1611,26 @@ public actor SyncEngine {
 
         case .createEdge:
             let p = try decoder.decode(CreateEdgePayload.self, from: data)
+            // The id the local store minted when the app made this edge. It
+            // lives in the record's own column rather than the payload —
+            // `enqueueCreateEdge` puts it there and the cascade logic already
+            // reads it as the edge's id. Sending it is what keeps the
+            // server's row under the id this device has already written, so
+            // the `edge.created` echo that follows updates that row instead
+            // of inserting a second one beside it.
             let body = CreateEdgeBody(
+                id: record.localId,
                 sourceId: p.source, targetId: p.target,
                 edgeType: p.edgeType, properties: p.properties
             )
-            let _: EdgeResponse = try await transport.request(
+            let response: EdgeResponse = try await transport.request(
                 method: .post, path: "/edges", body: body, query: nil
             )
+            // Adopt the server's copy, which carries the space and the
+            // timestamps the local mint could not know. A repeat the server
+            // acknowledges answers with the row it already holds and lands
+            // here the same way.
+            try await localStore.upsertEdge(response.edge)
 
         case .updateEdge:
             let p = try decoder.decode(UpdateEdgePayload.self, from: data)

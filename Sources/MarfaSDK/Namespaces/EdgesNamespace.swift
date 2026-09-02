@@ -41,7 +41,10 @@ public struct EdgesNamespace: Sendable {
             )
             return edge
         }
+        // Network-only: nothing was written locally, so there is no id to
+        // keep and the server mints one.
         let body = CreateEdgeBody(
+            id: nil,
             sourceId: source,
             targetId: target,
             edgeType: edgeType,
@@ -377,13 +380,20 @@ public struct EdgeTypesAPI: Sendable {
 // MARK: - Bodies / Envelopes
 
 /// Request body for `POST /edges`.
+///
+/// `id` names the edge the caller has already written locally. The route
+/// stores it under that id and echoes it back, so the row a synced device
+/// holds is the row the server holds. A client with no local row to name
+/// omits it and the server mints one instead.
 struct CreateEdgeBody: Codable, Sendable {
+    let id: String?
     let sourceId: String
     let targetId: String
     let edgeType: String
     let properties: [String: JSONValue]?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case sourceId = "source_id"
         case targetId = "target_id"
         case edgeType = "edge_type"
