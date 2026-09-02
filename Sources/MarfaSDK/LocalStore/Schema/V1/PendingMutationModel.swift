@@ -115,9 +115,17 @@ extension PendingMutationModel {
 ///   "stuck" record — crashed or cancelled replays recover the next
 ///   time the engine starts draining.
 ///
+/// - `blocked` — the last failure was one no retry can clear until the app
+///   changes something. The drain skips the row and the cycle does not report
+///   failure for it; ``PendingMutationBlockReason`` says why, and
+///   ``SyncEngine/retry(id:)`` puts it back in the queue. A `resolverMissing`
+///   block is the exception that clears itself, because the next drain that
+///   finds a registered resolver replays it.
+///
 /// Round-tripped through `stateRaw` — keep new cases additive so
 /// CloudKit-mirrored stores from older clients don't fail to decode.
 public enum PendingMutationState: String, Codable, Sendable, CaseIterable {
     case pending
     case inFlight
+    case blocked
 }

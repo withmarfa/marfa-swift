@@ -309,13 +309,15 @@ public final class MarfaClient: Sendable {
         url: URL,
         apiKey: String,
         storePath: String,
-        connectionManager: ConnectionStateManager = ConnectionStateManager()
+        connectionManager: ConnectionStateManager = ConnectionStateManager(),
+        maxReplayAttempts: Int = 5
     ) async throws -> MarfaClient {
         let config = ClientConfiguration(url: url, apiKey: apiKey)
         return try await synced(
             configuration: config,
             storePath: storePath,
-            connectionManager: connectionManager
+            connectionManager: connectionManager,
+            maxReplayAttempts: maxReplayAttempts
         )
     }
 
@@ -336,24 +338,31 @@ public final class MarfaClient: Sendable {
     ///     for tests.
     ///   - connectionManager: Optional pre-built manager; the default
     ///     creates one.
+    ///   - maxReplayAttempts: How many times a queued write is retried after a
+    ///     refusal that is neither permanent nor self-evidently unresolvable
+    ///     before it is blocked. Network-class failures are exempt and retry
+    ///     without bound. Must be at least 1.
     public static func synced(
         url: URL,
         tokenProvider: any TokenProvider,
         storePath: String,
-        connectionManager: ConnectionStateManager = ConnectionStateManager()
+        connectionManager: ConnectionStateManager = ConnectionStateManager(),
+        maxReplayAttempts: Int = 5
     ) async throws -> MarfaClient {
         let config = ClientConfiguration(url: url, tokenProvider: tokenProvider)
         return try await synced(
             configuration: config,
             storePath: storePath,
-            connectionManager: connectionManager
+            connectionManager: connectionManager,
+            maxReplayAttempts: maxReplayAttempts
         )
     }
 
     private static func synced(
         configuration config: ClientConfiguration,
         storePath: String,
-        connectionManager: ConnectionStateManager
+        connectionManager: ConnectionStateManager,
+        maxReplayAttempts: Int
     ) async throws -> MarfaClient {
         let transport = URLSessionTransport(configuration: config)
         let container = try MarfaModelContainer.make(path: storePath)
@@ -368,7 +377,8 @@ public final class MarfaClient: Sendable {
             localStore: store,
             mutationQueue: queue,
             connectionManager: connectionManager,
-            conflictResolvers: resolvers
+            conflictResolvers: resolvers,
+            maxReplayAttempts: maxReplayAttempts
         )
         return MarfaClient(
             configuration: config,

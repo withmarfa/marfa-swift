@@ -284,8 +284,8 @@ struct SyncEngineCreateConflictTests {
 
     // MARK: - The update path is untouched
 
-    @Test("a conflict on an update is not a create's conflict: the mutation stays queued")
-    func updateConflictIsStillTransient() async throws {
+    @Test("a conflict on an update is not a create's conflict: nothing is dead-lettered")
+    func updateConflictIsNotDeadLettered() async throws {
         let (store, queue, transport, connManager, engine) =
             try await SyncEngineTestKit.makeFixture()
 
@@ -313,10 +313,10 @@ struct SyncEngineCreateConflictTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        // Still queued and not dead-lettered. The create rule is keyed on the
-        // pair — this status, on a create — so an update meeting the same
-        // status is untouched by it.
-        #expect(try await queue.isEmpty == false)
+        // The create rule is keyed on the pair — this status, on a create — so
+        // an update meeting the same status is untouched by it and reaches no
+        // dead-letter. What happens to it instead is
+        // `SyncEngineBlockedMutationTests`; this asserts only the boundary.
         #expect(try await queue.fetchDropped().isEmpty)
     }
 }

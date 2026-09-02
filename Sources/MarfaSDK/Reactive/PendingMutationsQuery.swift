@@ -30,6 +30,25 @@ public enum PendingMutationStatus: Sendable, Equatable {
     /// drain cycle. `attemptCount` reports how many attempts have
     /// failed so far; `lastError` is the most recent error message.
     case retrying(attemptCount: Int, lastError: String)
+
+    /// The replay stopped. The last failure was one no retry can clear
+    /// until the app changes something, so the drain skips this row and
+    /// the cycle no longer reports failure on its account.
+    ///
+    /// The write is still queued — this is not
+    /// ``SyncEvent/mutationDropped``. ``PendingMutationBlockReason`` says
+    /// what has to change, and ``SyncEngine/retry(id:)`` returns the row to
+    /// the queue once it has. A
+    /// ``PendingMutationBlockReason/resolverMissing`` block needs no call:
+    /// the next drain that finds a registered resolver replays it.
+    ///
+    /// This is the status to render differently. `retrying` says wait;
+    /// `blocked` says the waiting will not end on its own.
+    case blocked(
+        reason: PendingMutationBlockReason,
+        attemptCount: Int,
+        lastError: String
+    )
 }
 
 // MARK: - PendingMutationSummary
@@ -85,6 +104,8 @@ public struct PendingMutationSummary: Sendable, Identifiable, Equatable {
     /// - `state == .pending && attemptCount > 0` → `.retrying(...)`
     ///   (carries the most recent `lastError`; defaults to an empty
     ///   string if the error message was never persisted)
+    /// - `state == .blocked` → `.blocked(...)` with the reason the engine
+    ///   recorded when it stopped retrying
     public static func make(from record: PendingMutationRecord) -> PendingMutationSummary {
         let status: PendingMutationStatus
         switch record.state {
@@ -99,6 +120,14 @@ public struct PendingMutationSummary: Sendable, Identifiable, Equatable {
             } else {
                 status = .pending
             }
+        case .blocked:
+            // A row in this state always carries a reason: `toRecord()`
+            // supplies one whether or not the stored value could be read.
+            status = .blocked(
+                reason: record.blockedReason ?? .retriesExhausted,
+                attemptCount: record.attemptCount,
+                lastError: record.lastError ?? ""
+            )
         }
         return PendingMutationSummary(
             id: record.id,

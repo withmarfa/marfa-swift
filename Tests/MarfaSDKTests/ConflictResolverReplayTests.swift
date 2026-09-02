@@ -142,10 +142,11 @@ struct ConflictResolverReplayTests {
         // resolved under a different one.
         #expect(transport.calls.isEmpty)
 
-        // The edit is still queued, and the reason is on the record. It is a
-        // transient failure by construction — registering a resolver makes the
-        // next drain carry it, and dropping it would lose a user's edit for a
-        // reason that has nothing to do with the edit.
+        // The edit is still queued, and the reason is on the record. The row is
+        // blocked rather than retried: a second attempt could not differ while
+        // no resolver is registered. Dropping it would lose a user's edit for a
+        // reason that has nothing to do with the edit, so it waits instead —
+        // and registering a resolver is the whole remedy.
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
         let record = try #require(remaining.first)
