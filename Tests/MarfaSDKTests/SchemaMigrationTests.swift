@@ -1,23 +1,45 @@
 import Testing
 import Foundation
 import CoreData
+import SQLite3
 @testable import MarfaSDK
 @_spi(MarfaSDKTestSupport) import MarfaSDK
 @testable import MarfaSDKTestSupport
 import SwiftData
 
-/// The migration plan, checked against stores built at the shapes it claims to
-/// migrate from.
+/// The migration plan, checked against a store a shipped build actually wrote.
 ///
-/// A store seeded through the live classes would already have the current
-/// shape, and reopening it would compare the schema against itself. Every
-/// store here is seeded through the frozen copies in ``FrozenV2``, which is
-/// what makes the comparison real — and is also why those copies are pinned by
-/// a test of their own below.
+/// **Nothing here instantiates a frozen model class, and that is a hard
+/// constraint rather than a preference.** Two `@Model` classes can share an
+/// entity name — that is what makes a versioned schema work at all — but
+/// SwiftData keys part of its runtime state by that name, so creating an object
+/// of the frozen class in a process that also creates objects of the live one
+/// leaves the two able to be confused. What it looks like is an
+/// `NSUnknownKeyException` naming the column the newest version added, thrown
+/// from an insert that never mentions it, in whichever test happens to run
+/// next. It needs the whole suite's ordering to appear and is invisible when
+/// this file runs on its own, which is why it is written down here rather than
+/// left to be rediscovered.
 ///
-/// File-on-disk shape (not in-memory) — the migration plan only fires on
-/// persistent stores. Each test runs in its own temp directory so the suite
-/// stays hermetic and can run in parallel with the rest.
+/// None of that reaches an app. A device only ever instantiates the live
+/// classes; the frozen ones exist as entity *descriptions* inside SwiftData's
+/// own migration machinery, which is a different thing and is exercised end to
+/// end by `ShippedStoreFixtureTests` against a real V2 store.
+///
+/// So the old store here is the committed fixture rather than one seeded
+/// through frozen classes, and what it holds afterwards is read with SQLite
+/// rather than fetched. Reading the columns is the stronger assertion anyway:
+/// `spaceId` coming back `nil` says as much about a fetch that returned nothing
+/// as about the migration, while the column being present in `ZMARFAITEMMODEL`
+/// says one thing only. The round trip through the live classes is covered on a
+/// fresh store in `ItemLayeringRoundTripTests`, where no frozen version exists.
+///
+/// **V1 is not exercised, and cannot be.** `MarfaSchemaV1` as this build
+/// compiles it describes no store that ever shipped: 7.0.0 dropped a column
+/// from the item model in place without moving the version identifier, so a
+/// store written while V1 was current hashes differently from V1 as it stands.
+/// The only way to produce one now is to seed it through the frozen classes,
+/// which is the thing above. The stage is kept for lineage.
 @Suite("SchemaMigration")
 struct SchemaMigrationTests {
 
@@ -47,130 +69,49 @@ struct SchemaMigrationTests {
         try? FileManager.default.removeItem(at: root)
     }
 
-    /// Builds a container at `path` fixed to one historical version, with no
-    /// migration plan. Used to seed a store of a known age before the current
-    /// schema reopens it.
-    private func makeContainer(
-        at path: String,
-        for version: any VersionedSchema.Type
-    ) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: version)
-        return try MarfaModelContainer.withCreationLock {
-            try ModelContainer(
-                for: schema,
-                configurations: ModelConfiguration(
-                    "marfa",
-                    schema: schema,
-                    url: URL(fileURLWithPath: path),
-                    allowsSave: true,
-                    cloudKitDatabase: .none
-                )
-            )
-        }
-    }
-
-    /// One queued write and one cursor row, through the frozen classes — the
-    /// two things a migration that reshapes tables would be caught losing.
-    private func seedQueueAndCursor(into context: ModelContext, localId: String) throws {
-        let pending = FrozenV2.PendingMutationModel()
-        pending.id = UUID().uuidString
-        pending.kindRaw = MutationKind.deleteItem.rawValue
-        pending.payloadJson = #"{"id":"\#(localId)"}"#
-        pending.localId = localId
-        pending.createdAt = Date().ISO8601Format(.init(includingFractionalSeconds: true))
-        pending.attemptCount = 0
-        pending.stateRaw = PendingMutationState.pending.rawValue
-        context.insert(pending)
-
-        let cursor = FrozenV2.SyncStateModel()
-        cursor.key = "last_event_id"
-        cursor.value = "evt-42"
-        context.insert(cursor)
-
-        try context.save()
-    }
-
-    @Test("a V1 store migrates forward and its queued write and cursor survive")
-    func v1StoreMigratesForward() async throws {
+    /// The committed V2 store, at the path the test may write to. Opening a
+    /// store migrates it in place, so the checked-in copy is never the one
+    /// under test.
+    private func stagedV2Store() throws -> String {
+        let source = try #require(
+            Bundle.module.url(
+                forResource: "store",
+                withExtension: "sqlite",
+                subdirectory: "Fixtures/ShippedStore"
+            ),
+            "the store fixture is not in the test bundle"
+        )
         let path = makeTempStorePath()
-        defer { removeStoreDirectory(of: path) }
-
-        do {
-            let v1 = try makeContainer(at: path, for: MarfaSchemaV1.self)
-            try seedQueueAndCursor(into: ModelContext(v1), localId: "server-x")
-        }
-
-        let context = ModelContext(try MarfaModelContainer.make(path: path))
-
-        let pending = try context.fetch(FetchDescriptor<PendingMutationModel>())
-        #expect(pending.count == 1)
-        #expect(pending.first?.localId == "server-x")
-        #expect(pending.first?.kind == .deleteItem)
-
-        let state = try context.fetch(FetchDescriptor<SyncStateModel>())
-        #expect(state.count == 1)
-        #expect(state.first?.key == "last_event_id")
-        #expect(state.first?.value == "evt-42")
-
-        // Both tables V1 never had, queryable and empty. A lightweight stage
-        // that failed to add one would fail here rather than at the first
-        // write on a device.
-        #expect(try context.fetch(FetchDescriptor<DroppedMutationModel>()).isEmpty)
-        #expect(try context.fetch(FetchDescriptor<CachedTypeModel>()).isEmpty)
+        try FileManager.default.copyItem(at: source, to: URL(fileURLWithPath: path))
+        return path
     }
 
     @Test("a V2 store migrates to V3 and gains the item's space id and the cached-types table")
-    func v2StoreMigratesToV3() async throws {
-        let path = makeTempStorePath()
+    func v2StoreMigratesToV3() throws {
+        let path = try stagedV2Store()
         defer { removeStoreDirectory(of: path) }
+        let store = URL(fileURLWithPath: path)
 
-        let itemId = "019eb100-0000-7000-8000-0000000000aa"
-        do {
-            let v2 = try makeContainer(at: path, for: MarfaSchemaV2.self)
-            let context = ModelContext(v2)
-            try seedQueueAndCursor(into: context, localId: itemId)
+        // Neither is there yet, or what follows would pass against a store the
+        // migration never touched.
+        #expect(!(try columns(of: "ZMARFAITEMMODEL", in: store).contains("ZSPACEID")))
+        #expect(!(try tables(in: store).contains("ZCACHEDTYPEMODEL")))
+        #expect(try QuarantinedStoreReader.read(storeAt: store).rows("pendingMutations").count == 1)
 
-            // A V2 item has no space column at all, so what the migration has
-            // to produce is a row that reads `nil` rather than one that fails
-            // to read.
-            let item = FrozenV2.MarfaItemModel()
-            item.id = itemId
-            item.type = "core.note"
-            item.source = "fixture"
-            context.insert(item)
-            try context.save()
-        }
+        do { _ = try MarfaModelContainer.make(path: path) }
 
-        // Scoped, one container at a time. Two live containers on one store
-        // file in one process is the arrangement that produces SwiftData's
-        // "failed to cast model" crash, and it is easy to write by accident
-        // when a test wants to reopen something.
-        do {
-            let migrated = try MarfaModelContainer.make(path: path)
-            let context = ModelContext(migrated)
+        #expect(try columns(of: "ZMARFAITEMMODEL", in: store).contains("ZSPACEID"))
+        #expect(try tables(in: store).contains("ZCACHEDTYPEMODEL"))
 
-            let items = try context.fetch(FetchDescriptor<MarfaItemModel>())
-            #expect(items.count == 1)
-            #expect(items.first?.id == itemId)
-            #expect(items.first?.spaceId == nil)
-            #expect(try context.fetch(FetchDescriptor<PendingMutationModel>()).count == 1)
-
-            // The new column takes a value, and the new table takes a row.
-            items.first?.spaceId = "space-1"
-            let cached = CachedTypeModel()
-            cached.id = "myapp.thing"
-            cached.parent = "core.note"
-            cached.definitionJson = #"{"id":"myapp.thing"}"#
-            cached.cachedAt = Date().ISO8601Format(.init(includingFractionalSeconds: true))
-            context.insert(cached)
-            try context.save()
-        }
-
-        // Reopened, so both are read back off disk rather than out of a
-        // context that still remembers writing them.
-        let reopened = ModelContext(try MarfaModelContainer.make(path: path))
-        #expect(try reopened.fetch(FetchDescriptor<MarfaItemModel>()).first?.spaceId == "space-1")
-        #expect(try reopened.fetch(FetchDescriptor<CachedTypeModel>()).first?.id == "myapp.thing")
+        // The rows the migration had to carry across. `ShippedStoreFixtureTests`
+        // checks every row in the store through the model layer; what is
+        // checked here is the ones that exist nowhere but this device.
+        let salvage = try QuarantinedStoreReader.read(storeAt: store)
+        #expect(salvage.rows("pendingMutations").count == 1)
+        #expect(salvage.rows("droppedMutations").count == 1)
+        #expect(salvage.rows("pendingBlobs").count == 1)
+        #expect(salvage.rows("syncState").first?["value"]?.stringValue == "evt-42")
+        #expect(try rowCount(of: "ZMARFAITEMMODEL", in: store) == 1)
     }
 
     @Test("each schema version lists the models that version's stores actually hold")
@@ -195,7 +136,9 @@ struct SchemaMigrationTests {
     /// have caught it.
     ///
     /// So the copies are compared against a store a shipped V2 build actually
-    /// wrote, by the hashes that store recorded for itself.
+    /// wrote, by the hashes that store recorded for itself. Building a
+    /// container over the frozen version creates entity descriptions and no
+    /// objects, which is the distinction the suite docblock turns on.
     @Test("the frozen V2 models still hash the way a shipped V2 store does")
     func frozenModelsMatchAShippedV2Store() throws {
         let fixture = try #require(
@@ -212,7 +155,21 @@ struct SchemaMigrationTests {
         defer { removeStoreDirectory(of: path) }
         // Scoped so the container is released and the store checkpointed
         // before its metadata is read.
-        do { _ = try makeContainer(at: path, for: MarfaSchemaV2.self) }
+        do {
+            let schema = Schema(versionedSchema: MarfaSchemaV2.self)
+            _ = try MarfaModelContainer.withCreationLock {
+                try ModelContainer(
+                    for: schema,
+                    configurations: ModelConfiguration(
+                        "marfa",
+                        schema: schema,
+                        url: URL(fileURLWithPath: path),
+                        allowsSave: true,
+                        cloudKitDatabase: .none
+                    )
+                )
+            }
+        }
         let frozen = try recordedHashes(at: URL(fileURLWithPath: path))
 
         // Entity names first. If a rename reached the name, every hash differs
@@ -226,6 +183,55 @@ struct SchemaMigrationTests {
         for name in Set(shipped.keys).sorted() {
             #expect(frozen[name] == shipped[name], "\(name) no longer hashes the way a V2 store holds it")
         }
+    }
+
+    // MARK: - Reading a store without a model
+
+    /// Opens the store read-write without `SQLITE_OPEN_CREATE`, so a path that
+    /// holds no database fails rather than becoming an empty one. Read-write
+    /// rather than read-only because a WAL store needs its shared-memory index
+    /// to be readable at all.
+    private func withDatabase<T>(at url: URL, _ body: (OpaquePointer) throws -> T) throws -> T {
+        var handle: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &handle, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK,
+              let database = handle
+        else {
+            let message = handle.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
+            sqlite3_close(handle)
+            throw StoreReadFailure(message: message)
+        }
+        defer { sqlite3_close(database) }
+        return try body(database)
+    }
+
+    private struct StoreReadFailure: Error { let message: String }
+
+    private func query(_ sql: String, in url: URL) throws -> [String] {
+        try withDatabase(at: url) { database in
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
+                throw StoreReadFailure(message: String(cString: sqlite3_errmsg(database)))
+            }
+            defer { sqlite3_finalize(statement) }
+            var out: [String] = []
+            while sqlite3_step(statement) == SQLITE_ROW {
+                guard let text = sqlite3_column_text(statement, 0) else { continue }
+                out.append(String(cString: text))
+            }
+            return out
+        }
+    }
+
+    private func tables(in url: URL) throws -> Set<String> {
+        Set(try query("SELECT name FROM sqlite_master WHERE type = 'table'", in: url))
+    }
+
+    private func columns(of table: String, in url: URL) throws -> Set<String> {
+        Set(try query("SELECT name FROM pragma_table_info('\(table)')", in: url))
+    }
+
+    private func rowCount(of table: String, in url: URL) throws -> Int {
+        Int(try query("SELECT COUNT(*) FROM \(table)", in: url).first ?? "0") ?? 0
     }
 
     /// Reads the version hashes a store recorded, without opening it under a
