@@ -49,6 +49,24 @@ public struct StoreRecovery: Sendable, Hashable {
     /// ordinary path.
     public let sidecarError: String?
 
+    /// The sidecar keys whose rows ran out before the table did — the salvage
+    /// read part of a table and could not read the rest. Empty on the ordinary
+    /// path, and empty when the salvage failed outright, which
+    /// ``sidecarError`` reports instead.
+    ///
+    /// **While this is non-empty the counts below are floors rather than
+    /// totals**, and the sidecar holds the same subset. A store is set aside
+    /// for a shape this build has no model for, which says nothing about the
+    /// bytes; but the same path takes a store that is genuinely damaged, and
+    /// there the rows stop mid-table. Reporting what was reached as though it
+    /// were the queue is the one outcome worse than reporting nothing: an app
+    /// showing "3 unsent changes" over 300 has told a person their work is
+    /// accounted for.
+    ///
+    /// Keys are the sidecar's own: `pendingMutations`, `droppedMutations`,
+    /// `syncState`, `pendingBlobs`.
+    public let truncatedTables: [String]
+
     /// Queued writes recovered into the sidecar.
     public let pendingMutationCount: Int
 
@@ -69,6 +87,7 @@ public struct StoreRecovery: Sendable, Hashable {
         quarantineDirectory: URL,
         sidecar: URL?,
         sidecarError: String?,
+        truncatedTables: [String],
         pendingMutationCount: Int,
         droppedMutationCount: Int,
         pendingBlobCount: Int,
@@ -79,6 +98,7 @@ public struct StoreRecovery: Sendable, Hashable {
         self.quarantineDirectory = quarantineDirectory
         self.sidecar = sidecar
         self.sidecarError = sidecarError
+        self.truncatedTables = truncatedTables
         self.pendingMutationCount = pendingMutationCount
         self.droppedMutationCount = droppedMutationCount
         self.pendingBlobCount = pendingBlobCount

@@ -60,6 +60,10 @@ enum QuarantinedStoreReader {
         /// "no such table".
         let tables: [String: [[String: JSONValue]]]
 
+        /// Keys whose read stopped before the table ended. See
+        /// ``StoreRecovery/truncatedTables``.
+        var truncated: [String] = []
+
         func rows(_ key: String) -> [[String: JSONValue]] { tables[key] ?? [] }
     }
 
@@ -99,15 +103,18 @@ enum QuarantinedStoreReader {
         defer { sqlite3_close(database) }
 
         var tables: [String: [[String: JSONValue]]] = [:]
+        var truncated: [String] = []
         for entry in salvaged {
             guard try tableExists(entry.table, in: database) else { continue }
-            tables[entry.sidecarKey] = try rows(
+            let read = try rows(
                 of: entry.table,
                 mappedBy: propertyNamesByColumn(entry.properties),
                 in: database
             )
+            tables[entry.sidecarKey] = read.rows
+            if read.truncated { truncated.append(entry.sidecarKey) }
         }
-        return Extraction(tables: tables)
+        return Extraction(tables: tables, truncated: truncated)
     }
 
     // MARK: - Internals
@@ -133,11 +140,21 @@ enum QuarantinedStoreReader {
         return sqlite3_step(statement) == SQLITE_ROW
     }
 
+    /// Every row the table will give up, and whether that was all of them.
+    ///
+    /// `sqlite3_step` answers "the table ended" and "this page is unreadable"
+    /// with the same shape — it simply stops returning `SQLITE_ROW` — so a
+    /// loop that only watches for rows cannot tell a complete read from a
+    /// partial one. The terminal status is the only thing that can, and the
+    /// rows already gathered are kept either way: a store is quarantined for
+    /// what its shape says rather than for its bytes, but the same path takes
+    /// a store that really is damaged, and part of its queue is worth more
+    /// than none of it.
     private static func rows(
         of table: String,
         mappedBy names: [String: String],
         in database: OpaquePointer
-    ) throws -> [[String: JSONValue]] {
+    ) throws -> (rows: [[String: JSONValue]], truncated: Bool) {
         var statement: OpaquePointer?
         // The table name is one of this file's own constants, never input.
         guard sqlite3_prepare_v2(database, "SELECT * FROM \(table)", -1, &statement, nil) == SQLITE_OK
@@ -147,7 +164,8 @@ enum QuarantinedStoreReader {
         defer { sqlite3_finalize(statement) }
 
         var out: [[String: JSONValue]] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        var status = sqlite3_step(statement)
+        while status == SQLITE_ROW {
             var row: [String: JSONValue] = [:]
             for index in 0..<sqlite3_column_count(statement) {
                 guard let raw = sqlite3_column_name(statement, index) else { continue }
@@ -156,8 +174,9 @@ enum QuarantinedStoreReader {
                 row[names[column] ?? column] = value(of: statement, at: index)
             }
             out.append(row)
+            status = sqlite3_step(statement)
         }
-        return out
+        return (out, status != SQLITE_DONE)
     }
 
     /// One column's value as JSON.

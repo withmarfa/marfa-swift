@@ -65,8 +65,30 @@ public enum MarfaModelContainer {
         path: String,
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none
     ) throws -> StoreOpenResult {
+        try open(path: path, cloudKitDatabase: cloudKitDatabase, fileManager: .default)
+    }
+
+    /// The same open, over a file manager a test can substitute.
+    ///
+    /// The store-side counterpart to substituting a `Transport`. Every failure
+    /// this path exists to survive is a filesystem refusing something, and the
+    /// ones worth pinning cannot be staged on a real filesystem: anything that
+    /// stops a rename — a permission, a lock, an immutable flag — stops the
+    /// removal beside it too, so the branch that removes what could not be
+    /// moved is unreachable from a test that has only real files to work with.
+    /// A full disk is the case that separates them, and it is not one a test
+    /// can arrange.
+    internal static func open(
+        path: String,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none,
+        fileManager: FileManager
+    ) throws -> StoreOpenResult {
         try withCreationLock {
-            try openUnlocked(path: path, cloudKitDatabase: cloudKitDatabase)
+            try openUnlocked(
+                path: path,
+                cloudKitDatabase: cloudKitDatabase,
+                fileManager: fileManager
+            )
         }
     }
 
@@ -80,7 +102,8 @@ public enum MarfaModelContainer {
 
     private static func openUnlocked(
         path: String,
-        cloudKitDatabase: ModelConfiguration.CloudKitDatabase
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase,
+        fileManager: FileManager
     ) throws -> StoreOpenResult {
         if path == ":memory:" {
             return StoreOpenResult(
@@ -107,7 +130,13 @@ public enum MarfaModelContainer {
         // match — and a build quietly writing into a newer store is the case
         // this refusal exists to prevent.
         if let newer = versionAheadOfThisBuild(at: url) {
-            return try failSafe(url: url, cloudKitDatabase: cloudKitDatabase, cause: .newerThanCode, reason: newer)
+            return try failSafe(
+                url: url,
+                cloudKitDatabase: cloudKitDatabase,
+                cause: .newerThanCode,
+                reason: newer,
+                fileManager: fileManager
+            )
         }
 
         do {
@@ -119,12 +148,13 @@ public enum MarfaModelContainer {
             // A store that is not there did not fail to open for a reason
             // recovery can address, and rebuilding on top of one would loop.
             // Say what actually happened instead.
-            guard FileManager.default.fileExists(atPath: url.path) else { throw error }
+            guard fileManager.fileExists(atPath: url.path) else { throw error }
             return try failSafe(
                 url: url,
                 cloudKitDatabase: cloudKitDatabase,
                 cause: .unreadable,
-                reason: error.localizedDescription
+                reason: error.localizedDescription,
+                fileManager: fileManager
             )
         }
     }
@@ -144,7 +174,8 @@ public enum MarfaModelContainer {
         url: URL,
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase,
         cause: StoreRecovery.Cause,
-        reason: String
+        reason: String,
+        fileManager: FileManager
     ) throws -> StoreOpenResult {
         let logger = Logger(subsystem: MarfaLogger.subsystem, category: "local")
         logger.error(
@@ -154,7 +185,11 @@ public enum MarfaModelContainer {
         // Throws on failure, and the throw is the point: no quarantine means
         // no wipe. An app that would otherwise lose its queued writes, its
         // dead letters, its cursor and its blob bytes is told instead.
-        let quarantine = try StoreQuarantine.run(storeAt: url, stampedAt: Date())
+        let quarantine = try StoreQuarantine.run(
+            storeAt: url,
+            stampedAt: Date(),
+            fileManager: fileManager
+        )
 
         var sidecarURL: URL?
         var sidecarError: String?
@@ -183,18 +218,42 @@ public enum MarfaModelContainer {
             )
         }
 
-        // Whatever the quarantine could not move is removed now rather than
-        // left for the fresh store to trip over: a journal whose database has
-        // gone is not recoverable and is not inert.
-        removeLeftovers(at: url, named: quarantine.unmoved, logger: logger)
+        // The journals the quarantine could not move are removed now rather
+        // than left for the fresh store to trip over. Only the journals: the
+        // support directory holds the only copy of the externally stored blob
+        // bytes and is harmless to the store that replaces it, so removing it
+        // would reach the delete-and-rebuild this path exists to replace.
+        removeLeftovers(
+            at: url,
+            named: quarantine.removableLeftovers,
+            fileManager: fileManager,
+            logger: logger
+        )
 
-        let container = try buildContainer(url: url, cloudKitDatabase: cloudKitDatabase)
+        // The quarantine directory has to travel with this failure. It is the
+        // only record of where the queue went, it was minted inside this call,
+        // and an open that returns the container's own error returns without
+        // it — so the data survives and its address does not.
+        let container: ModelContainer
+        do {
+            container = try buildContainer(url: url, cloudKitDatabase: cloudKitDatabase)
+        } catch {
+            logger.error(
+                "LocalStore could not be rebuilt after quarantining to \(quarantine.directory.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+            throw LocalStoreError.storeRebuildFailed(
+                quarantineDirectory: quarantine.directory,
+                reason: error.localizedDescription
+            )
+        }
+
         let recovery = StoreRecovery(
             cause: cause,
             reason: reason,
             quarantineDirectory: quarantine.directory,
             sidecar: sidecarURL,
             sidecarError: sidecarError,
+            truncatedTables: extraction.truncated,
             pendingMutationCount: extraction.rows("pendingMutations").count,
             droppedMutationCount: extraction.rows("droppedMutations").count,
             pendingBlobCount: extraction.rows("pendingBlobs").count,
@@ -273,8 +332,12 @@ public enum MarfaModelContainer {
     /// discarded its own diagnostic with a `try?`, so the one step capable of
     /// destroying a person's queued work was also the one step that never said
     /// anything.
-    private static func removeLeftovers(at url: URL, named siblings: [String], logger: Logger) {
-        let fileManager = FileManager.default
+    private static func removeLeftovers(
+        at url: URL,
+        named siblings: [String],
+        fileManager: FileManager,
+        logger: Logger
+    ) {
         let parent = url.deletingLastPathComponent()
         for sibling in siblings {
             let leftover = parent.appendingPathComponent(sibling)

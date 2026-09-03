@@ -71,19 +71,42 @@ the store aside, never deleting it:
    directory holding externally-stored blob bytes — are moved into
    `<store>.quarantined-<timestamp>/`. A rename needs to know nothing
    about the file's contents, so it cannot fail for the reason the open
-   failed. **If it fails, nothing is deleted** and
+   failed. **If the store itself will not move, nothing is deleted** and
    `LocalStoreError.storeQuarantineFailed(_:)` is thrown.
+
+   A *sibling* that will not move is reported in the sidecar and handled
+   by what it is. A journal whose database has gone holds transactions
+   nothing can replay, so it is removed rather than left beside the store
+   that replaces it. **The support directory is never removed**: it holds
+   the only copy of the externally-stored bytes, which for this schema is
+   the payload of every queued blob upload, and the fresh store neither
+   reads what is in there nor collides with it, because Core Data names
+   each external file with a fresh UUID. Deleting it would reach the same
+   end state as the delete-and-rebuild this path replaces.
 2. **Salvage.** The quarantined store is read with SQLite directly,
    because the refusal is a model-hash check and SwiftData is the one
    component guaranteed unable to read the file. The queued mutations,
    the dead letters, the sync state and the queued blobs' descriptors go
    into `recovered-queue.json` inside the quarantine directory. This step
    is best-effort: a failure costs the summary, not the data.
+
+   A read that stops part-way through a table is named in
+   `StoreRecovery.truncatedTables` and in the sidecar. `sqlite3_step`
+   answers "the table ended" and "this page is unreadable" identically,
+   so a partial read is otherwise indistinguishable from a complete one,
+   and the counts would be reported as totals. While that list is
+   non-empty they are floors.
 3. **Rebuild.** A fresh empty store is built at the original path, and it
-   re-hydrates from the server on the next sync.
+   re-hydrates from the server on the next sync. A rebuild that fails
+   throws `LocalStoreError.storeRebuildFailed(quarantineDirectory:reason:)`
+   rather than the container's own error, because by then the queue has
+   moved somewhere only this call knows the name of.
 4. **Report.** `StoreOpenResult.recovery` describes what happened.
    `MarfaClient.storeRecovery` carries it, and a synced client also emits
    `SyncEvent.storeRecovered(_:)` once from `SyncEngine.start()`.
+   **An app that means to come back to the quarantine should keep the
+   path it is given**, because nothing reports it a second time: the next
+   launch opens the fresh store cleanly and has nothing to say.
 
 `recovered-queue.json` is plain JSON with a `format` field and no SDK
 types in it, so a reader a version behind or ahead can still parse it.

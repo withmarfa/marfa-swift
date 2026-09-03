@@ -29,6 +29,10 @@ struct RecoveredQueueSidecar: Codable {
     /// on the ordinary path; a name here is data that was left behind.
     let unmovedSiblings: [String]
 
+    /// Keys below whose rows stopped before the table did, so what they hold
+    /// is part of what the store held. Empty on the ordinary path.
+    let truncatedTables: [String]
+
     let pendingMutations: [[String: JSONValue]]
     let droppedMutations: [[String: JSONValue]]
     let syncState: [[String: JSONValue]]
@@ -54,6 +58,7 @@ extension RecoveredQueueSidecar {
         self.storePath = storePath
         self.quarantinedStorePath = quarantinedStorePath
         self.unmovedSiblings = unmovedSiblings
+        self.truncatedTables = extraction.truncated
         self.pendingMutations = extraction.rows("pendingMutations")
         self.droppedMutations = extraction.rows("droppedMutations")
         self.syncState = extraction.rows("syncState")
