@@ -288,6 +288,35 @@ struct StoreFailSafeTests {
         #expect(try ModelContext(opened.container).fetch(FetchDescriptor<PendingMutationModel>()).isEmpty)
     }
 
+    @Test("an open that fails with no store there reports why, rather than blaming the quarantine")
+    func aFailedOpenWithNoStoreKeepsItsOwnError() throws {
+        // A directory nothing can be created in, and no store in it. The
+        // container fails, and there is nothing to move aside — so the
+        // recovery path must not run and claim the quarantine was the problem.
+        // Reaching for a quarantine here would replace the one error that says
+        // what is wrong with one that says a file could not be moved, about a
+        // file that was never there.
+        let directory = makeDirectory()
+        let fileManager = FileManager.default
+        try fileManager.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+        defer {
+            try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            try? fileManager.removeItem(at: directory)
+        }
+        let path = directory.appendingPathComponent("store.sqlite").path
+
+        do {
+            _ = try MarfaModelContainer.open(path: path)
+            Issue.record("the open succeeded in a directory nothing can be written to")
+        } catch let error as LocalStoreError {
+            if case .storeQuarantineFailed(let message) = error {
+                Issue.record("the open blamed the quarantine for a store that was never there: \(message)")
+            }
+        } catch {
+            // Any other error is the container's own, which is the point.
+        }
+    }
+
     // MARK: - Telling the app
 
     @Test("the app is told, on the events stream, that its store was rebuilt")
