@@ -69,7 +69,3 @@ fixture rather than the behavior under test.
 - Architecture, conventions, codegen workflows, and contributor guidance: [`CLAUDE.md`](./CLAUDE.md)
 - Guides and API reference: <https://docs.marfa.so>
 - Release notes: [`CHANGELOG.md`](./CHANGELOG.md)
-
-## License
-
-Apache-2.0.
