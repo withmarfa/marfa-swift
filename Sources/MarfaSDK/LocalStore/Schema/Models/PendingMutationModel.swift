@@ -48,23 +48,19 @@ final class PendingMutationModel {
     /// is removed, so `"failed"` is never a persisted state — consumers
     /// subscribe to ``SyncEvent/mutationDropped`` for permanent-fail UX.
     ///
-    /// **Adding a property to this model breaks every store on disk, a
-    /// defaulted one included.** Core Data refuses such a store with
-    /// `Cannot use staged migration with an unknown model version`: the
-    /// entity's shape moves while the versioned schema identifiers stay
-    /// put, so no stage in ``MarfaMigrationPlan`` describes the step. The
-    /// refusal does not surface as a crash, because
-    /// ``MarfaModelContainer/make(path:cloudKitDatabase:)`` answers a store
-    /// it cannot open by deleting it and building a fresh one — leaving a
-    /// device that has quietly lost its queued writes and its
-    /// dropped-mutation log. `ShippedStoreFixtureTests` fails on it.
+    /// **Adding a property to this model needs a schema version, not just a
+    /// default.** Core Data refuses a store whose entity hashes match no
+    /// version in ``MarfaMigrationPlan`` — the entity's shape moves while the
+    /// versioned schema identifiers stay put, so no stage describes the step.
+    /// A defaulted column is no exemption; the hash covers the shape, not the
+    /// values. `ShippedStoreFixtureTests` fails on it, against a store a real
+    /// build wrote.
     ///
-    /// Changing this model therefore means a migration stage and a new
-    /// versioned schema **that owns its own copies of the model classes**.
-    /// A new schema listing these same compiled classes fixes nothing: the
-    /// old version then hashes to the mutated shape too, and the stage has
-    /// nothing to migrate from. ``MarfaMigrationPlan`` says how to do it, in
-    /// the paragraph beginning "Adding V3 later".
+    /// So changing this model means a new versioned schema **that leaves the
+    /// previous one holding frozen copies of the model classes** —
+    /// ``MarfaMigrationPlan`` sets out the steps. A new schema listing these
+    /// same compiled classes fixes nothing: the old version then hashes to the
+    /// mutated shape too, and the stage has nothing to migrate from.
     ///
     /// A new *value* in this column costs nothing by contrast, because
     /// SwiftData never inspects what a string holds — so a new

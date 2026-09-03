@@ -7,6 +7,32 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Changed
+
+- **A local store this build cannot open is now moved aside rather than deleted, and the app is told.** This changes a shipped behavior and a consumer who has never seen the failure will meet it in the field, so it is worth reading in full. Until now, a store the container refused to attach to was deleted and rebuilt empty, and the deletion's own diagnostic was discarded by a `try?` — so a device silently lost its queued writes, its dead-letter log, its event cursor and the account claim in one step, and permanently orphaned the bytes behind every queued blob upload. Items and edges came back on the next import; none of those five did, and nothing said so.
+
+  The store is now **renamed into a quarantine directory beside it** before anything else happens. A rename needs to know nothing about the file's contents, so it cannot fail for the reason the open failed, and everything after it works against a copy that is already safe. **The rebuild is conditional on that rename succeeding**: a store that cannot be moved aside is not deleted either, and `MarfaModelContainer.make(path:cloudKitDatabase:)` throws the new `LocalStoreError.storeQuarantineFailed(_:)` instead of quietly starting over. `LocalStoreError` therefore gains a case, so an exhaustive switch over it stops compiling.
+
+  The quarantined store is then read with **SQLite directly rather than through SwiftData** — the refusal is a model-hash check, so the file is a perfectly readable database and the object-graph layer is the one component guaranteed unable to read it — and the queued mutations, the dead letters, the sync state and the queued blobs' descriptors are written to `recovered-queue.json` inside the quarantine directory. That file is plain JSON with a `format` field and no SDK types in it; a blob's bytes are not copied into it, because they are still in the quarantined store. **Nothing deletes the quarantine directory**, which is deliberate: an app decides when it is finished with it.
+
+- **A store recording a schema version this build does not have is refused rather than opened.** It was written by a newer build, so migrating it forward would mean guessing at a shape nobody has described. It takes the same path as a store that cannot be read at all. One caveat worth knowing: until this release the container was handed a schema built from a model array rather than from a versioned schema, so the version identifier never reached disk and **every existing store on disk records `1.0.0`, including stores written under V2**. That is fixed here, which means the check only begins telling the truth for stores written from this version onward.
+
+- **`SyncEvent` gains `storeRecovered(_:)`, and an exhaustive switch over it stops compiling.** A closed enum gaining a case breaks every switch that enumerates it, which is why this is reported as the enum rather than as the case. It is emitted once by `SyncEngine.start()` — the store is opened long before an engine exists to announce it, so a subscriber who takes `SyncEngine.events` and then calls `start()` receives it there.
+
+- **`SyncEngine.init` takes `storeRecovery:`, defaulted to `nil`.** The full spelling moves from `SyncEngine.init(transport:localStore:mutationQueue:connectionManager:drainDebounceInterval:conflictResolvers:maxReplayAttempts:)` to `SyncEngine.init(transport:localStore:mutationQueue:connectionManager:drainDebounceInterval:conflictResolvers:maxReplayAttempts:storeRecovery:)`. Every existing call site compiles unchanged; both `MarfaClient.synced(...)` factories pass it for you.
+
+### Added
+
+- **`StoreRecovery`**, the record of a store that had to be rebuilt: why, where the old one went, where the salvaged queue was written, and how many queued writes, dead letters and pending blob uploads came out of it, plus the event cursor it had reached. **`StoreRecovery.Cause`** distinguishes a store this build cannot read from one a newer build wrote.
+
+- **`MarfaClient.storeRecovery`** carries the same value, non-`nil` only when the fail-safe ran. It is the answer for a pure-local client, which has no sync engine to subscribe to, and for any app that would rather ask than listen. It is `nil` on a client built from a caller-supplied container, because the SDK did not open that store.
+
+- **`MarfaModelContainer.open(path:cloudKitDatabase:)`** returns **`StoreOpenResult`** — the container plus that optional recovery. `MarfaModelContainer.make(path:cloudKitDatabase:)` is unchanged and still returns the container alone; it now discards the recovery rather than never having had one.
+
+- **The store schema moves to V3, and both stages are lightweight.** A V1 or V2 store on a device migrates forward with every row intact, which the previous arrangement could not do for any change to an existing model's shape. Two additions: an item now keeps the `space_id` the wire has always sent, which the store dropped on the way in, so an item read back locally can say which space it came from; and a cached-types table ships empty, ahead of the local type registry that needs it, because adding a table inside a migration that is happening anyway costs nothing and adding one on its own costs every device a migration.
+
+  Extensions were *not* moved onto the item, and that is a decision rather than an omission. They already round-trip through the metadata row, which is the layer the server writes them through; a column on the item would put one field in two places and leave the two able to disagree. A test pins the layering so the column is not added later.
+
 ## [16.0.0] — 2026-09-02
 
 Major, and the breaking changes are the smaller half. **A synced client did not

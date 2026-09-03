@@ -17,6 +17,7 @@ extension MarfaItemModel {
             schemaVersion: schemaVersion,
             source: source,
             sourceId: sourceId,
+            spaceId: spaceId,
             state: state,
             tier: tier,
             timestamp: timestamp,
@@ -44,6 +45,12 @@ extension MarfaItemModel {
         properties = item.properties
         source = item.source
         sourceId = item.sourceId
+        // Absent means unreported, never "moved out": an item cannot change
+        // space, and not every payload carrying an item carries its space. A
+        // straight assignment would let one such payload erase a space id the
+        // store already knew, which is the shape of defect that cost the
+        // extensions layer its contents.
+        if let incomingSpaceId = item.spaceId { spaceId = incomingSpaceId }
         tier = item.tier
         version = item.version
         schemaVersion = item.schemaVersion

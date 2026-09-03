@@ -234,28 +234,25 @@ struct ShippedStoreFixtureTests {
         let staged = try stagedCopy(of: source)
         defer { try? FileManager.default.removeItem(at: staged.deletingLastPathComponent()) }
 
-        let before = try FileManager.default.attributesOfItem(atPath: staged.path)
-        let container = try MarfaModelContainer.make(path: staged.path)
-        let after = try FileManager.default.attributesOfItem(atPath: staged.path)
+        let opened = try MarfaModelContainer.open(path: staged.path)
 
-        // A schema break does not throw. `MarfaModelContainer.make` answers a
-        // store it cannot open by deleting it and building a fresh one, so the
-        // failure would otherwise arrive as a set of rows that are mysteriously
-        // zero. Say what happened instead: the file under this path is not the
-        // file that was staged.
-        let sizeChanged = (before[.size] as? Int) != (after[.size] as? Int)
-        let dateChanged = (before[.modificationDate] as? Date) != (after[.modificationDate] as? Date)
-        if sizeChanged || dateChanged {
+        // A schema break does not throw, and it no longer looks like anything
+        // either: the store is moved aside and rebuilt, so the failure would
+        // otherwise arrive as a set of rows that are mysteriously zero. Ask
+        // the open itself what happened rather than inferring it from the
+        // file, which a legitimate migration rewrites too.
+        if let recovery = opened.recovery {
             Issue.record(
                 """
-                The container could not open the fixture and replaced it: a model \
-                changed shape, so every row below is gone. On a device this is \
-                silent, and it costs the mutation queue, the pending blob bytes, \
-                the dropped-mutation log and the event cursor. See \
-                Fixtures/ShippedStore/README.md.
+                The container could not open the fixture and rebuilt it: a model \
+                changed shape with no migration stage describing the step, so \
+                every row below is gone from the live store. The old one is at \
+                \(recovery.quarantineDirectory.lastPathComponent) — \
+                \(recovery.reason). See Fixtures/ShippedStore/README.md.
                 """
             )
         }
+        let container = opened.container
 
         try SeededRows.assertAllRowsSurvived(in: ModelContext(container))
     }

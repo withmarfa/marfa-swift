@@ -59,6 +59,17 @@ public final class MarfaClient: Sendable {
     /// under ``MarfaAuth``, ``Passkey``, and ``DeviceFlow``.
     public let auth: AuthNamespace
 
+    /// Non-`nil` when this client's store could not be opened and had to be
+    /// rebuilt empty — see ``StoreRecovery``. `nil` on every ordinary open,
+    /// and on a client built from a caller-supplied container, which the SDK
+    /// did not open.
+    ///
+    /// A synced client also announces it once on ``SyncEngine/events`` as
+    /// ``SyncEvent/storeRecovered(_:)``. This property is the answer for a
+    /// pure-local client, which has no engine, and for any app that would
+    /// rather ask than subscribe.
+    public let storeRecovery: StoreRecovery?
+
     /// The active sync engine, present only in synced mode (``MarfaClient/synced(url:apiKey:storePath:)``).
     ///
     /// Call ``SyncEngine/start()`` to begin synchronization and
@@ -128,10 +139,12 @@ public final class MarfaClient: Sendable {
         mutationQueue: MutationQueue? = nil,
         syncEngine: SyncEngine? = nil,
         container: ModelContainer? = nil,
-        conflictResolvers: ConflictResolverRegistry? = nil
+        conflictResolvers: ConflictResolverRegistry? = nil,
+        storeRecovery: StoreRecovery? = nil
     ) {
         self.configuration = configuration
         self.transport = transport
+        self.storeRecovery = storeRecovery
         self.syncEngine = syncEngine
         self.container = container
         self.mutationQueue = mutationQueue
@@ -236,8 +249,8 @@ public final class MarfaClient: Sendable {
     /// - Throws: ``LocalStoreError`` if the database cannot be opened or
     ///   migrated.
     public static func local(path: String) async throws -> MarfaClient {
-        let container = try MarfaModelContainer.make(path: path)
-        return try await local(container: container)
+        let opened = try MarfaModelContainer.open(path: path)
+        return try await local(container: opened.container, storeRecovery: opened.recovery)
     }
 
     /// Creates a pure-local client backed by a caller-supplied
@@ -264,6 +277,13 @@ public final class MarfaClient: Sendable {
     /// calling from `@MainActor` would silently route every method onto
     /// the main thread.
     public static func local(container: ModelContainer) async throws -> MarfaClient {
+        try await local(container: container, storeRecovery: nil)
+    }
+
+    private static func local(
+        container: ModelContainer,
+        storeRecovery: StoreRecovery?
+    ) async throws -> MarfaClient {
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
         // Transport is never invoked in pure-local mode — every namespace
         // method checks `localStore` first. URL is a placeholder; the
@@ -277,7 +297,8 @@ public final class MarfaClient: Sendable {
             configuration: config,
             transport: URLSessionTransport(configuration: config),
             localStore: store,
-            container: container
+            container: container,
+            storeRecovery: storeRecovery
         )
     }
 
@@ -365,7 +386,8 @@ public final class MarfaClient: Sendable {
         maxReplayAttempts: Int
     ) async throws -> MarfaClient {
         let transport = URLSessionTransport(configuration: config)
-        let container = try MarfaModelContainer.make(path: storePath)
+        let opened = try MarfaModelContainer.open(path: storePath)
+        let container = opened.container
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
         let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
         // One registry, shared by the write path and the replay path. The
@@ -378,7 +400,8 @@ public final class MarfaClient: Sendable {
             mutationQueue: queue,
             connectionManager: connectionManager,
             conflictResolvers: resolvers,
-            maxReplayAttempts: maxReplayAttempts
+            maxReplayAttempts: maxReplayAttempts,
+            storeRecovery: opened.recovery
         )
         return MarfaClient(
             configuration: config,
@@ -387,7 +410,8 @@ public final class MarfaClient: Sendable {
             mutationQueue: queue,
             syncEngine: engine,
             container: container,
-            conflictResolvers: resolvers
+            conflictResolvers: resolvers,
+            storeRecovery: opened.recovery
         )
     }
 

@@ -49,6 +49,11 @@ final class MarfaItemModel {
     var captureLatitude: Double?
     var captureLongitude: Double?
 
+    /// The space the server says this item belongs to. Optional because a
+    /// pure-local store has no space, and because a row written before the
+    /// column existed has nothing to put in it.
+    var spaceId: String?
+
     /// 1:1 satellite metadata row. Cascade so `purgeItem` is one delete + one
     /// save. Inverse declared here only — never on both sides.
     @Relationship(deleteRule: .cascade, inverse: \MarfaMetadataModel.item)

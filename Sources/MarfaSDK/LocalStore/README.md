@@ -1,8 +1,8 @@
 # LocalStore
 
 Persistent on-device store for the SDK. Backed by SwiftData with a
-CloudKit-compatible v2 schema (`MarfaSchemaV2`) with a registered
-V1 → V2 migration. Two `@ModelActor`s
+CloudKit-compatible V3 schema (`MarfaSchemaV3`), with registered
+V1 → V2 and V2 → V3 migrations. Two `@ModelActor`s
 (`LocalStore` and `MutationQueue`) share a single `ModelContainer`
 constructed via `MarfaModelContainer.make(path:cloudKitDatabase:)`.
 Pass `cloudKitDatabase: .automatic(containerIdentifier: "iCloud.…")`
@@ -10,8 +10,7 @@ to mirror through CloudKit; omit it for pure-local (default `.none`).
 
 ## Schema
 
-Seven `@Model` classes (six under `Schema/V1/`, plus
-`DroppedMutationModel` added in `Schema/V2/`):
+Eight `@Model` classes, all under `Schema/Models/`:
 
 | Model | Purpose |
 | --- | --- |
@@ -22,12 +21,77 @@ Seven `@Model` classes (six under `Schema/V1/`, plus
 | `SyncStateModel` | Key/value table for sync cursor + bookkeeping. |
 | `PendingBlobModel` | Binary buffer for queued blob uploads. `data` field uses `@Attribute(.externalStorage)`. |
 | `DroppedMutationModel` | Permanently-failed mutations dropped from the replay queue, retained for inspection + dismissal. |
+| `CachedTypeModel` | The space's type graph as the server last described it. Ships empty; nothing writes it yet. |
 
 CloudKit invariants (no `#Unique`, every property defaulted, every
 relationship optional, no `.deny` rules, Codable enums via rawValue,
 no `description` property) apply across every model. See
 `PredicateConventions.swift` for the predicate-safe subset all
 fetches must stick to.
+
+## Versions, and where the model classes live
+
+`Schema/Models/` always holds the *current* shape. Every schema version
+before the current one owns frozen copies of the classes it stood for,
+in `Schema/Versions/FrozenV2.swift`, and `Schema/Versions/` holds one
+`VersionedSchema` per version.
+
+The arrangement is the cheap half of a choice with two sides. A new
+version has to hash differently from the old one, so one of the two must
+own copies. Freezing the *new* version would mean repointing `LocalStore`,
+`MutationQueue`, every reactive query and every test at a nested type on
+each schema change. Freezing the *old* version leaves all of that alone.
+It works because nesting is invisible to Core Data — an entity is
+identified by its name and hashed from that name and its property
+descriptions, with no input from where the Swift type lives — and
+`SchemaMigrationTests` pins exactly that by comparing the frozen copies'
+hashes against a store a shipped V2 build actually wrote.
+
+**Nothing in a frozen namespace is ever edited.** Editing it changes what
+that version hashes to, Core Data then matches no version to a real store
+of that age, the stage that would have migrated it never applies, and the
+device takes the fail-safe path below instead. Nothing fails at build
+time and nothing fails on a fresh install.
+
+Adding V4 means: copy the live classes into a new frozen namespace at
+their current shape, point V3 at it, change the live classes, add
+`MarfaSchemaV4` listing them, and append a stage.
+
+## When a store cannot be opened
+
+Almost always it can — an older store migrates forward. The exception is
+a store whose entity shapes match no version in `MarfaMigrationPlan`, or
+one recording a schema version this build does not have.
+
+`MarfaModelContainer.open(path:cloudKitDatabase:)` answers that by moving
+the store aside, never deleting it:
+
+1. **Quarantine.** The store and everything SQLite and Core Data keep
+   beside it — `-wal`, `-shm`, `-journal`, and the `.<name>_SUPPORT`
+   directory holding externally-stored blob bytes — are moved into
+   `<store>.quarantined-<timestamp>/`. A rename needs to know nothing
+   about the file's contents, so it cannot fail for the reason the open
+   failed. **If it fails, nothing is deleted** and
+   `LocalStoreError.storeQuarantineFailed(_:)` is thrown.
+2. **Salvage.** The quarantined store is read with SQLite directly,
+   because the refusal is a model-hash check and SwiftData is the one
+   component guaranteed unable to read the file. The queued mutations,
+   the dead letters, the sync state and the queued blobs' descriptors go
+   into `recovered-queue.json` inside the quarantine directory. This step
+   is best-effort: a failure costs the summary, not the data.
+3. **Rebuild.** A fresh empty store is built at the original path, and it
+   re-hydrates from the server on the next sync.
+4. **Report.** `StoreOpenResult.recovery` describes what happened.
+   `MarfaClient.storeRecovery` carries it, and a synced client also emits
+   `SyncEvent.storeRecovered(_:)` once from `SyncEngine.start()`.
+
+`recovered-queue.json` is plain JSON with a `format` field and no SDK
+types in it, so a reader a version behind or ahead can still parse it.
+Row keys are the SDK's property names (`payloadJson`, `attemptCount`, …)
+mapped back from the store's own columns. A blob's bytes are not in it —
+they are in the quarantined database, which is why that database is kept.
+**Nothing removes the quarantine directory.** An app decides when it is
+finished with it.
 
 ## CloudKit readiness — `cloudkit-smoke`
 
