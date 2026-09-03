@@ -218,11 +218,12 @@ public enum MarfaModelContainer {
             )
         }
 
-        // The journals the quarantine could not move are removed now rather
-        // than left for the fresh store to trip over. Only the journals: the
-        // support directory holds the only copy of the externally stored blob
-        // bytes and is harmless to the store that replaces it, so removing it
-        // would reach the delete-and-rebuild this path exists to replace.
+        // The journals the quarantine could not move are removed now: one
+        // whose database has gone holds transactions nothing can ever replay,
+        // so it costs nothing to lose and can only mislead whoever looks next.
+        // Only the journals. The support directory holds the only copy of the
+        // externally stored blob bytes, so removing it would reach the
+        // delete-and-rebuild this path exists to replace.
         removeLeftovers(
             at: url,
             named: quarantine.removableLeftovers,

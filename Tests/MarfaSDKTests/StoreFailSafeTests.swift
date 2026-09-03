@@ -278,10 +278,10 @@ struct StoreFailSafeTests {
     /// Core Data writes an externally stored attribute to a file under
     /// `.<store>_SUPPORT/_EXTERNAL_DATA/`, named with a fresh UUID, and for
     /// this schema that attribute is the payload of every queued blob upload.
-    /// A journal that will not move is removed because it is dangerous to the
-    /// store that replaces it; applying the same rule here would delete the
-    /// only copy of that payload, which is the loss the whole quarantine
-    /// exists to prevent.
+    /// A journal that will not move is removed because nothing can ever
+    /// replay what it holds; applying the same rule here would delete the only
+    /// copy of that payload, which is the loss the whole quarantine exists to
+    /// prevent.
     @Test("a support directory that will not move is left alone, not deleted with the journals")
     func anUnmovableSupportDirectorySurvives() throws {
         let directory = makeDirectory()
