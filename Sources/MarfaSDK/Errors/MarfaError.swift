@@ -60,7 +60,14 @@ open class MarfaError: Error, @unchecked Sendable {
     public var isPermanent: Bool {
         if self is SchemaVersionMismatchError { return true }
         switch status {
-        case 400, 403, 404: return true
+        // 501 sits here for the same reason 400 does — the call cannot start
+        // succeeding however many times it is repeated — and it is worth
+        // naming separately because the reason differs. 400 says the request
+        // is wrong; 501 says this resolution path does not implement it. Both
+        // are thrown before a mutation is queued today, but the property is
+        // public and a caller retrying on `!isPermanent` would otherwise spin
+        // for ever on a refusal that is final by construction.
+        case 400, 403, 404, 501: return true
         default: return false
         }
     }
@@ -225,8 +232,50 @@ public final class LocalFilterUnsupportedError: MarfaError {
         super.init(
             code: "local_filter_unsupported",
             message:
-                "\(operation) cannot apply the `\(field)` narrowing on a client that resolves locally, and will not act on a wider set than was asked for. Narrow with the structured fields, or use MarfaClient(url:apiKey:).",
+                "\(operation) cannot apply the `\(field)` narrowing on a client that resolves locally, and will not act on a wider set than was asked for. Narrow with the filter's structured fields instead, or perform the action through a client built with MarfaClient(url:apiKey:).",
             status: 501
+        )
+    }
+}
+
+/// 400 — A `purge` bulk action was submitted without its confirmation.
+///
+/// Mirrors the server's `bulk_confirmation_required`. The confirmation used to
+/// be enforced only inside `BulkActionInput`'s encoder, which runs when a
+/// mutation is queued — so a client resolving locally applied the purge first
+/// and threw afterwards, and a client with no queue never encoded at all and
+/// purged with no confirmation whatsoever.
+public final class BulkConfirmationRequiredError: MarfaError {
+    public init() {
+        super.init(
+            code: "bulk_confirmation_required",
+            message: #"A purge bulk action requires options.confirm == "PURGE"."#,
+            status: 400
+        )
+    }
+}
+
+/// 400 — A bulk action matched more rows than `maxItems` allows.
+///
+/// Mirrors the server's `bulk_cap_exceeded`, and the direction is the whole
+/// point: the cap **refuses the action**, it does not trim the match set. A
+/// client resolving locally used to pass the cap down as a fetch window, so a
+/// purge capped at one row purged one arbitrary row of the many that matched,
+/// reported `matched: 1`, and returned no error — a safety brake that quietly
+/// became a partial write.
+public final class BulkCapExceededError: MarfaError {
+    /// How many rows the filter actually matched.
+    public let matched: Int
+    /// The cap the caller set.
+    public let cap: Int
+
+    public init(matched: Int, cap: Int) {
+        self.matched = matched
+        self.cap = cap
+        super.init(
+            code: "bulk_cap_exceeded",
+            message: "The filter matched \(matched) items, above the maxItems cap of \(cap). Nothing was applied. Narrow the filter or raise the cap.",
+            status: 400
         )
     }
 }

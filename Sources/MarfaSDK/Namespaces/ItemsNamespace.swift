@@ -599,29 +599,41 @@ public struct ItemsNamespace: Sendable {
     ) async throws -> BulkActionResult {
         let (filter, options, actionName) = destructureAction(input)
 
-        // Refuse a narrowing this path cannot apply, rather than resolving
-        // without it. `filter` is the server's expression grammar, which
-        // reaches across edges and is evaluated server-side; the local store
-        // does not implement it and says so. Passing it through anyway
-        // resolved to every row the remaining fields allowed and then applied
-        // the action to all of them — and `purge` is one of the actions, so
-        // an expression naming nothing emptied the store.
+        // Everything that can refuse this action refuses it here, before a row
+        // is read or touched. That ordering is the substance rather than
+        // tidiness: each of these used to be enforced somewhere downstream of
+        // the fan-out, or not at all, so the action was applied and *then* the
+        // caller was told it should not have been.
+
+        // `filter` is the server's expression grammar. It reaches across edges
+        // and is evaluated server-side; the local store does not implement it
+        // and says so in its own docblock. Passing it down anyway resolved to
+        // every row the remaining fields allowed and applied the action to all
+        // of them — and `purge` is one of the actions, so an expression naming
+        // nothing emptied the store.
         //
-        // The refusal sits here, on the path that *acts*, and not on
-        // `makeItemsDescriptor`, which also serves plain reads. A read that
-        // comes back wide is corrected by the next read; a purge is not. A
-        // remote client never reaches this function at all — it has no store,
-        // so its bulk action goes to the server, which evaluates its own
-        // grammar correctly and loses no capability here.
+        // Refusing beats approximating: a local evaluator would be a second
+        // implementation of a grammar the server owns, and the two would drift.
         if filter.filter != nil {
             throw LocalFilterUnsupportedError(
                 operation: "items.bulkAction", field: "filter"
             )
         }
 
-        // Resolve the match set with the same `ListFilters` that
-        // `GET /items` would, so the local fan-out mirrors the server's
-        // server-side narrowing.
+        // The purge confirmation was enforced only by `BulkActionInput`'s
+        // encoder, which runs at `enqueueBulkAction` — *after* the fan-out. So
+        // a synced client purged every matching row locally, threw on the way
+        // to the queue, and queued nothing: the caller saw an error and could
+        // reasonably conclude nothing had happened, while the rows were gone
+        // and only a full re-import would bring them back. A pure-local client
+        // has no queue, so the encoder never ran and the confirmation was not
+        // enforced at all.
+        if case .purge = input, options.confirm != "PURGE" {
+            throw BulkConfirmationRequiredError()
+        }
+
+        // Resolve the match set with the same `ListFilters` that `GET /items`
+        // would, so the local fan-out narrows the way the server's does.
         var list = ListFilters()
         list.type = filter.type
         list.state = filter.state
@@ -630,9 +642,21 @@ public struct ItemsNamespace: Sendable {
         list.tags = filter.tags
         list.since = filter.since
         list.until = filter.until
-        list.limit = options.maxItems
 
+        // `maxItems` is deliberately *not* `list.limit`. The server's
+        // `max_items` caps the match set before a `bulk_cap_exceeded` error —
+        // it refuses the action rather than trimming it. Passing it down as a
+        // fetch window inverted that: a purge capped at one row purged one
+        // arbitrary row of the many that matched, reported `matched: 1` so
+        // nothing downstream could tell, and returned success. A caller
+        // reaching for a cap is reaching for a brake, and a brake that
+        // silently becomes a partial write is worse than no brake.
+        //
+        // The count is therefore taken over the unwindowed set and compared.
         let matched = try await store.fetchItems(filters: list)
+        if let cap = options.maxItems, matched.data.count > cap {
+            throw BulkCapExceededError(matched: matched.data.count, cap: cap)
+        }
 
         if options.dryRun == true {
             return BulkActionResult(

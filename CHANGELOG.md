@@ -9,6 +9,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **A bulk action on a client with a local store now refuses before it acts, where three of its refusals used to happen afterwards or not at all.** Each of these applied the action first and objected second, which is the same defect wearing three faces.
+
+  **A purge without its confirmation purged.** `options.confirm == "PURGE"` was enforced only inside `BulkActionInput`'s encoder, which runs when the mutation is queued — after the local fan-out. A synced client therefore purged every matching row locally, threw on the way to the queue, and queued nothing: the caller saw an error and could reasonably conclude nothing had happened, while the rows were gone and only a full re-import would return them. A pure-local client has no queue, so the encoder never ran and **the confirmation was not enforced at all**. It is now checked before any row is read.
+
+  **`maxItems` trimmed where the server refuses.** The server's `max_items` caps the match set *before* a `bulk_cap_exceeded` error — it declines the whole action rather than shrinking it. The local path passed the same number down as a fetch window, so a purge capped at one row purged one arbitrary row of the many that matched, reported `matched: 1` so nothing downstream could tell, and returned success. A caller reaching for a cap is reaching for a brake. It now refuses with `BulkCapExceededError`.
+
+  **`MarfaError.isPermanent` is now true for `501`.** A 501 says this resolution path does not implement the call, which no number of retries changes. Both `LocalModeUnsupportedError` and `LocalFilterUnsupportedError` reported themselves as retryable, so a caller looping on `!isPermanent` would spin for ever.
+
 - **A bulk action on a client with a local store now refuses a `filter` expression instead of acting on every row it could not narrow.** This is a shipped defect rather than a tightening, and it is worth reading in full because the failure was silent and destructive. `items.bulkAction` on a local or synced client resolves its own match set against the store, and the resolution accepted the caller's `filter` and `source` narrowing and then dropped both — a documented limitation of the local list, where an over-wide *read* is corrected by the next read. A bulk action is not a read. It applies an action to everything the resolution returned, and `purge` and `transition` are two of the six actions, so a filter expression naming nothing matched everything and a narrowed purge emptied the store. Nothing reported it: the result came back with `matched` set to the wider count, as though those rows had genuinely matched.
 
   `filter` is the server's expression grammar and reaches across edges; evaluating it on the device would be a second implementation of a rule the server owns, so it is **refused** with the new `LocalFilterUnsupportedError` rather than approximated. `source` had no such excuse — it is a plain stored column — so it now narrows, both here and on every local list and reactive query that shares the descriptor. **A remote client is unaffected in both cases**: it has no store, so its bulk action goes to the server, which evaluates its own grammar and loses no capability.
@@ -54,6 +62,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 ### Added
 
 - **`LocalFilterUnsupportedError`**, thrown when a narrowing cannot be applied where a request is being resolved, so the request is refused rather than answered wider than it was asked. It carries the `operation` refused and the `field` that could not be applied.
+
+- **`BulkConfirmationRequiredError`** and **`BulkCapExceededError`**, mirroring the server's `bulk_confirmation_required` and `bulk_cap_exceeded` so a caller catches the same failure wherever the action resolved. `BulkCapExceededError` carries the `matched` count and the `cap`.
 
 - **`PendingItemEdit`** describes one unsent write against an item in the form the store needs in order to put it back on top of the row the server sent — a property delta, or a lifecycle move. It is what the rebase above is expressed in, and it is public because `LocalStoreWriting` is. The delta case carries `tier` but deliberately not `sourceId`, which the same `PATCH` accepts: no local write path sets that column, so rebasing it would make the field change on the arrival of an inbound frame about something else. Queued `bulk` writes are translated alongside the single-item kinds; `bulkAction` is not, because it selects rows by a filter expression rather than by id and answering it locally means evaluating the `GET /items?filter=` grammar, edge traversal included.
 

@@ -553,16 +553,21 @@ public actor MutationQueue {
     /// how the server announces that layer moving.
     ///
     /// **`bulkAction` is absent and is a genuine gap rather than a layering
-    /// decision.** It selects rows by a `BulkActionFilter`, not by id — and
-    /// that filter carries `filter`, a string in the same filter-SQL grammar
-    /// `GET /items?filter=` takes, including `edge[type]` and `backref[type]`
-    /// traversal. Answering "does this bulk action name item X" therefore means
-    /// evaluating a server-side query language against a local row, edges
-    /// included, and matching the server's answer exactly — a query engine, not
-    /// a payload read. Until that exists, a queued bulk transition or bulk
-    /// property patch is invisible here and an inbound frame for a row it
-    /// covers overwrites its effect; the write itself is not lost, and
-    /// converges when the queue drains.
+    /// decision.** It selects rows by a `BulkActionFilter` rather than by id,
+    /// so a queued bulk transition or bulk property patch is invisible here and
+    /// an inbound frame for a row it covers overwrites its effect. The write
+    /// itself is not lost, and converges when the queue drains.
+    ///
+    /// **The reason has shrunk, and the gap has not.** This used to say the
+    /// obstacle was the filter's `filter` expression — a server-side grammar
+    /// with edge traversal, which matching locally would mean reimplementing.
+    /// `ItemsNamespace` now refuses that expression before enqueuing, so no
+    /// mutation written by this build can carry one, and every field that can
+    /// still reach the queue is a plain column a payload read could answer.
+    /// What remains is that nothing reads them: closing this needs the match
+    /// set resolved at enqueue and recorded on the row, not a query engine.
+    /// The old reason survives only for queues written by an earlier build,
+    /// which is why `BulkActionInput.init(from:)` still decodes the field.
     ///
     /// A blocked row is included. The drain has stopped asking about it, but
     /// the write is still there and an app is still showing it — dropping it

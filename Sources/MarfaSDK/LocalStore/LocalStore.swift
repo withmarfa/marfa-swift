@@ -973,8 +973,19 @@ public actor LocalStore {
     /// **Being on the list is a claim about a read, and a bulk action is not a
     /// read.** `ItemsNamespace` therefore refuses a `filter` expression rather
     /// than resolving through this descriptor and applying an action to the
-    /// result — an over-wide read corrects itself on the next fetch, and an
-    /// over-wide purge does not.
+    /// result — an over-wide read is corrected by the next fetch, and an
+    /// over-wide purge is not.
+    ///
+    /// **That justification is about the caller's ability to notice, and it
+    /// does not hold for a caller who never sees the filter.** An app calling
+    /// `items.list` wrote the narrowing itself and can tell a wide answer from
+    /// a narrow one. Three callers inside this kit translate a *typed*
+    /// argument into an expression on the caller's behalf —
+    /// `ConnectionsNamespace.list(kind:)`, `MarfaStore.queryConnections(kind:)`
+    /// and `MarfaStore.queryActivity(severity:)` — so the caller passes an
+    /// enum, the expression is dropped here, and an unnarrowed set comes back
+    /// with nothing to indicate it. Those three are a defect rather than a
+    /// documented limitation, and they are filed as one.
     nonisolated static func makeItemsDescriptor(filters: ListFilters?) -> FetchDescriptor<MarfaItemModel> {
         // Captured-value short-circuit pattern (predicate convention 8):
         // SwiftData has no runtime `Predicate<T>` composition, so we
