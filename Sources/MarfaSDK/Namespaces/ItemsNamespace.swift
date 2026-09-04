@@ -593,15 +593,85 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
+    /// What the server uses when a caller names no `max_items`, and the hard
+    /// ceiling it clamps to. Mirrored rather than left open so a local
+    /// resolution and a server one agree on how much work a call is — the
+    /// precedent is `LocalStoreSearch.defaultSearchLimit`, which mirrors the
+    /// list default for the same reason.
+    static let defaultBulkActionCap = 10_000
+    static let maxBulkActionCap = 50_000
+
     private func applyBulkActionLocally(
         _ input: BulkActionInput,
         store: LocalStore
     ) async throws -> BulkActionResult {
         let (filter, options, actionName) = destructureAction(input)
 
-        // Resolve the match set with the same `ListFilters` that
-        // `GET /items` would, so the local fan-out mirrors the server's
-        // server-side narrowing.
+        // Everything that can refuse this action refuses it here, before a row
+        // is read or touched. That ordering is the substance rather than
+        // tidiness: each of these used to be enforced somewhere downstream of
+        // the fan-out, or not at all, so the action was applied and *then* the
+        // caller was told it should not have been.
+
+        // `filter` is the server's expression grammar. It reaches across edges
+        // and is evaluated server-side; the local store does not implement it
+        // and says so in its own docblock. Passing it down anyway resolved to
+        // every row the remaining fields allowed and applied the action to all
+        // of them — and `purge` is one of the actions, so an expression naming
+        // nothing emptied the store.
+        //
+        // Refusing beats approximating: a local evaluator would be a second
+        // implementation of a grammar the server owns, and the two would drift.
+        // A dry run is refused too, and that is deliberate rather than an
+        // oversight in the ordering: a preview is the likeliest caller, and a
+        // preview reporting the *wide* match set is exactly the silent
+        // misreport this whole guard exists to stop. The cap below is checked
+        // before the preview returns for the same reason — a preview of an
+        // action the server would refuse is not a preview.
+        if filter.filter != nil {
+            throw LocalFilterUnsupportedError(
+                operation: "items.bulkAction", field: "filter"
+            )
+        }
+
+        // The purge confirmation was enforced only by `BulkActionInput`'s
+        // encoder, which runs at `enqueueBulkAction` — *after* the fan-out. So
+        // a synced client purged every matching row locally, threw on the way
+        // to the queue, and queued nothing: the caller saw an error and could
+        // reasonably conclude nothing had happened, while the rows were gone
+        // and only a full re-import would bring them back. A pure-local client
+        // has no queue, so the encoder never ran and the confirmation was not
+        // enforced at all.
+        if case .purge = input, options.confirm != "PURGE" {
+            throw BulkConfirmationRequiredError()
+        }
+
+        // The server declares `max_items` as strictly positive and refuses
+        // anything else as a schema violation. Locally a zero cap refused
+        // every non-empty match and a negative one refused even an empty
+        // match, so both sides said no and said it differently — and the
+        // negative case produced a message nobody could act on. Having
+        // mirrored the default and the ceiling, the lower bound is the same
+        // decision.
+        if let maxItems = options.maxItems, maxItems <= 0 {
+            throw ValidationError(
+                message: "maxItems must be greater than zero; received \(maxItems)."
+            )
+        }
+
+        // The server requires at least one non-empty of `add` and `remove`.
+        // Locally a tag edit naming neither walked every matched row, changed
+        // nothing, and counted them all as succeeded — and in synced mode the
+        // replay then met the server's refusal and dead-lettered.
+        if case .updateTags(_, let add, let remove, _) = input,
+           (add?.isEmpty ?? true) && (remove?.isEmpty ?? true) {
+            throw ValidationError(
+                message: "A tag bulk action needs at least one of add or remove to be non-empty."
+            )
+        }
+
+        // Resolve the match set with the same `ListFilters` that `GET /items`
+        // would, so the local fan-out narrows the way the server's does.
         var list = ListFilters()
         list.type = filter.type
         list.state = filter.state
@@ -610,10 +680,32 @@ public struct ItemsNamespace: Sendable {
         list.tags = filter.tags
         list.since = filter.since
         list.until = filter.until
-        list.filter = filter.filter
-        list.limit = options.maxItems
 
+        // `maxItems` is deliberately *not* `list.limit`. The server's
+        // `max_items` caps the match set before a `bulk_cap_exceeded` error —
+        // it refuses the action rather than trimming it. Passing it down as a
+        // fetch window inverted that: a purge capped at one row purged one
+        // arbitrary row of the many that matched, reported `matched: 1` so
+        // nothing downstream could tell, and returned success. A caller
+        // reaching for a cap is reaching for a brake, and a brake that
+        // silently becomes a partial write is worse than no brake.
+        //
+        // **The default matters as much as the explicit value.** The server
+        // caps at `min(max_items ?? 10_000, 50_000)`, so a caller who sets
+        // nothing still has a ceiling. Leaving the local side uncapped meant
+        // a synced client could act on far more rows than the server would
+        // then accept, and the replay's `400` is permanent — so the device
+        // applied the action, the server applied none, and the mutation was
+        // dead-lettered. Mirroring the default is what keeps the two halves
+        // agreeing about how much work a call is.
+        //
+        // The count is taken over the unwindowed set, because a windowed
+        // fetch cannot tell "this many matched" from "this many were read".
         let matched = try await store.fetchItems(filters: list)
+        let cap = min(options.maxItems ?? Self.defaultBulkActionCap, Self.maxBulkActionCap)
+        if matched.data.count > cap {
+            throw BulkCapExceededError(matched: matched.data.count, cap: cap)
+        }
 
         if options.dryRun == true {
             return BulkActionResult(
@@ -687,10 +779,14 @@ public struct ItemsNamespace: Sendable {
                 case .purge:
                     try await store.purgeItem(id: item.id)
                 case .updateTags(_, let add, let remove, _):
+                    // `remove` was guarded only by `if let` where `add` was
+                    // guarded by `!isEmpty`, so an empty array slipped through
+                    // one and not the other. Symmetric now; the refusal above
+                    // is what stops a call with nothing to do reaching here.
                     if let add, !add.isEmpty {
                         _ = try await store.addTags(itemId: item.id, tags: add)
                     }
-                    if let remove {
+                    if let remove, !remove.isEmpty {
                         for tag in remove {
                             try await store.removeTag(itemId: item.id, tag: tag)
                         }
@@ -706,12 +802,8 @@ public struct ItemsNamespace: Sendable {
                     _ = try await store.updateItem(
                         id: item.id, properties: merged, tier: nil
                     )
-                case .updateTimestamp:
-                    // LocalStore doesn't expose a timestamp-only setter
-                    // today; treat locally as a no-op and let replay
-                    // carry the change on the server. Reported as
-                    // succeeded so the counts match synced-mode intent.
-                    break
+                case .updateTimestamp(_, let timestamp, _):
+                    _ = try await store.setTimestamp(id: item.id, to: timestamp)
                 }
                 succeededIds.append(item.id)
                 succeeded += 1

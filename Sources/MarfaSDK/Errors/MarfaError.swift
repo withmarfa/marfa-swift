@@ -187,6 +187,14 @@ public final class SchemaVersionMismatchError: MarfaError {
 public final class LocalModeUnsupportedError: MarfaError {
     public let operation: String
 
+    /// Overridden rather than widening the 501 band in ``MarfaError/isPermanent``.
+    /// A *server* answering 501 is a different question — a route mid-rollout
+    /// or a proxy — and `PendingMutationBlockReason` deliberately treats a 5xx
+    /// as transient so a queued write survives it. Widening the band there
+    /// would turn those into dropped writes, which is a much larger change
+    /// than the caller-facing one this needs.
+    public override var isPermanent: Bool { true }
+
     public init(operation: String) {
         self.operation = operation
         super.init(
@@ -194,6 +202,87 @@ public final class LocalModeUnsupportedError: MarfaError {
             message:
                 "\(operation) requires a live server connection. Use MarfaClient.synced(...) or MarfaClient(url:apiKey:) instead.",
             status: 501
+        )
+    }
+}
+
+/// 501 — A narrowing the caller asked for cannot be applied where the request
+/// is being resolved, so the request is refused rather than answered wider
+/// than it was asked.
+///
+/// Raised by a bulk action on a client that resolves its own match set — local
+/// or synced — when the filter carries the server's `filter` expression. That
+/// grammar reaches across edges and is evaluated by the server; the local
+/// store does not implement it. Resolving without it would hand the action
+/// every row the remaining fields allow, and two of the six actions are
+/// `purge` and `transition`.
+///
+/// **A remote client never sees this.** It has no store, so its bulk action
+/// goes to the server, which evaluates its own grammar. Narrow with the
+/// structured fields — `type`, `state`, `source`, `tier`, `tags`, `since`,
+/// `until` — or perform the action through a remote client.
+public final class LocalFilterUnsupportedError: MarfaError {
+    /// Refusing a narrowing this path cannot apply is final by construction:
+    /// the same call on the same client resolves the same way every time. See
+    /// ``LocalModeUnsupportedError`` for why this is an override rather than a
+    /// widening of the status band.
+    public override var isPermanent: Bool { true }
+
+    /// The call that was refused, e.g. `items.bulkAction`.
+    public let operation: String
+    /// The narrowing that could not be applied, e.g. `filter`.
+    public let field: String
+
+    public init(operation: String, field: String) {
+        self.operation = operation
+        self.field = field
+        super.init(
+            code: "local_filter_unsupported",
+            message:
+                "\(operation) cannot apply the `\(field)` narrowing on a client that resolves locally, and will not act on a wider set than was asked for. Narrow with the filter's structured fields instead, or perform the action through a client built with MarfaClient(url:apiKey:).",
+            status: 501
+        )
+    }
+}
+
+/// 400 — A `purge` bulk action was submitted without its confirmation.
+///
+/// Mirrors the server's `bulk_confirmation_required`. The confirmation used to
+/// be enforced only inside `BulkActionInput`'s encoder, which runs when a
+/// mutation is queued — so a client resolving locally applied the purge first
+/// and threw afterwards, and a client with no queue never encoded at all and
+/// purged with no confirmation whatsoever.
+public final class BulkConfirmationRequiredError: MarfaError {
+    public init() {
+        super.init(
+            code: "bulk_confirmation_required",
+            message: #"A purge bulk action requires options.confirm == "PURGE"."#,
+            status: 400
+        )
+    }
+}
+
+/// 400 — A bulk action matched more rows than `maxItems` allows.
+///
+/// Mirrors the server's `bulk_cap_exceeded`, and the direction is the whole
+/// point: the cap **refuses the action**, it does not trim the match set. A
+/// client resolving locally used to pass the cap down as a fetch window, so a
+/// purge capped at one row purged one arbitrary row of the many that matched,
+/// reported `matched: 1`, and returned no error — a safety brake that quietly
+/// became a partial write.
+public final class BulkCapExceededError: MarfaError {
+    /// How many rows the filter actually matched.
+    public let matched: Int
+    /// The cap the caller set.
+    public let cap: Int
+
+    public init(matched: Int, cap: Int) {
+        self.matched = matched
+        self.cap = cap
+        super.init(
+            code: "bulk_cap_exceeded",
+            message: "The filter matched \(matched) items, above the maxItems cap of \(cap). Nothing was applied. Narrow the filter or raise the cap.",
+            status: 400
         )
     }
 }

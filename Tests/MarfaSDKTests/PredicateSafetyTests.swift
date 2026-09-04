@@ -54,6 +54,11 @@ struct PredicateSafetyTests {
         task.updatedAt = "2026-01-06T00:00:00.000Z"
         task.timestamp = task.createdAt
         task.source = "test"
+        // The one row carrying a tier, so a filter naming every clause at once
+        // can match a known id rather than matching nothing. A composed
+        // predicate asserted to be empty pins only that it does not crash — a
+        // lowering bug that wrongly excludes rows passes it identically.
+        task.tierRaw = Tier.library.rawValue
         context.insert(task)
 
         try context.save()
@@ -168,6 +173,57 @@ struct PredicateSafetyTests {
         // The seed rows carry no tier, so a tier filter matches nothing —
         // the point here is that the composed predicate evaluates at all.
         #expect(everything.isEmpty)
+    }
+
+    /// The items descriptor's sibling witness. It composes more branches than
+    /// the search one — seven now that `source` narrows — and the file it
+    /// lives in warns twice that clause count is what pushes the `#Predicate`
+    /// macro past the type-checker. A compile proves the macro accepted it;
+    /// only a fetch proves the predicate *lowers*, which is the "compiles then
+    /// crashes at runtime" failure this suite exists to catch.
+    @Test("Items descriptor composes every filter without crashing") func itemsDescriptorShapes() async throws {
+        let (context, _) = try await seededContext()
+
+        // Unfiltered: `system.*` rows drop out, trashed ones do not — the
+        // items descriptor has no default state exclusion where search does,
+        // and that asymmetry is deliberate.
+        let unfiltered = try context.fetch(LocalStore.makeItemsDescriptor(filters: nil))
+        #expect(Set(unfiltered.map(\.id)) == ["a", "b", "c"])
+
+        // Each captured branch alone, so a clause that stopped narrowing is
+        // distinguishable from one that never matched.
+        let byState = try context.fetch(
+            LocalStore.makeItemsDescriptor(filters: ListFilters(state: .trashed))
+        )
+        #expect(byState.map(\.id) == ["b"])
+
+        let bySource = try context.fetch(
+            LocalStore.makeItemsDescriptor(filters: ListFilters(source: "test"))
+        )
+        #expect(Set(bySource.map(\.id)) == ["a", "b", "c"])
+
+        let byMissingSource = try context.fetch(
+            LocalStore.makeItemsDescriptor(filters: ListFilters(source: "no-such-source"))
+        )
+        #expect(byMissingSource.isEmpty)
+
+        // Every captured branch live at once, and matching a known row rather
+        // than matching nothing — so this pins that the composition *narrows*
+        // as well as that it evaluates.
+        var everything = ListFilters(type: "core.task", state: .active, tier: .library)
+        everything.source = "test"
+        everything.since = "2026-01-01T00:00:00.000Z"
+        everything.until = "2026-12-31T00:00:00.000Z"
+        let composed = try context.fetch(LocalStore.makeItemsDescriptor(filters: everything))
+        #expect(composed.map(\.id) == ["c"])
+
+        // And the same seven clauses with one value moved off the row, so the
+        // assertion above cannot be satisfied by a predicate that stopped
+        // narrowing at all.
+        var narrowed = everything
+        narrowed.source = "no-such-source"
+        let none = try context.fetch(LocalStore.makeItemsDescriptor(filters: narrowed))
+        #expect(none.isEmpty)
     }
 
     // MARK: - Range comparisons (used by since/until)

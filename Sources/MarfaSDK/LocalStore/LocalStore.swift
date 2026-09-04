@@ -328,6 +328,27 @@ public actor LocalStore {
         return model.toWireItem()
     }
 
+    /// Sets the item's user-meaningful timestamp.
+    ///
+    /// Exists because a bulk `update_timestamp` had nowhere to write locally
+    /// and so did nothing while reporting every matched row as succeeded. In
+    /// synced mode a replay would eventually carry the change, which made the
+    /// no-op look defensible; a pure-local client has no queue and no server,
+    /// so the write was simply discarded and the caller told it had landed.
+    func setTimestamp(id: String, to timestamp: String) throws -> Item {
+        let predicate = #Predicate<MarfaItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Item not found: \(id)")
+        }
+        model.timestamp = timestamp
+        model.version += 1
+        model.updatedAt = now()
+        try modelContext.save()
+        return model.toWireItem()
+    }
+
     /// Sets the item's state to `trashed` (soft delete).
     func trashItem(id: String) throws {
         let predicate = #Predicate<MarfaItemModel> { $0.id == id }
@@ -955,14 +976,37 @@ public actor LocalStore {
     // and the ItemQuery / ItemsWithMetadataQuery refetch paths via the
     // `nonisolated` static helpers.
     ///
-    /// **What a local list still does not narrow on.** `source`, `filter`,
-    /// `edge` and `backref` are accepted and ignored here. `filter` is the
-    /// server's structured expression and is not evaluated locally, matching
-    /// how `LocalStoreSearch` treats `SearchFilters.filter`; the other three
-    /// have no local implementation yet. Listed rather than left silent,
-    /// because a filter that is quietly dropped is indistinguishable from one
-    /// that matched everything, and that is the defect this file just spent
-    /// two changes repairing.
+    /// **What a local list still does not narrow on.** `filter`, `edge` and
+    /// `backref` are accepted and ignored here. `filter` is the server's
+    /// structured expression and is not evaluated locally, matching how
+    /// `LocalStoreSearch` treats `SearchFilters.filter`; the other two have no
+    /// local implementation yet. Listed rather than left silent, because a
+    /// filter that is quietly dropped is indistinguishable from one that
+    /// matched everything.
+    ///
+    /// **`source` used to be on that list and is not any more.** It is a plain
+    /// stored column, so there was never a reason it could not narrow, and
+    /// dropping it meant a local list answered a `source` question with every
+    /// row in the store. Two callers make that worse than a wide read: a bulk
+    /// action resolves its match set through here and then *acts* on it, and
+    /// `purge` is one of the actions.
+    ///
+    /// **Being on the list is a claim about a read, and a bulk action is not a
+    /// read.** `ItemsNamespace` therefore refuses a `filter` expression rather
+    /// than resolving through this descriptor and applying an action to the
+    /// result — an over-wide read is corrected by the next fetch, and an
+    /// over-wide purge is not.
+    ///
+    /// **That justification is about the caller's ability to notice, and it
+    /// does not hold for a caller who never sees the filter.** An app calling
+    /// `items.list` wrote the narrowing itself and can tell a wide answer from
+    /// a narrow one. Three callers inside this kit translate a *typed*
+    /// argument into an expression on the caller's behalf —
+    /// `ConnectionsNamespace.list(kind:)`, `MarfaStore.queryConnections(kind:)`
+    /// and `MarfaStore.queryActivity(severity:)` — so the caller passes an
+    /// enum, the expression is dropped here, and an unnarrowed set comes back
+    /// with nothing to indicate it. Those three are a defect rather than a
+    /// documented limitation, and they are filed as one.
     nonisolated static func makeItemsDescriptor(filters: ListFilters?) -> FetchDescriptor<MarfaItemModel> {
         // Captured-value short-circuit pattern (predicate convention 8):
         // SwiftData has no runtime `Predicate<T>` composition, so we
@@ -980,6 +1024,8 @@ public actor LocalStore {
         // compares directly against the stored column.
         let tierFilter = filters?.tier?.rawValue ?? ""
         let hasTierFilter = filters?.tier != nil
+        let sourceFilter = filters?.source ?? ""
+        let hasSourceFilter = filters?.source != nil
 
         // `system.*` records are operational rather than user data, and the
         // server drops them from a listing unless the caller names a system
@@ -1019,6 +1065,7 @@ public actor LocalStore {
             (!hasSince || item.timestamp >= since || item.timestamp == "") &&
             (!hasUntil || item.timestamp <= until) &&
             (!hasTierFilter  || item.tierRaw == tierFilter) &&
+            (!hasSourceFilter || item.source == sourceFilter) &&
             (!excludeSystemTypes || !item.type.starts(with: systemPrefix))
         }
 
