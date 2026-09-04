@@ -201,6 +201,65 @@ struct SyncEngineInboundRebaseTests {
         #expect(text(stored, "title") == "Renamed")
     }
 
+    @Test("an unsent bulk write survives the frame, and the other device's field lands")
+    func pendingBulkWriteSurvivesAndTheOtherFieldLands() async throws {
+        // A `bulk` sets no `localId` — its ids sit one per payload entry — so a
+        // lookup keyed on `localId` alone could not see it, and an inbound
+        // frame overwrote a queued bulk write with the server's row. That is
+        // the same exposure the single-write case above closes, one kind over.
+        //
+        // Enqueued directly rather than through `items.bulk`, which writes a
+        // fresh local row per entry: the case here is a bulk naming a row that
+        // already exists on both sides, which is what an upsert-mode re-ingest
+        // produces.
+        let (store, queue, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("i1", title: "Draft", body: "first pass", version: 1))
+
+        try await queue.enqueueBulk(
+            BulkInput(items: [
+                BulkItemInput(
+                    id: "i1", type: "core.note",
+                    properties: ["body": .string("rewritten by a bulk")]
+                )
+            ])
+        )
+
+        await engine._applyEventForTesting(
+            try frame("item.updated", item("i1", title: "Renamed", body: "first pass", version: 2))
+        )
+
+        let stored = try await store.fetchItem(id: "i1")
+        #expect(text(stored, "body") == "rewritten by a bulk")
+        #expect(text(stored, "title") == "Renamed")
+    }
+
+    @Test("a queued bulk naming other rows does not touch this one")
+    func pendingBulkForAnotherRowIsNotApplied() async throws {
+        // The control for the test above. Bulk rows are fetched by kind rather
+        // than by id, because they carry no `localId` to fetch by — so every
+        // queued bulk is read for every inbound frame, and the entry filter is
+        // the only thing keeping one row's queued write off another row.
+        let (store, queue, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("i1", title: "Draft", body: "first pass", version: 1))
+
+        try await queue.enqueueBulk(
+            BulkInput(items: [
+                BulkItemInput(
+                    id: "somebody-else", type: "core.note",
+                    properties: ["body": .string("belongs to another row")]
+                )
+            ])
+        )
+
+        await engine._applyEventForTesting(
+            try frame("item.updated", item("i1", title: "Renamed", body: "theirs", version: 2))
+        )
+
+        let stored = try await store.fetchItem(id: "i1")
+        #expect(text(stored, "body") == "theirs")
+        #expect(text(stored, "title") == "Renamed")
+    }
+
     // MARK: - The order queued edits are put back in
 
     @Test("two queued edits to one field replay oldest first, so the later one wins")
