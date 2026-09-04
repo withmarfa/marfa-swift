@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import MarfaSDK
 @testable import MarfaSDKTestSupport
@@ -120,11 +121,23 @@ struct SyncEngineInboundRebaseTests {
         #expect(text(stored, "title") == "Renamed")
     }
 
-    @Test("a metadata.changed frame lands its tags without discarding an unsent edit")
+    @Test("a metadata.changed frame lands its tags and its item field without discarding an unsent edit")
     func metadataFrameKeepsThePendingEdit() async throws {
         // `metadata.changed` carries the item alongside the sidecar and applies
         // both, so it had the same exposure as `item.updated` and needed the
         // same fix rather than a second one.
+        //
+        // The frame changes the title, which is what makes this test say
+        // anything. Carrying the same title, body and version as the stored row
+        // — as it did — left every assertion satisfied by an engine that
+        // skipped this arm's item apply altogether, so it passed without
+        // witnessing the thing it is named for.
+        //
+        // The changed field also pins the one clause nothing else reaches. The
+        // local update bumps the stored version to 2 while this frame still
+        // says 1, so the frame is *behind* the row and applies only because the
+        // version check is skipped for a row with queued writes. Drop
+        // `edits.isEmpty` from that guard and the title below stays "Draft".
         let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         try await store.upsertItem(item("i1", title: "Draft", body: "first pass", version: 1))
 
@@ -135,14 +148,165 @@ struct SyncEngineInboundRebaseTests {
         await engine._applyEventForTesting(
             try frame(
                 "metadata.changed",
-                item("i1", title: "Draft", body: "first pass", version: 1),
+                item("i1", title: "Renamed", body: "first pass", version: 1),
                 metadata: Metadata(extensions: [:], itemId: "i1", tags: ["urgent"])
             )
         )
 
         let stored = try await store.fetchItem(id: "i1")
         #expect(text(stored, "body") == "second pass")
+        #expect(text(stored, "title") == "Renamed")
         #expect(try await store.fetchMetadata(itemId: "i1").tags == ["urgent"])
+    }
+
+    @Test("an unsent restore survives the frame, and the other device's field lands")
+    func pendingRestoreSurvivesAndTheOtherFieldLands() async throws {
+        // `.restoreItem` and `.transitionItem` are translated by the same
+        // `switch` as the two kinds above and are shaped alike, so an edit to
+        // one of the four is likely to break the others. Both are covered here
+        // rather than assumed to follow.
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(
+            item("i1", title: "Draft", body: "first pass", state: .trashed, version: 1)
+        )
+
+        _ = try await items(store, queue, transport).restore(id: "i1")
+
+        // The other device still thinks it is in the bin, and renames it there.
+        await engine._applyEventForTesting(
+            try frame(
+                "item.updated",
+                item("i1", title: "Renamed", body: "first pass", state: .trashed, version: 2)
+            )
+        )
+
+        let stored = try await store.fetchItem(id: "i1")
+        #expect(stored.state == .active)
+        #expect(text(stored, "title") == "Renamed")
+    }
+
+    @Test("an unsent transition survives the frame, and the other device's field lands")
+    func pendingTransitionSurvivesAndTheOtherFieldLands() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("i1", title: "Draft", body: "first pass", version: 1))
+
+        _ = try await items(store, queue, transport).transition(id: "i1", to: .archived)
+
+        await engine._applyEventForTesting(
+            try frame("item.updated", item("i1", title: "Renamed", body: "first pass", version: 2))
+        )
+
+        let stored = try await store.fetchItem(id: "i1")
+        #expect(stored.state == .archived)
+        #expect(text(stored, "title") == "Renamed")
+    }
+
+    // MARK: - The order queued edits are put back in
+
+    @Test("two queued edits to one field replay oldest first, so the later one wins")
+    func queuedEditsApplyOldestFirst() async throws {
+        // The rebase orders by `createdAt` because the drain does, so what a
+        // person sees before their writes reach the server matches what they
+        // see after. Reversed, a device that edited the same field twice would
+        // show the first edit until the queue drained and then jump to the
+        // second.
+        //
+        // The ordering keys are literal strings rather than the production
+        // clock, and that is the whole reason this test can exist. The column
+        // is millisecond-resolution, so two mutations enqueued through the
+        // namespace inside one millisecond carry the same key and are genuinely
+        // unordered — that is a real defect, and it is not what this pins.
+        // Writing the keys makes the input unambiguous, so a failure here means
+        // the sort is wrong rather than that the machine was fast.
+        let (store, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        try await SyncEngineTestKit.markImported(queue)
+        let engine = SyncEngine(
+            transport: MockTransport(),
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: ConnectionStateManager()
+        )
+        try await store.upsertItem(item("i1", title: "Draft", body: "first pass", version: 1))
+
+        // Inserted a second apart and in reverse, so a fetch that returned them
+        // in insertion order rather than sorted would fail this.
+        try await insertQueuedBodyEdit(
+            container, id: "m-later", itemId: "i1",
+            body: "the second thing they typed", createdAt: "2026-09-03T09:00:01.000Z"
+        )
+        try await insertQueuedBodyEdit(
+            container, id: "m-earlier", itemId: "i1",
+            body: "the first thing they typed", createdAt: "2026-09-03T09:00:00.000Z"
+        )
+
+        await engine._applyEventForTesting(
+            try frame("item.updated", item("i1", title: "Renamed", body: "theirs", version: 2))
+        )
+
+        let stored = try await store.fetchItem(id: "i1")
+        #expect(text(stored, "body") == "the second thing they typed")
+        // The control: an engine that ignored inbound frames entirely would
+        // satisfy the assertion above.
+        #expect(text(stored, "title") == "Renamed")
+    }
+
+    /// Writes one queued `updateItem` against `itemId` with an ordering key the
+    /// caller chooses.
+    ///
+    /// Through a fresh `@MainActor` context against the shared container, the
+    /// same way the blob and fail-safe suites seed a queue: the save commits to
+    /// the store the `MutationQueue` actor reads from.
+    private func insertQueuedBodyEdit(
+        _ container: ModelContainer,
+        id: String,
+        itemId: String,
+        body: String,
+        createdAt: String
+    ) async throws {
+        try await Task { @MainActor in
+            let context = ModelContext(container)
+            let mutation = PendingMutationModel()
+            mutation.id = id
+            mutation.kindRaw = MutationKind.updateItem.rawValue
+            mutation.payloadJson = #"{"id":"\#(itemId)","properties":{"body":"\#(body)"}}"#
+            mutation.localId = itemId
+            mutation.createdAt = createdAt
+            mutation.attemptCount = 0
+            mutation.stateRaw = PendingMutationState.pending.rawValue
+            context.insert(mutation)
+            try context.save()
+        }.value
+    }
+
+    // MARK: - When both devices touched the same field
+
+    @Test("a local edit to the field the frame also changed wins until the queue drains")
+    func sameFieldCollisionKeepsTheLocalEdit() async throws {
+        // Every other test here has the two devices touching different fields,
+        // which is the case the rebase is designed around and the one that
+        // reads as obviously right. This is the case it is not designed around,
+        // pinned so the behavior is a decision rather than a consequence.
+        //
+        // Queued edits are applied last, so a local edit wins the field and the
+        // other device's value for it is not shown at all — not merged, not
+        // flagged, simply hidden until the queue drains and the server decides.
+        // That is the defensible answer for the device doing the typing: the
+        // alternative shows someone their own sentence being replaced as they
+        // write it. It does mean a person can be looking at a field whose value
+        // another device has already changed, with nothing on screen saying so.
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("i1", title: "Draft", body: "first pass", version: 1))
+
+        _ = try await items(store, queue, transport).update(
+            id: "i1", properties: ["body": .string("mine, still typing")]
+        )
+
+        // Same row, same field, from somewhere else.
+        await engine._applyEventForTesting(
+            try frame("item.updated", item("i1", title: "Draft", body: "theirs", version: 2))
+        )
+
+        #expect(text(try await store.fetchItem(id: "i1"), "body") == "mine, still typing")
     }
 
     // MARK: - A frame older than the row does not apply

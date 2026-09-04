@@ -59,6 +59,21 @@ struct SyncEngineRemovalTests {
         )
     }
 
+    /// A page that says more is waiting. `cursor: nil` builds the pair no
+    /// well-behaved server sends — more results, nowhere to resume from.
+    private func pageWithMore(
+        _ items: [Item], cursor: String?
+    ) -> PaginatedResult<ItemWithMetadata> {
+        PaginatedResult<ItemWithMetadata>(
+            data: items.map(pair), cursor: cursor, hasMore: true
+        )
+    }
+
+    /// Stands in for anything that can end a read partway: a dropped
+    /// connection, a 500, a decode that failed. What it is does not matter —
+    /// only that the import does not reach the end of the library.
+    private struct ReadFailedMidway: Error {}
+
     private struct ItemFrame: Encodable {
         let type: String
         let item: Item
@@ -142,14 +157,29 @@ struct SyncEngineRemovalTests {
         #expect(try await storedIds(store) == ["binned"])
     }
 
-    @Test("the re-import asks for every state, so the bin is not mistaken for a purge")
-    func reimportAsksForEveryState() async throws {
-        // The one wire assertion here, and it decides whether the prune is safe
-        // at all. `GET /items` excludes trashed rows unless asked otherwise, so
-        // an import that does not widen sees a bin full of rows as a server
-        // that has purged all of them — and empties the device's bin on every
-        // re-import. A mock answers whatever is queued regardless of the query,
-        // so nothing downstream of here can catch the omission.
+    @Test("the re-import asks for everything the prune then judges")
+    func reimportAsksForEverythingThePruneJudges() async throws {
+        // The wire assertions, and together they decide whether the prune is
+        // safe at all. It reads the ids the answer named as the entire server
+        // side, so anything the *request* narrows away is not a smaller import
+        // — it is a deletion. `GET /items` narrows two ways by default and each
+        // one is a different set of rows destroyed:
+        //
+        // `state` — trashed rows are excluded, so a bin full of rows reads as a
+        // server that purged all of them and the device's bin empties on every
+        // re-import.
+        //
+        // `include` — `system.*` rows are excluded, while the stream that has
+        // been filling this store filters on nothing. Every device, connection
+        // and activity row would be absent from the keep-set and deleted, so
+        // `connections.list()` empties against a server that still has all of
+        // them, and no event ever corrects it because no event describes a row
+        // that did not change.
+        //
+        // A mock answers whatever is queued regardless of the query, so nothing
+        // downstream of here can catch either omission — and a third narrowing
+        // added to this query later would be just as invisible. This is the
+        // test that has to fail for it.
         let (_, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         transport.enqueue(page([]))
         transport.enqueue(noEdges())
@@ -160,6 +190,73 @@ struct SyncEngineRemovalTests {
         #expect(itemCalls.count == 1)
         let query = itemCalls.first?.query ?? []
         #expect(query.contains { $0.0 == "state" && $0.1 == "any" })
+        // Asserted on the parsed set rather than the whole string, because the
+        // route splits `include` on commas and the order of the values is not
+        // something this test should pin.
+        let include = Set(
+            (query.first { $0.0 == "include" }?.1 ?? "")
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+        )
+        #expect(include.contains("system"))
+        #expect(include.contains("metadata"))
+        // Nothing narrows the answer by type. A `type` parameter would exclude
+        // every other type from the keep-set and delete the lot.
+        #expect(!query.contains { $0.0 == "type" })
+    }
+
+    @Test("a read that fails midway prunes nothing")
+    func partialReadPrunesNothing() async throws {
+        // The most destructive property in this change, and until now nothing
+        // held it. The prune deletes every stored row the answer did not name,
+        // so running it against a partial answer deletes every row on every
+        // page that never arrived — a whole library, from one dropped
+        // connection.
+        //
+        // It is true today because both the request and the cancellation check
+        // throw from inside the loop, which leaves the prune unreachable. That
+        // is a property of where two statements sit, so it is exactly the kind
+        // that a later refactor moving the prune, or catching the read, would
+        // take away without anything saying so.
+        let (store, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("named-on-page-one"))
+        try await store.upsertItem(item("would-have-been-on-page-two"))
+
+        transport.enqueue(pageWithMore([item("named-on-page-one")], cursor: "page-2"))
+        transport.enqueueError(ReadFailedMidway())
+
+        await #expect(throws: ReadFailedMidway.self) {
+            _ = try await engine.performInitialSync()
+        }
+
+        // Both rows, including the one the answer never got to. The store is
+        // exactly as it was, which is what lets the next cycle try again.
+        #expect(try await storedIds(store) == ["named-on-page-one", "would-have-been-on-page-two"])
+    }
+
+    @Test("a page claiming more results with no cursor is refused, not read as the end")
+    func unresumablePageIsRefused() async throws {
+        // The same data loss reached without any error at all. A page answering
+        // `hasMore: true` with a null cursor used to skip the break, set the
+        // cursor to null, fail the loop condition and return normally — so the
+        // prune ran against a keep-set holding only the pages that had arrived,
+        // and every row beyond them was deleted as purged.
+        //
+        // Marfa's own server cannot send this pair. This SDK also talks to
+        // self-hosted servers, so that is one implementation's behavior rather
+        // than a promise the route makes, and the cost of not trusting it is a
+        // single throw.
+        let (store, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("named-on-page-one"))
+        try await store.upsertItem(item("would-have-been-on-page-two"))
+
+        transport.enqueue(pageWithMore([item("named-on-page-one")], cursor: nil))
+
+        await #expect(throws: InitialSyncError.self) {
+            _ = try await engine.performInitialSync()
+        }
+
+        #expect(try await storedIds(store) == ["named-on-page-one", "would-have-been-on-page-two"])
     }
 
     // MARK: - The announcement

@@ -737,7 +737,7 @@ public actor SyncEngine {
             // against self-hosted servers, so that is a fact about one
             // implementation rather than a guarantee of the route.
             guard let nextCursor = page.cursor else {
-                throw InitialSyncError.unresumablePage(path: "/items", imported: imported)
+                throw InitialSyncError.unresumablePage(route: "/items", imported: imported)
             }
             cursor = nextCursor
             // Not `while cursor != nil`: the guard above has already settled
@@ -810,7 +810,7 @@ public actor SyncEngine {
             // above would leave the next reader to work out which of the two
             // loops was the deliberate one.
             guard let nextEdgeCursor = page.cursor else {
-                throw InitialSyncError.unresumablePage(path: "/edges", imported: edgesImported)
+                throw InitialSyncError.unresumablePage(route: "/edges", imported: edgesImported)
             }
             edgeCursor = nextEdgeCursor
         } while true

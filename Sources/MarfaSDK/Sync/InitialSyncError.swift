@@ -44,12 +44,16 @@ public enum InitialSyncError: Error, Sendable {
     /// detail rather than a promise the route makes.
     ///
     /// - Parameters:
-    ///   - path: The route that answered this way, so a report names which of
+    ///   - route: The route that answered this way, so a report names which of
     ///     the import's passes stopped rather than only that one did.
     ///   - imported: How many rows had been written when it stopped. A run that
     ///     always stops at the same count is a server paginating wrongly at a
     ///     fixed boundary rather than a transient one.
-    case unresumablePage(path: String, imported: Int)
+    // Labeled `route:` rather than `path:` deliberately. `RouteCoverageTests`
+    // treats a route-shaped `path:` argument outside a transport call as an
+    // HTTP call that escaped its scan, and that guard is worth more than the
+    // label.
+    case unresumablePage(route: String, imported: Int)
 }
 
 extension InitialSyncError: CustomStringConvertible {
@@ -62,10 +66,10 @@ extension InitialSyncError: CustomStringConvertible {
                 reached the server. Importing now would overwrite them. Let the \
                 sync engine drain its queue and ask again.
                 """
-        case .unresumablePage(let path, let imported):
+        case .unresumablePage(let route, let imported):
             let rows = imported == 1 ? "1 row" : "\(imported) rows"
             return """
-                The initial sync stopped after \(rows) because \(path) reported \
+                The initial sync stopped after \(rows) because \(route) reported \
                 more results and returned no cursor to continue from. Nothing \
                 was changed locally: finishing a partial answer would delete \
                 every row the remaining pages would have named.
