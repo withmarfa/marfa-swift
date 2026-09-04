@@ -16,6 +16,27 @@ public enum LocalStoreError: Error, Sendable {
     /// Carries the originating error's localized description.
     case databaseSetupFailed(String)
 
+    /// A store this build cannot open also could not be moved aside, so
+    /// nothing was deleted and no container was built. Carries what failed.
+    ///
+    /// The alternative — rebuilding anyway — is what this case exists to stop.
+    /// It would take the queued writes, the dead-letter log, the event cursor
+    /// and the bytes behind every queued upload with it, and the app would
+    /// have no way to know that had happened.
+    case storeQuarantineFailed(String)
+
+    /// A store was moved aside and the fresh one that should have replaced it
+    /// could not be built. Carries the directory the old store is in, and what
+    /// the rebuild said.
+    ///
+    /// The directory is the reason this case exists rather than the container's
+    /// own error being rethrown. At this point the queued writes, the dead
+    /// letters, the cursor and the blob bytes have all been moved somewhere the
+    /// app has never been told about and, since the open did not return, never
+    /// will be — the one path out of the fail-safe that could still lose the
+    /// data by losing its address.
+    case storeRebuildFailed(quarantineDirectory: URL, reason: String)
+
     /// A model fetch returned no rows for a key the caller treated as
     /// known (e.g. an upsert tried to mutate a row mid-transaction and
     /// found it gone). Carries the missing id.

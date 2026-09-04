@@ -90,6 +90,11 @@ public actor SyncEngine {
     private let connectionManager: ConnectionStateManager
     private let logger = MarfaLogger(category: "sync")
 
+    /// Set when the store this engine writes to had to be rebuilt on open.
+    /// Announced once on ``start()`` and then cleared, because a restart is
+    /// not a second incident.
+    private var pendingStoreRecovery: StoreRecovery?
+
     /// Debounce window between a `MutationQueue.drainRequests` ping and
     /// the proactive drain firing. Coalesces bursts of enqueues from a
     /// single user action (e.g. `setMetadata` + `addTags` back-to-back)
@@ -346,7 +351,8 @@ public actor SyncEngine {
         connectionManager: ConnectionStateManager,
         drainDebounceInterval: Duration = .milliseconds(150),
         conflictResolvers: ConflictResolverRegistry? = nil,
-        maxReplayAttempts: Int = 5
+        maxReplayAttempts: Int = 5,
+        storeRecovery: StoreRecovery? = nil
     ) {
         self.transport = transport
         self.localStore = localStore
@@ -354,6 +360,7 @@ public actor SyncEngine {
         self.connectionManager = connectionManager
         self.drainDebounceInterval = drainDebounceInterval
         self.conflictResolvers = conflictResolvers
+        self.pendingStoreRecovery = storeRecovery
         // A ceiling below one would block a write on its first failure,
         // including the network-class failures that are meant to be exempt —
         // an offline device would park every write it made.
@@ -414,6 +421,14 @@ public actor SyncEngine {
             await Task.yield()
         }
         guard !running, !starting else { return }
+        // Before anything that can suspend. The store was opened long before
+        // this engine existed, so this is the first moment there is anywhere
+        // to say what happened to it, and a subscriber who took the stream and
+        // then called `start()` must not be able to miss it.
+        if let recovery = pendingStoreRecovery {
+            pendingStoreRecovery = nil
+            emit(.storeRecovered(recovery))
+        }
         let generation = UUID()
         lifecycleGeneration = generation
         starting = true

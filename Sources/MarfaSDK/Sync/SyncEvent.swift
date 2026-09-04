@@ -153,6 +153,20 @@ public enum SyncEvent: Sendable {
     /// or local id, and `nil` for records that carry none.
     case mutationBlocked(kind: String, itemId: String?, reason: PendingMutationBlockReason)
 
+    /// The local store could not be opened and was rebuilt empty, so this
+    /// device is starting from nothing until the first import finishes.
+    ///
+    /// Emitted once, by ``SyncEngine/start()``, because the store is opened
+    /// before an engine exists to announce it. Subscribe to ``SyncEngine/events``
+    /// before calling `start()` and the announcement arrives there; the same
+    /// value is also readable synchronously as ``MarfaClient/storeRecovery``.
+    ///
+    /// Worth surfacing rather than logging. The payload names the directory
+    /// the old store was moved to and how many queued writes, dead letters and
+    /// queued uploads were salvaged out of it — the things the server cannot
+    /// send back.
+    case storeRecovered(StoreRecovery)
+
     /// A blob upload has started. Fires once per upload attempt, before
     /// any bytes hit the network. `totalBytes` comes from the queued
     /// payload — the same value `BlobUploadResponse.size` returned when
