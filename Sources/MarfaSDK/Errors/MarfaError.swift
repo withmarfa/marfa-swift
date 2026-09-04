@@ -198,6 +198,39 @@ public final class LocalModeUnsupportedError: MarfaError {
     }
 }
 
+/// 501 — A narrowing the caller asked for cannot be applied where the request
+/// is being resolved, so the request is refused rather than answered wider
+/// than it was asked.
+///
+/// Raised by a bulk action on a client that resolves its own match set — local
+/// or synced — when the filter carries the server's `filter` expression. That
+/// grammar reaches across edges and is evaluated by the server; the local
+/// store does not implement it. Resolving without it would hand the action
+/// every row the remaining fields allow, and two of the six actions are
+/// `purge` and `transition`.
+///
+/// **A remote client never sees this.** It has no store, so its bulk action
+/// goes to the server, which evaluates its own grammar. Narrow with the
+/// structured fields — `type`, `state`, `source`, `tier`, `tags`, `since`,
+/// `until` — or perform the action through a remote client.
+public final class LocalFilterUnsupportedError: MarfaError {
+    /// The call that was refused, e.g. `items.bulkAction`.
+    public let operation: String
+    /// The narrowing that could not be applied, e.g. `filter`.
+    public let field: String
+
+    public init(operation: String, field: String) {
+        self.operation = operation
+        self.field = field
+        super.init(
+            code: "local_filter_unsupported",
+            message:
+                "\(operation) cannot apply the `\(field)` narrowing on a client that resolves locally, and will not act on a wider set than was asked for. Narrow with the structured fields, or use MarfaClient(url:apiKey:).",
+            status: 501
+        )
+    }
+}
+
 // MARK: - Network Error
 
 /// Transport-level failure (no connectivity, timeout, DNS, etc.).

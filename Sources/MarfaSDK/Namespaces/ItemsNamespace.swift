@@ -599,6 +599,26 @@ public struct ItemsNamespace: Sendable {
     ) async throws -> BulkActionResult {
         let (filter, options, actionName) = destructureAction(input)
 
+        // Refuse a narrowing this path cannot apply, rather than resolving
+        // without it. `filter` is the server's expression grammar, which
+        // reaches across edges and is evaluated server-side; the local store
+        // does not implement it and says so. Passing it through anyway
+        // resolved to every row the remaining fields allowed and then applied
+        // the action to all of them — and `purge` is one of the actions, so
+        // an expression naming nothing emptied the store.
+        //
+        // The refusal sits here, on the path that *acts*, and not on
+        // `makeItemsDescriptor`, which also serves plain reads. A read that
+        // comes back wide is corrected by the next read; a purge is not. A
+        // remote client never reaches this function at all — it has no store,
+        // so its bulk action goes to the server, which evaluates its own
+        // grammar correctly and loses no capability here.
+        if filter.filter != nil {
+            throw LocalFilterUnsupportedError(
+                operation: "items.bulkAction", field: "filter"
+            )
+        }
+
         // Resolve the match set with the same `ListFilters` that
         // `GET /items` would, so the local fan-out mirrors the server's
         // server-side narrowing.
@@ -610,7 +630,6 @@ public struct ItemsNamespace: Sendable {
         list.tags = filter.tags
         list.since = filter.since
         list.until = filter.until
-        list.filter = filter.filter
         list.limit = options.maxItems
 
         let matched = try await store.fetchItems(filters: list)
