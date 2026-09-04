@@ -112,6 +112,18 @@ public struct Connection: MarfaItem {
     /// Next scheduled run, when applicable.
     public var nextRunAt: String? { item.properties["next_run_at"]?.stringValue }
 
+    /// For `kind: integration` — while this instant is in the future, the
+    /// runtime brings items already stored onto the type the mapping now
+    /// names rather than refusing them as a type mismatch.
+    ///
+    /// A deadline rather than a boolean, so the state cannot outlive the
+    /// intent that set it: a sweep that parks and never resumes, or a
+    /// connection paused mid-run, would otherwise leave every future sweep
+    /// re-typing a corpus nobody asked it to.
+    public var mappingReapplyUntil: String? {
+        item.properties["mapping_reapply_until"]?.stringValue
+    }
+
     /// Most recent failure timestamp (cleared on next success).
     public var lastErrorAt: String? { item.properties["last_error_at"]?.stringValue }
 

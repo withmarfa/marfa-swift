@@ -103,10 +103,16 @@ jobs:
             exit 1
           fi
 
-      - name: Codegen freshness (domain models)
+      - name: Codegen freshness (domain models and the type registry)
+        # `codegen-domain` emits two things from one input, and both are
+        # diffed: the domain-model structs, and the runtime type registry the
+        # device validates writes against. The registry is listed explicitly
+        # rather than folded into the same directory because the generator
+        # prunes anything in the domain-model output it did not emit as a
+        # struct — a registry living there would be deleted on the next run.
         run: |
           swift run codegen-domain
-          if ! git diff --exit-code -- Sources/MarfaSDK/DomainModels/Generated; then
+          if ! git diff --exit-code -- Sources/MarfaSDK/DomainModels/Generated Sources/MarfaSDK/Types/Registry/Generated; then
             echo "::error::codegen-domain output is stale. Run 'swift run codegen-domain' (or './scripts/sync-types.sh' if the core-types snapshot is behind) locally and commit the delta."
             exit 1
           fi

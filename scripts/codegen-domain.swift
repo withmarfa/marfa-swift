@@ -22,11 +22,17 @@ struct FieldDefinition: Decodable {
     let format: String?
     let enumValues: [String]?
     let itemsType: String?
+    /// Upper bounds the server applies. No vendored type declares either
+    /// today; they are decoded because the server's field definition carries
+    /// them and a custom type may override the defaults.
+    let maxItems: Int?
+    let maxLength: Int?
 
     enum CodingKeys: String, CodingKey {
         case type, description, format
         case enumValues = "enum_values"
         case itemsType = "items_type"
+        case maxItems, maxLength
     }
 }
 
@@ -150,17 +156,20 @@ func resolvedFields(
         current = parent
     }
     // Walk from root → leaf; child overrides parent for same key.
-    var merged: [(key: String, value: FieldDefinition)] = []
-    var seen = Set<String>()
-    // Reverse so root comes first, then children override.
+    // Root first, then each child replaces what it redeclares. The guard used
+    // to skip a key already seen, which — walking root to leaf — kept the
+    // *root's* definition and discarded the child's, the inverse of both this
+    // comment and the server. Latent while every redeclaration in the vendored
+    // set keeps its parent's type, and a defect the moment one narrows it.
+    var byKey: [String: FieldDefinition] = [:]
+    var order: [String] = []
     for ancestor in chain.reversed() {
         for (key, field) in ancestor.fields.sorted(by: { $0.key < $1.key }) {
-            if !seen.contains(key) {
-                merged.append((key, field))
-                seen.insert(key)
-            }
+            if byKey[key] == nil { order.append(key) }
+            byKey[key] = field
         }
     }
+    var merged: [(key: String, value: FieldDefinition)] = order.map { ($0, byKey[$0]!) }
     // Re-sort alphabetically for stable output; required fields first.
     let requiredSet = resolvedRequired(for: schema, registry: registry)
     merged.sort {
@@ -493,3 +502,145 @@ for schema in activeSchemas {
 }
 
 print("done — \(generatedCount) files written to \(outputDir.path)")
+
+// MARK: - The runtime platform registry
+
+// Domain-model structs are emitted for `core.*` only, because the system types
+// are hand-written for their closed enums. The *registry* needs both: a device
+// validating a write, or resolving a subtype, has to know about every type the
+// platform ships, and `system.connection` rows reach a local store like any
+// other. So the system schemas are loaded here rather than into `schemas`,
+// which would make the generator above start emitting structs that are
+// deliberately hand-written.
+let systemDir = typesDir.appendingPathComponent("system")
+var registrySchemas = schemas
+for file in (try? FileManager.default.contentsOfDirectory(
+    at: systemDir, includingPropertiesForKeys: nil
+))?.filter({ $0.pathExtension == "json" }) ?? [] {
+    guard let data = try? Data(contentsOf: file),
+          let schema = try? decoder.decode(TypeSchema.self, from: data)
+    else {
+        print("warning: could not parse system/\(file.lastPathComponent)")
+        continue
+    }
+    registrySchemas[schema.id] = schema
+}
+
+/// The server collapses four declared formats into a field type before
+/// validating, so `{"type": "string", "format": "url"}` is checked as a URL
+/// rather than as free text. Reading `type` alone dropped every one of them —
+/// sixty fields across the vendored set, including every format on a `core.*`
+/// type, which is the half apps actually write. `bcp47` and `iso3166` are not
+/// in the map because the server does not enforce them either.
+let formatToFieldType: [String: String] = [
+    "url": "url",
+    "email": "email",
+    "datetime": "datetime",
+    "date": "date",
+]
+
+func swiftFieldType(_ field: FieldDefinition) -> String {
+    let collapsed = field.format.flatMap { formatToFieldType[$0] } ?? field.type
+    // The registry's enum spells `enum` as `explicitEnum`, because `enum` is a
+    // keyword; every other case is the declared name unchanged.
+    return collapsed == "enum" ? "explicitEnum" : collapsed
+}
+
+func quoted(_ text: String) -> String {
+    "\"" + text.replacingOccurrences(of: "\\", with: "\\\\")
+        .replacingOccurrences(of: "\"", with: "\\\"") + "\""
+}
+
+let registryTypes = registrySchemas.values
+    .filter { $0.deferred != true }
+    .sorted { $0.id < $1.id }
+
+var registryBody = ""
+for schema in registryTypes {
+    // The server seeds every resolved field set with these two before
+    // validating, so a type that declares neither still refuses a string where
+    // an array belongs. Seeded here rather than at validation time for the
+    // same reason the parent chain is flattened here: once, not per call.
+    let universalFields: [(key: String, value: FieldDefinition)] = [
+        ("attachments", FieldDefinition(
+            type: "array", description: nil, format: nil, enumValues: nil,
+            itemsType: "object", maxItems: nil, maxLength: nil
+        )),
+        ("links", FieldDefinition(
+            type: "array", description: nil, format: nil, enumValues: nil,
+            itemsType: "string", maxItems: nil, maxLength: nil
+        )),
+    ]
+    var fields = resolvedFields(for: schema, registry: registrySchemas)
+    for universal in universalFields where !fields.contains(where: { $0.key == universal.key }) {
+        fields.append(universal)
+    }
+    let required = resolvedRequired(for: schema, registry: registrySchemas)
+    let hints = resolvedDisplayHints(for: schema, registry: registrySchemas)
+
+    var fieldLines: [String] = []
+    for (name, field) in fields.sorted(by: { $0.key < $1.key }) {
+        var parts = ["type: .\(swiftFieldType(field))"]
+        if let values = field.enumValues, !values.isEmpty {
+            parts.append("enumValues: [\(values.map(quoted).joined(separator: ", "))]")
+        }
+        if let maxItems = field.maxItems {
+            parts.append("maxItems: \(maxItems)")
+        }
+        if let maxLength = field.maxLength {
+            parts.append("maxLength: \(maxLength)")
+        }
+        if required.contains(name) {
+            parts.append("isRequired: true")
+        }
+        fieldLines.append("                \(quoted(name)): .init(\(parts.joined(separator: ", "))),")
+    }
+
+    var leading = ["id: \(quoted(schema.id))"]
+    if let parent = schema.parent {
+        leading.append("parent: \(quoted(parent))")
+    }
+    var trailing: [String] = []
+    if let title = hints?.titleField {
+        trailing.append("titleField: \(quoted(title))")
+    }
+    if let body = hints?.bodyField {
+        trailing.append("bodyField: \(quoted(body))")
+    }
+    trailing.append("schemaVersion: \(schema.version)")
+
+    let fieldsArgument = fieldLines.isEmpty
+        ? "fields: [:]"
+        : "fields: [\n\(fieldLines.joined(separator: "\n"))\n            ]"
+    let allParts = leading + [fieldsArgument] + trailing
+
+    registryBody += "        \(quoted(schema.id)): MarfaTypeDefinition(\n"
+    registryBody += "            " + allParts.joined(separator: ",\n            ") + "\n"
+    registryBody += "        ),\n"
+}
+
+let registryDir = repoRoot.appendingPathComponent("Sources/MarfaSDK/Types/Registry/Generated")
+try? FileManager.default.createDirectory(at: registryDir, withIntermediateDirectories: true)
+let registryFile = registryDir.appendingPathComponent("PlatformTypeRegistry.swift")
+
+let registryContent = """
+// Code generated by codegen-domain; DO NOT EDIT.
+// Source: scripts/MarfaCodegenCore/core-types/ (core and system schemas)
+// To regenerate: `./scripts/sync-types.sh` (or `swift run codegen-domain` if the snapshot is current).
+//
+// The type graph the SDK ships with, flattened. Each definition carries its
+// own fields *and* every inherited one, because that is the set a write is
+// validated against and walking the chain at validation time would repeat the
+// work on every call. `parent` is kept so a query for a parent type can find
+// its descendants.
+
+import Foundation
+
+enum PlatformTypeRegistry {
+    static let definitions: [String: MarfaTypeDefinition] = [
+\(registryBody)    ]
+}
+"""
+
+try registryContent.write(to: registryFile, atomically: true, encoding: .utf8)
+print("registry — \(registryTypes.count) types written to \(registryFile.path)")

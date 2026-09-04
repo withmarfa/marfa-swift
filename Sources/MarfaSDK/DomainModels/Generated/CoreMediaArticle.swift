@@ -19,7 +19,7 @@ public struct CoreMediaArticle: MarfaItem {
 
     // MARK: - Properties
 
-    /// Text content or description
+    /// The article text
     public var body: String { item.properties["body"]?.stringValue ?? "" }
 
     /// Name of the work
