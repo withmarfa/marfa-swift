@@ -538,6 +538,143 @@ public actor MutationQueue {
         return try modelContext.fetch(descriptor).map { $0.toRecord() }
     }
 
+    /// The unsent writes queued against one item, oldest first, in the form
+    /// ``LocalStore/applyServerItem(_:rebasing:)`` needs to put them back on
+    /// top of the server's row.
+    ///
+    /// Five kinds are translated. Four name their row in `localId` and change
+    /// its own columns; `bulk` names no row at all and is read from its payload,
+    /// the same way ``pendingCreatedItemIds()`` reads it, because the ids are
+    /// there one per entry.
+    ///
+    /// `setMetadata`, `addTags`, `setExtension` and their siblings key on the
+    /// same `localId` and are deliberately absent: they write the metadata
+    /// layer, which an item frame does not touch, and `metadata.changed` is
+    /// how the server announces that layer moving.
+    ///
+    /// **`bulkAction` is absent and is a genuine gap rather than a layering
+    /// decision.** It selects rows by a `BulkActionFilter`, not by id — and
+    /// that filter carries `filter`, a string in the same filter-SQL grammar
+    /// `GET /items?filter=` takes, including `edge[type]` and `backref[type]`
+    /// traversal. Answering "does this bulk action name item X" therefore means
+    /// evaluating a server-side query language against a local row, edges
+    /// included, and matching the server's answer exactly — a query engine, not
+    /// a payload read. Until that exists, a queued bulk transition or bulk
+    /// property patch is invisible here and an inbound frame for a row it
+    /// covers overwrites its effect; the write itself is not lost, and
+    /// converges when the queue drains.
+    ///
+    /// A blocked row is included. The drain has stopped asking about it, but
+    /// the write is still there and an app is still showing it — dropping it
+    /// here would make a blocked edit vanish from under someone the moment
+    /// another device touched the same row.
+    ///
+    /// Ordered by `createdAt`, the same column the drain replays in, so what a
+    /// person sees before their writes reach the server matches what they see
+    /// after.
+    func pendingItemEdits(forItem itemId: String) throws -> [PendingItemEdit] {
+        // `bulk` rows have to be fetched by kind rather than by `localId`,
+        // which they never set. Captured into locals and compared against the
+        // raw column, per `PredicateConventions`: a renamed case then fails to
+        // compile instead of silently matching nothing.
+        let bulkRaw = MutationKind.bulk.rawValue
+        let predicate = #Predicate<PendingMutationModel> { model in
+            model.localId == itemId || model.kindRaw == bulkRaw
+        }
+        let descriptor = FetchDescriptor<PendingMutationModel>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        var edits: [PendingItemEdit] = []
+        for model in try modelContext.fetch(descriptor) {
+            guard let data = model.payloadJson.data(using: .utf8) else { continue }
+            switch model.kind {
+            case .updateItem:
+                guard model.localId == itemId,
+                      let payload = try? MutationQueue.decoder.decode(
+                          UpdateItemPayload.self, from: data
+                      ) else { continue }
+                edits.append(.properties(delta: payload.properties, tier: payload.tier))
+            case .deleteItem:
+                guard model.localId == itemId else { continue }
+                edits.append(.state(.trashed))
+            case .restoreItem:
+                guard model.localId == itemId else { continue }
+                edits.append(.state(.active))
+            case .transitionItem:
+                guard model.localId == itemId,
+                      let payload = try? MutationQueue.decoder.decode(
+                          TransitionPayload.self, from: data
+                      ) else { continue }
+                edits.append(.state(payload.state))
+            case .bulk:
+                guard let payload = try? MutationQueue.decoder.decode(
+                    BulkPayload.self, from: data
+                ) else { continue }
+                // An entry may carry both a property set and a lifecycle state,
+                // so one entry can be two edits. Appended in that order because
+                // they touch different columns and neither can undo the other.
+                for entry in payload.input.items where entry.id == itemId {
+                    if let properties = entry.properties {
+                        edits.append(.properties(delta: properties, tier: entry.tier))
+                    } else if let tier = entry.tier {
+                        edits.append(.properties(delta: [:], tier: tier))
+                    }
+                    if let state = entry.state {
+                        edits.append(.state(state))
+                    }
+                }
+            default:
+                continue
+            }
+        }
+        return edits
+    }
+
+    /// Every item id a queued create would put on the server.
+    ///
+    /// The answer to "which local rows does the server not know about yet",
+    /// which is what a prune has to leave alone. Two kinds carry one: a
+    /// `createItem` names it in `localId`, and a `bulk` sets no `localId` at
+    /// all — its ids are in the payload, one per entry, each naming a row the
+    /// store already wrote.
+    ///
+    /// A bulk in upsert mode may name rows the server does have, so this can
+    /// protect a little more than it needs to. That is the safe direction: a
+    /// row kept in error is corrected by the next thing the server says about
+    /// it, and a row deleted in error is gone.
+    func pendingCreatedItemIds() throws -> Set<String> {
+        // Captured from the enum rather than written as string literals, per
+        // `PredicateConventions`. The enumeration below is complete for today's
+        // kinds; what this guards is the next create-shaped one, where a
+        // literal would go on matching a case that had been renamed out from
+        // under it and this list would silently protect nothing.
+        let createItemRaw = MutationKind.createItem.rawValue
+        let bulkRaw = MutationKind.bulk.rawValue
+        let predicate = #Predicate<PendingMutationModel> { model in
+            model.kindRaw == createItemRaw || model.kindRaw == bulkRaw
+        }
+        let descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        var ids: Set<String> = []
+        for model in try modelContext.fetch(descriptor) {
+            switch model.kind {
+            case .createItem:
+                if let localId = model.localId { ids.insert(localId) }
+            case .bulk:
+                guard let data = model.payloadJson.data(using: .utf8),
+                      let payload = try? MutationQueue.decoder.decode(
+                          BulkPayload.self, from: data
+                      ) else { continue }
+                for entry in payload.input.items {
+                    if let id = entry.id { ids.insert(id) }
+                }
+            default:
+                continue
+            }
+        }
+        return ids
+    }
+
     func remove(id: String) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)

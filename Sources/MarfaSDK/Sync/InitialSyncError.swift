@@ -28,6 +28,43 @@ public enum InitialSyncError: Error, Sendable {
     ///   that does not fall across retries is a stuck queue rather than a busy
     ///   one, and those need different answers from a person.
     case pendingMutations(count: Int)
+
+    /// A page said more rows were waiting and carried no cursor to reach them
+    /// with, so the import cannot see the whole server side and stops.
+    ///
+    /// The import is not only a read. It takes the ids it saw as the entire
+    /// server side and removes every stored row absent from that set, so an
+    /// answer that stops early is not a smaller import — it is a deletion of
+    /// everything the unread pages would have named. **Stopping is what keeps
+    /// the prune from running on a partial answer**, and the next cycle asks
+    /// again.
+    ///
+    /// **It does not roll the import back, and the distinction matters.** Each
+    /// page is written and saved as it arrives, so every row that landed
+    /// before the throw is still in the store — the import is not a
+    /// transaction and has never been one. On the `/edges` pass it is stronger
+    /// still: that throw fires after the item pass has finished, which means
+    /// its prune has already deleted rows and already published
+    /// ``SyncEvent/itemPurged(id:)`` for each. What is guaranteed is narrower
+    /// and is the half worth having: no row is removed on the strength of an
+    /// answer nobody finished reading.
+    ///
+    /// Marfa's own server cannot produce this pair: its item store sets a
+    /// cursor only when there is more to fetch. This SDK also talks to
+    /// self-hosted servers, where that is somebody else's implementation
+    /// detail rather than a promise the route makes.
+    ///
+    /// - Parameters:
+    ///   - route: The route that answered this way, so a report names which of
+    ///     the import's passes stopped rather than only that one did.
+    ///   - imported: How many rows had been written when it stopped. A run that
+    ///     always stops at the same count is a server paginating wrongly at a
+    ///     fixed boundary rather than a transient one.
+    // Labeled `route:` rather than `path:` deliberately. `RouteCoverageTests`
+    // treats a route-shaped `path:` argument outside a transport call as an
+    // HTTP call that escaped its scan, and that guard is worth more than the
+    // label.
+    case unresumablePage(route: String, imported: Int)
 }
 
 extension InitialSyncError: CustomStringConvertible {
@@ -39,6 +76,15 @@ extension InitialSyncError: CustomStringConvertible {
                 The initial sync was not run because \(writes) have not yet \
                 reached the server. Importing now would overwrite them. Let the \
                 sync engine drain its queue and ask again.
+                """
+        case .unresumablePage(let route, let imported):
+            let rows = imported == 1 ? "1 row" : "\(imported) rows"
+            return """
+                The initial sync stopped after \(rows) because \(route) reported \
+                more results and returned no cursor to continue from. The rows \
+                it had already read are stored; nothing was removed, because \
+                finishing a partial answer would delete every row the \
+                remaining pages would have named.
                 """
         }
     }

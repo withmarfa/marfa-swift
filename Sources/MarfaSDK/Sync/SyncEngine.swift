@@ -113,6 +113,13 @@ public actor SyncEngine {
     private var streamTask: Task<Void, Never>?
     private var stoppingTask: Task<Void, Never>?
     private var running = false
+
+    /// Event types this build met and had no case for. The `default` arm logs
+    /// each one; this is the same signal in a form a test can assert on,
+    /// because a log line is not one.
+    private var unhandledEventTypes: Set<String> = []
+    internal var unhandledEventTypesForTesting: Set<String> { unhandledEventTypes }
+
     private var starting = false
     private var lifecycleGeneration: UUID?
 
@@ -644,10 +651,15 @@ public actor SyncEngine {
     /// standing in for a liveness check, and one that reads as correct. Here
     /// the queue is in hand, so the answer cannot be right by accident.
     ///
-    /// Per-row skipping was the other option and it cannot be made complete: a
-    /// mutation carries an optional `localId`, and the three bulk enqueues set
-    /// none at all, so a bulk write is invisible to any "does item X have a
-    /// pending edit" test.
+    /// Per-row skipping was the other option and it still cannot be made
+    /// complete, though the reason has narrowed. A mutation carries an
+    /// optional `localId` and the bulk enqueues set none, so a per-row test
+    /// has to read payloads: `pendingItemEdits` now does that for `bulk`,
+    /// whose entries name their ids. `bulkAction` selects by a filter
+    /// expression rather than by id, so no payload read can answer "does this
+    /// name item X" without evaluating the server's filter grammar locally —
+    /// which is why the whole-queue count, not a per-row test, is what gates
+    /// the import.
     ///
     /// The engine's own catch-up drains before it asks, which is what clears
     /// the way rather than working around this.
@@ -664,6 +676,11 @@ public actor SyncEngine {
     private func importPasses(pageSize: Int) async throws -> Int {
         var cursor: String? = nil
         var imported = 0
+        // Every id the answer mentioned. What the prune below is for: a row the
+        // server purged while this device was away is absent from the answer
+        // rather than changed in it, so no event describes it and nothing else
+        // ever corrects it.
+        var seenItemIds: Set<String> = []
         repeat {
             // `stop()` cancels this task, and a page loop that never asks
             // would keep paging a whole library past the teardown that was
@@ -671,7 +688,30 @@ public actor SyncEngine {
             try Task.checkCancellation()
             var query: [(String, String)] = [
                 ("limit", String(pageSize)),
-                ("include", "metadata"),
+                // `system` beside `metadata`, and the prune is why. `GET /items`
+                // leaves `system.*` rows out unless a caller asks for them, so
+                // an import that does not ask sees none of them — while the
+                // stream, which filters on nothing, has been writing them to
+                // this store all along. The keep-set would then omit every
+                // device, connection and activity row the store holds, and the
+                // prune would delete the lot: `connections.list()` empties while
+                // the server still has all of them, and no event ever corrects
+                // it, because no event describes a row that did not change.
+                //
+                // Widening the question is the fix rather than teaching the
+                // prune to skip these rows, because the prune's whole premise is
+                // that the answer is the entire server side. A carve-out there
+                // would keep a genuinely purged connection on the device
+                // forever, and would sit in a function that cannot see which
+                // query produced its keep-set.
+                ("include", "metadata,system"),
+                // Every state, trashed included. Omitted, the route answers
+                // with active rows only, and reading that as the whole library
+                // would make every row in the bin look purged — so the prune
+                // below would empty the device's bin on each re-import. It is
+                // also what brings a row *into* the bin on a device that was
+                // away when it was trashed.
+                ("state", "any"),
             ]
             if let cursor { query.append(("cursor", cursor)) }
 
@@ -682,14 +722,53 @@ public actor SyncEngine {
             for pair in page.data {
                 try await localStore.upsertItem(pair.item)
                 try await localStore.upsertMetadata(pair.metadata)
+                seenItemIds.insert(pair.item.id)
                 imported += 1
             }
 
             if !page.hasMore {
                 break
             }
-            cursor = page.cursor
-        } while cursor != nil
+            // The server said there is more and did not say where to resume
+            // from. Refused rather than treated as the end, because the prune
+            // below reads `seenItemIds` as the whole server side: exiting here
+            // would hand it a keep-set holding only the pages that arrived, and
+            // every row on every page that did not would be deleted as purged.
+            //
+            // The loop used to end on exactly this pair by accident — a null
+            // cursor failed the `while` condition one line down and returned
+            // normally. The current server cannot produce it, since its item
+            // store only sets a cursor when there is more; this kit ships
+            // against self-hosted servers, so that is a fact about one
+            // implementation rather than a guarantee of the route.
+            guard let nextCursor = page.cursor else {
+                throw InitialSyncError.unresumablePage(route: "/items", imported: imported)
+            }
+            cursor = nextCursor
+            // Not `while cursor != nil`: the guard above has already settled
+            // that, and a condition that can no longer be false is the one that
+            // hid this. The two ways out are the `break` and the `throw`.
+        } while true
+
+        // The queue is asked here rather than before the first page, and the
+        // difference is the whole point. `refuseIfWorkIsStillQueued` runs once,
+        // ahead of the import, so what it guarantees is that nothing was queued
+        // when the import *began* — and the paging that follows spans a whole
+        // library. Someone writing a note while theirs downloads lands inside
+        // that window, and the row the server has never heard of is exactly the
+        // one this pass would otherwise take for a purge.
+        //
+        // Thrown rather than defaulted when the queue cannot be read. An empty
+        // answer here is indistinguishable from "protect nothing", and pruning
+        // on it would delete the rows this list exists to keep. Failing leaves
+        // the store as it was and the next cycle asks again.
+        let protectedIds = try await mutationQueue.pendingCreatedItemIds()
+        let removed = try await localStore.pruneItems(
+            keeping: seenItemIds, protecting: protectedIds
+        )
+        for id in removed {
+            emit(.itemPurged(id: id))
+        }
 
         // Edges, on the same one-shot basis, and not a nicety. Edge reads
         // resolve against the local store whenever one exists, so a store with
@@ -727,11 +806,22 @@ public actor SyncEngine {
             if !page.hasMore {
                 break
             }
-            edgeCursor = page.cursor
-        } while edgeCursor != nil
+            // Same refusal as the item loop, for a smaller consequence: edges
+            // are never pruned, so a short read here loses no row — it leaves
+            // the device holding a library with relationships missing, which
+            // reads to a person as notes that have quietly stopped being
+            // related to each other. Worth a legible failure rather than a
+            // silent one either way, and leaving the shape here while fixing it
+            // above would leave the next reader to work out which of the two
+            // loops was the deliberate one.
+            guard let nextEdgeCursor = page.cursor else {
+                throw InitialSyncError.unresumablePage(route: "/edges", imported: edgesImported)
+            }
+            edgeCursor = nextEdgeCursor
+        } while true
 
         logger.log.info(
-            "sync.initial_sync items=\(imported, privacy: .public) edges=\(edgesImported, privacy: .public)"
+            "sync.initial_sync items=\(imported, privacy: .public) edges=\(edgesImported, privacy: .public) pruned=\(removed.count, privacy: .public)"
         )
 
         // Stamp the completion so consumers can gate fresh pulls on recency
@@ -1220,6 +1310,37 @@ public actor SyncEngine {
         return .settled
     }
 
+    /// Writes an item the server described into the local store, as what an
+    /// app should see rather than as the server's copy verbatim.
+    ///
+    /// Every item-shaped frame goes through here — including the one
+    /// `metadata.changed` carries — so a device holding an unsent edit shows
+    /// the same thing whichever frame arrives.
+    ///
+    /// Returns whether the store took the frame. Callers announce only on
+    /// `true`, and that is the whole reason this hands the answer back rather
+    /// than swallowing it into a log line: a refused frame changed nothing, so
+    /// an event describing it tells an app the opposite of what the store
+    /// holds. A stale `item.deleted` is the case that bites — the row is
+    /// correctly left active, and an ungated emit hands the app
+    /// `.itemDeleted(id:)` for a row it can still read.
+    private func applyInboundItem(_ item: Item) async throws -> Bool {
+        // Keyed on `localId` for the four single-item kinds, plus every
+        // queued `bulk` row — those carry no `localId`, so they are fetched by
+        // kind and filtered on their entries here. A device with nothing
+        // queued is the ordinary case and the fetch returns nothing; a device
+        // holding bulk writes pays for reading them on each inbound frame,
+        // which is the cost of the rebase seeing them at all.
+        let edits = try await mutationQueue.pendingItemEdits(forItem: item.id)
+        let applied = try await localStore.applyServerItem(item, rebasing: edits)
+        if !applied {
+            logger.log.info(
+                "sync.sse.stale_item_frame id=\(item.id, privacy: .public) version=\(item.version, privacy: .public)"
+            )
+        }
+        return applied
+    }
+
     /// Writes a single decoded event into the local store. Throws whatever the
     /// store threw, which is what keeps the cursor behind the event.
     private func applyToLocalStore(_ event: SSEEvent) async throws {
@@ -1230,21 +1351,41 @@ public actor SyncEngine {
         switch eventType {
         case "item.created":
             if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try await localStore.upsertItem(payload.item)
-                emit(.itemCreated(id: payload.item.id))
+                if try await applyInboundItem(payload.item) {
+                    emit(.itemCreated(id: payload.item.id))
+                }
             }
 
         case "item.updated", "item.restored", "item.state_changed":
             if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try await localStore.upsertItem(payload.item)
-                emit(.itemUpdated(id: payload.item.id))
+                if try await applyInboundItem(payload.item) {
+                    emit(.itemUpdated(id: payload.item.id))
+                }
             }
 
         case "item.deleted":
-            // Server sends the deleted item with state = trashed/purged.
+            // Server sends the deleted item with state = trashed.
             if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
-                try await localStore.upsertItem(payload.item)
-                emit(.itemDeleted(id: payload.item.id))
+                if try await applyInboundItem(payload.item) {
+                    emit(.itemDeleted(id: payload.item.id))
+                }
+            }
+
+        case "item.purged":
+            // Not the same news as `item.deleted`. That one says the row was
+            // trashed and can come back, so a store that keeps trash keeps it;
+            // this one says the row is gone for good and nothing will ever
+            // correct a copy of it. The frame still carries the row as it last
+            // stood, because there is nothing left to read once it has been
+            // published.
+            //
+            // No rebase and no version check: a queued edit against a row the
+            // server no longer has cannot land whatever this device does with
+            // it, and keeping the row so the edit stays visible would leave
+            // someone looking at something that does not exist.
+            if let payload = decodeOrLog(ItemEventPayload.self, from: data, eventType: eventType, decoder: decoder) {
+                try await localStore.purgeItem(id: payload.item.id)
+                emit(.itemPurged(id: payload.item.id))
             }
 
         case "edge.created":
@@ -1283,15 +1424,26 @@ public actor SyncEngine {
                 // an item created before this device's cursor.
                 //
                 // The item is applied on every such frame rather than only an
-                // unknown one, which carries the same exposure `item.updated`
-                // already has: a frame landing over an edit this device has
-                // queued replaces the local row with the server's, and the
-                // edit converges when its own replay reaches the server.
-                try await localStore.upsertItem(payload.item)
+                // unknown one, and through the same path `item.updated` takes:
+                // it carries the same exposure to a queued local edit, so it
+                // needs the same rebase rather than a second answer to it.
+                //
+                // The two halves are judged separately, which is the one place
+                // that matters. The item half can be refused for naming a
+                // version the row has already passed; the sidecar is a
+                // different layer with its own announcement and is not stale
+                // because the item half was. Gating the metadata write on the
+                // item's answer would silently drop a tag another device really
+                // did add.
+                let itemApplied = try await applyInboundItem(payload.item)
+                var metadataApplied = false
                 if let metadata = payload.metadata {
                     try await localStore.upsertMetadata(metadata)
+                    metadataApplied = true
                 }
-                emit(.itemUpdated(id: payload.item.id))
+                if itemApplied || metadataApplied {
+                    emit(.itemUpdated(id: payload.item.id))
+                }
             }
 
         case "catchup_too_old":
@@ -1323,7 +1475,24 @@ public actor SyncEngine {
             // reopen it with no `Last-Event-ID` header.
 
         default:
-            break
+            // A type this build has no case for. Reported rather than dropped
+            // in silence: the engine cannot apply what it cannot recognize, and
+            // an unrecognized type used to look exactly like one deliberately
+            // ignored. That is what let `item.purged` sit unhandled — the
+            // server announced a removal, the client kept the row, and no
+            // signal anywhere distinguished the two.
+            // Once per distinct type, not once per frame. The set is bounded by
+            // what a server can name, but the *frames* are not: a server
+            // emitting an unknown high-rate type would otherwise write an error
+            // line per event, and a log that floods is one nobody reads — which
+            // is the failure this arm was added to end, arrived at from the
+            // other side. `insert` reports whether it was new, so the check
+            // costs nothing beyond the bookkeeping already here.
+            if unhandledEventTypes.insert(eventType).inserted {
+                logger.log.error(
+                    "sync.sse.unhandled_event event=\(eventType, privacy: .public)"
+                )
+            }
         }
     }
 

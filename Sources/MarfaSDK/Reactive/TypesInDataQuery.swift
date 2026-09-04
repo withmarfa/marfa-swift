@@ -31,13 +31,19 @@ import SwiftData
 /// and decodes the entire library on every store save to answer a question
 /// about a filter menu. An app shipped exactly that.
 ///
-/// ## Trashed items are excluded
+/// ## Trashed rows and `system.*` types are excluded
 ///
 /// A type whose only items are in the trash is not a type the space holds, and
 /// a filter offering it matches nothing. ``TagsQuery`` already excludes trashed
 /// rows, so a consumer building one filter list from both had the two
 /// disagreeing: the type of a trashed item was offered while its tags were
 /// not.
+///
+/// `system.*` types are left out on the same reasoning. `items.list()` does
+/// not return those rows unless a caller names a system type outright, so a
+/// chip for `system.activity` would filter a list that never shows them —
+/// and they are operational records rather than anything a person filed. An
+/// app that wants connections reads ``ConnectionsNamespace``.
 ///
 /// ## Usage
 ///
@@ -71,8 +77,23 @@ public final class TypesInDataQuery {
     private func refetch() {
         do {
             let trashedRaw = ItemState.trashed.rawValue
+            // `system.*` types are left out for the same reason trashed rows
+            // are: this list is a filter menu, and a chip has to name
+            // something an app's own list will show. `items.list()` excludes
+            // system rows unless a caller names a system type outright, so
+            // offering `system.activity` here would hand someone a filter for
+            // rows the list beside it does not display — and these are
+            // operational records rather than anything a person filed.
+            //
+            // Unconditional, unlike the listing's clause, because this query
+            // takes no type filter: there is no caller asking for a system
+            // type by name to make an exception for. An app that wants
+            // connections reads `client.connections`, which is the typed API
+            // for exactly that.
+            let systemPrefix = "system."
             let predicate = #Predicate<MarfaItemModel> { item in
-                item.stateRaw != trashedRaw
+                item.stateRaw != trashedRaw &&
+                !item.type.starts(with: systemPrefix)
             }
             let descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
             let models = try context.fetch(descriptor)

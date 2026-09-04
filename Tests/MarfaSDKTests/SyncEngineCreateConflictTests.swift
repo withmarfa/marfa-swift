@@ -22,6 +22,13 @@ private actor RefusingLocalStore: LocalStoreWriting {
     func upsertItem(_ item: Item) throws {
         throw LocalStoreError.encodingFailure("upsertItem(\(item.id))")
     }
+    @discardableResult
+    func applyServerItem(_ item: Item, rebasing edits: [PendingItemEdit]) throws -> Bool {
+        try upsertItem(item)
+        return true
+    }
+    @discardableResult
+    func pruneItems(keeping: Set<String>, protecting: Set<String>) throws -> [String] { [] }
     func upsertEdge(_ edge: Edge) throws {}
     func deleteEdge(id: String) throws {}
     func upsertMetadata(_ metadata: Metadata) throws {}
