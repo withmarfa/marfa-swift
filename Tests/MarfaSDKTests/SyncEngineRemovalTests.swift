@@ -219,6 +219,89 @@ struct SyncEngineRemovalTests {
         #expect(await engine.unhandledEventTypesForTesting.isEmpty)
     }
 
+    // MARK: - What the app is told
+
+    @Test("the purge frame announces a purge, which is not the news a trash carries")
+    func purgedFrameAnnouncesItsOwnEvent() async throws {
+        // An app holding the id outside the store learns the row is gone from
+        // this event and from nothing else. `.itemDeleted` would tell it the
+        // row went to a bin it can be restored from, and the store assertions
+        // above cannot tell the two apart: both leave the same store.
+        let (store, _, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("doomed"))
+
+        // Subscribed before the apply, or the emission this is about would
+        // have happened before anything was listening.
+        let events = engine.events
+        await engine._applyEventForTesting(try frame("item.purged", item("doomed")))
+
+        let published = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        guard case let .itemPurged(id) = published.first else {
+            Issue.record("expected .itemPurged, got \(published)")
+            return
+        }
+        #expect(id == "doomed")
+    }
+
+    @Test("the re-import announces the rows it removed")
+    func reimportAnnouncesWhatItPruned() async throws {
+        // The prune is the only pass that notices a row purged while the
+        // device was away, so it is also the only thing that can tell an app
+        // holding that id. Removing the row silently would leave a view
+        // showing something the store no longer has.
+        let (store, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("kept"))
+        try await store.upsertItem(item("purged-while-away"))
+
+        transport.enqueue(page([item("kept")]))
+        transport.enqueue(noEdges())
+
+        let events = engine.events
+        _ = try await engine.performInitialSync()
+
+        let published = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        let purged = published.compactMap { event -> String? in
+            if case let .itemPurged(id) = event { return id }
+            return nil
+        }
+        #expect(purged == ["purged-while-away"])
+    }
+
+    @Test("a row a queued bulk create still owns survives the re-import")
+    func reimportKeepsARowWithAQueuedBulkCreate() async throws {
+        // The same protection as the queued-create case above, reached by the
+        // other kind that carries one. A `bulk` sets no `localId` at all — its
+        // ids are one per payload entry — so a protection reading only
+        // `createItem` would leave these rows to be pruned, which is the
+        // create case's data loss one branch over.
+        let (store, queue, connManager) = try await makeHookedFixture()
+        let hooked = HookedTransport(onCall: { [store, queue] path in
+            guard path == "/items" else { return }
+            let created = try await store.createItem(
+                CreateItemInput(type: "core.note", properties: ["body": .string("bulk-written mid-import")])
+            )
+            try await queue.enqueueBulk(
+                BulkInput(items: [BulkItemInput(id: created.id, type: "core.note")])
+            )
+        })
+        let engine = SyncEngine(
+            transport: hooked,
+            localStore: store,
+            mutationQueue: queue,
+            connectionManager: connManager
+        )
+        try await store.upsertItem(item("kept"))
+
+        await hooked.enqueue(page([item("kept")]))
+        await hooked.enqueue(noEdges())
+
+        _ = try await engine.performInitialSync()
+
+        let ids = try await storedIds(store)
+        #expect(ids.contains("kept"))
+        #expect(ids.count == 2)
+    }
+
     // MARK: - Helpers
 
     private func makeHookedFixture() async throws -> (LocalStore, MutationQueue, ConnectionStateManager) {
