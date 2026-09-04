@@ -140,7 +140,7 @@ private func oauthErrorBody(_ code: String) -> Data {
 /// `signedOut` to a caller who subscribed and then read a token.
 private func collectingAuthEvents(
     _ provider: StoredTokenProvider
-) async -> Task<[AuthEvent], Never> {
+) -> Task<[AuthEvent], Never> {
     let stream = provider.authEvents
     return Task { () -> [AuthEvent] in
         var seen: [AuthEvent] = []
@@ -199,7 +199,7 @@ struct TokenRefreshTests {
         let storage = InMemoryKeychain()
         let provider = makeProvider(storage: storage)
         try await provider.store(expiredToken())
-        let collector = await collectingAuthEvents(provider)
+        let collector = collectingAuthEvents(provider)
 
         await #expect(throws: OAuthError.self) {
             _ = try await provider.currentToken()
@@ -229,7 +229,7 @@ struct TokenRefreshTests {
         )])
         let provider = makeProvider(storage: InMemoryKeychain())
         try await provider.store(expiredToken())
-        let collector = await collectingAuthEvents(provider)
+        let collector = collectingAuthEvents(provider)
 
         await #expect(throws: OAuthError.self) {
             _ = try await provider.currentToken()
@@ -279,7 +279,7 @@ struct TokenRefreshTests {
         let storage = InMemoryKeychain()
         let provider = makeProvider(storage: storage)
         try await provider.store(expiredToken())
-        let collector = await collectingAuthEvents(provider)
+        let collector = collectingAuthEvents(provider)
 
         #expect(try await provider.currentToken().accessToken == "fresh")
         #expect(TokenRefreshStubURLProtocol.count() == 2)
@@ -298,7 +298,7 @@ struct TokenRefreshTests {
         let storage = InMemoryKeychain()
         let provider = makeProvider(storage: storage, maxAttempts: 3)
         try await provider.store(expiredToken())
-        let collector = await collectingAuthEvents(provider)
+        let collector = collectingAuthEvents(provider)
 
         await #expect(throws: OAuthError.self) { _ = try await provider.currentToken() }
 

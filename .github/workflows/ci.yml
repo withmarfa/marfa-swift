@@ -13,9 +13,29 @@ on:
       - 'LICENSE'
   workflow_dispatch:
 
+# A pull request's next push supersedes the run before it, so cancelling is
+# free there. `main` is the opposite: each merge is a distinct commit that
+# nothing else will ever validate, and the release workflow tags from `main`.
+# A commit whose tests never ran is how a release was once cut from one.
+#
+# **Turning cancellation off is not enough on its own, and that is the part
+# worth knowing.** `cancel-in-progress: false` protects the run that is
+# already going; GitHub still keeps only one *pending* run per concurrency
+# group and cancels the pending one when a newer arrives. With three merges
+# landing close together — the ordinary case here, since agents self-merge on
+# green and the pool is contended — the first runs, the second waits, and the
+# third cancels the second before it ever starts. The commit is unvalidated
+# either way and the only difference is which mechanism dropped it.
+#
+# So `main` gets a group per commit rather than a shared one, and every merge
+# that starts a run gets to finish it. Not every merge starts one: the
+# `paths-ignore` below means a documentation-only merge runs no CI at all,
+# which is deliberate and is a different thing from a run being dropped.
+# Pull requests keep the shared, cancelling group, which is what makes a fast
+# follow-up push cheap.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # `validate` (build + full test suite) runs on every PR and every merge to
 # main, because a change is not validated until its tests have run and a PR

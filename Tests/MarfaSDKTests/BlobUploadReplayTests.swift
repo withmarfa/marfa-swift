@@ -67,7 +67,7 @@ struct BlobUploadReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await waitUntil(timeout: .seconds(5), description: "(try? await queue.isEmpty) == true") {
+        try await awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 

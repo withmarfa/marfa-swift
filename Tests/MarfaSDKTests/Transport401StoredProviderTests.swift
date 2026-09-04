@@ -206,19 +206,28 @@ private func invalidGrant() -> StoredProvider401StubURLProtocol.TokenResponse {
     )
 }
 
-/// Collects auth events, giving the actor-hop subscription time to register
-/// before the caller triggers whatever should emit.
+/// Collects auth events emitted after this call.
+///
+/// **There is no subscription race to wait out, and there used to be a sleep
+/// here that said there was.** `StoredTokenProvider.authEvents` registers its
+/// continuation synchronously inside the `AsyncStream` build closure — which
+/// runs when the stream is *created*, on the line below, before the collecting
+/// task exists. The provider's own comment records that this was made
+/// synchronous deliberately, because deferring it onto a `Task` let an emit
+/// land before the subscribe and past events are not replayed.
+///
+/// So the window closes at `provider.authEvents`, not at the first `await`,
+/// and a sleep after it waits on nothing while claiming to cover an actor hop
+/// the code does not take.
 private func collectingAuthEvents(
     _ provider: StoredTokenProvider
-) async -> Task<[AuthEvent], Never> {
+) -> Task<[AuthEvent], Never> {
     let stream = provider.authEvents
-    let collector = Task { () -> [AuthEvent] in
+    return Task { () -> [AuthEvent] in
         var seen: [AuthEvent] = []
         for await event in stream { seen.append(event) }
         return seen
     }
-    try? await Task.sleep(for: .milliseconds(50))
-    return collector
 }
 
 @Suite("Transport 401 against the real stored-token provider", .serialized)
@@ -327,7 +336,7 @@ struct Transport401StoredProviderTests {
         let provider = makeStoredProvider(storage: storage)
         try await provider.store(liveToken(access: "revoked", refresh: "rt-dead"))
         let transport = makeTransport(provider: provider)
-        let collector = await collectingAuthEvents(provider)
+        let collector = collectingAuthEvents(provider)
 
         await #expect(throws: OAuthError.self) {
             _ = try await transport.request(

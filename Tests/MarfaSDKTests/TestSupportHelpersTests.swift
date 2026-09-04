@@ -6,7 +6,11 @@ import MarfaSDKTestSupport
 /// Tests for ``MarfaSDKTest`` helpers in ``MarfaSDKTestSupport`` —
 /// specifically the in-memory client factory that consumer apps adopt
 /// to avoid the file-backed multi-container pattern.
-@Suite("MarfaSDKTest helpers")
+// Every wait in this suite is a poll with no test-owned deadline, so this
+// trait is what stops a starved condition hanging the run. It is coarse on
+// purpose: a minute that names itself a timeout beats half a second that
+// names the wrong thing.
+@Suite("MarfaSDKTest helpers", .timeLimit(.minutes(1)))
 struct TestSupportHelpersTests {
 
     @Test("makeInMemoryClient returns a working pure-local client")
@@ -55,7 +59,7 @@ struct TestSupportHelpersTests {
             )
 
             let query = store.query()
-            try await waitUntil(timeout: .seconds(2), description: "query.items.count >= 1") {
+            try await awaitCondition(description: "query.items.count >= 1") {
                 query.items.count >= 1
             }
             #expect(query.items.count == 1)

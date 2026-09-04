@@ -96,35 +96,33 @@ enum SyncEngineTestKit {
         return collected
     }
 
-    /// Thrown by `waitUntil` when `condition` never becomes true before the
-    /// timeout, so the failure names what was awaited and for how long
-    /// instead of leaving the caller's next line — and the assertion after
-    /// it — to run against state the wait never established.
-    struct WaitUntilTimeoutError: Error, CustomStringConvertible {
-        let description: String
-    }
-
-    // Simple polling helper — SSE consumption is task-driven and can't be
-    // pinned to a known deadline. Poll until `condition` returns true or
-    // the timeout elapses, then throw. Keeps its own deadline instead of
-    // leaning on Swift Testing's `.timeLimit` trait: that trait's
-    // granularity bottoms out at a minute, far coarser than these
-    // sub-second waits.
-    static func waitUntil(
-        timeout: Duration,
+    /// Polls until `condition` holds, with **no test-owned deadline** — the
+    /// suite's `.timeLimit` owns the clock. The non-isolated sibling of
+    /// `MarfaSDKTestSupport.awaitCondition`, duplicated for the same reason the
+    /// two `waitUntil`s are: this one is `nonisolated` over a `@Sendable`
+    /// condition because its call sites await actors from off the main actor,
+    /// and in strict-concurrency Swift the isolation modifier is part of a
+    /// function's meaning.
+    ///
+    /// **Every suite using this must carry a `.timeLimit`,** or a starved
+    /// condition hangs the run rather than naming itself.
+    static func awaitCondition(
         every: Duration = .milliseconds(10),
         description: String,
         _ condition: @Sendable () async throws -> Bool
     ) async throws {
-        let start = ContinuousClock.now
-        while ContinuousClock.now - start < timeout {
+        while true {
             if try await condition() { return }
-            try await Task.sleep(for: every)
+            // Translate cancellation into a named failure, so the trait's
+            // "time limit exceeded" carries what was being awaited rather than
+            // only how long. See the public sibling for the reasoning.
+            do {
+                try Task.checkCancellation()
+                try await Task.sleep(for: every)
+            } catch is CancellationError {
+                throw AwaitConditionCancelled(description: description)
+            }
         }
-        if try await condition() { return }
-        throw WaitUntilTimeoutError(
-            description: "timed out after \(timeout) waiting for \(description)"
-        )
     }
 
     /// The inverse of ``waitUntil``: proves something does *not* happen while
@@ -143,6 +141,7 @@ enum SyncEngineTestKit {
     static func expectRemainsFalse(
         for duration: Duration,
         every: Duration = .milliseconds(10),
+        sourceLocation: SourceLocation = #_sourceLocation,
         _ condition: @Sendable () async throws -> Bool
     ) async throws {
         let deadline = ContinuousClock.now + duration
@@ -152,11 +151,49 @@ enum SyncEngineTestKit {
                 // after this returns, so throwing here would skip it and leak
                 // whatever that teardown was releasing (a lock, an engine, a
                 // blocked transport) into the next test.
-                Issue.record("expectRemainsFalse: condition became true within \(duration)")
+                Issue.record(
+                    "expectRemainsFalse: condition became true within \(duration)",
+                    sourceLocation: sourceLocation
+                )
                 return
             }
             try await Task.sleep(for: every)
         }
+    }
+}
+
+/// Asserts a main-actor invariant *holds* for a window — the shape for
+/// proving something does **not** happen.
+///
+/// A negative cannot be proven without a window, so unlike
+/// ``awaitCondition(every:description:_:)`` this one keeps a duration by
+/// necessity rather than by habit. **Derive it from the constant it is about**
+/// — the refetch debounce, a retry interval — and write the derivation at the
+/// call site, so a reader can tell a bound that means something from a number
+/// somebody liked.
+///
+/// Records an issue rather than throwing, matching the reasoning on the
+/// non-isolated `expectRemainsFalse`: call sites run unconditional teardown
+/// after this returns, and throwing would skip it.
+@MainActor
+func expectRemains(
+    for duration: Duration,
+    every: Duration = .milliseconds(10),
+    description: String,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ invariant: @MainActor () async throws -> Bool
+) async throws {
+    let deadline = ContinuousClock.now + duration
+    while ContinuousClock.now < deadline {
+        if try await invariant() == false {
+            Issue.record(
+                "\(description) stopped holding within \(duration)",
+                sourceLocation: sourceLocation
+            )
+            return
+        }
+        await Task.yield()
+        try await Task.sleep(for: every)
     }
 }
 

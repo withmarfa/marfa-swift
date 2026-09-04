@@ -180,7 +180,26 @@ private final class LiveFixture {
     // these tests compete for that cap, and a client refused a stream reads as
     // a device that never received an event — which is what half of them are
     // about, so the failure would look exactly like the defect.
-    .serialized
+    .serialized,
+    // A backstop, not a budget. Every wait below is bounded already, and
+    // those bounds are real: they are how long a round trip to a live server
+    // may take, which is a delay rather than the starvation the in-process
+    // suites face. This only catches a server that never answers at all.
+    //
+    // Eight minutes rather than one, and the number is measured rather than
+    // guessed. The limit is per test function and covers fixture setup and
+    // teardown, and one test here deliberately holds a stream for
+    // `resourceTimeout * 1.25` — 150 seconds on the default configuration.
+    // Run against staging it takes **251 seconds** end to end, so a
+    // one-minute trait would have failed it by construction, and five minutes
+    // would have left it 49 seconds of headroom on a quiet machine and none
+    // on a busy one. Two other tests carry 150 seconds of waits between them.
+    //
+    // CI could not have caught any of that: this suite is gated on
+    // credentials CI does not have, so it is the one place in the repository
+    // where a green run proves nothing and the number has to be taken from a
+    // real run.
+    .timeLimit(.minutes(8))
 )
 @MainActor
 struct LiveSyncedClientTests {

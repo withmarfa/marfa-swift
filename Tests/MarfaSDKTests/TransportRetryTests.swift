@@ -95,7 +95,10 @@ private func makeStubbedTransport(
     )
 }
 
-@Suite("Transport retry behavior", .serialized)
+// The cancellation test now polls for the request to reach the stub with no
+// test-owned deadline, so this trait is what stops a stub that never serves
+// hanging the run.
+@Suite("Transport retry behavior", .serialized, .timeLimit(.minutes(1)))
 struct TransportRetryTests {
 
     @Test("429 + Retry-After then 200 retries once and succeeds")
@@ -261,8 +264,26 @@ struct TransportRetryTests {
             )
         }
 
-        // Yield briefly so the request is in-flight.
-        try await Task.sleep(for: .milliseconds(50))
+        // Wait for the request to be in flight rather than assume it is. The
+        // stub appends to `recordedRequests` inside `startLoading`, so a
+        // non-empty recording is exactly "the request reached the transport" —
+        // the fact the sleep was estimating. It also closes a pass for the
+        // wrong reason: on a loaded machine the old fifty milliseconds could
+        // elapse before the request started, and cancelling a task that has
+        // not begun still throws `CancellationError`, so the test went green
+        // having exercised nothing.
+        try await SyncEngineTestKit.awaitCondition(
+            description: "this test's own request to reach the stub"
+        ) {
+            // Filtered by path, not merely non-empty. `recordedRequests` is a
+            // module-global shared by every suite using this stub, and only
+            // this suite is `.serialized` — the others run alongside it under
+            // `--parallel`. Another suite's request landing between the reset
+            // and this poll would open the gate before this test's own request
+            // started, restoring exactly the pass-for-the-wrong-reason this
+            // wait was written to close.
+            StubURLProtocol.recorded().contains { $0.url?.path == "/slow" }
+        }
         task.cancel()
 
         await #expect(throws: CancellationError.self) {

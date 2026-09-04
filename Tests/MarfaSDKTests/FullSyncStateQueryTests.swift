@@ -60,11 +60,7 @@ struct FullSyncStateQueryTests {
 
         let query = try #require(store.queryFullSyncState())
 
-        try await waitUntil(
-
-            description: "query.state becomes .synced"
-
-        ) {
+        try await awaitCondition(description: "query.state becomes .synced") {
 
             if case .synced = query.state { return true }
 
@@ -96,9 +92,7 @@ struct FullSyncStateQueryTests {
         // The cycle emits `.syncing` and then `.failed`. We assert
         // both arrive in order — the query should land on `.failed`
         // having passed through `.syncing`.
-        try await waitUntil(
-            description: "query.state becomes .failed"
-        ) {
+        try await awaitCondition(description: "query.state becomes .failed") {
             if case .failed = query.state { return true }
             return false
         }
@@ -113,11 +107,7 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        try await waitUntil(
-
-            description: "query.state becomes .synced"
-
-        ) {
+        try await awaitCondition(description: "query.state becomes .synced") {
 
             if case .synced = query.state { return true }
 
@@ -141,11 +131,7 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        try await waitUntil(
-
-            description: "query.state becomes .failed"
-
-        ) {
+        try await awaitCondition(description: "query.state becomes .failed") {
 
             if case .failed = query.state { return true }
 
@@ -158,11 +144,7 @@ struct FullSyncStateQueryTests {
         transport.enqueue(EmptyResponse())
         await engine.triggerProactiveDrainForTesting()
 
-        try await waitUntil(
-
-            description: "query.state becomes .synced"
-
-        ) {
+        try await awaitCondition(description: "query.state becomes .synced") {
 
             if case .synced = query.state { return true }
 
@@ -185,9 +167,7 @@ struct FullSyncStateQueryTests {
 
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
-        try await waitUntil(
-            description: "query.state becomes .synced"
-        ) {
+        try await awaitCondition(description: "query.state becomes .synced") {
             if case .synced = query.state { return true }
             return false
         }
@@ -199,11 +179,20 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.syncing)
         await connManager.applyStateForTesting(.online)
 
-        // Settle window — give the (no-op) listener a chance to mis-
-        // handle if it ever drifts back to subscribing.
-        try await Task.sleep(for: .milliseconds(50))
-        if case .synced = query.state { } else {
-            Issue.record("expected .synced to be preserved; got \(query.state)")
+        // Settle window. There is no constant to derive this from, and saying
+        // so is better than borrowing one that looks like a derivation: this
+        // query holds no `RefetchObserver` and no `didSave` subscription, so
+        // the refetch debounce has nothing to do with the path under test.
+        // The regression it guards is a `stateUpdates` subscription
+        // reappearing, whose latency is an AsyncStream hop. The window is
+        // stated as what it is — long enough that a subscription would have
+        // delivered, and paid in full only when the test passes.
+        try await expectRemains(
+            for: .milliseconds(400),
+            description: "connection-state changes do not reach the full-sync query"
+        ) {
+            if case .synced = query.state { return true }
+            return false
         }
         query.stop()
     }

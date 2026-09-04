@@ -97,10 +97,7 @@ struct SyncEngineCatchUpOnStartTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the server's items to reach a store that has never synced"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the server's items to reach a store that has never synced") {
             let stored = try await store.fetchItems(filters: nil)
             return Set(stored.data.map(\.id)) == ["i1", "i2"]
         }
@@ -113,10 +110,7 @@ struct SyncEngineCatchUpOnStartTests {
         // The import lands before the stream is asked for, so the call log is
         // waited out to the stream rather than read at the import — otherwise
         // "no other call" is asserted against a cycle still in progress.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the stream to open after the import"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the stream to open after the import") {
             transport.calls.contains { $0.path == "/events" }
         }
         // No other call: the two import passes, then the stream.
@@ -142,10 +136,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the engine to open its event stream"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the engine to open its event stream") {
             await transport.openStreamCount >= 1
         }
 
@@ -153,10 +144,7 @@ struct SyncEngineCatchUpOnStartTests {
         // close can be what moves this. An app watching `FullSyncStateQuery`
         // through its first sync would otherwise sit on "waiting for first
         // sync" with a full library already on screen.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the store to report itself synced while its stream is still open"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the store to report itself synced while its stream is still open") {
             if case .synced = await engine.fullSyncState { return true }
             return false
         }
@@ -177,10 +165,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the first cycle to import and then open its stream"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the first cycle to import and then open its stream") {
             itemGets(transport) == 1 && transport.calls.contains { $0.path == "/events" }
         }
         await engine.stop()
@@ -190,10 +175,7 @@ struct SyncEngineCatchUpOnStartTests {
         // now — otherwise every reconnect re-imports the whole library.
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the second cycle to open its own stream"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the second cycle to open its own stream") {
             transport.calls.filter { $0.path == "/events" }.count >= 2
         }
 
@@ -227,10 +209,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the drain to finish and the import to reach the server"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the drain to finish and the import to reach the server") {
             await transport.heldRequestReached
         }
 
@@ -243,10 +222,7 @@ struct SyncEngineCatchUpOnStartTests {
         }
         await transport.releaseHeldRequest()
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the import to finish and the stream to open"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the import to finish and the stream to open") {
             await transport.calls.contains { $0.path == "/events" }
         }
 
@@ -299,20 +275,14 @@ struct SyncEngineCatchUpOnStartTests {
         // the window a consumer's own call lands in: both apps call the import
         // themselves today, and those calls do not go away the day the engine
         // starts making it too.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the catch-up to reach GET /items"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the catch-up to reach GET /items") {
             await transport.heldRequestReached
         }
 
         async let explicit = engine.performInitialSync()
         // Both callers have to be inside before the release, or the second
         // one merely arrives after the first finished and joins nothing.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the explicit caller to reach the import as well"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the explicit caller to reach the import as well") {
             await engine.importCallerCountForTesting == 2
         }
         await transport.releaseHeldRequest()
@@ -350,10 +320,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the catch-up to reach GET /items"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the catch-up to reach GET /items") {
             await transport.heldRequestReached
         }
 
@@ -391,10 +358,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the failed drain to be reported"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the failed drain to be reported") {
             if case .failed = await engine.fullSyncState { return true }
             return false
         }
@@ -438,10 +402,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the drain to fail and be reported"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the drain to fail and be reported") {
             if case .failed = await engine.fullSyncState { return true }
             return false
         }
@@ -454,10 +415,7 @@ struct SyncEngineCatchUpOnStartTests {
         await transport.finishOpenStreams()
         await connManager.applyStateForTesting(.offline)
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the next cycle to open its own stream"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the next cycle to open its own stream") {
             await transport.calls.filter { $0.path == "/events" }.count >= 2
         }
 
@@ -490,10 +448,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the import to reach the server and stay there"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the import to reach the server and stay there") {
             await transport.heldRequestReached
         }
 
@@ -527,10 +482,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the engine to open its event stream"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the engine to open its event stream") {
             await transport.openStreamCount >= 1
         }
 
@@ -553,10 +505,7 @@ struct SyncEngineCatchUpOnStartTests {
         // Waited on what the retry puts in the store rather than on another
         // GET appearing: the failed attempt already left one of those in the
         // call log, so a wait on presence would pass without a retry.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the next online cycle to import what the failed one did not"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the next online cycle to import what the failed one did not") {
             let stored = try await store.fetchItems(filters: nil)
             return stored.data.map(\.id) == ["i1"]
         }
@@ -590,10 +539,7 @@ struct SyncEngineCatchUpOnStartTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the write queued while the engine was stopped to replay"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the write queued while the engine was stopped to replay") {
             try await engine.hasPendingMutations == false
         }
 
@@ -633,10 +579,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the first import to reach the server"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the first import to reach the server") {
             await transport.heldRequestReached
         }
 
@@ -651,10 +594,7 @@ struct SyncEngineCatchUpOnStartTests {
         }
         await transport.releaseHeldRequest()
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the write made during the import to replay once the engine is online"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the write made during the import to replay once the engine is online") {
             try await engine.hasPendingMutations == false
         }
         let streamStillOpen = await transport.openStreamsFinished == false
@@ -681,10 +621,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the engine to open its event stream"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the engine to open its event stream") {
             await transport.openStreamCount >= 1
         }
 
@@ -693,20 +630,14 @@ struct SyncEngineCatchUpOnStartTests {
         // registering, because that is the precondition the case rests on —
         // the proactive drain is gated on it, and an engine that treats an
         // open stream as still connecting never gets there at all.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the engine to report itself online while its stream is open"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the engine to report itself online while its stream is open") {
             connManager.state == .online
         }
 
         try await transport.enqueue(EmptyResponse())
         try await queue.enqueueDeleteItem(id: "server-2")
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the write made during the stream to replay while it is still open"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the write made during the stream to replay while it is still open") {
             try await engine.hasPendingMutations == false
         }
         let streamStillOpen = await transport.openStreamsFinished == false
@@ -729,10 +660,7 @@ struct SyncEngineCatchUpOnStartTests {
         // the engine's own call installs no second monitor and no fresh path
         // update arrives to move the state off `.online`.
         await connManager.start()
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the path monitor to deliver its first update"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the path monitor to deliver its first update") {
             connManager.state != .offline
         }
         await connManager.applyStateForTesting(.online)
@@ -758,10 +686,7 @@ struct SyncEngineCatchUpOnStartTests {
 
         await engine.start()
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the engine to open a stream against an already-online manager"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the engine to open a stream against an already-online manager") {
             transport.calls.contains { $0.path == "/events" }
         }
         #expect(itemGets(transport) == 1, "the same entry has to run the catch-up")
@@ -775,10 +700,7 @@ struct SyncEngineCatchUpOnStartTests {
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         await connManager.start()
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            description: "the path monitor to deliver its first update"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "the path monitor to deliver its first update") {
             connManager.state != .offline
         }
         // Mid-drain rather than online. The nudge exists for a manager parked
