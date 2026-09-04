@@ -54,6 +54,11 @@ struct PredicateSafetyTests {
         task.updatedAt = "2026-01-06T00:00:00.000Z"
         task.timestamp = task.createdAt
         task.source = "test"
+        // The one row carrying a tier, so a filter naming every clause at once
+        // can match a known id rather than matching nothing. A composed
+        // predicate asserted to be empty pins only that it does not crash — a
+        // lowering bug that wrongly excludes rows passes it identically.
+        task.tierRaw = Tier.library.rawValue
         context.insert(task)
 
         try context.save()
@@ -202,15 +207,23 @@ struct PredicateSafetyTests {
         )
         #expect(byMissingSource.isEmpty)
 
-        // Every captured branch live at once, which is the shape at risk.
-        var everything = ListFilters(type: "core.note", state: .active, tier: .library)
+        // Every captured branch live at once, and matching a known row rather
+        // than matching nothing — so this pins that the composition *narrows*
+        // as well as that it evaluates.
+        var everything = ListFilters(type: "core.task", state: .active, tier: .library)
         everything.source = "test"
         everything.since = "2026-01-01T00:00:00.000Z"
         everything.until = "2026-12-31T00:00:00.000Z"
         let composed = try context.fetch(LocalStore.makeItemsDescriptor(filters: everything))
-        // The seed rows carry no tier, so this matches nothing. The point is
-        // that a predicate carrying all seven branches evaluates at all.
-        #expect(composed.isEmpty)
+        #expect(composed.map(\.id) == ["c"])
+
+        // And the same seven clauses with one value moved off the row, so the
+        // assertion above cannot be satisfied by a predicate that stopped
+        // narrowing at all.
+        var narrowed = everything
+        narrowed.source = "no-such-source"
+        let none = try context.fetch(LocalStore.makeItemsDescriptor(filters: narrowed))
+        #expect(none.isEmpty)
     }
 
     // MARK: - Range comparisons (used by since/until)

@@ -646,6 +646,30 @@ public struct ItemsNamespace: Sendable {
             throw BulkConfirmationRequiredError()
         }
 
+        // The server declares `max_items` as strictly positive and refuses
+        // anything else as a schema violation. Locally a zero cap refused
+        // every non-empty match and a negative one refused even an empty
+        // match, so both sides said no and said it differently — and the
+        // negative case produced a message nobody could act on. Having
+        // mirrored the default and the ceiling, the lower bound is the same
+        // decision.
+        if let maxItems = options.maxItems, maxItems <= 0 {
+            throw ValidationError(
+                message: "maxItems must be greater than zero; received \(maxItems)."
+            )
+        }
+
+        // The server requires at least one non-empty of `add` and `remove`.
+        // Locally a tag edit naming neither walked every matched row, changed
+        // nothing, and counted them all as succeeded — and in synced mode the
+        // replay then met the server's refusal and dead-lettered.
+        if case .updateTags(_, let add, let remove, _) = input,
+           (add?.isEmpty ?? true) && (remove?.isEmpty ?? true) {
+            throw ValidationError(
+                message: "A tag bulk action needs at least one of add or remove to be non-empty."
+            )
+        }
+
         // Resolve the match set with the same `ListFilters` that `GET /items`
         // would, so the local fan-out narrows the way the server's does.
         var list = ListFilters()
@@ -755,10 +779,14 @@ public struct ItemsNamespace: Sendable {
                 case .purge:
                     try await store.purgeItem(id: item.id)
                 case .updateTags(_, let add, let remove, _):
+                    // `remove` was guarded only by `if let` where `add` was
+                    // guarded by `!isEmpty`, so an empty array slipped through
+                    // one and not the other. Symmetric now; the refusal above
+                    // is what stops a call with nothing to do reaching here.
                     if let add, !add.isEmpty {
                         _ = try await store.addTags(itemId: item.id, tags: add)
                     }
-                    if let remove {
+                    if let remove, !remove.isEmpty {
                         for tag in remove {
                             try await store.removeTag(itemId: item.id, tag: tag)
                         }
@@ -774,12 +802,8 @@ public struct ItemsNamespace: Sendable {
                     _ = try await store.updateItem(
                         id: item.id, properties: merged, tier: nil
                     )
-                case .updateTimestamp:
-                    // LocalStore doesn't expose a timestamp-only setter
-                    // today; treat locally as a no-op and let replay
-                    // carry the change on the server. Reported as
-                    // succeeded so the counts match synced-mode intent.
-                    break
+                case .updateTimestamp(_, let timestamp, _):
+                    _ = try await store.setTimestamp(id: item.id, to: timestamp)
                 }
                 succeededIds.append(item.id)
                 succeeded += 1

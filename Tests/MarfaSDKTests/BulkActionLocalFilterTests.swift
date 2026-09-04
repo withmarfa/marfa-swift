@@ -235,6 +235,76 @@ struct BulkActionLocalFilterTests {
         #expect(remaining.data.count == 1)
     }
 
+    // MARK: - Actions that reported work they had not done
+
+    /// `update_timestamp` wrote nowhere and counted every matched row as
+    /// succeeded, on the reasoning that a replay would carry it. That is true
+    /// in synced mode and false in pure-local mode, which has no queue and no
+    /// server — so the write was discarded and the caller told it had landed.
+    @Test("a bulk timestamp update actually moves the timestamp")
+    func timestampUpdateWrites() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let created = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("a")], source: "seed")
+        )
+        let moved = "2020-06-01T00:00:00.000Z"
+        #expect(created.timestamp != moved)
+
+        let result = try await client.items.bulkAction(
+            .updateTimestamp(filter: BulkActionFilter(type: "core.note"), timestamp: moved)
+        )
+        #expect(result.succeeded == 1)
+
+        let after = try await client.items.get(id: created.id)
+        #expect(after.timestamp == moved, "reported success and wrote nothing")
+    }
+
+    /// The server requires at least one non-empty of `add` and `remove`. A
+    /// call naming neither walked every matched row, changed nothing, and
+    /// counted them all as succeeded.
+    @Test("a tag bulk action with nothing to do is refused")
+    func emptyTagEditIsRefused() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        try await seedTwoNotes(client)
+
+        await #expect(throws: ValidationError.self) {
+            _ = try await client.items.bulkAction(
+                .updateTags(filter: BulkActionFilter(type: "core.note"), add: [], remove: [])
+            )
+        }
+    }
+
+    /// The server declares `max_items` strictly positive. Locally a zero cap
+    /// refused every non-empty match and a negative one refused even an empty
+    /// match, so both sides said no and said it differently.
+    @Test("a cap that is not positive is refused as a validation failure")
+    func nonPositiveCapIsRefused() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        try await seedTwoNotes(client)
+
+        await #expect(throws: ValidationError.self) {
+            _ = try await client.items.bulkAction(
+                .transition(
+                    filter: BulkActionFilter(type: "core.note"),
+                    state: .archived,
+                    options: BulkActionOptions(maxItems: 0)
+                )
+            )
+        }
+    }
+
+    /// The refusal's permanence is read through the base class by
+    /// `SyncEngine.isFinal`, so asserting it on the concrete type would pass
+    /// under static dispatch even if the override were removed.
+    @Test("the refusal reports itself permanent through the base class")
+    func permanenceIsVisibleThroughTheBaseClass() {
+        let error: MarfaError = LocalFilterUnsupportedError(operation: "items.bulkAction", field: "filter")
+        #expect(error.isPermanent)
+
+        let localMode: MarfaError = LocalModeUnsupportedError(operation: "types.get")
+        #expect(localMode.isPermanent)
+    }
+
     // MARK: - What this change deliberately leaves open
 
     /// The read path still drops `filter`, and that is a decision rather than

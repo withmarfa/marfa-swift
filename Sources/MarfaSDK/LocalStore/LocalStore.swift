@@ -328,6 +328,27 @@ public actor LocalStore {
         return model.toWireItem()
     }
 
+    /// Sets the item's user-meaningful timestamp.
+    ///
+    /// Exists because a bulk `update_timestamp` had nowhere to write locally
+    /// and so did nothing while reporting every matched row as succeeded. In
+    /// synced mode a replay would eventually carry the change, which made the
+    /// no-op look defensible; a pure-local client has no queue and no server,
+    /// so the write was simply discarded and the caller told it had landed.
+    func setTimestamp(id: String, to timestamp: String) throws -> Item {
+        let predicate = #Predicate<MarfaItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else {
+            throw NotFoundError(message: "Item not found: \(id)")
+        }
+        model.timestamp = timestamp
+        model.version += 1
+        model.updatedAt = now()
+        try modelContext.save()
+        return model.toWireItem()
+    }
+
     /// Sets the item's state to `trashed` (soft delete).
     func trashItem(id: String) throws {
         let predicate = #Predicate<MarfaItemModel> { $0.id == id }
