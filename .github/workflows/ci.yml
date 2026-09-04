@@ -28,8 +28,11 @@ on:
 # either way and the only difference is which mechanism dropped it.
 #
 # So `main` gets a group per commit rather than a shared one, and every merge
-# is validated. Pull requests keep the shared, cancelling group, which is what
-# makes a fast follow-up push cheap.
+# that starts a run gets to finish it. Not every merge starts one: the
+# `paths-ignore` below means a documentation-only merge runs no CI at all,
+# which is deliberate and is a different thing from a run being dropped.
+# Pull requests keep the shared, cancelling group, which is what makes a fast
+# follow-up push cheap.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}

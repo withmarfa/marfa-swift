@@ -96,46 +96,6 @@ enum SyncEngineTestKit {
         return collected
     }
 
-    /// Thrown by `waitUntil` when `condition` never becomes true before the
-    /// timeout, so the failure names what was awaited and for how long
-    /// instead of leaving the caller's next line — and the assertion after
-    /// it — to run against state the wait never established.
-    struct WaitUntilTimeoutError: Error, CustomStringConvertible {
-        let description: String
-    }
-
-    // Simple polling helper — SSE consumption is task-driven and can't be
-    // pinned to a known deadline. Poll until `condition` returns true or
-    // the timeout elapses, then throw. Keeps its own deadline instead of
-    // leaning on Swift Testing's `.timeLimit` trait: that trait's
-    // granularity bottoms out at a minute, far coarser than these
-    // sub-second waits.
-    //
-    // **That trade only holds for a condition which can be delayed and not
-    // starved**, and most conditions here can be starved. A drain sitting
-    // behind a debounce and several actor hops does not run slowly on a loaded
-    // machine, it does not run at all until the machine reaches it — so a
-    // bound in milliseconds reports on the runner and arrives dressed as a
-    // logic failure. Use `awaitCondition` there. Pass `timeout:` only when the
-    // bound is derived from the constant under test, with the derivation
-    // written beside it.
-    static func waitUntil(
-        timeout: Duration,
-        every: Duration = .milliseconds(10),
-        description: String,
-        _ condition: @Sendable () async throws -> Bool
-    ) async throws {
-        let start = ContinuousClock.now
-        while ContinuousClock.now - start < timeout {
-            if try await condition() { return }
-            try await Task.sleep(for: every)
-        }
-        if try await condition() { return }
-        throw WaitUntilTimeoutError(
-            description: "timed out after \(timeout) waiting for \(description)"
-        )
-    }
-
     /// Polls until `condition` holds, with **no test-owned deadline** — the
     /// suite's `.timeLimit` owns the clock. The non-isolated sibling of
     /// `MarfaSDKTestSupport.awaitCondition`, duplicated for the same reason the

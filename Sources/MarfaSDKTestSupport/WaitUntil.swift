@@ -31,25 +31,32 @@ public struct WaitUntilTimeoutError: Error, CustomStringConvertible {
 /// here only when the bound is *derived from the constant it is testing* and
 /// that derivation is written beside it.
 ///
-/// The 5s default absorbs CI hosts that run 5-10x slower than local
-/// Apple silicon — a 500ms *default* produced flakes on CI without ever
-/// firing locally. That is a claim about the default, not a floor for the
-/// argument, and the distinction is worth keeping straight: sub-second
-/// bounds are passed deliberately all over this repository, most of them
-/// to `SyncEngineTestKit.waitUntil`, which requires `timeout:` precisely
-/// so each call site states its own. Pass a tighter `timeout:` here when
-/// an assertion depends on one, derived from the constant it is testing
-/// rather than from what the machine usually manages; nothing relies on
-/// the default.
+/// The 5s default absorbs CI hosts that run 5-10x slower than local Apple
+/// silicon — a 500ms *default* produced flakes on CI without ever firing
+/// locally.
 ///
-/// **There is a second wait helper in this repository, and that is
-/// deliberate.** `SyncEngineTestKit.waitUntil` is `nonisolated` and takes
-/// a `@Sendable` condition, because its call sites await actors from off
-/// the main actor. This one is `@MainActor` and takes a `@MainActor`
-/// condition. The two bodies are near-identical, so a sweep that compares
-/// function *bodies* concludes they are duplicates and should be folded
-/// together — which is wrong, and costs every one of those call sites an
-/// isolation annotation to paper over. In strict-concurrency Swift the
+/// **Two helpers, and which one to reach for is the whole decision.** This one
+/// keeps a deadline and is for a condition that can be *delayed* — a round
+/// trip to a live server, where a bound in tens of seconds says something
+/// about the network. ``awaitCondition(every:description:_:)`` keeps none and
+/// is for a condition that can be *starved*, which is every in-process wait on
+/// a debounced refetch or a drain behind several actor hops: those do not run
+/// slowly on a loaded machine, they do not run until the machine reaches them,
+/// so a bound in milliseconds measures the runner and reports it as logic.
+///
+/// Every surviving caller of this function is in the live-server suite and
+/// passes a bound between fifteen and a hundred and twenty seconds, each
+/// derived from what that call actually does against a real space. Nothing in
+/// the repository passes a sub-second bound here any more.
+///
+/// **There is a second pair of these, and that is deliberate.**
+/// `SyncEngineTestKit.awaitCondition` is `nonisolated` and takes a `@Sendable`
+/// condition, because its call sites await actors from off the main actor;
+/// ``awaitCondition(every:description:_:)`` below is `@MainActor` and takes a
+/// `@MainActor` condition. The two bodies are near-identical, so a sweep that
+/// compares function *bodies* concludes they are duplicates and should be
+/// folded together — which is wrong, and costs every one of those call sites
+/// an isolation annotation to paper over. In strict-concurrency Swift the
 /// isolation modifier is part of a function's meaning, so one helper per
 /// repository cannot hold across two isolation domains. **Diff what the
 /// compiler reads, not what the eye matches.**
