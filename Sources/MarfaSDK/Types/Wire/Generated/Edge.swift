@@ -14,6 +14,7 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
     public let spaceId: String?
     public let targetId: String
     public let updatedAt: String
+    public let version: Int
 
     public init(
         createdAt: String,
@@ -23,7 +24,8 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
         sourceId: String,
         spaceId: String? = nil,
         targetId: String,
-        updatedAt: String
+        updatedAt: String,
+        version: Int
     ) {
         self.createdAt = createdAt
         self.edgeType = edgeType
@@ -33,6 +35,7 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
         self.spaceId = spaceId
         self.targetId = targetId
         self.updatedAt = updatedAt
+        self.version = version
     }
 
     enum CodingKeys: String, CodingKey {
@@ -44,5 +47,6 @@ public struct Edge: Codable, Sendable, Hashable, Identifiable {
         case spaceId = "space_id"
         case targetId = "target_id"
         case updatedAt = "updated_at"
+        case version
     }
 }

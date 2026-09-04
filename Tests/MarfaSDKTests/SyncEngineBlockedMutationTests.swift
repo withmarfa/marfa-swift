@@ -26,7 +26,7 @@ struct SyncEngineBlockedMutationTests {
             ancestor: ConflictSnapshot(properties: ["body": .string("original")], version: 1),
             conflictingFields: ["body"],
             current: ConflictSnapshot(properties: ["body": .string("server edit")], version: 2),
-            error: ConflictResponseError(code: .versionConflict, status: 409),
+            error: ConflictResponseError(code: .versionConflict, message: "Version conflict", status: 409),
             mergePolicy: MergePolicy(default: .lastWriterWins, fields: nil)
         )
     }

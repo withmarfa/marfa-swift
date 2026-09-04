@@ -212,8 +212,8 @@ struct PredicateSafetyTests {
         // as well as that it evaluates.
         var everything = ListFilters(type: "core.task", state: .active, tier: .library)
         everything.source = "test"
-        everything.since = "2026-01-01T00:00:00.000Z"
-        everything.until = "2026-12-31T00:00:00.000Z"
+        everything.timestampAfter = "2026-01-01T00:00:00.000Z"
+        everything.timestampBefore = "2026-12-31T00:00:00.000Z"
         let composed = try context.fetch(LocalStore.makeItemsDescriptor(filters: everything))
         #expect(composed.map(\.id) == ["c"])
 

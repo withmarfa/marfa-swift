@@ -52,7 +52,8 @@ struct SyncEngineCatchUpOnStartTests {
             properties: [:],
             sourceId: source,
             targetId: target,
-            updatedAt: "2026-09-02T09:00:00Z"
+            updatedAt: "2026-09-02T09:00:00Z",
+            version: 1
         )
     }
 

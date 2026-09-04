@@ -718,7 +718,8 @@ actor EdgeMintingTransport: Transport {
             sourceId: sent.sourceId,
             spaceId: Self.spaceId,
             targetId: sent.targetId,
-            updatedAt: Self.stampedAt
+            updatedAt: Self.stampedAt,
+            version: 1
         )
         if echo { echoes.append(edge) }
         return edge

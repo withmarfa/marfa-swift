@@ -317,12 +317,12 @@ struct LocalStoreTests {
         _ = try await store.updateItem(id: item.id, properties: ["body": .string("edited today")])
 
         let aroundItsOwnDate = try await store.fetchItems(
-            filters: ListFilters(since: "2025-02-01T00:00:00.000Z", until: "2025-04-01T00:00:00.000Z")
+            filters: ListFilters(timestampAfter: "2025-02-01T00:00:00.000Z", timestampBefore: "2025-04-01T00:00:00.000Z")
         )
         #expect(aroundItsOwnDate.data.map(\.id).contains(item.id))
 
         let aroundTheEdit = try await store.fetchItems(
-            filters: ListFilters(since: "2026-01-01T00:00:00.000Z")
+            filters: ListFilters(timestampAfter: "2026-01-01T00:00:00.000Z")
         )
         #expect(!aroundTheEdit.data.map(\.id).contains(item.id),
                 "an item edited today is not an item dated today")
@@ -341,13 +341,13 @@ struct LocalStoreTests {
 
         let inRange = LocalStore.applyDateBounds(
             [undated],
-            filters: ListFilters(since: "2025-06-01T00:00:00.000Z", until: "2025-07-01T00:00:00.000Z")
+            filters: ListFilters(timestampAfter: "2025-06-01T00:00:00.000Z", timestampBefore: "2025-07-01T00:00:00.000Z")
         )
         #expect(inRange.count == 1)
 
         let outOfRange = LocalStore.applyDateBounds(
             [undated],
-            filters: ListFilters(since: "2025-08-01T00:00:00.000Z")
+            filters: ListFilters(timestampAfter: "2025-08-01T00:00:00.000Z")
         )
         #expect(outOfRange.isEmpty, "an undated item is not silently kept, nor silently dropped")
     }

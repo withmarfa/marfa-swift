@@ -105,7 +105,7 @@ struct ConflictTests {
     func conflictResponseCamelCaseMapping() throws {
         let body = #"""
         {
-            "error": {"code": "version_conflict", "status": 409},
+            "error": {"code": "version_conflict", "message": "Version conflict", "status": 409},
             "current": {"version": 2, "properties": {"title": "Server"}},
             "ancestor": {"version": 1, "properties": {"title": "Original"}},
             "conflicting_fields": ["title"],
@@ -125,7 +125,7 @@ struct ConflictTests {
     func conflictResponseRequiresAncestor() {
         let body = #"""
         {
-            "error": {"code": "version_conflict"},
+            "error": {"code": "version_conflict", "message": "Version conflict"},
             "current": {"version": 2, "properties": {}},
             "conflicting_fields": [],
             "merge_policy": {}
@@ -141,7 +141,7 @@ struct ConflictTests {
     func conflictResponseRequiresMergePolicy() {
         let body = #"""
         {
-            "error": {"code": "version_conflict", "status": 409},
+            "error": {"code": "version_conflict", "message": "Version conflict", "status": 409},
             "current": {"version": 2, "properties": {}},
             "ancestor": {"version": 1, "properties": {}},
             "conflicting_fields": []
@@ -462,7 +462,7 @@ struct ConflictTests {
             ancestor: ConflictSnapshot(properties: ancestorProps, version: 1),
             conflictingFields: conflictingFields,
             current: ConflictSnapshot(properties: currentProps, version: currentVersion),
-            error: ConflictResponseError(code: .versionConflict, status: 409),
+            error: ConflictResponseError(code: .versionConflict, message: "Version conflict", status: 409),
             mergePolicy: policy
         )
         transport.enqueue(response)

@@ -15,8 +15,18 @@ public struct ListFilters: Sendable {
     public var filter: String?
     public var sort: SortField?
     public var direction: SortDirection?
-    public var since: String?
-    public var until: String?
+    /// Lower bound on the item's user-meaningful time, inclusive.
+    ///
+    /// Named for the parameter it sends. The wire names were `since` and
+    /// `until`, and the server renamed them because those said *when the
+    /// request was made* to every reader who met them cold, where the value
+    /// they read is the item's own timestamp. The kit kept the old spelling
+    /// long after the server began refusing it, so every date-bounded remote
+    /// read returned a 400 — and nothing noticed, because no test put a time
+    /// bound against a real server.
+    public var timestampAfter: String?
+    /// Upper bound on the item's user-meaningful time, inclusive.
+    public var timestampBefore: String?
     public var limit: Int?
     public var cursor: String?
     /// Outbound edge filter — `[edgeType: targetId]`. Restricts to items that
@@ -37,8 +47,8 @@ public struct ListFilters: Sendable {
         filter: String? = nil,
         sort: SortField? = nil,
         direction: SortDirection? = nil,
-        since: String? = nil,
-        until: String? = nil,
+        timestampAfter: String? = nil,
+        timestampBefore: String? = nil,
         limit: Int? = nil,
         cursor: String? = nil,
         edge: [String: String]? = nil,
@@ -52,8 +62,8 @@ public struct ListFilters: Sendable {
         self.filter = filter
         self.sort = sort
         self.direction = direction
-        self.since = since
-        self.until = until
+        self.timestampAfter = timestampAfter
+        self.timestampBefore = timestampBefore
         self.limit = limit
         self.cursor = cursor
         self.edge = edge
@@ -71,8 +81,8 @@ public struct ListFilters: Sendable {
         if let filter { params.append(("filter", filter)) }
         if let sort { params.append(("sort", sort.rawValue)) }
         if let direction { params.append(("direction", direction.rawValue)) }
-        if let since { params.append(("since", since)) }
-        if let until { params.append(("until", until)) }
+        if let timestampAfter { params.append(("timestamp_after", timestampAfter)) }
+        if let timestampBefore { params.append(("timestamp_before", timestampBefore)) }
         if let limit { params.append(("limit", String(limit))) }
         if let cursor { params.append(("cursor", cursor)) }
         if let edge {

@@ -18,7 +18,8 @@
                 "source_id": "itm_01JABCXYZ",
                 "space_id": "tnt_01",
                 "target_id": "itm_01PARENT",
-                "updated_at": "2026-04-14T10:01:00Z"
+                "updated_at": "2026-04-14T10:01:00Z",
+                "version": 1
               }
             ],
             "has_more": false

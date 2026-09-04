@@ -55,7 +55,8 @@ struct SyncEngineInitialSyncImportTests {
             properties: [:],
             sourceId: source,
             targetId: target,
-            updatedAt: "2026-08-26T09:00:00Z"
+            updatedAt: "2026-08-26T09:00:00Z",
+            version: 1
         )
     }
 

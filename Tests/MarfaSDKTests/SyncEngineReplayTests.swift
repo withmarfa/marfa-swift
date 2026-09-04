@@ -479,7 +479,8 @@ struct SyncEngineReplayTests {
             sourceId: edge.sourceId,
             spaceId: EdgeMintingTransport.spaceId,
             targetId: edge.targetId,
-            updatedAt: EdgeMintingTransport.stampedAt
+            updatedAt: EdgeMintingTransport.stampedAt,
+            version: 1
         )
     }
 
@@ -796,7 +797,8 @@ struct SyncEngineReplayTests {
             sourceId: "A",
             spaceId: nil,
             targetId: "X",
-            updatedAt: now
+            updatedAt: now,
+            version: 1
         ))
 
         let createInput = CreateItemInput(

@@ -81,7 +81,8 @@ struct SyncEngineCreateConflictTests {
             sourceId: source,
             spaceId: nil,
             targetId: target,
-            updatedAt: Self.stamped
+            updatedAt: Self.stamped,
+            version: 1
         )
     }
 

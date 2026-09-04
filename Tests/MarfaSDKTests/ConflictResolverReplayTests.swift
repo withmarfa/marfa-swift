@@ -28,7 +28,7 @@ struct ConflictResolverReplayTests {
             current: ConflictSnapshot(
                 properties: ["body": .string("server edit")],
                 version: currentVersion),
-            error: ConflictResponseError(code: .versionConflict, status: 409),
+            error: ConflictResponseError(code: .versionConflict, message: "Version conflict", status: 409),
             mergePolicy: MergePolicy(
                 default: .lastWriterWins, fields: ["body": .keepBothCopies])
         )

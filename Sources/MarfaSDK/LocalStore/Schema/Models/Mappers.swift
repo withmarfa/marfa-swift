@@ -75,7 +75,8 @@ extension MarfaEdgeModel {
             sourceId: sourceId,
             spaceId: spaceId,
             targetId: targetId,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            version: version
         )
     }
 
@@ -94,6 +95,7 @@ extension MarfaEdgeModel {
         spaceId = edge.spaceId
         createdAt = edge.createdAt
         updatedAt = edge.updatedAt
+        version = edge.version
     }
 }
 

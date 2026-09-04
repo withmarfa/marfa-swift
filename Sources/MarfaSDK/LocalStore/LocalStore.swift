@@ -150,7 +150,7 @@ public actor LocalStore {
         // answer is only known after the fetch, so the window cannot be
         // pushed into the descriptor without reporting a short page as a
         // whole one.
-        let datesNeedSettling = filters?.since != nil || filters?.until != nil
+        let datesNeedSettling = filters?.timestampAfter != nil || filters?.timestampBefore != nil
 
         guard !required.isEmpty || datesNeedSettling else {
             // One row past the limit, so truncation is known without a second
@@ -184,11 +184,11 @@ public actor LocalStore {
         _ models: [MarfaItemModel],
         filters: ListFilters?
     ) -> [MarfaItemModel] {
-        guard filters?.since != nil || filters?.until != nil else { return models }
+        guard filters?.timestampAfter != nil || filters?.timestampBefore != nil else { return models }
         return models.filter { item in
             guard item.timestamp.isEmpty else { return true }
-            if let since = filters?.since, item.createdAt < since { return false }
-            if let until = filters?.until, item.createdAt > until { return false }
+            if let lower = filters?.timestampAfter, item.createdAt < lower { return false }
+            if let upper = filters?.timestampBefore, item.createdAt > upper { return false }
             return true
         }
     }
@@ -570,7 +570,10 @@ public actor LocalStore {
             sourceId: source,
             spaceId: nil,
             targetId: target,
-            updatedAt: now
+            updatedAt: now,
+            // A locally created edge starts at 1, as a locally created item
+            // does. The server's value replaces it on the first echo back.
+            version: 1
         )
         let model = MarfaEdgeModel.make(from: edge)
         modelContext.insert(model)
@@ -1016,10 +1019,10 @@ public actor LocalStore {
         let hasTypeFilter = filters?.type != nil
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
-        let since = filters?.since ?? ""
-        let hasSince = filters?.since != nil
-        let until = filters?.until ?? ""
-        let hasUntil = filters?.until != nil
+        let since = filters?.timestampAfter ?? ""
+        let hasSince = filters?.timestampAfter != nil
+        let until = filters?.timestampBefore ?? ""
+        let hasUntil = filters?.timestampBefore != nil
         // `TierFilter` and `Tier` share their raw values, so the filter
         // compares directly against the stored column.
         let tierFilter = filters?.tier?.rawValue ?? ""

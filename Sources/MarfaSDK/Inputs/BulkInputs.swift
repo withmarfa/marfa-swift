@@ -149,12 +149,27 @@ public struct BulkActionFilter: Codable, Sendable {
     public var source: String?
     public var tier: TierFilter?
     public var tags: [String]?
-    public var since: String?
-    public var until: String?
+    /// Lower bound on the item's user-meaningful time, inclusive. See
+    /// ``ListFilters/timestampAfter`` for why the name changed.
+    public var timestampAfter: String?
+    /// Upper bound on the item's user-meaningful time, inclusive.
+    public var timestampBefore: String?
     /// Full filter-SQL DSL expression, identical grammar to
     /// `GET /items?filter=`. `edge[type]=id` and `backref[type]=id`
     /// URL shorthand translates to `edge[type] eq "id"` here.
     public var filter: String?
+
+    /// Spelled out because this type had none, and relied on its Swift names
+    /// happening to match the wire. That held only while the two agreed: the
+    /// moment the time bounds were renamed to what the server takes, the
+    /// synthesized keys became `timestampAfter` and `timestampBefore`, which
+    /// no server has ever accepted. A type whose encoding depends on a
+    /// coincidence between two vocabularies is one rename from silence.
+    enum CodingKeys: String, CodingKey {
+        case type, state, source, tier, tags, filter
+        case timestampAfter = "timestamp_after"
+        case timestampBefore = "timestamp_before"
+    }
 
     public init(
         type: String? = nil,
@@ -162,8 +177,8 @@ public struct BulkActionFilter: Codable, Sendable {
         source: String? = nil,
         tier: TierFilter? = nil,
         tags: [String]? = nil,
-        since: String? = nil,
-        until: String? = nil,
+        timestampAfter: String? = nil,
+        timestampBefore: String? = nil,
         filter: String? = nil
     ) {
         self.type = type
@@ -171,8 +186,8 @@ public struct BulkActionFilter: Codable, Sendable {
         self.state = state
         self.tier = tier
         self.tags = tags
-        self.since = since
-        self.until = until
+        self.timestampAfter = timestampAfter
+        self.timestampBefore = timestampBefore
         self.filter = filter
     }
 }

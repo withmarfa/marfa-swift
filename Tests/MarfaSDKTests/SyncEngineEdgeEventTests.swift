@@ -47,7 +47,8 @@ struct SyncEngineEdgeEventTests {
             sourceId: stored.sourceId,
             spaceId: stored.spaceId,
             targetId: stored.targetId,
-            updatedAt: "2026-09-02T09:00:00.000Z"
+            updatedAt: "2026-09-02T09:00:00.000Z",
+            version: 1
         )
 
         // Subscribe first: a subscription taken afterwards would have missed
@@ -85,7 +86,8 @@ struct SyncEngineEdgeEventTests {
             sourceId: "source-2",
             spaceId: nil,
             targetId: "target-2",
-            updatedAt: "2026-09-02T09:00:00.000Z"
+            updatedAt: "2026-09-02T09:00:00.000Z",
+            version: 1
         )
 
         let events = engine.events
