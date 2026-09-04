@@ -480,14 +480,13 @@ public actor LocalStore {
         // edit, not the first.
         for edit in edits {
             switch edit {
-            case .properties(let delta, let tier, let sourceId):
+            case .properties(let delta, let tier):
                 var merged = model.properties
                 for (key, value) in delta {
                     merged[key] = value
                 }
                 model.properties = merged
                 if let tier { model.tier = tier }
-                if let sourceId { model.sourceId = sourceId }
             case .state(let state):
                 model.state = state
             }

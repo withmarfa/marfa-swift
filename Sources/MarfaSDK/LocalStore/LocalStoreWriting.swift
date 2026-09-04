@@ -9,10 +9,21 @@ import Foundation
 /// apart rather than having the store learn to read the queue's payloads.
 public enum PendingItemEdit: Sendable, Equatable {
 
-    /// A partial-merge property delta, plus the two axes `PATCH /items/:id`
-    /// carries beside it. Mirrors ``LocalStore/updateItem(id:properties:tier:)``:
-    /// keys in the delta win, keys absent from it survive.
-    case properties(delta: [String: JSONValue], tier: Tier?, sourceId: String?)
+    /// A partial-merge property delta, plus the one axis `PATCH /items/:id`
+    /// carries beside it that a local write also applies. Mirrors
+    /// ``LocalStore/updateItem(id:properties:tier:)``: keys in the delta win,
+    /// keys absent from it survive.
+    ///
+    /// `sourceId` is deliberately not here, though the same PATCH carries it.
+    /// `updateItem` takes no such parameter, so a local edit never writes that
+    /// column and the device shows the server's value until the queue drains.
+    /// Rebasing it anyway would make the field change on the arrival of an
+    /// inbound frame about something else entirely — visible only after an
+    /// unrelated event, which is a worse thing to debug than a field that
+    /// simply lags. The queue still replays the edit and the server still
+    /// echoes it back; what is dropped is an optimistic preview no other code
+    /// path offers.
+    case properties(delta: [String: JSONValue], tier: Tier?)
 
     /// A lifecycle move — a trash, a restore, or an explicit transition.
     case state(ItemState)
@@ -47,9 +58,23 @@ public protocol LocalStoreWriting: Sendable {
     /// Returns `false` when the frame was refused for describing a server
     /// version the row has already passed.
     ///
-    /// The read, the rebase and the write happen in one hop on purpose. Split
-    /// across three, a write landing between the read and the write is lost
-    /// with nothing reporting it.
+    /// **The row's read, rebase and write are one hop on purpose**, so no other
+    /// write to that row can land between the read and the write that follows
+    /// it. Split across three calls, one that did would be overwritten with
+    /// nothing reporting it.
+    ///
+    /// **That does not extend to `edits`, and the difference is worth stating
+    /// where it will be read.** The caller gathers the queued writes in a
+    /// separate call before this one, so the list is a snapshot taken slightly
+    /// earlier rather than a view of the queue as of this hop. An edit enqueued
+    /// in the gap is absent from `edits` and is not rebased, so the server's
+    /// value for that field is what stays visible until the queue drains and
+    /// the server echoes the edit back. The window is two awaits wide and the
+    /// outcome is a stale field rather than a lost write — the queue still
+    /// holds the edit and still replays it — but it is not the same guarantee
+    /// as the one above and reading it as such is how the gap would be missed.
+    /// Closing it needs the queue and the store to be read under one lock,
+    /// which they do not share.
     @discardableResult
     func applyServerItem(_ item: Item, rebasing edits: [PendingItemEdit]) async throws -> Bool
 

@@ -28,6 +28,28 @@ public enum InitialSyncError: Error, Sendable {
     ///   that does not fall across retries is a stuck queue rather than a busy
     ///   one, and those need different answers from a person.
     case pendingMutations(count: Int)
+
+    /// A page said more rows were waiting and carried no cursor to reach them
+    /// with, so the import cannot see the whole server side and stops.
+    ///
+    /// The import is not only a read. It takes the ids it saw as the entire
+    /// server side and removes every stored row absent from that set, so an
+    /// answer that stops early is not a smaller import — it is a deletion of
+    /// everything the unread pages would have named. Stopping leaves the store
+    /// exactly as it was and the next cycle asks again.
+    ///
+    /// Marfa's own server cannot produce this pair: its item store sets a
+    /// cursor only when there is more to fetch. This SDK also talks to
+    /// self-hosted servers, where that is somebody else's implementation
+    /// detail rather than a promise the route makes.
+    ///
+    /// - Parameters:
+    ///   - path: The route that answered this way, so a report names which of
+    ///     the import's passes stopped rather than only that one did.
+    ///   - imported: How many rows had been written when it stopped. A run that
+    ///     always stops at the same count is a server paginating wrongly at a
+    ///     fixed boundary rather than a transient one.
+    case unresumablePage(path: String, imported: Int)
 }
 
 extension InitialSyncError: CustomStringConvertible {
@@ -39,6 +61,14 @@ extension InitialSyncError: CustomStringConvertible {
                 The initial sync was not run because \(writes) have not yet \
                 reached the server. Importing now would overwrite them. Let the \
                 sync engine drain its queue and ask again.
+                """
+        case .unresumablePage(let path, let imported):
+            let rows = imported == 1 ? "1 row" : "\(imported) rows"
+            return """
+                The initial sync stopped after \(rows) because \(path) reported \
+                more results and returned no cursor to continue from. Nothing \
+                was changed locally: finishing a partial answer would delete \
+                every row the remaining pages would have named.
                 """
         }
     }
