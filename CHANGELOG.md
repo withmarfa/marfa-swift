@@ -24,6 +24,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - **`Edge.init` gains a required `version`.** Anything constructing an `Edge` — a test double, a fake transport — needs the extra argument, the same break `ConflictResponseError` takes above.
 
 - **`Edge` carries a `version`,** which the wire has sent since edges gained one, and the local store now keeps it. A locally created edge starts at 1 and the server's value replaces it on the first echo back. Wire fixtures and the `409` envelope's new `message` field moved with the refreshed snapshot.
+- **`MarfaSDKTestSupport` no longer imports `Testing`.** The polling helper that needed it has moved into the SDK's own test target, where all of its call sites already were. `Testing` is a developer-only library absent from a shipped app's runtime, so a consumer linking this target into an app target rather than a test target was inheriting a dependency for a function it could not call.
 
 - **A bulk action on a client with a local store now refuses before it acts, where three of its refusals used to happen afterwards or not at all.** Each of these applied the action first and objected second, which is the same defect wearing three faces.
 

@@ -100,7 +100,12 @@ struct SyncEngineBulkResultTests {
         #expect(decoded["type"] as? String == "core.bad")
         #expect(decoded["items"] == nil, "the whole page was kept, not the entry")
 
-        let collected = await collector.value
+        let collected = await awaitCancellable(collector)
+        // Cancellation hands back whatever the collector had gathered, so
+        // without this a timed-out run reports the honest limit *and* a
+        // content failure on a partial array — a clock dressed as a logic
+        // error, which is the shape the racing timeouts were removed for.
+        guard !Task.isCancelled else { return }
         let events = collected.compactMap { event -> String? in
             if case let .mutationDropped(kind, itemId, _, _) = event { return "\(kind):\(itemId ?? "-")" }
             return nil
@@ -136,7 +141,12 @@ struct SyncEngineBulkResultTests {
         // would collapse in any list keyed on it.
         #expect(Set(dropped.map(\.id)).count == 2)
 
-        let collected = await collector.value
+        let collected = await awaitCancellable(collector)
+        // Cancellation hands back whatever the collector had gathered, so
+        // without this a timed-out run reports the honest limit *and* a
+        // content failure on a partial array — a clock dressed as a logic
+        // error, which is the shape the racing timeouts were removed for.
+        guard !Task.isCancelled else { return }
         let count = collected.filter { if case .mutationDropped = $0 { return true } else { return false } }.count
         #expect(count == 2)
     }

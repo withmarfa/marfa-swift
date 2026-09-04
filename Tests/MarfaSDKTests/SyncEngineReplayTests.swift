@@ -194,7 +194,12 @@ struct SyncEngineReplayTests {
             (try? await queue.isEmpty) == true
         }
 
-        let collected = await collector.value
+        let collected = await awaitCancellable(collector)
+        // Cancellation hands back whatever the collector had gathered, so
+        // without this a timed-out run reports the honest limit *and* a
+        // content failure on a partial array — a clock dressed as a logic
+        // error, which is the shape the racing timeouts were removed for.
+        guard !Task.isCancelled else { return }
         let dropEvent = collected.first { if case .mutationDropped = $0 { return true } else { return false } }
         #expect(dropEvent != nil)
         if case let .mutationDropped(kind, itemId, attempt, error) = dropEvent {
@@ -860,7 +865,12 @@ struct SyncEngineReplayTests {
         // exists on either side.
         #expect((try? await store.fetchEdge(id: "E-AX")) == nil)
 
-        let collected = await collector.value
+        let collected = await awaitCancellable(collector)
+        // Cancellation hands back whatever the collector had gathered, so
+        // without this a timed-out run reports the honest limit *and* a
+        // content failure on a partial array — a clock dressed as a logic
+        // error, which is the shape the racing timeouts were removed for.
+        guard !Task.isCancelled else { return }
         let drops = collected.compactMap { event -> (String, String?)? in
             if case let .mutationDropped(kind, itemId, _, _) = event {
                 return (kind, itemId)

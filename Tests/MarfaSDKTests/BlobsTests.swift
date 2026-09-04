@@ -295,12 +295,15 @@ struct BlobsTests {
         // uncancellable and a collector that never finished hung the run with
         // no output rather than failing at a minute. Forwarding cancellation
         // is what actually hands the bound to the trait.
-        let collected = try await withTaskCancellationHandler {
-            await collector.value
-        } onCancel: {
-            collector.cancel()
-        }
+        let collected = await awaitCancellable(collector)
         await engine.stop()
+
+        // Teardown above, assertions below. Cancellation returns whatever the
+        // collector had gathered, so without this a timed-out run reports two
+        // issues: the honest limit, and a content failure on a partial array —
+        // a clock dressed as a logic error, which is what the racing timeout
+        // this replaced used to produce.
+        guard !Task.isCancelled else { return }
 
         // The mutation was permanently dropped, not retried.
         let droppedKinds = collected.compactMap { event -> String? in
