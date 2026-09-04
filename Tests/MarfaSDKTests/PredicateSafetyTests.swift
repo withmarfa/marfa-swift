@@ -170,6 +170,49 @@ struct PredicateSafetyTests {
         #expect(everything.isEmpty)
     }
 
+    /// The items descriptor's sibling witness. It composes more branches than
+    /// the search one — seven now that `source` narrows — and the file it
+    /// lives in warns twice that clause count is what pushes the `#Predicate`
+    /// macro past the type-checker. A compile proves the macro accepted it;
+    /// only a fetch proves the predicate *lowers*, which is the "compiles then
+    /// crashes at runtime" failure this suite exists to catch.
+    @Test("Items descriptor composes every filter without crashing") func itemsDescriptorShapes() async throws {
+        let (context, _) = try await seededContext()
+
+        // Unfiltered: `system.*` rows drop out, trashed ones do not — the
+        // items descriptor has no default state exclusion where search does,
+        // and that asymmetry is deliberate.
+        let unfiltered = try context.fetch(LocalStore.makeItemsDescriptor(filters: nil))
+        #expect(Set(unfiltered.map(\.id)) == ["a", "b", "c"])
+
+        // Each captured branch alone, so a clause that stopped narrowing is
+        // distinguishable from one that never matched.
+        let byState = try context.fetch(
+            LocalStore.makeItemsDescriptor(filters: ListFilters(state: .trashed))
+        )
+        #expect(byState.map(\.id) == ["b"])
+
+        let bySource = try context.fetch(
+            LocalStore.makeItemsDescriptor(filters: ListFilters(source: "test"))
+        )
+        #expect(Set(bySource.map(\.id)) == ["a", "b", "c"])
+
+        let byMissingSource = try context.fetch(
+            LocalStore.makeItemsDescriptor(filters: ListFilters(source: "no-such-source"))
+        )
+        #expect(byMissingSource.isEmpty)
+
+        // Every captured branch live at once, which is the shape at risk.
+        var everything = ListFilters(type: "core.note", state: .active, tier: .library)
+        everything.source = "test"
+        everything.since = "2026-01-01T00:00:00.000Z"
+        everything.until = "2026-12-31T00:00:00.000Z"
+        let composed = try context.fetch(LocalStore.makeItemsDescriptor(filters: everything))
+        // The seed rows carry no tier, so this matches nothing. The point is
+        // that a predicate carrying all seven branches evaluates at all.
+        #expect(composed.isEmpty)
+    }
+
     // MARK: - Range comparisons (used by since/until)
 
     @Test("String >= comparison filters correctly") func stringGreaterEqual() async throws {

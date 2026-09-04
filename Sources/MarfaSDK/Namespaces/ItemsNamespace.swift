@@ -593,6 +593,14 @@ public struct ItemsNamespace: Sendable {
         )
     }
 
+    /// What the server uses when a caller names no `max_items`, and the hard
+    /// ceiling it clamps to. Mirrored rather than left open so a local
+    /// resolution and a server one agree on how much work a call is — the
+    /// precedent is `LocalStoreSearch.defaultSearchLimit`, which mirrors the
+    /// list default for the same reason.
+    static let defaultBulkActionCap = 10_000
+    static let maxBulkActionCap = 50_000
+
     private func applyBulkActionLocally(
         _ input: BulkActionInput,
         store: LocalStore
@@ -614,6 +622,12 @@ public struct ItemsNamespace: Sendable {
         //
         // Refusing beats approximating: a local evaluator would be a second
         // implementation of a grammar the server owns, and the two would drift.
+        // A dry run is refused too, and that is deliberate rather than an
+        // oversight in the ordering: a preview is the likeliest caller, and a
+        // preview reporting the *wide* match set is exactly the silent
+        // misreport this whole guard exists to stop. The cap below is checked
+        // before the preview returns for the same reason — a preview of an
+        // action the server would refuse is not a preview.
         if filter.filter != nil {
             throw LocalFilterUnsupportedError(
                 operation: "items.bulkAction", field: "filter"
@@ -652,9 +666,20 @@ public struct ItemsNamespace: Sendable {
         // reaching for a cap is reaching for a brake, and a brake that
         // silently becomes a partial write is worse than no brake.
         //
-        // The count is therefore taken over the unwindowed set and compared.
+        // **The default matters as much as the explicit value.** The server
+        // caps at `min(max_items ?? 10_000, 50_000)`, so a caller who sets
+        // nothing still has a ceiling. Leaving the local side uncapped meant
+        // a synced client could act on far more rows than the server would
+        // then accept, and the replay's `400` is permanent — so the device
+        // applied the action, the server applied none, and the mutation was
+        // dead-lettered. Mirroring the default is what keeps the two halves
+        // agreeing about how much work a call is.
+        //
+        // The count is taken over the unwindowed set, because a windowed
+        // fetch cannot tell "this many matched" from "this many were read".
         let matched = try await store.fetchItems(filters: list)
-        if let cap = options.maxItems, matched.data.count > cap {
+        let cap = min(options.maxItems ?? Self.defaultBulkActionCap, Self.maxBulkActionCap)
+        if matched.data.count > cap {
             throw BulkCapExceededError(matched: matched.data.count, cap: cap)
         }
 

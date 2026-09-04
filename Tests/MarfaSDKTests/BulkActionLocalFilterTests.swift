@@ -15,6 +15,27 @@ import MarfaSDKTestSupport
 @Suite("Local bulk actions honor the narrowing they were given", .timeLimit(.minutes(1)))
 struct BulkActionLocalFilterTests {
 
+    /// A synced-mode client over an in-memory store, so the queue exists and
+    /// the encoder path the confirmation used to hide in is reachable.
+    private func makeSyncedClient() async throws -> MarfaClient {
+        let mock = MockTransport()
+        let config = ClientConfiguration(url: URL(string: "http://test")!, apiKey: "test-key")
+        let (store, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        return MarfaClient(
+            configuration: config,
+            transport: mock,
+            localStore: store,
+            mutationQueue: queue,
+            syncEngine: SyncEngine(
+                transport: mock,
+                localStore: store,
+                mutationQueue: queue,
+                connectionManager: ConnectionStateManager()
+            ),
+            container: container
+        )
+    }
+
     /// Two rows under one source, for the cases where the source axis is not
     /// what is being tested.
     private func seedTwoNotes(_ client: MarfaClient) async throws {
@@ -138,6 +159,29 @@ struct BulkActionLocalFilterTests {
         #expect(remaining.data.count == 2, "a capped purge trimmed instead of refusing")
     }
 
+    /// The cap guards all six actions, not just the destructive one. Without
+    /// this, scoping the check to `purge` leaves every other test green while
+    /// a capped `transition` archives everything it matched — the same brake
+    /// that does not brake, one action along.
+    @Test("the cap refuses a non-purge action too")
+    func capRefusesOnNonPurgeAction() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        try await seedTwoNotes(client)
+
+        await #expect(throws: BulkCapExceededError.self) {
+            _ = try await client.items.bulkAction(
+                .transition(
+                    filter: BulkActionFilter(type: "core.note"),
+                    state: .archived,
+                    options: BulkActionOptions(maxItems: 1)
+                )
+            )
+        }
+
+        let stillActive = try await client.items.list(filters: ListFilters(state: .active))
+        #expect(stillActive.data.count == 2, "a capped transition ran anyway")
+    }
+
     /// A cap the match set fits inside is not an error, which is the
     /// discriminator: without this, refusing every capped call would pass.
     @Test("a match set within maxItems proceeds")
@@ -154,6 +198,41 @@ struct BulkActionLocalFilterTests {
         )
 
         #expect(result.matched == 2)
+    }
+
+    /// The cap a caller sets is only half of it: the server applies its own
+    /// default when none is named, so an uncapped local resolution could act
+    /// on far more than the server would then accept — and the replay's 400 is
+    /// permanent, so the device acted, the server did not, and the write was
+    /// dead-lettered. Pinning the numbers rather than the behavior because
+    /// they are a mirror of another system's constants, and a mirror that
+    /// drifts silently is the thing worth catching.
+    @Test("the local cap mirrors the server's default and ceiling")
+    func capMirrorsTheServer() {
+        #expect(ItemsNamespace.defaultBulkActionCap == 10_000)
+        #expect(ItemsNamespace.maxBulkActionCap == 50_000)
+    }
+
+    /// The original defect's worst form was synced: purge locally, throw at
+    /// enqueue, queue nothing, so the caller saw an error over work that had
+    /// already happened. Every other test here runs pure-local, where the
+    /// encoder never ran at all — this is the half that reproduces the shape
+    /// a person would have met.
+    @Test("a synced client's purge without confirmation refuses before the fan-out")
+    func syncedPurgeWithoutConfirmationIsRefused() async throws {
+        let client = try await makeSyncedClient()
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("kept")], source: "seed")
+        )
+
+        await #expect(throws: BulkConfirmationRequiredError.self) {
+            _ = try await client.items.bulkAction(
+                .purge(filter: BulkActionFilter(type: "core.note"), options: BulkActionOptions())
+            )
+        }
+
+        let remaining = try await client.items.list(filters: ListFilters(state: .active))
+        #expect(remaining.data.count == 1)
     }
 
     // MARK: - What this change deliberately leaves open
@@ -178,18 +257,33 @@ struct BulkActionLocalFilterTests {
     /// `edge` and `backref` are structured fields on `ListFilters` that the
     /// local descriptor never reads. They cannot reach a bulk action — the
     /// bulk filter has no such fields, and the URL shorthand for them becomes
-    /// part of the refused `filter` string — so this pins the read path only.
-    @Test("a local list still ignores edge and backref, deliberately")
-    func localListStillIgnoresEdgeAndBackref() async throws {
+    /// part of the refused `filter` string — so these pin the read path only.
+    ///
+    /// One test per axis rather than one for both: setting them together
+    /// covers the same mutations, but closing either axis alone produced a
+    /// byte-identical failure, so the red could not say which had moved.
+    @Test("a local list still ignores edge, deliberately")
+    func localListStillIgnoresEdge() async throws {
         let client = try await MarfaSDKTest.makeInMemoryClient()
         try await seedTwoNotes(client)
 
         var filters = ListFilters(type: "core.note")
         filters.edge = ["core.about": "no-such-target"]
+        let listed = try await client.items.list(filters: filters)
+
+        #expect(listed.data.count == 2, "the read path narrowed on `edge`; the docblock says it does not")
+    }
+
+    @Test("a local list still ignores backref, deliberately")
+    func localListStillIgnoresBackref() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        try await seedTwoNotes(client)
+
+        var filters = ListFilters(type: "core.note")
         filters.backref = ["core.reply": "no-such-source"]
         let listed = try await client.items.list(filters: filters)
 
-        #expect(listed.data.count == 2, "the read path narrowed on edge/backref; the docblock says it does not")
+        #expect(listed.data.count == 2, "the read path narrowed on `backref`; the docblock says it does not")
     }
 
     /// An empty expression is non-nil and so is refused. That is the safe

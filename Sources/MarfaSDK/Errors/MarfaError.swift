@@ -60,14 +60,7 @@ open class MarfaError: Error, @unchecked Sendable {
     public var isPermanent: Bool {
         if self is SchemaVersionMismatchError { return true }
         switch status {
-        // 501 sits here for the same reason 400 does — the call cannot start
-        // succeeding however many times it is repeated — and it is worth
-        // naming separately because the reason differs. 400 says the request
-        // is wrong; 501 says this resolution path does not implement it. Both
-        // are thrown before a mutation is queued today, but the property is
-        // public and a caller retrying on `!isPermanent` would otherwise spin
-        // for ever on a refusal that is final by construction.
-        case 400, 403, 404, 501: return true
+        case 400, 403, 404: return true
         default: return false
         }
     }
@@ -194,6 +187,14 @@ public final class SchemaVersionMismatchError: MarfaError {
 public final class LocalModeUnsupportedError: MarfaError {
     public let operation: String
 
+    /// Overridden rather than widening the 501 band in ``MarfaError/isPermanent``.
+    /// A *server* answering 501 is a different question — a route mid-rollout
+    /// or a proxy — and `PendingMutationBlockReason` deliberately treats a 5xx
+    /// as transient so a queued write survives it. Widening the band there
+    /// would turn those into dropped writes, which is a much larger change
+    /// than the caller-facing one this needs.
+    public override var isPermanent: Bool { true }
+
     public init(operation: String) {
         self.operation = operation
         super.init(
@@ -221,6 +222,12 @@ public final class LocalModeUnsupportedError: MarfaError {
 /// structured fields — `type`, `state`, `source`, `tier`, `tags`, `since`,
 /// `until` — or perform the action through a remote client.
 public final class LocalFilterUnsupportedError: MarfaError {
+    /// Refusing a narrowing this path cannot apply is final by construction:
+    /// the same call on the same client resolves the same way every time. See
+    /// ``LocalModeUnsupportedError`` for why this is an override rather than a
+    /// widening of the status band.
+    public override var isPermanent: Bool { true }
+
     /// The call that was refused, e.g. `items.bulkAction`.
     public let operation: String
     /// The narrowing that could not be applied, e.g. `filter`.
