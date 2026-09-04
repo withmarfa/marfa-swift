@@ -384,6 +384,61 @@ struct SyncEngineInboundRebaseTests {
         #expect(stored.version == 5)
     }
 
+    @Test("a refused frame announces nothing")
+    func staleFrameAnnouncesNothing() async throws {
+        // The store assertions above cannot see this. A refused frame changes
+        // nothing, so "the row is unchanged" is satisfied whether or not the
+        // engine also told the app the row had changed — and it did tell them,
+        // because the apply's answer went into a log line and every arm emitted
+        // regardless.
+        //
+        // `item.deleted` is the arm where that costs something. The version
+        // guard correctly refuses a stale one and the row stays active, while
+        // the app is handed `.itemDeleted(id:)` for a row it can still read.
+        // An app holding ids outside the store — the audience this change's own
+        // documentation names for removal events — acts on the event, not on
+        // the row.
+        let (store, _, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("i1", title: "Current", body: "current", version: 5))
+
+        let events = engine.events
+        await engine._applyEventForTesting(
+            try frame(
+                "item.deleted",
+                item("i1", title: "Old", body: "old", state: .trashed, version: 3)
+            )
+        )
+
+        // The row is still active, which is the refusal working.
+        #expect(try await store.fetchItem(id: "i1").state == .active)
+        let published = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        #expect(published.isEmpty, "a refused frame published \(published)")
+    }
+
+    @Test("a frame the store took is still announced")
+    func appliedFrameIsAnnounced() async throws {
+        // Control for the test above: gating every emit on `false` would pass
+        // it and would silence the whole event stream.
+        let (store, _, _, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("i1", title: "Current", body: "current", version: 5))
+
+        let events = engine.events
+        await engine._applyEventForTesting(
+            try frame(
+                "item.deleted",
+                item("i1", title: "Current", body: "current", state: .trashed, version: 6)
+            )
+        )
+
+        #expect(try await store.fetchItem(id: "i1").state == .trashed)
+        let published = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        guard case let .itemDeleted(id) = published.first else {
+            Issue.record("expected .itemDeleted, got \(published)")
+            return
+        }
+        #expect(id == "i1")
+    }
+
     @Test("a frame ahead of the row does apply")
     func freshFrameApplies() async throws {
         // Control for the test above. A guard that refused everything would
