@@ -52,7 +52,7 @@ struct SyncEngineSSEAndCursorTests {
         #expect(await !connManager.isStartedForTesting)
 
         await engine.resumeStartPublicationForTesting()
-        await startTask.value
+        await awaitCancellable(startTask)
         #expect(await !engine.isRunningForTesting)
         #expect(await !engine.hasLifecycleTasksForTesting)
         #expect(await !connManager.isStartedForTesting)
@@ -86,8 +86,8 @@ struct SyncEngineSSEAndCursorTests {
         }
         let restartTask = Task { await engine.start() }
         await transport.releaseRequest()
-        await stopTask.value
-        await restartTask.value
+        await awaitCancellable(stopTask)
+        await awaitCancellable(restartTask)
 
         #expect(await engine.isRunningForTesting)
         await connManager.applyStateForTesting(.connecting)
@@ -99,7 +99,7 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStoppingForTesting
         }
         await transport.releaseRequest()
-        await finalStopTask.value
+        await awaitCancellable(finalStopTask)
     }
 
     @Test("start cannot open a new lifecycle while a stop is still in flight")
@@ -136,8 +136,8 @@ struct SyncEngineSSEAndCursorTests {
         }
 
         await transport.releaseRequest()
-        await stopTask.value
-        await restartTask.value
+        await awaitCancellable(stopTask)
+        await awaitCancellable(restartTask)
 
         #expect(await engine.isRunningForTesting)
         #expect(await connManager.isStartedForTesting)
@@ -165,7 +165,7 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStoppingForTesting
         }
         await engine.resumeStreamForTesting()
-        await stopTask.value
+        await awaitCancellable(stopTask)
 
         // The nudge is an unstructured task: it does not inherit the stream
         // task's cancellation, so one installed after the snapshot outlives
@@ -193,7 +193,7 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStoppingForTesting
         }
         await engine.resumeStreamForTesting()
-        await stopTask.value
+        await awaitCancellable(stopTask)
 
         // `markOnline` is a no-op once the manager is offline, so the state
         // machine records nothing either way; the call count is what proves

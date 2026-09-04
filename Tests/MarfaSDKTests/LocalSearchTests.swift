@@ -377,7 +377,7 @@ struct LocalSearchTests {
         task.cancel()
 
         await #expect(throws: CancellationError.self) {
-            _ = try await task.value
+            _ = try await awaitCancellable(task)
         }
     }
 

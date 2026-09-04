@@ -97,7 +97,7 @@ struct DeviceFlowPollingTests {
         #expect(await clock.nextSleepRequest() == 5)
         clock.advance(by: 5)
 
-        _ = try await task.value
+        _ = try await awaitCancellable(task)
 
         #expect(http.calls.count == 2)
         // Cadence held steady — authorization_pending must not escalate.
@@ -160,8 +160,8 @@ struct DeviceFlowPollingTests {
         #expect(await clockB.nextSleepRequest() == 5)
         clockA.advance(by: 5)
         clockB.advance(by: 5)
-        #expect(try await tokenA.value.currentToken().accessToken == "token-a")
-        #expect(try await tokenB.value.currentToken().accessToken == "token-b")
+        #expect(try await awaitCancellable(tokenA).currentToken().accessToken == "token-a")
+        #expect(try await awaitCancellable(tokenB).currentToken().accessToken == "token-b")
         let keyA = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerA, clientId: "test-client")
         let keyB = OAuthIssuer.storageKey(kind: "tokens", issuer: issuerB, clientId: "test-client")
         #expect(await storage.peek(account: keyA)?.contains("token-a") == true)
@@ -220,7 +220,7 @@ struct DeviceFlowPollingTests {
         #expect(await clock.nextSleepRequest() == 10)
         clock.advance(by: 10)
 
-        _ = try await task.value
+        _ = try await awaitCancellable(task)
 
         #expect(http.calls.count == 2)
         #expect(clock.recordedSleeps == [5, 10])
@@ -241,7 +241,7 @@ struct DeviceFlowPollingTests {
             clock.advance(by: 5)
         }
 
-        _ = try await task.value
+        _ = try await awaitCancellable(task)
 
         #expect(http.calls.count == 4)
         #expect(clock.recordedSleeps == [5, 5, 5, 5])
@@ -257,7 +257,7 @@ struct DeviceFlowPollingTests {
         clock.advance(by: 5)
 
         await #expect(throws: DeviceFlowError.self) {
-            _ = try await task.value
+            _ = try await awaitCancellable(task)
         }
 
         // One HTTP call only — loop terminated after the permanent error.
@@ -276,7 +276,7 @@ struct DeviceFlowPollingTests {
 
         let thrown: Error
         do {
-            _ = try await task.value
+            _ = try await awaitCancellable(task)
             Issue.record("expected DeviceFlowError; got success")
             return
         } catch {
@@ -301,7 +301,7 @@ struct DeviceFlowPollingTests {
 
         let thrown: Error
         do {
-            _ = try await task.value
+            _ = try await awaitCancellable(task)
             Issue.record("expected OAuthError; got success")
             return
         } catch {
@@ -354,7 +354,7 @@ struct DeviceFlowPollingTests {
         clock.advance(by: 5)
 
         do {
-            _ = try await task.value
+            _ = try await awaitCancellable(task)
             Issue.record("expected URLError; got success")
             return
         } catch let error as URLError {
@@ -375,7 +375,7 @@ struct DeviceFlowPollingTests {
         task.cancel()
 
         await #expect(throws: CancellationError.self) {
-            _ = try await task.value
+            _ = try await awaitCancellable(task)
         }
         // No HTTP call ever happened — cancellation hit during the
         // first sleep, before any poll.
@@ -479,7 +479,7 @@ struct DeviceFlowPollingTests {
         let task = Task { try await handle.awaitToken() }
         #expect(await clock.nextSleepRequest() == 5)
         clock.advance(by: 5)
-        _ = try await task.value
+        _ = try await awaitCancellable(task)
     }
 
     @Test("start() leaves verification_uri_complete nil when the server omits it")

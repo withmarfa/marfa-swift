@@ -70,7 +70,7 @@ struct SyncEngineReplayTests {
         #expect(await transport.requestCallCount == 1)
 
         await transport.releaseRequest()
-        await stopTask.value
+        await awaitCancellable(stopTask)
 
         let remaining = try await queue.fetchAll()
         #expect(remaining.count == 1)
@@ -116,7 +116,7 @@ struct SyncEngineReplayTests {
             await engine.isStoppingForTesting
         }
         await transport.releaseRequest()
-        await stopTask.value
+        await awaitCancellable(stopTask)
 
         #expect(await engine.lastCleanDrainAt == nil)
         let remaining = try await queue.fetchAll()
@@ -150,7 +150,7 @@ struct SyncEngineReplayTests {
         // everything it knows about, which is not the same as a drained queue.
         try await queue.enqueueDeleteItem(id: "server-second")
         await transport.releaseRequest()
-        await drain.value
+        await awaitCancellable(drain)
 
         #expect(await engine.lastCleanDrainAt == nil)
         let remaining = try await queue.fetchAll()

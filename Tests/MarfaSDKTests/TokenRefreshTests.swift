@@ -216,7 +216,7 @@ struct TokenRefreshTests {
         #expect(try await storage.get(for: tokenKey) == nil)
 
         collector.cancel()
-        let events = await collector.value
+        let events = await awaitCancellable(collector)
         #expect(events.first == .signedOut(reason: .reuseDetected))
     }
 
@@ -236,7 +236,7 @@ struct TokenRefreshTests {
         }
 
         collector.cancel()
-        let events = await collector.value
+        let events = await awaitCancellable(collector)
         #expect(events.first == .signedOut(reason: .refreshTokenRejected))
     }
 
@@ -285,7 +285,7 @@ struct TokenRefreshTests {
         #expect(TokenRefreshStubURLProtocol.count() == 2)
 
         collector.cancel()
-        #expect(await collector.value.isEmpty)
+        #expect(await awaitCancellable(collector).isEmpty)
     }
 
     @Test("exhausting retries on 429 throws but leaves the session intact")
@@ -308,7 +308,7 @@ struct TokenRefreshTests {
         // next attempt can succeed rather than forcing the user to sign in.
         #expect(try await storage.get(for: tokenKey) != nil)
         collector.cancel()
-        #expect(await collector.value.isEmpty)
+        #expect(await awaitCancellable(collector).isEmpty)
     }
 
     // MARK: - Rotation persistence
