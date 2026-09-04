@@ -69,6 +69,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **The type graph now reaches the device.** A client with a local store accepted any type string and validated nothing, so a write the type forbids was queued, sent, and refused by the server — possibly hours later on a reconnect, long after the person who could have fixed it moved on.
+
+  **`MarfaTypeRegistry`** carries every `core.*` and `system.*` type the platform ships, with each definition's inherited fields already flattened. `MarfaTypeRegistry.platform` is the shipped set; `merging(_:)` layers a space's own types over it, the space winning a collision because its copy is what its rows were written against. It answers three questions: whether one type descends from another, which types a query for a parent should match, and which fields a type's display hints name for offline search.
+
+  **`MarfaTypeRegistry.validate(properties:against:)`** refuses a write the type forbids, throwing **`TypeValidationError`** with every failure rather than the first — the server returns them all, and stopping early would make the local refusal and the remote one disagree about a write neither accepts. **`MarfaTypeDefinition`**, **`MarfaFieldDefinition`** and **`MarfaFieldType`** describe what it checks against.
+
+  **What it deliberately does not do**, stated because a local check advertised as equivalent and merely similar is worse than one whose limits are written down: it mirrors the rules the server applies *by default*. An unknown type is refused, a required field must be present and well-typed, and a declared field must hold what it declares. An undeclared property passes, because the server passes it — strict enforcement is a per-space setting the device does not hold, and a write only strict mode would refuse is still refused on drain. The format checks are narrow in the safe direction: each accepts at least everything the server accepts, so a write the server would take is never refused locally.
+
 - **`LocalFilterUnsupportedError`**, thrown when a narrowing cannot be applied where a request is being resolved, so the request is refused rather than answered wider than it was asked. It carries the `operation` refused and the `field` that could not be applied.
 
 - **`BulkConfirmationRequiredError`** and **`BulkCapExceededError`**, mirroring the server's `bulk_confirmation_required` and `bulk_cap_exceeded` so a caller catches the same failure wherever the action resolved. `BulkCapExceededError` carries the `matched` count and the `cap`.
