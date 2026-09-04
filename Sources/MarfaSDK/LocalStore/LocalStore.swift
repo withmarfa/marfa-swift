@@ -1019,10 +1019,10 @@ public actor LocalStore {
         let hasTypeFilter = filters?.type != nil
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
-        let since = filters?.timestampAfter ?? ""
-        let hasSince = filters?.timestampAfter != nil
-        let until = filters?.timestampBefore ?? ""
-        let hasUntil = filters?.timestampBefore != nil
+        let lowerBound = filters?.timestampAfter ?? ""
+        let hasLowerBound = filters?.timestampAfter != nil
+        let upperBound = filters?.timestampBefore ?? ""
+        let hasUpperBound = filters?.timestampBefore != nil
         // `TierFilter` and `Tier` share their raw values, so the filter
         // compares directly against the stored column.
         let tierFilter = filters?.tier?.rawValue ?? ""
@@ -1065,8 +1065,8 @@ public actor LocalStore {
         let predicate = #Predicate<MarfaItemModel> { item in
             (!hasTypeFilter  || item.type == typeFilter) &&
             (!hasStateFilter || item.stateRaw == stateFilter) &&
-            (!hasSince || item.timestamp >= since || item.timestamp == "") &&
-            (!hasUntil || item.timestamp <= until) &&
+            (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
+            (!hasUpperBound || item.timestamp <= upperBound) &&
             (!hasTierFilter  || item.tierRaw == tierFilter) &&
             (!hasSourceFilter || item.source == sourceFilter) &&
             (!excludeSystemTypes || !item.type.starts(with: systemPrefix))

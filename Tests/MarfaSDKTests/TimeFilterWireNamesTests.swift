@@ -19,7 +19,11 @@ struct TimeFilterWireNamesTests {
         filters.timestampAfter = "2026-01-01T00:00:00Z"
         filters.timestampBefore = "2026-12-31T00:00:00Z"
 
-        let names = Dictionary(uniqueKeysWithValues: filters.toQueryParams())
+        // Not `uniqueKeysWithValues:`, which traps on a duplicate key: a
+        // regression emitting both bounds under one name would kill the test
+        // process — taking every test sharing it down and reporting none as
+        // failed — instead of failing an assertion.
+        let names = Dictionary(filters.toQueryParams(), uniquingKeysWith: { first, _ in first })
         #expect(names["timestamp_after"] == "2026-01-01T00:00:00Z")
         #expect(names["timestamp_before"] == "2026-12-31T00:00:00Z")
 
@@ -30,11 +34,13 @@ struct TimeFilterWireNamesTests {
         #expect(names["until"] == nil)
     }
 
-    /// The discriminator: an unset bound emits nothing, so the assertions
-    /// above are about the names rather than about the map being empty.
+    /// Not a discriminator for the test above — that one rules out an empty
+    /// map by itself, since it asserts values rather than absence. What this
+    /// catches is the opposite defect: an emitter that appends unconditionally
+    /// and sends `timestamp_after=` on every unfiltered list.
     @Test("an unset bound emits no parameter at all")
     func unsetEmitsNothing() {
-        let names = Dictionary(uniqueKeysWithValues: ListFilters().toQueryParams())
+        let names = Dictionary(ListFilters().toQueryParams(), uniquingKeysWith: { first, _ in first })
         #expect(names["timestamp_after"] == nil)
         #expect(names["timestamp_before"] == nil)
     }

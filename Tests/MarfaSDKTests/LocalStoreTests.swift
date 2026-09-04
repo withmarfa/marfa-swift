@@ -350,6 +350,15 @@ struct LocalStoreTests {
             filters: ListFilters(timestampAfter: "2025-08-01T00:00:00.000Z")
         )
         #expect(outOfRange.isEmpty, "an undated item is not silently kept, nor silently dropped")
+
+        // The mirror case, and it was missing everywhere. Every date exclusion
+        // in this suite narrowed with a *lower* bound, so deleting the upper
+        // bound's branch from `applyDateBounds` left the whole suite green.
+        let afterTheWindow = LocalStore.applyDateBounds(
+            [undated],
+            filters: ListFilters(timestampBefore: "2025-06-01T00:00:00.000Z")
+        )
+        #expect(afterTheWindow.isEmpty, "an upper bound did not exclude a later item")
     }
 
     // MARK: - Tag and tier filters
