@@ -221,7 +221,7 @@ private func invalidGrant() -> StoredProvider401StubURLProtocol.TokenResponse {
 /// the code does not take.
 private func collectingAuthEvents(
     _ provider: StoredTokenProvider
-) async -> Task<[AuthEvent], Never> {
+) -> Task<[AuthEvent], Never> {
     let stream = provider.authEvents
     return Task { () -> [AuthEvent] in
         var seen: [AuthEvent] = []
@@ -336,7 +336,7 @@ struct Transport401StoredProviderTests {
         let provider = makeStoredProvider(storage: storage)
         try await provider.store(liveToken(access: "revoked", refresh: "rt-dead"))
         let transport = makeTransport(provider: provider)
-        let collector = await collectingAuthEvents(provider)
+        let collector = collectingAuthEvents(provider)
 
         await #expect(throws: OAuthError.self) {
             _ = try await transport.request(

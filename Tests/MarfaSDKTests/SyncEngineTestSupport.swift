@@ -113,8 +113,15 @@ enum SyncEngineTestKit {
     ) async throws {
         while true {
             if try await condition() { return }
-            try Task.checkCancellation()
-            try await Task.sleep(for: every)
+            // Translate cancellation into a named failure, so the trait's
+            // "time limit exceeded" carries what was being awaited rather than
+            // only how long. See the public sibling for the reasoning.
+            do {
+                try Task.checkCancellation()
+                try await Task.sleep(for: every)
+            } catch is CancellationError {
+                throw AwaitConditionCancelled(description: description)
+            }
         }
     }
 
@@ -134,6 +141,7 @@ enum SyncEngineTestKit {
     static func expectRemainsFalse(
         for duration: Duration,
         every: Duration = .milliseconds(10),
+        sourceLocation: SourceLocation = #_sourceLocation,
         _ condition: @Sendable () async throws -> Bool
     ) async throws {
         let deadline = ContinuousClock.now + duration
@@ -143,7 +151,10 @@ enum SyncEngineTestKit {
                 // after this returns, so throwing here would skip it and leak
                 // whatever that teardown was releasing (a lock, an engine, a
                 // blocked transport) into the next test.
-                Issue.record("expectRemainsFalse: condition became true within \(duration)")
+                Issue.record(
+                    "expectRemainsFalse: condition became true within \(duration)",
+                    sourceLocation: sourceLocation
+                )
                 return
             }
             try await Task.sleep(for: every)
@@ -169,12 +180,16 @@ func expectRemains(
     for duration: Duration,
     every: Duration = .milliseconds(10),
     description: String,
+    sourceLocation: SourceLocation = #_sourceLocation,
     _ invariant: @MainActor () async throws -> Bool
 ) async throws {
     let deadline = ContinuousClock.now + duration
     while ContinuousClock.now < deadline {
         if try await invariant() == false {
-            Issue.record("\(description) stopped holding within \(duration)")
+            Issue.record(
+                "\(description) stopped holding within \(duration)",
+                sourceLocation: sourceLocation
+            )
             return
         }
         await Task.yield()

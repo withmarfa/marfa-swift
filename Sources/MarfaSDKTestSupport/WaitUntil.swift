@@ -4,6 +4,14 @@ import Foundation
 /// timeout, so the failure names what was awaited and for how long
 /// instead of leaving the caller's next line — and the assertion after
 /// it — to run against state the wait never established.
+public struct AwaitConditionCancelled: Error, CustomStringConvertible {
+    public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
+}
+
 public struct WaitUntilTimeoutError: Error, CustomStringConvertible {
     public let description: String
 
@@ -100,6 +108,16 @@ public func waitUntil(
 /// and then names itself a timeout is strictly more useful than one that fails
 /// in half a second saying the wrong thing. **Every suite using this must
 /// carry a `.timeLimit`,** or a starved condition hangs the run instead.
+///
+/// **And a `.timeLimit` bounds a *cancellable* wait only**, which is the part
+/// that is easy to get wrong and was got wrong here once. The trait cancels
+/// the test task; it does not kill it. Every poll below suspends in
+/// `Task.sleep`, which throws on cancellation, so the trait reaches them. An
+/// unstructured `Task` does not inherit that cancellation, and `await
+/// someTask.value` on a non-throwing `Task` cannot throw `CancellationError`
+/// at all — so a test awaiting one hangs forever under a trait that looks like
+/// it covers the case. Wrap such a wait in `withTaskCancellationHandler` and
+/// cancel the task in `onCancel:`, or keep its own bound.
 @MainActor
 public func awaitCondition(
     every: Duration = .milliseconds(10),
@@ -108,10 +126,19 @@ public func awaitCondition(
 ) async throws {
     while true {
         if try await condition() { return }
-        try Task.checkCancellation()
-        // Yield so the debounced refetch task lands on the main actor before
-        // the sleep, for the same reason `waitUntil` does it.
-        await Task.yield()
-        try await Task.sleep(for: every)
+        // The suite's time limit works by *cancelling* the test task, and
+        // cancellation on its own reports only the trait's message — which
+        // names a duration and not what was being waited for. Translating it
+        // here is what makes `description` load-bearing rather than a string
+        // every call site composes and nothing prints.
+        do {
+            try Task.checkCancellation()
+            // Yield so the debounced refetch task lands on the main actor
+            // before the sleep, for the same reason `waitUntil` does it.
+            await Task.yield()
+            try await Task.sleep(for: every)
+        } catch is CancellationError {
+            throw AwaitConditionCancelled(description: description)
+        }
     }
 }

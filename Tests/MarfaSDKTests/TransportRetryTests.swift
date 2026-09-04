@@ -273,9 +273,16 @@ struct TransportRetryTests {
         // not begun still throws `CancellationError`, so the test went green
         // having exercised nothing.
         try await SyncEngineTestKit.awaitCondition(
-            description: "the request to reach the stub"
+            description: "this test's own request to reach the stub"
         ) {
-            StubURLProtocol.recorded().isEmpty == false
+            // Filtered by path, not merely non-empty. `recordedRequests` is a
+            // module-global shared by every suite using this stub, and only
+            // this suite is `.serialized` — the others run alongside it under
+            // `--parallel`. Another suite's request landing between the reset
+            // and this poll would open the gate before this test's own request
+            // started, restoring exactly the pass-for-the-wrong-reason this
+            // wait was written to close.
+            StubURLProtocol.recorded().contains { $0.url?.path == "/slow" }
         }
         task.cancel()
 

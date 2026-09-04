@@ -285,9 +285,21 @@ struct BlobsTests {
         // No racing timeout. A losing race returned an empty array, so a
         // starved collector failed on the *contents* of `droppedKinds` — a
         // clock reported as a logic error, with nothing in the output naming a
-        // budget or an elapsed time. The suite's `.timeLimit` owns this now,
-        // and a failure says it timed out.
-        let collected = try await collector.value
+        // budget or an elapsed time.
+        //
+        // **The trait alone does not replace it, and assuming it did left this
+        // wait unbounded.** A time limit *cancels* the test task rather than
+        // killing it, and `collector` is an unstructured `Task` that inherits
+        // no cancellation — worse, `await someTask.value` on a non-throwing
+        // `Task` cannot throw `CancellationError` at all, so the wait was
+        // uncancellable and a collector that never finished hung the run with
+        // no output rather than failing at a minute. Forwarding cancellation
+        // is what actually hands the bound to the trait.
+        let collected = try await withTaskCancellationHandler {
+            await collector.value
+        } onCancel: {
+            collector.cancel()
+        }
         await engine.stop()
 
         // The mutation was permanently dropped, not retried.
