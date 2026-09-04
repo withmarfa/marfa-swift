@@ -623,6 +623,15 @@ public actor SyncEngine {
             // import began is still asking to overwrite it, and arriving late
             // is not consent.
             try await refuseIfWorkIsStillQueued()
+            // A joiner does **not** cancel the import when it is cancelled
+            // itself. The task belongs to the caller that started it, and
+            // abandoning that caller's work because a later arrival went away
+            // is the opposite of what coalescing is for. The cost is stated
+            // rather than hidden: a cancelled joiner keeps waiting, because
+            // `await` on another task's value cannot be interrupted without
+            // cancelling it. Closing that needs joiners to observe completion
+            // through something they can be released from, which is a larger
+            // change than this one.
             return try await importTask.value
         }
         let task = Task { [self] in
@@ -631,7 +640,19 @@ public actor SyncEngine {
         }
         importTask = task
         defer { if importTask == task { importTask = nil } }
-        return try await task.value
+        // The owner forwards its cancellation, which nothing here used to do.
+        // An unstructured task inherits none from whoever awaits it, so a
+        // cancelled caller stayed suspended on a value that would never
+        // arrive — and because the inner task was never cancelled, neither was
+        // anything it awaited, so a transport holding a request open never
+        // learned to let go either. `stop()` has always cancelled-then-awaited
+        // its lifecycle tasks; this was the one place on this path that did
+        // neither.
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     /// Refuses the import while the queue still holds work, rather than

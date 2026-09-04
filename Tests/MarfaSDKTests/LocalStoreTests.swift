@@ -68,6 +68,15 @@ struct LocalStoreTests {
         _ = try MarfaModelContainer.make(path: ":memory:")
 
         let releaseLock = DispatchSemaphore(value: 0)
+        // Signalled on *every* exit, not only the one where the assertions
+        // pass. A thread is parked inside `withCreationLock`, which is a
+        // static lock shared by the whole process, and the only signal used to
+        // sit after two awaits that throw on cancellation — so a time limit
+        // firing in that window skipped it and left the creation lock held for
+        // good, blocking every later `MarfaModelContainer.make()` in the
+        // process. That is worse than the hang it would be reported as: one
+        // cancelled test wedges every test after it.
+        defer { releaseLock.signal() }
         await withCheckedContinuation { (acquired: CheckedContinuation<Void, Never>) in
             DispatchQueue.global().async {
                 MarfaModelContainer.withCreationLock {
@@ -87,6 +96,8 @@ struct LocalStoreTests {
             await completed.isSet
         }
 
+        // The deliberate release, which is what the rest of the test is about.
+        // The `defer` above is a net for the paths that never reach here.
         releaseLock.signal()
         try await SyncEngineTestKit.awaitCondition(description: "completed.isSet") {
             await completed.isSet
