@@ -258,6 +258,42 @@ struct ConnectionsNamespaceTests {
         #expect(cycle["hop_count"] as? Int == 2)
     }
 
+    @Test("list still reaches system.connection rows in the local store")
+    func localListReachesConnectionRows() async throws {
+        // The end-to-end guard for the listing's `system.*` exclusion. That
+        // clause is conditional precisely so this call keeps working: `list`
+        // is `items.list(type: "system.connection")`, so an exclusion that did
+        // not make room for a caller naming the type would empty the one API
+        // whose whole purpose is reading these rows.
+        //
+        // Through the client rather than the store, because the store-level
+        // test cannot see a namespace that stopped passing the type down.
+        let client = try await MarfaClient.local(path: ":memory:")
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("a note someone wrote")])
+        )
+        _ = try await client.items.create(
+            CreateItemInput(
+                type: "system.connection",
+                // `granted_at` is not decoration: `Connection.init?(from:)`
+                // requires it, and `list` compactMaps, so a row missing it is
+                // silently dropped rather than surfaced.
+                properties: [
+                    "kind": .string("integration"),
+                    "name": .string("Calendar"),
+                    "granted_at": .string("2026-09-03T09:00:00Z"),
+                ]
+            )
+        )
+
+        let connections = try await client.connections.list()
+        #expect(connections.data.count == 1)
+
+        // And the control: the same store's untyped item list does not show it.
+        let items = try await client.items.list(filters: nil)
+        #expect(items.data.allSatisfy { !$0.type.hasPrefix("system.") })
+    }
+
     @Test("Pure-local rejects install + lifecycle operations + previewEvent")
     func localModeRejects() async throws {
         let client = try await MarfaClient.local(path: ":memory:")
