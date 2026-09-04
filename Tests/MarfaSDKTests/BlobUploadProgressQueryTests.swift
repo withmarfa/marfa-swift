@@ -67,9 +67,10 @@ struct BlobUploadProgressQueryTests {
 
         // After eviction-on-complete the entry is gone from the query.
         // The full chain — drain done, engine emits blobUploadCompleted,
-        // query observer reacts, eviction runs — resolves in <50ms locally
-        // but takes longer on the slower CI runner; 5s is the headroom
-        // ceiling.
+        // query observer reacts, eviction runs — resolves in under 50ms
+        // locally and takes longer on a contended runner. It is also four
+        // hops that a busy machine can starve rather than slow, so the
+        // ceiling is the suite's rather than a number here.
         try await awaitCondition(description: "query.uploads[hash] == nil") {
             query.uploads[hash] == nil
         }

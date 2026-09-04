@@ -179,12 +179,16 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.syncing)
         await connManager.applyStateForTesting(.online)
 
-        // Settle window — give the (no-op) listener a chance to mishandle if
-        // it ever drifts back to subscribing. Derived from the refetch
-        // coalescing window rather than picked, so it is eight chances rather
-        // than a number that once looked long enough.
+        // Settle window. There is no constant to derive this from, and saying
+        // so is better than borrowing one that looks like a derivation: this
+        // query holds no `RefetchObserver` and no `didSave` subscription, so
+        // the refetch debounce has nothing to do with the path under test.
+        // The regression it guards is a `stateUpdates` subscription
+        // reappearing, whose latency is an AsyncStream hop. The window is
+        // stated as what it is — long enough that a subscription would have
+        // delivered, and paid in full only when the test passes.
         try await expectRemains(
-            for: .milliseconds(RefreshDebounce.interval * 8),
+            for: .milliseconds(400),
             description: "connection-state changes do not reach the full-sync query"
         ) {
             if case .synced = query.state { return true }

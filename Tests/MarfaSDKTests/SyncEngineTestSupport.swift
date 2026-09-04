@@ -191,6 +191,37 @@ enum SyncEngineTestKit {
     }
 }
 
+/// Asserts a main-actor invariant *holds* for a window — the shape for
+/// proving something does **not** happen.
+///
+/// A negative cannot be proven without a window, so unlike
+/// ``awaitCondition(every:description:_:)`` this one keeps a duration by
+/// necessity rather than by habit. **Derive it from the constant it is about**
+/// — the refetch debounce, a retry interval — and write the derivation at the
+/// call site, so a reader can tell a bound that means something from a number
+/// somebody liked.
+///
+/// Records an issue rather than throwing, matching the reasoning on the
+/// non-isolated `expectRemainsFalse`: call sites run unconditional teardown
+/// after this returns, and throwing would skip it.
+@MainActor
+func expectRemains(
+    for duration: Duration,
+    every: Duration = .milliseconds(10),
+    description: String,
+    _ invariant: @MainActor () async throws -> Bool
+) async throws {
+    let deadline = ContinuousClock.now + duration
+    while ContinuousClock.now < deadline {
+        if try await invariant() == false {
+            Issue.record("\(description) stopped holding within \(duration)")
+            return
+        }
+        await Task.yield()
+        try await Task.sleep(for: every)
+    }
+}
+
 /// One-shot flag for observing that an async consumer finished.
 actor TestLatch {
     private(set) var isSet = false

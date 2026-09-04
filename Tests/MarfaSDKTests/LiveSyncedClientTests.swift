@@ -181,10 +181,25 @@ private final class LiveFixture {
     // a device that never received an event — which is what half of them are
     // about, so the failure would look exactly like the defect.
     .serialized,
-    // Each wait below is a poll with no test-owned deadline, so this trait is
-    // what stops a starved condition — or an unresponsive server — hanging the
-    // run rather than naming itself.
-    .timeLimit(.minutes(1))
+    // A backstop, not a budget. Every wait below is bounded already, and
+    // those bounds are real: they are how long a round trip to a live server
+    // may take, which is a delay rather than the starvation the in-process
+    // suites face. This only catches a server that never answers at all.
+    //
+    // Eight minutes rather than one, and the number is measured rather than
+    // guessed. The limit is per test function and covers fixture setup and
+    // teardown, and one test here deliberately holds a stream for
+    // `resourceTimeout * 1.25` — 150 seconds on the default configuration.
+    // Run against staging it takes **251 seconds** end to end, so a
+    // one-minute trait would have failed it by construction, and five minutes
+    // would have left it 49 seconds of headroom on a quiet machine and none
+    // on a busy one. Two other tests carry 150 seconds of waits between them.
+    //
+    // CI could not have caught any of that: this suite is gated on
+    // credentials CI does not have, so it is the one place in the repository
+    // where a green run proves nothing and the number has to be taken from a
+    // real run.
+    .timeLimit(.minutes(8))
 )
 @MainActor
 struct LiveSyncedClientTests {
@@ -253,9 +268,10 @@ struct LiveSyncedClientTests {
     /// Waits for the engine to report nothing left to replay.
     private func waitForDrain(
         _ engine: SyncEngine,
+        timeout: Duration = .seconds(30),
         description: String
     ) async throws {
-        try await awaitCondition(description: description) {
+        try await waitUntil(timeout: timeout, description: description) {
             let pending = try await engine.hasPendingMutations
             return !pending
         }
@@ -297,7 +313,10 @@ struct LiveSyncedClientTests {
             // arriving after a busy one pays for what it finds. A bound tight
             // enough to be quick here would report on how much history the
             // space happened to hold.
-            try await awaitCondition(description: "the two items the other device created to reach this device's store") {
+            try await waitUntil(
+                timeout: .seconds(60),
+                description: "the two items the other device created to reach this device's store"
+            ) {
                 let page = try await device.items.list(filters: recentNotes())
                 return Set(page.data.map(\.id)).isSuperset(of: [first.id, second.id])
             }
@@ -337,7 +356,10 @@ struct LiveSyncedClientTests {
             let tag = "live-\(run)"
             _ = try await other.metadata.addTags(itemId: item.id, tags: [tag])
 
-            try await awaitCondition(description: "the tag added on the other device to reach this device") {
+            try await waitUntil(
+                timeout: .seconds(30),
+                description: "the tag added on the other device to reach this device"
+            ) {
                 try await device.metadata.get(itemId: item.id).tags.contains(tag)
             }
 
@@ -396,10 +418,14 @@ struct LiveSyncedClientTests {
             // would report them identically.
             try await waitForDrain(
                 engine,
+                timeout: .seconds(60),
                 description: "the queued offline write to replay once the device is back"
             )
 
-            try await awaitCondition(description: "the offline extension write to be readable on this device and at the server") {
+            try await waitUntil(
+                timeout: .seconds(60),
+                description: "the offline extension write to be readable on this device and at the server"
+            ) {
                 let local = try await device.extensions.get(
                     itemId: item.id, namespace: Self.extensionNamespace
                 )
@@ -476,7 +502,10 @@ struct LiveSyncedClientTests {
             try await waitForDrain(engine, description: "the two creates and the edge to replay")
 
             var serverEdgeId = ""
-            try await awaitCondition(description: "the server to list an edge from that source") {
+            try await waitUntil(
+                timeout: .seconds(30),
+                description: "the server to list an edge from that source"
+            ) {
                 let remote = try await other.edges.listFromSource(
                     sourceId: source.id, edgeType: Self.edgeType
                 )
@@ -489,7 +518,10 @@ struct LiveSyncedClientTests {
             // to land rather than racing it: a count taken before it arrives
             // would pass for the wrong reason and stay green after a fix that
             // changed nothing.
-            try await awaitCondition(description: "the server's edge.created echo to reach this device's store") {
+            try await waitUntil(
+                timeout: .seconds(30),
+                description: "the server's edge.created echo to reach this device's store"
+            ) {
                 let local = try await device.edges.listFromSource(
                     sourceId: source.id, edgeType: Self.edgeType
                 )
@@ -535,7 +567,10 @@ struct LiveSyncedClientTests {
             try await waitForDrain(engine, description: "the two creates and the edge to replay")
 
             var serverEdgeId = ""
-            try await awaitCondition(description: "the server to list an edge from that source") {
+            try await waitUntil(
+                timeout: .seconds(30),
+                description: "the server to list an edge from that source"
+            ) {
                 let remote = try await other.edges.listFromSource(
                     sourceId: source.id, edgeType: Self.edgeType
                 )
@@ -549,7 +584,10 @@ struct LiveSyncedClientTests {
             // Any local edge from that source will do. Pinning the assertion to
             // one id would make it depend on how many rows the edge create left
             // behind, which is a different defect with its own test above.
-            try await awaitCondition(description: "the edge properties edited elsewhere to reach this device") {
+            try await waitUntil(
+                timeout: .seconds(30),
+                description: "the edge properties edited elsewhere to reach this device"
+            ) {
                 let local = try await device.edges.listFromSource(
                     sourceId: source.id, edgeType: Self.edgeType
                 )
@@ -595,7 +633,10 @@ struct LiveSyncedClientTests {
                 // Bounded short on purpose. A create that is going to settle
                 // settles on the next drain, so a longer wait only lengthens
                 // the report of a queue that is looping.
-                try await awaitCondition(description: "the replayed create to settle and the queue to drain") {
+                try await waitUntil(
+                    timeout: .seconds(15),
+                    description: "the replayed create to settle and the queue to drain"
+                ) {
                     try await queue.pendingCount == 0
                 }
             } catch {
@@ -652,7 +693,10 @@ struct LiveSyncedClientTests {
         do {
             // The engine catches the store up before it subscribes, so the
             // first stream appears only once the initial import has landed.
-            try await awaitCondition(description: "the engine opened its first event stream") {
+            try await waitUntil(
+                timeout: .seconds(120),
+                description: "the engine opened its first event stream"
+            ) {
                 transport.streamOpens >= 1
             }
             #expect(transport.streamOpens == 1)
