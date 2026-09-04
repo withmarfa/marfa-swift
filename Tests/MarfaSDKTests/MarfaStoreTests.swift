@@ -438,9 +438,14 @@ struct MarfaStoreTests {
             CreateItemInput(type: "system.connection", properties: ["body": .string("an integration")])
         )
 
+        // Waits for the first refetch to settle, which is a weaker condition
+        // than the one being asserted on purpose. All three rows are written
+        // before the query exists, so the first pass sees the final state —
+        // and waiting on the assertion itself would report a wrong answer as
+        // a timeout rather than as the diff it is.
         let query = store.queryTypesInData()
-        try await waitUntil(timeout: .seconds(2), description: "query.types == [\"core.note\"]") {
-            query.types == ["core.note"]
+        try await waitUntil(timeout: .seconds(2), description: "the first refetch settled") {
+            !query.isLoading
         }
 
         // On the monorepo's own production numbers a real device holds several

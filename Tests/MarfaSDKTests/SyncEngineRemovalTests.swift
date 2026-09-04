@@ -234,6 +234,30 @@ struct SyncEngineRemovalTests {
         #expect(try await storedIds(store) == ["named-on-page-one", "would-have-been-on-page-two"])
     }
 
+    @Test("a refused import keeps the pages it already read")
+    func refusedImportKeepsWhatItAlreadyRead() async throws {
+        // The companion to the two above, and it pins the opposite half so
+        // nobody writes "the import changes nothing" again. It does change
+        // things: every page is saved as it arrives, so the rows that landed
+        // before the throw stay. What the refusal buys is narrower and is the
+        // half that matters — no row is *removed* on a partial answer.
+        //
+        // Neither test above can see this, because both pre-store the same row
+        // page one then serves. This one has page one carry a row the store
+        // has never held.
+        let (store, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        try await store.upsertItem(item("already-here"))
+
+        transport.enqueue(pageWithMore([item("arrived-on-page-one")], cursor: nil))
+
+        await #expect(throws: InitialSyncError.self) {
+            _ = try await engine.performInitialSync()
+        }
+
+        // The new row was committed, and the old one was not pruned.
+        #expect(try await storedIds(store) == ["already-here", "arrived-on-page-one"])
+    }
+
     @Test("a page claiming more results with no cursor is refused, not read as the end")
     func unresumablePageIsRefused() async throws {
         // The same data loss reached without any error at all. A page answering
