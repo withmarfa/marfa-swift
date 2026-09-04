@@ -131,6 +131,12 @@ public struct MarfaTypeRegistry: Sendable {
         }
     }
 
+    /// The server's own defaults, mirrored so a local resolution and a remote
+    /// one agree about how much a field may hold. A custom type overriding
+    /// either travels on the field definition.
+    static let defaultMaxStringLength = 100_000
+    static let defaultMaxArrayItems = 10_000
+
     private static func check(
         _ value: JSONValue,
         against field: MarfaFieldDefinition,
@@ -142,7 +148,8 @@ public struct MarfaTypeRegistry: Sendable {
 
         switch field.type {
         case .string:
-            guard case .string = value else { return wrongType("a string") }
+            guard case .string(let text) = value else { return wrongType("a string") }
+            if let failure = boundedString(text, field: field, named: name) { return failure }
         case .number:
             // `int` and `double` are separate cases on the wire type, and both
             // are numbers to the server.
@@ -180,19 +187,42 @@ public struct MarfaTypeRegistry: Sendable {
             guard case .string(let text) = value else { return wrongType("a string") }
             // An enum declaring no values is a plain string, which is what the
             // server falls back to rather than refusing everything.
-            if let permitted = field.enumValues, !permitted.isEmpty, !permitted.contains(text) {
-                return .init(
-                    field: name,
-                    message: "Expected one of \(permitted.sorted().joined(separator: ", "))"
-                )
+            if let permitted = field.enumValues, !permitted.isEmpty {
+                guard permitted.contains(text) else {
+                    return .init(
+                        field: name,
+                        message: "Expected one of \(permitted.sorted().joined(separator: ", "))"
+                    )
+                }
+            } else if let failure = boundedString(text, field: field, named: name) {
+                // An enum declaring no values falls back to a bounded string on
+                // the server too, bound and all.
+                return failure
             }
         case .array:
             guard case .array(let elements) = value else { return wrongType("an array") }
-            if let maxItems = field.maxItems, elements.count > maxItems {
+            let maxItems = field.maxItems ?? defaultMaxArrayItems
+            if elements.count > maxItems {
                 return .init(field: name, message: "Expected at most \(maxItems) items")
             }
         case .object:
             guard value.dictionaryValue != nil else { return wrongType("an object") }
+        }
+        return nil
+    }
+
+    /// Length and NUL, the two bounds the server puts on every string.
+    private static func boundedString(
+        _ text: String,
+        field: MarfaFieldDefinition,
+        named name: String
+    ) -> TypeValidationError.Failure? {
+        let maxLength = field.maxLength ?? defaultMaxStringLength
+        if text.count > maxLength {
+            return .init(field: name, message: "Expected at most \(maxLength) characters")
+        }
+        if text.utf8.contains(0) {
+            return .init(field: name, message: "A string may not contain a NUL byte")
         }
         return nil
     }
@@ -229,7 +259,13 @@ public struct MarfaTypeRegistry: Sendable {
         // ±HH:MM. Checked structurally rather than by a formatter because
         // `ISO8601DateFormatter` accepts a naive local time, which is the one
         // shape the server refuses.
-        guard text.count >= 20, text.contains("T") else { return false }
+        //
+        // No length floor. A minimum of twenty characters looked harmless and
+        // singled out minute precision — `2026-09-04T23:00Z` is seventeen — so
+        // it refused an instant the server accepts, on nine shipped fields.
+        // The structural checks below are what decide; a length test in front
+        // of them can only overrule them wrongly.
+        guard text.contains("T") else { return false }
         let halves = text.split(separator: "T", maxSplits: 1)
         guard halves.count == 2, isCalendarDate(String(halves[0])) else { return false }
         let time = String(halves[1])

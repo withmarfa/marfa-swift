@@ -37,7 +37,7 @@ public struct CoreFileAudio: MarfaItem {
     /// Machine-extracted text content of the referenced blob (server enrichment: document text or image OCR)
     public var extractedText: String? { item.properties["extracted_text"]?.stringValue }
 
-    /// BCP 47 language code
+    /// BCP 47 language code (for spoken content)
     public var language: String? { item.properties["language"]?.stringValue }
 
     /// Personal annotations

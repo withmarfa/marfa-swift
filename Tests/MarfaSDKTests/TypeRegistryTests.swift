@@ -197,6 +197,117 @@ struct TypeRegistryTests {
         }
     }
 
+    // MARK: - The bounds and formats the server applies to every field
+
+    /// A declared `format` collapses into a field type on the server, so
+    /// `{"type": "string", "format": "url"}` is checked as a URL. Reading
+    /// `type` alone dropped every one of them — sixty fields, including every
+    /// format on a `core.*` type, which is the half apps write. Asserted
+    /// against a *real* platform type rather than a constructed one, because
+    /// the defect was in the generator and a synthetic registry cannot see it.
+    @Test("a declared format is checked on a real platform type")
+    func formatCollapsesOnAPlatformType() throws {
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(
+                properties: ["source_url": .string("definitely not a url")],
+                against: "core.bookmark"
+            )
+        }
+        // The discriminator: a real URL passes, so the red above is the format
+        // check rather than the field being refused outright.
+        try registry.validate(
+            properties: ["source_url": .string("https://example.com/a")],
+            against: "core.bookmark"
+        )
+    }
+
+    /// A minute-precision instant is seventeen characters, and a length floor
+    /// of twenty refused it while the server accepts it — the one direction
+    /// that blocks work nobody can act on. Nine shipped fields were affected.
+    @Test("an instant without seconds is accepted")
+    func minutePrecisionInstant() throws {
+        let registry = MarfaTypeRegistry(definitions: [
+            "t": MarfaTypeDefinition(id: "t", fields: ["at": .init(type: .datetime)]),
+        ])
+        try registry.validate(properties: ["at": .string("2026-09-04T23:00Z")], against: "t")
+        try registry.validate(properties: ["at": .string("2026-09-04T23:00:00Z")], against: "t")
+        // Still refused, because the offset is what makes it an instant.
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(properties: ["at": .string("2026-09-04T23:00")], against: "t")
+        }
+    }
+
+    /// The server bounds every string and refuses a NUL byte. A 200KB string
+    /// passing locally, queueing, and being refused hours later is exactly the
+    /// failure this registry exists to remove.
+    @Test("a string over the bound, or carrying a NUL, is refused")
+    func stringBounds() throws {
+        let registry = MarfaTypeRegistry(definitions: [
+            "t": MarfaTypeDefinition(id: "t", fields: [
+                "free": .init(type: .string),
+                "short": .init(type: .string, maxLength: 4),
+            ]),
+        ])
+        try registry.validate(properties: ["free": .string("ordinary")], against: "t")
+
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(
+                properties: ["free": .string(String(repeating: "x", count: 100_001))],
+                against: "t"
+            )
+        }
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(properties: ["free": .string("a\u{0000}b")], against: "t")
+        }
+        // A type's own bound overrides the default in both directions.
+        try registry.validate(properties: ["short": .string("abcd")], against: "t")
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(properties: ["short": .string("abcde")], against: "t")
+        }
+    }
+
+    /// The server seeds every resolved field set with these two, so a type
+    /// declaring neither still refuses a string where an array belongs.
+    @Test("every type carries the universal fields")
+    func universalFields() throws {
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(
+                properties: ["body": .string("here"), "attachments": .string("not an array")],
+                against: "core.note"
+            )
+        }
+        try registry.validate(
+            properties: ["body": .string("here"), "attachments": .array([]), "links": .array([])],
+            against: "core.note"
+        )
+    }
+
+    /// An array has a default bound too, and it is the server's.
+    @Test("an array over the default bound is refused")
+    func arrayDefaultBound() throws {
+        let registry = MarfaTypeRegistry(definitions: [
+            "t": MarfaTypeDefinition(id: "t", fields: ["xs": .init(type: .array)]),
+        ])
+        try registry.validate(
+            properties: ["xs": .array(Array(repeating: .int(1), count: 10_000))],
+            against: "t"
+        )
+        #expect(throws: TypeValidationError.self) {
+            try registry.validate(
+                properties: ["xs": .array(Array(repeating: .int(1), count: 10_001))],
+                against: "t"
+            )
+        }
+    }
+
+    /// Mirrored constants drift silently, so they are pinned rather than
+    /// trusted — the same reason the bulk-action caps are.
+    @Test("the bounds mirror the server's constants")
+    func boundsMirrorTheServer() {
+        #expect(MarfaTypeRegistry.defaultMaxStringLength == 100_000)
+        #expect(MarfaTypeRegistry.defaultMaxArrayItems == 10_000)
+    }
+
     // MARK: - Search
 
     @Test("searchable fields come from the display hints, with a fallback")

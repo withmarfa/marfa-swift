@@ -30,6 +30,8 @@ public struct MarfaFieldDefinition: Sendable, Equatable, Codable {
     public let enumValues: [String]?
     /// Upper bound on an `array` field's element count.
     public let maxItems: Int?
+    /// Upper bound on a string field's length.
+    public let maxLength: Int?
     /// Whether the type lists this field under `required`.
     public let isRequired: Bool
 
@@ -37,11 +39,13 @@ public struct MarfaFieldDefinition: Sendable, Equatable, Codable {
         type: MarfaFieldType,
         enumValues: [String]? = nil,
         maxItems: Int? = nil,
+        maxLength: Int? = nil,
         isRequired: Bool = false
     ) {
         self.type = type
         self.enumValues = enumValues
         self.maxItems = maxItems
+        self.maxLength = maxLength
         self.isRequired = isRequired
     }
 }
