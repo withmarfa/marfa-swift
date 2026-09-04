@@ -100,6 +100,18 @@ public enum SyncEvent: Sendable {
     /// An item was deleted (soft delete / trashed).
     case itemDeleted(id: String)
 
+    /// An item is gone for good and the local row has been removed.
+    ///
+    /// Not the same news as ``SyncEvent/itemDeleted(id:)``, which says the row
+    /// was trashed and can come back. Nothing will ever correct a copy of a
+    /// purged row, so a view still holding one is showing something that no
+    /// longer exists anywhere.
+    ///
+    /// Fires for both routes a removal reaches a device by: the server's
+    /// `item.purged` announcement, and the re-import, where a row purged while
+    /// this device was away is simply absent from the answer.
+    case itemPurged(id: String)
+
     /// An edge was created.
     case edgeCreated(id: String)
 

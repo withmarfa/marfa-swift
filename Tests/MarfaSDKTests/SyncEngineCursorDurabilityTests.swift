@@ -36,6 +36,18 @@ actor FailingLocalStore: LocalStoreWriting {
         throw LocalStoreError.encodingFailure("upsertItem(\(item.id))")
     }
 
+    /// Routed through ``upsertItem(_:)`` so the refusal stays keyed on the
+    /// item write rather than on which of the two spellings the engine
+    /// happens to use for an inbound frame.
+    @discardableResult
+    func applyServerItem(_ item: Item, rebasing edits: [PendingItemEdit]) throws -> Bool {
+        try upsertItem(item)
+        return true
+    }
+
+    @discardableResult
+    func pruneItems(keeping: Set<String>, protecting: Set<String>) throws -> [String] { [] }
+
     func upsertEdge(_ edge: Edge) throws {}
 
     func deleteEdge(id: String) throws {}

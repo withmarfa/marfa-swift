@@ -421,6 +421,110 @@ public actor LocalStore {
         try modelContext.save()
     }
 
+    /// Stores what an app should see for an item the server just described.
+    ///
+    /// Two things separate this from ``upsertItem(_:)``, and both are about a
+    /// device that is not merely a mirror of the server.
+    ///
+    /// **A frame behind the row does not apply.** The stored `version` is the
+    /// server's own on a row this device has not edited, so a frame naming an
+    /// older one describes a state the row has already passed and writing it
+    /// would put the row back. The comparison is "not older" rather than
+    /// "newer": a reconnect resumes from the cursor and re-delivers the frame
+    /// it stopped on, and refusing that would drop a write the store never
+    /// made.
+    ///
+    /// **A queued edit is put back on top.** Without it, a frame from another
+    /// device replaced the row wholesale and text someone was still typing
+    /// disappeared until the queue drained. Rebasing keeps the local edit
+    /// visible *and* lets the other device's change to a different field land,
+    /// which replacing and dropping respectively cannot both do.
+    ///
+    /// The version check is skipped while `edits` is non-empty, and that is a
+    /// limitation worth naming rather than an oversight. `updateItem` bumps the
+    /// stored `version` on every local edit, so on a row this device is holding
+    /// writes for the column is an optimistic guess at what the server will
+    /// assign rather than a server fact, and it cannot order anything. The
+    /// rebase decides the outcome there instead: the edit survives either way,
+    /// and a stale frame can still land in a field the edit does not mention.
+    /// Closing that needs the server's version tracked apart from the visible
+    /// one, which is a column and therefore a schema version.
+    ///
+    /// The metadata row is untouched. The server writes metadata through its
+    /// own layer and announces it as `metadata.changed`; an item frame carries
+    /// the sidecar too, and taking it from here would put one field in two
+    /// places and leave the two able to disagree.
+    @discardableResult
+    public func applyServerItem(_ item: Item, rebasing edits: [PendingItemEdit]) throws -> Bool {
+        let id = item.id
+        let predicate = #Predicate<MarfaItemModel> { $0.id == id }
+        var descriptor = FetchDescriptor<MarfaItemModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        let existing = try modelContext.fetch(descriptor).first
+
+        if let existing, edits.isEmpty, item.version < existing.version {
+            return false
+        }
+
+        let model: MarfaItemModel
+        if let existing {
+            existing.apply(item)
+            model = existing
+        } else {
+            model = MarfaItemModel.make(from: item)
+            modelContext.insert(model)
+        }
+
+        // Oldest first, which is the order the queue replays them in. A device
+        // that edited the same field twice has to end up showing the second
+        // edit, not the first.
+        for edit in edits {
+            switch edit {
+            case .properties(let delta, let tier, let sourceId):
+                var merged = model.properties
+                for (key, value) in delta {
+                    merged[key] = value
+                }
+                model.properties = merged
+                if let tier { model.tier = tier }
+                if let sourceId { model.sourceId = sourceId }
+            case .state(let state):
+                model.state = state
+            }
+        }
+
+        try modelContext.save()
+        return true
+    }
+
+    /// Removes every stored item the server did not send, except the ones a
+    /// queued create still owns.
+    ///
+    /// A row the server purged while this device was away is absent from the
+    /// import rather than changed in it, so no event describes it and nothing
+    /// else ever corrects it — this pass is the only thing that can.
+    ///
+    /// `protecting` is what keeps that from destroying work. A row the queue
+    /// still holds a create for has never reached the server, so its absence
+    /// from the answer says nothing at all, and treating that absence as a
+    /// deletion would remove something a person made moments earlier.
+    ///
+    /// Filtered in Swift rather than in a predicate: `Set.contains` is not
+    /// among the shapes SwiftData's predicate engine supports.
+    @discardableResult
+    public func pruneItems(keeping keptIds: Set<String>, protecting protectedIds: Set<String>) throws -> [String] {
+        let models = try modelContext.fetch(FetchDescriptor<MarfaItemModel>())
+        var removed: [String] = []
+        for model in models where !keptIds.contains(model.id) && !protectedIds.contains(model.id) {
+            removed.append(model.id)
+            modelContext.delete(model)
+        }
+        if !removed.isEmpty {
+            try modelContext.save()
+        }
+        return removed
+    }
+
     // MARK: - Edge CRUD
 
     /// Creates a new edge between two items.

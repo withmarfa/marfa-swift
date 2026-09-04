@@ -538,6 +538,92 @@ public actor MutationQueue {
         return try modelContext.fetch(descriptor).map { $0.toRecord() }
     }
 
+    /// The unsent writes queued against one item, oldest first, in the form
+    /// ``LocalStore/applyServerItem(_:rebasing:)`` needs to put them back on
+    /// top of the server's row.
+    ///
+    /// Only the four kinds that change an item's own columns are translated.
+    /// `setMetadata`, `addTags`, `setExtension` and their siblings key on the
+    /// same `localId` and are deliberately absent: they write the metadata
+    /// layer, which an item frame does not touch, and `metadata.changed` is
+    /// how the server announces that layer moving.
+    ///
+    /// A blocked row is included. The drain has stopped asking about it, but
+    /// the write is still there and an app is still showing it — dropping it
+    /// here would make a blocked edit vanish from under someone the moment
+    /// another device touched the same row.
+    ///
+    /// Ordered by `createdAt`, the same column the drain replays in, so what a
+    /// person sees before their writes reach the server matches what they see
+    /// after.
+    func pendingItemEdits(forItem itemId: String) throws -> [PendingItemEdit] {
+        let predicate = #Predicate<PendingMutationModel> { $0.localId == itemId }
+        let descriptor = FetchDescriptor<PendingMutationModel>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        return try modelContext.fetch(descriptor).compactMap { model in
+            guard let data = model.payloadJson.data(using: .utf8) else { return nil }
+            switch model.kind {
+            case .updateItem:
+                guard let payload = try? MutationQueue.decoder.decode(
+                    UpdateItemPayload.self, from: data
+                ) else { return nil }
+                return .properties(
+                    delta: payload.properties, tier: payload.tier, sourceId: payload.sourceId
+                )
+            case .deleteItem:
+                return .state(.trashed)
+            case .restoreItem:
+                return .state(.active)
+            case .transitionItem:
+                guard let payload = try? MutationQueue.decoder.decode(
+                    TransitionPayload.self, from: data
+                ) else { return nil }
+                return .state(payload.state)
+            default:
+                return nil
+            }
+        }
+    }
+
+    /// Every item id a queued create would put on the server.
+    ///
+    /// The answer to "which local rows does the server not know about yet",
+    /// which is what a prune has to leave alone. Two kinds carry one: a
+    /// `createItem` names it in `localId`, and a `bulk` sets no `localId` at
+    /// all — its ids are in the payload, one per entry, each naming a row the
+    /// store already wrote.
+    ///
+    /// A bulk in upsert mode may name rows the server does have, so this can
+    /// protect a little more than it needs to. That is the safe direction: a
+    /// row kept in error is corrected by the next thing the server says about
+    /// it, and a row deleted in error is gone.
+    func pendingCreatedItemIds() throws -> Set<String> {
+        let predicate = #Predicate<PendingMutationModel> {
+            $0.kindRaw == "createItem" || $0.kindRaw == "bulk"
+        }
+        let descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        var ids: Set<String> = []
+        for model in try modelContext.fetch(descriptor) {
+            switch model.kind {
+            case .createItem:
+                if let localId = model.localId { ids.insert(localId) }
+            case .bulk:
+                guard let data = model.payloadJson.data(using: .utf8),
+                      let payload = try? MutationQueue.decoder.decode(
+                          BulkPayload.self, from: data
+                      ) else { continue }
+                for entry in payload.input.items {
+                    if let id = entry.id { ids.insert(id) }
+                }
+            default:
+                continue
+            }
+        }
+        return ids
+    }
+
     func remove(id: String) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
