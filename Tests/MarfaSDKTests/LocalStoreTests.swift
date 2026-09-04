@@ -140,6 +140,70 @@ struct LocalStoreTests {
         #expect(result.cursor == nil)
     }
 
+    // MARK: - system.* rows
+
+    // The store holds `system.*` rows — the stream writes them and, since the
+    // import began asking for them, so does that. What a *listing* does with
+    // them is a separate question, and the answer has to match the server's:
+    // it drops them from a list and from search, and from nowhere else. The
+    // pair below is the same pair `LocalSearchTests` pins for search, because
+    // either half alone is satisfied by a broken implementation.
+
+    @Test("an untyped list leaves system.* rows out")
+    func untypedListExcludesSystemRows() async throws {
+        let store = try await makeStore()
+        let note = try await store.createItem(noteInput(body: "a note someone wrote"))
+        _ = try await store.createItem(
+            CreateItemInput(type: "system.activity", properties: ["body": .string("a sync happened")])
+        )
+        _ = try await store.createItem(
+            CreateItemInput(type: "system.connection", properties: ["body": .string("an integration")])
+        )
+
+        let ids = try await store.fetchItems(filters: nil).data.map(\.id)
+
+        // Not `!ids.contains(...)`: the point is that the list holds the one
+        // row a person filed and nothing else, and a count assertion is what
+        // fails when a third system type is added later.
+        #expect(ids == [note.id])
+    }
+
+    @Test("a list naming a system type returns those rows")
+    func typedListReturnsSystemRows() async throws {
+        // The other half, and the one that matters most. `connections.list()`
+        // is `items.list(type: "system.connection")`, so an exclusion that
+        // did not make room for a caller naming the type outright would empty
+        // the one API whose whole purpose is reading these rows — the leak
+        // above, inverted, and no better.
+        let store = try await makeStore()
+        _ = try await store.createItem(noteInput(body: "a note someone wrote"))
+        let connection = try await store.createItem(
+            CreateItemInput(type: "system.connection", properties: ["body": .string("an integration")])
+        )
+
+        let ids = try await store.fetchItems(
+            filters: ListFilters(type: "system.connection")
+        ).data.map(\.id)
+
+        #expect(ids == [connection.id])
+    }
+
+    @Test("stats still counts system rows, because the server does")
+    func statsCountsSystemRows() async throws {
+        // Deliberately not excluded, and worth pinning so nobody "fixes" it
+        // into agreement with the list above. The server applies its
+        // `system.%` exclusion in exactly two places, the item listing and
+        // search; `stats()` counts every row. Adding the clause here would
+        // create a local/remote divergence rather than close one.
+        let store = try await makeStore()
+        _ = try await store.createItem(noteInput(body: "a note someone wrote"))
+        _ = try await store.createItem(
+            CreateItemInput(type: "system.activity", properties: ["body": .string("a sync happened")])
+        )
+
+        #expect(try await store.itemStats()["active"] == 2)
+    }
+
     // MARK: - Pagination
     //
     // A limit used to be applied and then reported as `hasMore: false`, so a

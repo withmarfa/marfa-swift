@@ -981,6 +981,26 @@ public actor LocalStore {
         let tierFilter = filters?.tier?.rawValue ?? ""
         let hasTierFilter = filters?.tier != nil
 
+        // `system.*` records are operational rather than user data, and the
+        // server drops them from a listing unless the caller names a system
+        // type outright. The same clause as `makeSearchDescriptor`, and it has
+        // to be here too: search and list are the only two places the server
+        // applies it, so they are the only two places a local store mirroring
+        // the server should.
+        //
+        // **Conditional, not absolute.** `ConnectionsNamespace.list` is
+        // `items.list(type: "system.connection")`, so an unconditional
+        // exclusion here would return nothing to the one API whose whole job
+        // is reading these rows — the same failure as leaking them, one turn
+        // further on.
+        //
+        // This became reachable when the import began asking for `system`
+        // rows. Before that the prune deleted them again on every re-import,
+        // so the leak was intermittent and partly hidden by a second defect
+        // rather than absent.
+        let systemPrefix = "system."
+        let excludeSystemTypes = !(filters?.type?.hasPrefix(systemPrefix) ?? false)
+
         // The date bounds narrow here but do not decide here. The server
         // compares `COALESCE(timestamp, created_at)`, and a row that reached
         // this store from a server with no timestamp holds `""`, so the
@@ -998,7 +1018,8 @@ public actor LocalStore {
             (!hasStateFilter || item.stateRaw == stateFilter) &&
             (!hasSince || item.timestamp >= since || item.timestamp == "") &&
             (!hasUntil || item.timestamp <= until) &&
-            (!hasTierFilter  || item.tierRaw == tierFilter)
+            (!hasTierFilter  || item.tierRaw == tierFilter) &&
+            (!excludeSystemTypes || !item.type.starts(with: systemPrefix))
         }
 
         var descriptor = FetchDescriptor<MarfaItemModel>(

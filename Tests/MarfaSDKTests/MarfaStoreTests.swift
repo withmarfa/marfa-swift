@@ -416,6 +416,40 @@ struct MarfaStoreTests {
         query.stop()
     }
 
+    /// The second deliberate divergence, on the same reasoning as trashed
+    /// rows. This list is a filter menu, so a chip has to name something the
+    /// app's own list will show — and `items.list()` leaves `system.*` rows
+    /// out unless a caller names a system type outright.
+    ///
+    /// It became reachable when the import began asking the server for system
+    /// rows. Before that the prune deleted them again on every re-import, so
+    /// the store held them only between a stream frame and the next import.
+    @Test("TypesInDataQuery excludes system.* types") func typesInDataExcludesSystemTypes() async throws {
+        let client = try await makeClient()
+        guard let store = client.makeStore() else {
+            Issue.record("Expected non-nil store"); return
+        }
+
+        _ = try await client.items.create(noteInput(body: "a note someone wrote"))
+        _ = try await client.items.create(
+            CreateItemInput(type: "system.activity", properties: ["body": .string("a sync happened")])
+        )
+        _ = try await client.items.create(
+            CreateItemInput(type: "system.connection", properties: ["body": .string("an integration")])
+        )
+
+        let query = store.queryTypesInData()
+        try await waitUntil(timeout: .seconds(2), description: "query.types == [\"core.note\"]") {
+            query.types == ["core.note"]
+        }
+
+        // On the monorepo's own production numbers a real device holds several
+        // thousand activity rows against a few hundred of everything else, so
+        // the menu this feeds would have been mostly operational chips.
+        #expect(query.types == ["core.note"])
+        query.stop()
+    }
+
     /// The query is only affordable because it never decodes an item's
     /// properties, and no test can observe that directly. What this pins is the
     /// correctness half: a row whose properties blob dwarfs every other column
