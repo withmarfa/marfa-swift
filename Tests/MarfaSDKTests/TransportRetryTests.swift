@@ -95,7 +95,10 @@ private func makeStubbedTransport(
     )
 }
 
-@Suite("Transport retry behavior", .serialized)
+// The cancellation test now polls for the request to reach the stub with no
+// test-owned deadline, so this trait is what stops a stub that never serves
+// hanging the run.
+@Suite("Transport retry behavior", .serialized, .timeLimit(.minutes(1)))
 struct TransportRetryTests {
 
     @Test("429 + Retry-After then 200 retries once and succeeds")
@@ -261,8 +264,19 @@ struct TransportRetryTests {
             )
         }
 
-        // Yield briefly so the request is in-flight.
-        try await Task.sleep(for: .milliseconds(50))
+        // Wait for the request to be in flight rather than assume it is. The
+        // stub appends to `recordedRequests` inside `startLoading`, so a
+        // non-empty recording is exactly "the request reached the transport" —
+        // the fact the sleep was estimating. It also closes a pass for the
+        // wrong reason: on a loaded machine the old fifty milliseconds could
+        // elapse before the request started, and cancelling a task that has
+        // not begun still throws `CancellationError`, so the test went green
+        // having exercised nothing.
+        try await SyncEngineTestKit.awaitCondition(
+            description: "the request to reach the stub"
+        ) {
+            StubURLProtocol.recorded().isEmpty == false
+        }
         task.cancel()
 
         await #expect(throws: CancellationError.self) {

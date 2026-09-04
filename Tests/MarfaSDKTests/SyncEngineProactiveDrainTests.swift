@@ -25,7 +25,7 @@ struct SyncEngineProactiveDrainTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait until the stream close has landed us on .online.
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500), description: "connManager.state == .online") {
+        try await SyncEngineTestKit.awaitCondition(description: "connManager.state == .online") {
             connManager.state == .online
         }
 
@@ -35,10 +35,7 @@ struct SyncEngineProactiveDrainTests {
         try await queue.enqueueDeleteItem(id: "server-x")
 
         // Debounce (20 ms) + replay should clear the queue promptly.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
         await engine.stop()
@@ -51,7 +48,7 @@ struct SyncEngineProactiveDrainTests {
         transport.enqueueEvents([])
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500), description: "connManager.state == .online") {
+        try await SyncEngineTestKit.awaitCondition(description: "connManager.state == .online") {
             connManager.state == .online
         }
 
@@ -65,10 +62,7 @@ struct SyncEngineProactiveDrainTests {
             try await queue.enqueueDeleteItem(id: "burst-\(i)")
         }
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 

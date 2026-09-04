@@ -88,7 +88,7 @@ struct LocalStoreTests {
         }
 
         releaseLock.signal()
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(5), description: "completed.isSet") {
+        try await SyncEngineTestKit.awaitCondition(description: "completed.isSet") {
             await completed.isSet
         }
     }
@@ -435,9 +435,9 @@ struct LocalStoreTests {
 
         let store = try #require(await client.makeStore())
         let query = await store.query(filters: ListFilters(tags: ["keep"]))
-        try await Task.sleep(for: .milliseconds(300))
-        let ids = await query.items.map { $0.id }
-        #expect(ids == [kept.id])
+        try await awaitCondition(description: "the tag-filtered query to load only the kept row") {
+            await query.items.map { $0.id } == [kept.id]
+        }
     }
 
     @Test("a cursor that is not ours is refused rather than restarting")

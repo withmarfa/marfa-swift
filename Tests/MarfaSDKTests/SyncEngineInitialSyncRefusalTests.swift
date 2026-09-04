@@ -148,10 +148,7 @@ struct SyncEngineInitialSyncRefusalTests {
         // been cleared, a reconnect resumes from nothing, and nothing else ever
         // asks for a full import — so a refusal here is a gap with no route
         // back rather than a retry.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(1000),
-            description: "transport.calls.contains an /items GET"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "transport.calls.contains an /items GET") {
             await transport.calls.contains { $0.path == "/items" && $0.method == .get }
         }
 

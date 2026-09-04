@@ -5,7 +5,11 @@ import SwiftData
 @testable import MarfaSDK
 import MarfaSDKTestSupport
 
-@Suite("BlobsNamespace")
+// Every wait in this suite is a poll with no test-owned deadline, so this
+// trait is what stops a starved condition hanging the run. It is coarse on
+// purpose: a minute that names itself a timeout beats half a second that
+// names the wrong thing.
+@Suite("BlobsNamespace", .timeLimit(.minutes(1)))
 struct BlobsTests {
 
     func makeClient() -> (MarfaClient, MockTransport) {
@@ -205,9 +209,7 @@ struct BlobsTests {
         await connManager.markConnecting()
 
         // Wait for the mutation queue to drain.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .seconds(5),
-            every: .milliseconds(20),
+        try await SyncEngineTestKit.awaitCondition(every: .milliseconds(20),
             description: "(try? await queue.isEmpty) == true"
         ) {
             (try? await queue.isEmpty) == true
@@ -280,16 +282,12 @@ struct BlobsTests {
 
         await connManager.markConnecting()
 
-        let collected = try await withThrowingTaskGroup(of: [SyncEvent].self) { group in
-            group.addTask { try await collector.value }
-            group.addTask {
-                try await Task.sleep(for: .seconds(5))
-                return []
-            }
-            let result = try await group.next() ?? []
-            group.cancelAll()
-            return result
-        }
+        // No racing timeout. A losing race returned an empty array, so a
+        // starved collector failed on the *contents* of `droppedKinds` — a
+        // clock reported as a logic error, with nothing in the output naming a
+        // budget or an elapsed time. The suite's `.timeLimit` owns this now,
+        // and a failure says it timed out.
+        let collected = try await collector.value
         await engine.stop()
 
         // The mutation was permanently dropped, not retried.

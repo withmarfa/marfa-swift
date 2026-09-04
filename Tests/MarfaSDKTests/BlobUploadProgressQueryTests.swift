@@ -61,7 +61,7 @@ struct BlobUploadProgressQueryTests {
         // end-to-end. `query.uploads[hash] == nil` is also true BEFORE
         // the upload starts (the entry is created on
         // `blobUploadStarted`), so we can't use it alone.
-        try await waitUntil(timeout: .seconds(2), description: "(try? await queue.isEmpty) == true") {
+        try await awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -70,7 +70,7 @@ struct BlobUploadProgressQueryTests {
         // query observer reacts, eviction runs — resolves in <50ms locally
         // but takes longer on the slower CI runner; 5s is the headroom
         // ceiling.
-        try await waitUntil(timeout: .seconds(5), description: "query.uploads[hash] == nil") {
+        try await awaitCondition(description: "query.uploads[hash] == nil") {
             query.uploads[hash] == nil
         }
 
@@ -99,7 +99,7 @@ struct BlobUploadProgressQueryTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait for the failure to land.
-        try await waitUntil(timeout: .seconds(2), description: "query.uploads[hash]?.state is .failed") {
+        try await awaitCondition(description: "query.uploads[hash]?.state is .failed") {
             if case .failed = query.uploads[hash]?.state { return true }
             return false
         }

@@ -64,10 +64,7 @@ struct SyncEngineReplayTests {
         await transport.waitUntilRequestStarted()
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "engine.isStoppingForTesting"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
         #expect(await transport.requestCallCount == 1)
@@ -115,10 +112,7 @@ struct SyncEngineReplayTests {
         await transport.waitUntilRequestStarted()
 
         let stopTask = Task { await engine.stop() }
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "engine.isStoppingForTesting"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "engine.isStoppingForTesting") {
             await engine.isStoppingForTesting
         }
         await transport.releaseRequest()
@@ -196,10 +190,7 @@ struct SyncEngineReplayTests {
         await connManager.applyStateForTesting(.connecting)
 
         // The replay should remove the record (no retry on permanent error).
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -232,10 +223,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
         await engine.stop()
@@ -373,10 +361,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -421,10 +406,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -513,10 +495,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -548,9 +527,7 @@ struct SyncEngineReplayTests {
         // land rather than racing it: a count taken before it arrives passes
         // for the wrong reason and stays green after a fix that changed
         // nothing. The cursor moving is the device having applied it.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-1\""
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-1\""
         ) {
             (try? await queue.loadSyncState(key: "last_event_id")) == "evt-1"
         }
@@ -614,9 +591,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-2\""
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-2\""
         ) {
             (try? await queue.loadSyncState(key: "last_event_id")) == "evt-2"
         }
@@ -684,9 +659,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-2\""
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.loadSyncState(key: \"last_event_id\")) == \"evt-2\""
         ) {
             (try? await queue.loadSyncState(key: "last_event_id")) == "evt-2"
         }
@@ -736,10 +709,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -779,10 +749,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -872,10 +839,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -934,13 +898,11 @@ struct SyncEngineReplayTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait for the first SSE stream to be observed.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "transport.calls.filter { $0.path == \"/events\" }.count >= 1"
+        try await SyncEngineTestKit.awaitCondition(description: "transport.calls.filter { $0.path == \"/events\" }.count >= 1"
         ) {
             await transport.calls.filter { $0.path == "/events" }.count >= 1
         }
-        try await SyncEngineTestKit.waitUntil(timeout: .milliseconds(500), description: "connManager.state == .online") {
+        try await SyncEngineTestKit.awaitCondition(description: "connManager.state == .online") {
             connManager.state == .online
         }
 
@@ -954,18 +916,13 @@ struct SyncEngineReplayTests {
         // re-triggering `.connecting`. Wait for the observable effect instead
         // of sampling immediately after the queue drains: proactive replay can
         // empty the queue before the reconnect delay elapses.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(800),
-            description: "transport.calls.filter { $0.path == \"/events\" }.count >= 2"
+        try await SyncEngineTestKit.awaitCondition(description: "transport.calls.filter { $0.path == \"/events\" }.count >= 2"
         ) {
             transport.calls.filter { $0.path == "/events" }.count >= 2
         }
 
         // The mutation also drains without another reachability transition.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(800),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -1017,10 +974,7 @@ struct SyncEngineReplayTests {
         await connManager.applyStateForTesting(.connecting)
 
         // Wait for full drain — both cycles must complete cleanly.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(800),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -1100,10 +1054,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(800),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 
@@ -1194,10 +1145,7 @@ struct SyncEngineReplayTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(800),
-            description: "(try? await queue.isEmpty) == true"
-        ) {
+        try await SyncEngineTestKit.awaitCondition(description: "(try? await queue.isEmpty) == true") {
             (try? await queue.isEmpty) == true
         }
 

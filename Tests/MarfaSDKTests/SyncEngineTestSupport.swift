@@ -110,6 +110,15 @@ enum SyncEngineTestKit {
     // leaning on Swift Testing's `.timeLimit` trait: that trait's
     // granularity bottoms out at a minute, far coarser than these
     // sub-second waits.
+    //
+    // **That trade only holds for a condition which can be delayed and not
+    // starved**, and most conditions here can be starved. A drain sitting
+    // behind a debounce and several actor hops does not run slowly on a loaded
+    // machine, it does not run at all until the machine reaches it — so a
+    // bound in milliseconds reports on the runner and arrives dressed as a
+    // logic failure. Use `awaitCondition` there. Pass `timeout:` only when the
+    // bound is derived from the constant under test, with the derivation
+    // written beside it.
     static func waitUntil(
         timeout: Duration,
         every: Duration = .milliseconds(10),
@@ -125,6 +134,28 @@ enum SyncEngineTestKit {
         throw WaitUntilTimeoutError(
             description: "timed out after \(timeout) waiting for \(description)"
         )
+    }
+
+    /// Polls until `condition` holds, with **no test-owned deadline** — the
+    /// suite's `.timeLimit` owns the clock. The non-isolated sibling of
+    /// `MarfaSDKTestSupport.awaitCondition`, duplicated for the same reason the
+    /// two `waitUntil`s are: this one is `nonisolated` over a `@Sendable`
+    /// condition because its call sites await actors from off the main actor,
+    /// and in strict-concurrency Swift the isolation modifier is part of a
+    /// function's meaning.
+    ///
+    /// **Every suite using this must carry a `.timeLimit`,** or a starved
+    /// condition hangs the run rather than naming itself.
+    static func awaitCondition(
+        every: Duration = .milliseconds(10),
+        description: String,
+        _ condition: @Sendable () async throws -> Bool
+    ) async throws {
+        while true {
+            if try await condition() { return }
+            try Task.checkCancellation()
+            try await Task.sleep(for: every)
+        }
     }
 
     /// The inverse of ``waitUntil``: proves something does *not* happen while

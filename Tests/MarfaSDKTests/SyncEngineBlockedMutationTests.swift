@@ -103,10 +103,7 @@ struct SyncEngineBlockedMutationTests {
             Issue.record("expected .blocked, got \(blocked.status)")
         }
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "a .mutationBlocked event to arrive"
-        ) { await events.blocked.count == 1 }
+        try await SyncEngineTestKit.awaitCondition(description: "a .mutationBlocked event to arrive") { await events.blocked.count == 1 }
         let blockedEvents = await events.blocked
         if case let .mutationBlocked(kind, itemId, reason) = blockedEvents.first {
             #expect(kind == "updateItem")
@@ -361,10 +358,7 @@ struct SyncEngineBlockedMutationTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "the cycle to report .synced"
-        ) { await events.contains { if case .synced = $0 { return true } else { return false } } }
+        try await SyncEngineTestKit.awaitCondition(description: "the cycle to report .synced") { await events.contains { if case .synced = $0 { return true } else { return false } } }
         #expect(await !events.contains { if case .failed = $0 { return true } else { return false } })
 
         // And the state the app renders agrees.
@@ -455,10 +449,7 @@ struct SyncEngineBlockedMutationTests {
         // the cycle failed to do, so it must not withhold `.synced` — deciding
         // that from a count of the queue instead is what left this shape, the
         // common one, never reporting a successful sync again.
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(500),
-            description: "the cycle to report .synced with a deferred row outstanding"
-        ) { await events.contains { if case .synced = $0 { return true } else { return false } } }
+        try await SyncEngineTestKit.awaitCondition(description: "the cycle to report .synced with a deferred row outstanding") { await events.contains { if case .synced = $0 { return true } else { return false } } }
         #expect(await !events.contains { if case .failed = $0 { return true } else { return false } })
     }
 
@@ -661,9 +652,7 @@ struct SyncEngineBlockedMutationTests {
         // retried row whether or not the request made during the cycle was
         // kept. Here the second pass has exactly one possible cause.
         let cycle = Task { await engine.triggerProactiveDrainForTesting() }
-        try await SyncEngineTestKit.waitUntil(
-            timeout: .milliseconds(1000), description: "the held replay to start"
-        ) { await transport.requestStarted }
+        try await SyncEngineTestKit.awaitCondition(description: "the held replay to start") { await transport.requestStarted }
 
         // Before this, the overlap guard dropped a request arriving mid-cycle,
         // so the row waited for an unrelated wake-up — which against a live

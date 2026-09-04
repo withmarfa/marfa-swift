@@ -13,9 +13,16 @@ on:
       - 'LICENSE'
   workflow_dispatch:
 
+# A pull request's next push supersedes the run before it, so cancelling is
+# free there. `main` is the opposite: each merge is a distinct commit that
+# nothing else will ever validate, and the release workflow tags from `main`.
+# Cancelling an in-progress run when the next merge lands leaves that commit
+# with no validation at all — which is how a release was once cut from a
+# commit whose tests had never run. The monorepo exempts `main` for the same
+# reason; this repository did not.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # `validate` (build + full test suite) runs on every PR and every merge to
 # main, because a change is not validated until its tests have run and a PR

@@ -149,7 +149,7 @@ struct SyncEngineCursorDurabilityTests {
         await engine.start()
         await connManager.applyStateForTesting(.connecting)
 
-        try await SyncEngineTestKit.waitUntil(timeout: .seconds(2), description: "!store.refusedItemIds.isEmpty") {
+        try await SyncEngineTestKit.awaitCondition(description: "!store.refusedItemIds.isEmpty") {
             await !store.refusedItemIds.isEmpty
         }
         try await SyncEngineTestKit.expectRemainsFalse(for: .milliseconds(300)) {

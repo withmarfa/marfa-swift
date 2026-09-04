@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 
 /// Thrown by `waitUntil` when `condition` never becomes true before the
 /// timeout, so the failure names what was awaited and for how long
@@ -20,6 +21,16 @@ public struct WaitUntilTimeoutError: Error, CustomStringConvertible {
 /// Keeps its own deadline instead of leaning on Swift Testing's
 /// `.timeLimit` trait: that trait's granularity bottoms out at a minute,
 /// far coarser than these sub-second waits.
+///
+/// **A deadline here is only honest for a condition that can be delayed but
+/// not starved**, and most conditions in this suite can be starved. A
+/// debounced refetch sitting behind several actor hops does not run slowly on
+/// a loaded machine — it does not run at all until the machine gets to it, so
+/// a bound expressed in milliseconds measures the runner rather than the code
+/// and turns a correct engine red. Use ``awaitCondition(every:description:_:)``
+/// there and let the suite's `.timeLimit` own the clock. Pass a `timeout:`
+/// here only when the bound is *derived from the constant it is testing* and
+/// that derivation is written beside it.
 ///
 /// The 5s default absorbs CI hosts that run 5-10x slower than local
 /// Apple silicon — a 500ms *default* produced flakes on CI without ever
@@ -66,4 +77,66 @@ public func waitUntil(
     throw WaitUntilTimeoutError(
         description: "timed out after \(timeout) waiting for \(description)"
     )
+}
+
+/// Polls a main-actor condition until it holds, with **no test-owned
+/// deadline**. The suite's `.timeLimit` trait owns the clock.
+///
+/// This is the shape for a condition that can be *starved* rather than merely
+/// delayed. A test-owned bound on such a condition is a clock wearing an
+/// assertion's clothes: nothing in the output says `timed out`, no elapsed
+/// figure appears and no budget is named, so a load-induced red sends the next
+/// reader to study a diff that is fine. Thirty-one suites in this repository
+/// already carry `.timeLimit(.minutes(1))`, which means the budget exists and
+/// a sub-second wait merely fires before it can.
+///
+/// A minute is coarse, and that is the point: a test that hangs for a minute
+/// and then names itself a timeout is strictly more useful than one that fails
+/// in half a second saying the wrong thing. **Every suite using this must
+/// carry a `.timeLimit`,** or a starved condition hangs the run instead.
+@MainActor
+public func awaitCondition(
+    every: Duration = .milliseconds(10),
+    description: String,
+    _ condition: @MainActor () async throws -> Bool
+) async throws {
+    while true {
+        if try await condition() { return }
+        try Task.checkCancellation()
+        // Yield so the debounced refetch task lands on the main actor before
+        // the sleep, for the same reason `waitUntil` does it.
+        await Task.yield()
+        try await Task.sleep(for: every)
+    }
+}
+
+/// Asserts a main-actor invariant *holds* for a window — the shape for
+/// proving something does **not** happen.
+///
+/// A negative cannot be proven without a window, so unlike
+/// ``awaitCondition(every:description:_:)`` this one keeps a duration by
+/// necessity rather than by habit. **Derive it from the constant it is about**
+/// — the refetch debounce, a retry interval — and write the derivation at the
+/// call site, so a reader can tell a bound that means something from a number
+/// somebody liked.
+///
+/// Records an issue rather than throwing, matching the reasoning on the
+/// non-isolated `expectRemainsFalse`: call sites run unconditional teardown
+/// after this returns, and throwing would skip it.
+@MainActor
+public func expectRemains(
+    for duration: Duration,
+    every: Duration = .milliseconds(10),
+    description: String,
+    _ invariant: @MainActor () async throws -> Bool
+) async throws {
+    let deadline = ContinuousClock.now + duration
+    while ContinuousClock.now < deadline {
+        if try await invariant() == false {
+            Issue.record("\(description) stopped holding within \(duration)")
+            return
+        }
+        await Task.yield()
+        try await Task.sleep(for: every)
+    }
 }

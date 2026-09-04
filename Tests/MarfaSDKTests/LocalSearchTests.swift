@@ -8,7 +8,11 @@ import MarfaSDKTestSupport
 ///
 /// All tests use an in-memory SwiftData container, so they leave no
 /// on-disk artifacts and run safely in parallel.
-@Suite("Local search")
+// Every wait in this suite is a poll with no test-owned deadline, so this
+// trait is what stops a starved condition hanging the run. It is coarse on
+// purpose: a minute that names itself a timeout beats half a second that
+// names the wrong thing.
+@Suite("Local search", .timeLimit(.minutes(1)))
 struct LocalSearchTests {
 
     // MARK: - Helpers
@@ -431,7 +435,11 @@ private final class MainActorProbe {
 
 /// Tests for ``SearchQuery``. Bodies are `@MainActor`-isolated because
 /// the query is `@Observable @MainActor`, matching ``MarfaStoreTests``.
-@Suite("SearchQuery")
+// Every wait in this suite is a poll with no test-owned deadline, so this
+// trait is what stops a starved condition hanging the run. It is coarse on
+// purpose: a minute that names itself a timeout beats half a second that
+// names the wrong thing.
+@Suite("SearchQuery", .timeLimit(.minutes(1)))
 @MainActor
 struct SearchQueryTests {
 
@@ -450,7 +458,7 @@ struct SearchQueryTests {
         _ = try await client.items.create(note("Shopping list"))
 
         let query = store.querySearch(text: "invoice")
-        try await waitUntil(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
+        try await awaitCondition(description: "query.isLoading == false") { query.isLoading == false }
 
         #expect(query.results.count == 1)
         #expect(query.error == nil)
@@ -468,7 +476,7 @@ struct SearchQueryTests {
         #expect(query.isLoading == true)
         #expect(query.results.isEmpty)
 
-        try await waitUntil(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
+        try await awaitCondition(description: "query.isLoading == false") { query.isLoading == false }
         #expect(query.results.count == 1)
         query.stop()
     }
@@ -476,11 +484,11 @@ struct SearchQueryTests {
     @Test("Picks up items created after the query started") func updatesOnWrite() async throws {
         let (client, store) = try await makeStore()
         let query = store.querySearch(text: "invoice")
-        try await waitUntil(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
+        try await awaitCondition(description: "query.isLoading == false") { query.isLoading == false }
         #expect(query.results.isEmpty)
 
         _ = try await client.items.create(note("A new invoice"))
-        try await waitUntil(timeout: .seconds(3), description: "query.results.count == 1") { query.results.count == 1 }
+        try await awaitCondition(description: "query.results.count == 1") { query.results.count == 1 }
 
         query.stop()
     }
@@ -493,7 +501,7 @@ struct SearchQueryTests {
         )
 
         let query = store.querySearch(text: "invoice", filters: SearchFilters(type: "core.task"))
-        try await waitUntil(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
+        try await awaitCondition(description: "query.isLoading == false") { query.isLoading == false }
 
         #expect(query.results.count == 1)
         #expect(query.results[0].item.type == "core.task")
@@ -503,13 +511,21 @@ struct SearchQueryTests {
     @Test("stop() halts further updates") func stopHaltsUpdates() async throws {
         let (client, store) = try await makeStore()
         let query = store.querySearch(text: "invoice")
-        try await waitUntil(timeout: .seconds(2), description: "query.isLoading == false") { query.isLoading == false }
+        try await awaitCondition(description: "query.isLoading == false") { query.isLoading == false }
         query.stop()
 
         _ = try await client.items.create(note("Late invoice"))
-        // Give the debounce window several times over to fire.
-        try? await Task.sleep(for: .milliseconds(400))
 
-        #expect(query.results.isEmpty)
+        // A negative needs a window, so this one keeps a duration where the
+        // rest of the suite dropped theirs — and the duration is derived from
+        // the thing it is about. `RefreshDebounce.interval` is the coalescing
+        // window between `didSave` and a refetch, so a refresh that was going
+        // to happen has had eight of them to happen in.
+        try await expectRemains(
+            for: .milliseconds(RefreshDebounce.interval * 8),
+            description: "a stopped search query stays empty"
+        ) {
+            query.results.isEmpty
+        }
     }
 }
