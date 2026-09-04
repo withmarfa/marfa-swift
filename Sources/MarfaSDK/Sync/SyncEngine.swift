@@ -651,10 +651,15 @@ public actor SyncEngine {
     /// standing in for a liveness check, and one that reads as correct. Here
     /// the queue is in hand, so the answer cannot be right by accident.
     ///
-    /// Per-row skipping was the other option and it cannot be made complete: a
-    /// mutation carries an optional `localId`, and the three bulk enqueues set
-    /// none at all, so a bulk write is invisible to any "does item X have a
-    /// pending edit" test.
+    /// Per-row skipping was the other option and it still cannot be made
+    /// complete, though the reason has narrowed. A mutation carries an
+    /// optional `localId` and the bulk enqueues set none, so a per-row test
+    /// has to read payloads: `pendingItemEdits` now does that for `bulk`,
+    /// whose entries name their ids. `bulkAction` selects by a filter
+    /// expression rather than by id, so no payload read can answer "does this
+    /// name item X" without evaluating the server's filter grammar locally —
+    /// which is why the whole-queue count, not a per-row test, is what gates
+    /// the import.
     ///
     /// The engine's own catch-up drains before it asks, which is what clears
     /// the way rather than working around this.
@@ -1320,9 +1325,12 @@ public actor SyncEngine {
     /// correctly left active, and an ungated emit hands the app
     /// `.itemDeleted(id:)` for a row it can still read.
     private func applyInboundItem(_ item: Item) async throws -> Bool {
-        // A device with nothing queued is the ordinary case, and asking the
-        // queue for one row's worth of writes is a keyed fetch rather than a
-        // scan of it.
+        // Keyed on `localId` for the four single-item kinds, plus every
+        // queued `bulk` row — those carry no `localId`, so they are fetched by
+        // kind and filtered on their entries here. A device with nothing
+        // queued is the ordinary case and the fetch returns nothing; a device
+        // holding bulk writes pays for reading them on each inbound frame,
+        // which is the cost of the rebase seeing them at all.
         let edits = try await mutationQueue.pendingItemEdits(forItem: item.id)
         let applied = try await localStore.applyServerItem(item, rebasing: edits)
         if !applied {
