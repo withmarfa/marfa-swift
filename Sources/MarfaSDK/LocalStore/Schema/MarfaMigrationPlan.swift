@@ -19,11 +19,32 @@ import SwiftData
 /// reactive query and every test at a nested type on each schema change; this
 /// one leaves all of that alone and confines the churn to one file of history.
 ///
-/// Adding V4 therefore means: copy the live classes into a new frozen
-/// namespace at their current shape, point V3 at it, change the live classes,
-/// add `MarfaSchemaV4` listing them, and append a stage. `SchemaMigrationTests`
-/// checks that the frozen copies still hash the way the versions they stand
-/// for hashed, so getting the copy wrong fails there rather than on a device.
+/// Adding a version therefore means: copy the live classes into a new frozen
+/// namespace at their current shape, point the outgoing version at it, change
+/// the live classes, add the new `MarfaSchemaVn` listing them, and append a
+/// stage. `SchemaMigrationTests` checks that the frozen copies still hash the
+/// way the versions they stand for hashed, so getting the copy wrong fails
+/// there rather than on a device.
+///
+/// ## The current version is open until it ships, and that is worth checking
+///
+/// **A version only has to be frozen once a store exists that records it.**
+/// V3 is unreleased — the newest tag is `v16.0.0` and the V3 change sits under
+/// `## [Unreleased]` — so no device holds a V3 store, and an additive column
+/// added to a live model today joins V3 rather than forcing a V4. The cost to
+/// a device is unchanged either way: it takes the V2 to V3 stage it was going
+/// to take, carrying whatever shape V3 has when it ships.
+///
+/// So before adding a version, **check whether the current one has shipped**.
+/// Reaching for a new one out of habit buys nothing and costs every device an
+/// extra stage. The check is a tag: if the current version's changelog entry
+/// is still under `## [Unreleased]`, the version is still open.
+///
+/// The one consequence worth knowing is developer-only. A store built from an
+/// intermediate state of an open version records `3.0.0` while holding a shape
+/// no committed version describes, so a later build refuses it with `Cannot
+/// use staged migration with an unknown model version` and takes the
+/// quarantine path. That is the fail-safe working, on a store nobody shipped.
 ///
 /// ## What happens when no stage describes the store
 ///
