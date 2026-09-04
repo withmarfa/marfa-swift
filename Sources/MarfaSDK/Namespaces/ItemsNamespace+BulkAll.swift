@@ -40,7 +40,7 @@ public extension ItemsNamespace {
     ///   - mode: ``BulkMode`` passed to every batch. Default ``BulkMode/upsert``.
     ///   - atomic: Per-batch atomicity flag. Default `false` so inter-batch
     ///     partial failures don't abort the whole run.
-    ///   - emitEvents: Per-batch opt-in for item webhook fanout. Default `false`.
+    ///   - enableFanout: Per-batch opt-in for item webhook fanout. Default `false`.
     ///   - progressHandler: Called after each batch with
     ///     `(itemsCompleted, itemsTotal)`. `@Sendable` because the handler
     ///     may cross executors.
@@ -51,7 +51,7 @@ public extension ItemsNamespace {
         batchSize: Int = 500,
         mode: BulkMode = .upsert,
         atomic: Bool = false,
-        emitEvents: Bool = false,
+        enableFanout: Bool = false,
         progressHandler: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> BulkResult {
         let total = items.count
@@ -82,7 +82,7 @@ public extension ItemsNamespace {
                 items: slice,
                 mode: mode,
                 atomic: atomic,
-                emitEvents: emitEvents
+                enableFanout: enableFanout
             )
 
             do {

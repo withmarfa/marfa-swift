@@ -42,7 +42,7 @@ struct SyncEngineBulkResultTests {
             items: entries.map { BulkItemInput(id: $0.id, type: $0.type) },
             mode: mode,
             atomic: atomic,
-            emitEvents: nil
+            enableFanout: nil
         )
     }
 

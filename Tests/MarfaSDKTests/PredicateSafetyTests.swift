@@ -226,7 +226,7 @@ struct PredicateSafetyTests {
         #expect(none.isEmpty)
     }
 
-    // MARK: - Range comparisons (used by since/until)
+    // MARK: - Range comparisons (used by the timestamp bounds)
 
     @Test("String >= comparison filters correctly") func stringGreaterEqual() async throws {
         let (context, _) = try await seededContext()

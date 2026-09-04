@@ -61,14 +61,14 @@ struct BulkEdgesTests {
                     properties: ["weight": .int(1)]
                 )
             ],
-            emitEvents: true
+            enableFanout: true
         )
         let data = try JSONEncoder().encode(input)
         let json = String(data: data, encoding: .utf8) ?? ""
         #expect(json.contains("\"source_id\":\"s\""))
         #expect(json.contains("\"target_id\":\"t\""))
         #expect(json.contains("\"edge_type\":\"about\""))
-        #expect(json.contains("\"emit_events\":true"))
+        #expect(json.contains("\"enable_fanout\":true"))
     }
 
     @Test("bulk encodes mode as create_only snake_case value")

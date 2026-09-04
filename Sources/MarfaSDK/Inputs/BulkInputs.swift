@@ -81,23 +81,23 @@ public struct BulkInput: Codable, Sendable {
     public var atomic: Bool?
     /// Per-item `created`/`updated` events default to OFF to avoid
     /// webhook fanout on bulk calls.
-    public var emitEvents: Bool?
+    public var enableFanout: Bool?
 
     public init(
         items: [BulkItemInput],
         mode: BulkMode? = nil,
         atomic: Bool? = nil,
-        emitEvents: Bool? = nil
+        enableFanout: Bool? = nil
     ) {
         self.items = items
         self.mode = mode
         self.atomic = atomic
-        self.emitEvents = emitEvents
+        self.enableFanout = enableFanout
     }
 
     enum CodingKeys: String, CodingKey {
         case items, mode, atomic
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 }
 
@@ -199,18 +199,18 @@ public struct BulkActionOptions: Sendable {
     /// ``BulkActionInput/purge(filter:options:)`` refuses to encode without it.
     public var confirm: String?
     public var maxItems: Int?
-    public var emitEvents: Bool?
+    public var enableFanout: Bool?
 
     public init(
         dryRun: Bool? = nil,
         confirm: String? = nil,
         maxItems: Int? = nil,
-        emitEvents: Bool? = nil
+        enableFanout: Bool? = nil
     ) {
         self.dryRun = dryRun
         self.confirm = confirm
         self.maxItems = maxItems
-        self.emitEvents = emitEvents
+        self.enableFanout = enableFanout
     }
 }
 
@@ -237,7 +237,7 @@ public enum BulkActionInput: Codable, Sendable {
         case timestamp
         case dryRun = "dry_run"
         case maxItems = "max_items"
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -302,7 +302,7 @@ public enum BulkActionInput: Codable, Sendable {
         var options = BulkActionOptions()
         options.dryRun = try c.decodeIfPresent(Bool.self, forKey: .dryRun)
         options.maxItems = try c.decodeIfPresent(Int.self, forKey: .maxItems)
-        options.emitEvents = try c.decodeIfPresent(Bool.self, forKey: .emitEvents)
+        options.enableFanout = try c.decodeIfPresent(Bool.self, forKey: .enableFanout)
 
         switch action {
         case "transition":
@@ -340,7 +340,7 @@ public enum BulkActionInput: Codable, Sendable {
     ) throws {
         try container.encodeIfPresent(options.dryRun, forKey: .dryRun)
         try container.encodeIfPresent(options.maxItems, forKey: .maxItems)
-        try container.encodeIfPresent(options.emitEvents, forKey: .emitEvents)
+        try container.encodeIfPresent(options.enableFanout, forKey: .enableFanout)
         if includeConfirm {
             try container.encodeIfPresent(options.confirm, forKey: .confirm)
         }
