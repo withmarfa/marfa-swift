@@ -634,6 +634,21 @@ public actor SyncEngine {
 
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
+        // **Gated for the same reason `start()` is, and the gate on `start()`
+        // alone was not enough.** An import is not only reads: it upserts
+        // items, edges and metadata, and it *prunes* — it takes the ids the
+        // server returned as the whole answer and removes the rest. A client
+        // that does not hold the store's writer lock running that can delete
+        // rows the real writer created locally and has not yet pushed.
+        //
+        // Thrown rather than logged, because this one has a caller who asked
+        // for it and is waiting on a count. `start()` is the engine's own
+        // lifecycle and has nobody to tell.
+        guard isStoreWriter else {
+            throw LocalStoreError.storeQuarantineFailed(
+                "this client does not hold the store's writer lock, so it cannot import — another client is the writer for this store"
+            )
+        }
         importCallerCount += 1
         defer { importCallerCount -= 1 }
 

@@ -78,23 +78,48 @@ struct StoreWriterLockTests {
     /// A pid is not an identity across a restart: the machine reboots, the
     /// number is handed out again, and a liveness check answers yes for
     /// something unrelated — leaving the store read-only for ever.
-    @Test("a holder from a previous boot is not treated as live")
+    ///
+    /// **This is the fallback path**, taken when no process start time is
+    /// available — an older lockfile, or a platform that declines to answer
+    /// for a process this one does not own. Where a start time exists it is
+    /// asked first and the boot is not consulted at all.
+    @Test("with no start time to compare, a holder from a previous boot is stale")
     func aHolderFromAnotherBootIsStale() {
         let live = StoreLockHolder(
             pid: ProcessInfo.processInfo.processIdentifier, token: "t", since: "now",
-            bootedAt: StoreWriterLock.machineBootedAt(),
-            startedAt: StoreWriterLock.processStartedAt(pid: ProcessInfo.processInfo.processIdentifier)
+            bootedAt: StoreWriterLock.machineBootedAt(), startedAt: nil
         )
         #expect(StoreWriterLock.stillHolding(live))
 
         // The discriminator: the same running process, written under a boot
-        // that is not this one. Without it this test would pass against a
-        // build that never checks the boot at all.
+        // that is not this one. Without it this would pass against a build
+        // that never checks the boot at all.
         let previousBoot = StoreLockHolder(
             pid: live.pid, token: live.token, since: live.since,
-            bootedAt: live.bootedAt - 1, startedAt: live.startedAt
+            bootedAt: live.bootedAt - 1, startedAt: nil
         )
         #expect(StoreWriterLock.stillHolding(previousBoot) == false)
+    }
+
+    /// **A recorded start time outranks a moved boot instant**, and the order
+    /// is the point rather than a detail.
+    ///
+    /// `kern.boottime` is not immovable within one boot — a calendar step, an
+    /// NTP correction, a manual date change moves it. An equality test on it,
+    /// asked first, would then declare a live holder dead and hand the caller
+    /// the takeover path, which is how a lock ends up held twice. A start time
+    /// that still matches is direct evidence the holder is the same process,
+    /// and it needs no tolerance window to say so.
+    @Test("a live holder survives the boot instant moving under it")
+    func aStartTimeOutranksAMovedBoot() throws {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let started = try #require(StoreWriterLock.processStartedAt(pid: pid))
+
+        let clockStepped = StoreLockHolder(
+            pid: pid, token: "t", since: "now",
+            bootedAt: StoreWriterLock.machineBootedAt() - 1, startedAt: started
+        )
+        #expect(StoreWriterLock.stillHolding(clockStepped), "still the same process")
     }
 
     /// The case a boot instant cannot see, and the one Darwin lets this kit
@@ -208,5 +233,47 @@ struct StoreWriterLockTests {
             transport.calls.contains { $0.path == "/events" }
         }
         await writer.stop()
+    }
+
+    // MARK: - The window a review found
+
+    /// **Two openers meeting one stale lock must not both come away as
+    /// writer**, and an earlier version let them.
+    ///
+    /// Clearing by unlink removes whatever is at the path *now*, not the dead
+    /// holder just read — so both find it dead, both clear, and the second
+    /// clears the first's fresh claim. Both hold, and the first's release is
+    /// then a no-op because its token no longer matches, so it never cleans up
+    /// either. Clearing by rename is atomic: exactly one caller can succeed,
+    /// and the loser re-reads rather than removing a claim somebody has just
+    /// made.
+    @Test("two openers meeting one stale lock produce exactly one writer")
+    func onlyOneOpenerTakesOverAStaleLock() async throws {
+        let path = tempStorePath()
+        let lockPath = try #require(StoreWriterLock.lockPath(for: path))
+        try FileManager.default.createDirectory(
+            atPath: (lockPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        let dead = StoreLockHolder(
+            pid: 999_999, token: "gone", since: "then",
+            bootedAt: StoreWriterLock.machineBootedAt(), startedAt: nil
+        )
+        try JSONEncoder().encode(dead).write(to: URL(fileURLWithPath: lockPath))
+
+        // The in-process guard would settle this on its own, so it is stood
+        // down for the length of the race: what is under test is the
+        // filesystem claim, which is what two *processes* would contend over.
+        let winners = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<2 {
+                group.addTask {
+                    StoreWriterLock.clearedStaleLockForTesting(at: lockPath)
+                }
+            }
+            var won = 0
+            for await didClear in group where didClear { won += 1 }
+            return won
+        }
+        #expect(winners == 1, "both openers cleared the same stale lock")
     }
 }

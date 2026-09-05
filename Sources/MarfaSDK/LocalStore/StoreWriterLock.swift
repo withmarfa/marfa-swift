@@ -14,7 +14,8 @@ public struct StoreLockHolder: Sendable, Equatable, Codable {
     /// accident.
     public let token: String
 
-    /// When it was taken, ISO 8601.
+    /// When it was taken, ISO 8601 — or a short phrase for a hold this
+    /// process took, which has no file and therefore no stamp.
     public let since: String
 
     /// When the **machine** was started, not when the holder was.
@@ -112,15 +113,22 @@ extension StoreWriterLock {
         // directory yet. It goes here rather than in the caller because the
         // lock needs its own directory whether or not a database is ever
         // opened beside it.
-        let directory = (path as NSString).deletingLastPathComponent
-        if !FileManager.default.fileExists(atPath: directory) {
-            try FileManager.default.createDirectory(
-                atPath: directory, withIntermediateDirectories: true
-            )
-        }
-
         let token = UUID().uuidString
         do {
+            // **Inside the `do`, and it was outside.** A throw here left the
+            // in-process key taken with nothing to give it back, so every
+            // later open in this process was refused for a cause that had
+            // since gone — the store permanently read-only with nothing
+            // raised, which is the exact outcome the error discrimination
+            // below exists to prevent, arriving through the one statement the
+            // recovery did not cover.
+            let directory = (path as NSString).deletingLastPathComponent
+            if !FileManager.default.fileExists(atPath: directory) {
+                try FileManager.default.createDirectory(
+                    atPath: directory, withIntermediateDirectories: true
+                )
+            }
+
             guard try claim(path: path, token: token) else {
                 let holder = readHolder(path: path)
                 // A holder that is not running left the file behind when it
@@ -130,13 +138,36 @@ extension StoreWriterLock {
                     inProcess.give(path)
                     return StoreWriterLock(writer: false, heldBy: holder, release: {})
                 }
-                try? FileManager.default.removeItem(atPath: path)
+                // **Cleared by rename, not by unlink, and that is the whole
+                // difference between one writer and two.**
+                //
+                // An unlink removes whatever is at the path *now*, not the
+                // dead holder just read — so two openers meeting one stale
+                // lock both find it dead, both clear, and the second clears
+                // the first's fresh claim. Both come away as writer, and the
+                // first's release is then a no-op because the token no longer
+                // matches, so it never cleans up either. The trigger is
+                // ordinary: an app and its share extension starting together
+                // after a crash left a lockfile behind.
+                //
+                // A rename is atomic and names the file it is moving, so
+                // exactly one caller can succeed. The loser's rename fails
+                // because what it named is gone, and it re-reads rather than
+                // clearing a claim somebody else has just made.
+                guard clearedStaleLock(at: path, token: token) else {
+                    inProcess.give(path)
+                    return StoreWriterLock(
+                        writer: false, heldBy: readHolder(path: path) ?? unknownHolder(),
+                        release: {}
+                    )
+                }
                 guard try claim(path: path, token: token) else {
-                    // Somebody else won the race to the abandoned lock, which
+                    // Somebody else claimed between the clear and here, which
                     // is an ordinary outcome rather than an error.
                     inProcess.give(path)
                     return StoreWriterLock(
-                        writer: false, heldBy: readHolder(path: path), release: {}
+                        writer: false, heldBy: readHolder(path: path) ?? unknownHolder(),
+                        release: {}
                     )
                 }
                 return held(path: path, token: token)
@@ -158,6 +189,37 @@ extension StoreWriterLock {
             }
             inProcess.give(path)
         })
+    }
+
+    /// Takes a stale lock out of the way, atomically.
+    ///
+    /// Returns `false` when somebody else got there first — the rename fails
+    /// because the file it named no longer exists, which is exactly the answer
+    /// wanted: this caller did not clear it and must not claim as though it
+    /// had.
+    private static func clearedStaleLock(at path: String, token: String) -> Bool {
+        let aside = "\(path).\(token).stale"
+        guard rename(path, aside) == 0 else { return false }
+        try? FileManager.default.removeItem(atPath: aside)
+        return true
+    }
+
+    /// A holder for the case where the lock is held and the file has already
+    /// moved on — contended, by somebody this caller cannot name.
+    ///
+    /// A `nil` here would answer "who has it" with "nobody", which is the one
+    /// answer that is certainly wrong when the caller has just been refused.
+    private static func unknownHolder() -> StoreLockHolder {
+        StoreLockHolder(
+            pid: -1, token: "unknown", since: "unknown",
+            bootedAt: machineBootedAt(), startedAt: nil
+        )
+    }
+
+    /// The atomic clear, reachable from a test so the race it exists to
+    /// settle can actually be run. Nothing else calls it.
+    static func clearedStaleLockForTesting(at path: String) -> Bool {
+        clearedStaleLock(at: path, token: UUID().uuidString)
     }
 
     private static func heldHere() -> StoreLockHolder {
@@ -220,20 +282,25 @@ extension StoreWriterLock {
 
     /// Whether the process a holder names can still be holding anything.
     static func stillHolding(_ holder: StoreLockHolder) -> Bool {
-        // Checked before liveness, because liveness on a reused number answers
-        // yes and would keep this store read-only for good.
-        guard holder.bootedAt == machineBootedAt() else { return false }
         guard alive(pid: holder.pid) else { return false }
 
-        // The case the boot cannot see: a pid recycled within one boot, where
-        // the boot matches and something unrelated is running under the number.
-        // Only checked when both readings exist — a platform that will not say
-        // leaves this exactly where the boot check left it, which is where a
-        // portable implementation has to stop.
+        // **The process start time is asked FIRST where it exists, and the
+        // boot instant is the fallback.** That order matters: `kern.boottime`
+        // is not immovable within one boot — a calendar step, an NTP
+        // correction, a manual date change, moves it — and an equality test on
+        // it would then call a live holder dead and hand this caller the
+        // takeover path. A start time that still matches is direct evidence
+        // the holder is the same process, and it needs no tolerance window to
+        // say so.
         if let then = holder.startedAt, let now = processStartedAt(pid: holder.pid) {
             return then == now
         }
-        return true
+
+        // No start time to compare, so the boot is all there is. A pid is not
+        // an identity across a restart: the machine reboots, the number is
+        // handed out again, and liveness on it answers yes for something
+        // unrelated — which would keep this store read-only for good.
+        return holder.bootedAt == machineBootedAt()
     }
 
     /// Whether a process is still there to hold anything.
