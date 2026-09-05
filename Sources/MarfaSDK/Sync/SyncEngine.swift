@@ -600,15 +600,18 @@ public actor SyncEngine {
     /// - Throws: Transport errors from the pagination requests, or upsert
     ///   errors from the local store.
     /// Counts callers currently inside ``performInitialSync(pageSize:)``,
-    /// owner and joiners alike. A test proving that two callers share one
-    /// import has to know both have arrived before it releases the first, and
-    /// every other way of knowing that is a sleep racing the thing it measures.
-    internal private(set) var importCallerCountForTesting = 0
+    /// owner and joiners alike.
+    ///
+    /// A test proving that two callers share one import has to know both have
+    /// arrived before it releases the first, and every other way of knowing
+    /// that is a sleep racing the thing it measures.
+    internal private(set) var importCallerCount = 0
+
 
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
-        importCallerCountForTesting += 1
-        defer { importCallerCountForTesting -= 1 }
+        importCallerCount += 1
+        defer { importCallerCount -= 1 }
 
         // Join a run already going, or publish this one — with nothing
         // suspending between the two, so a caller entering on actor reentry
@@ -648,6 +651,21 @@ public actor SyncEngine {
         // learned to let go either. `stop()` has always cancelled-then-awaited
         // its lifecycle tasks; this was the one place on this path that did
         // neither.
+        //
+        // **And it cancels unconditionally, which costs a joiner its import.**
+        // `task.value` rethrows the child's error, so a cancelled owner hands
+        // `CancellationError` to everyone joined to it — none of them
+        // cancelled, none consulted, and the owner is only whoever arrived
+        // first. Making the cancel conditional on there being no joiners was
+        // tried and is worse: it protects the joiners and strands the owner,
+        // which cannot abandon `task.value` any more than a joiner can.
+        //
+        // Both halves have the same root, and one fix answers both: waiters
+        // registering their own continuations, so any of them can be released
+        // without touching the shared task, which is the shape the blocking
+        // transports in the test support already use. That is a restructure of
+        // this function rather than a line in it, so the cost is recorded here
+        // and carried rather than swapped for a different one.
         return try await withTaskCancellationHandler {
             try await task.value
         } onCancel: {

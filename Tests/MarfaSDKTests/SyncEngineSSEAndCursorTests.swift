@@ -125,6 +125,15 @@ struct SyncEngineSSEAndCursorTests {
         }
 
         let restartTask = Task { await engine.start() }
+        // Released on every exit, not only the one where the assertions
+        // pass. `expectRemainsFalse` throws on cancellation, so a time limit
+        // firing in its window skipped the release below and left a
+        // deliberately uncancellable request held for good — after which
+        // `stopTask` never completes and `stopBlocking` is never reached.
+        // The helper's own docblock names releasing a blocked transport as one
+        // of the three things this pattern strands; this is that case.
+        defer { Task { await transport.stopBlocking() } }
+
         // The blocked replay holds the barrier open. A start that does not
         // wait for it opens a second lifecycle on top of a teardown that has
         // already snapshotted the first one, so the two overlap: the barrier

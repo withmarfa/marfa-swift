@@ -284,7 +284,7 @@ struct SyncEngineCatchUpOnStartTests {
         // Both callers have to be inside before the release, or the second
         // one merely arrives after the first finished and joins nothing.
         try await SyncEngineTestKit.awaitCondition(description: "the explicit caller to reach the import as well") {
-            await engine.importCallerCountForTesting == 2
+            await engine.importCallerCount == 2
         }
         await transport.releaseHeldRequest()
 
@@ -718,6 +718,12 @@ struct SyncEngineCatchUpOnStartTests {
         await suppressReconnect(engine)
 
         await engine.start()
+
+        // Stopped on every exit. `expectRemainsFalse` throws on cancellation,
+        // so a limit firing in its window skipped the `stop()` below and left
+        // a running engine behind — the second of the three cases the helper's
+        // docblock names.
+        defer { Task { await engine.stop() } }
 
         #expect(connManager.state == .syncing, "start() moved a manager it should have left alone")
         try await SyncEngineTestKit.expectRemainsFalse(for: .milliseconds(300)) {
