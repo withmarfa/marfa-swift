@@ -22,10 +22,32 @@ extension LocalStore {
     /// The shape LocalStoreWriting requires. Kept beside the bounded one
     /// rather than defaulted on the protocol, for the reason written there.
     public func cacheBlob(hash: String, data: Data, mimeType: String) throws {
-        try cacheBlob(hash: hash, data: data, mimeType: mimeType, limit: nil)
+        try cacheBlob(hash: hash, data: data, mimeType: mimeType, limit: nil, owned: false)
     }
 
-    func cacheBlob(hash: String, data: Data, mimeType: String, limit: Int?) throws {
+    /// Takes ownership of bytes nothing else holds.
+    ///
+    /// **The difference from ``cacheBlob(hash:data:mimeType:)`` is that these
+    /// bytes are not a copy.** A client with no server has nowhere to fetch
+    /// them back from, so the two ways the cache is allowed to lose a row —
+    /// evicting the least recently used, and declining one larger than the
+    /// whole bound — would both lose the file. An owned row is skipped by the
+    /// first and accepted by the second.
+    ///
+    /// A row that already exists is promoted rather than duplicated: a hash is
+    /// a content address, so the same bytes arriving from a download and then
+    /// from a local write are one row that has become the only copy.
+    public func ownBlob(hash: String, data: Data, mimeType: String) throws {
+        try cacheBlob(hash: hash, data: data, mimeType: mimeType, limit: nil, owned: true)
+    }
+
+    func cacheBlob(
+        hash: String,
+        data: Data,
+        mimeType: String,
+        limit: Int?,
+        owned: Bool = false
+    ) throws {
         let bound = limit ?? Self.defaultBlobCacheBytes
         // **A blob that cannot fit is not cached, rather than cached and then
         // evicting everything to make room it will not get.** Without this the
@@ -33,7 +55,12 @@ extension LocalStore {
         // nothing, so one large video flushes a person's whole cache for no
         // gain. The write is refused silently because a blob too big to keep
         // is not an error — the server still has it.
-        guard data.count <= bound else { return }
+        //
+        // **Owned bytes are exempt, because the premise above is false for
+        // them.** There is no server holding the file, so refusing it here
+        // does not decline a convenience; it drops the only copy and returns
+        // a hash addressing nothing.
+        guard owned || data.count <= bound else { return }
         let stamped = now()
         let predicate = #Predicate<CachedBlobModel> { $0.contentHash == hash }
         var descriptor = FetchDescriptor<CachedBlobModel>(predicate: predicate)
@@ -49,6 +76,10 @@ extension LocalStore {
             // answers, depending on whether this device's cache was warm.
             existing.mimeType = mimeType
             existing.lastUsedAt = stamped
+            // Promotes and never demotes. A cached copy that a local write
+            // then made the only copy is owned from that point; a download of
+            // bytes this device already owns does not stop owning them.
+            if owned { existing.isOwned = true }
         } else {
             let row = CachedBlobModel()
             row.contentHash = hash
@@ -56,6 +87,7 @@ extension LocalStore {
             row.mimeType = mimeType
             row.byteCount = data.count
             row.lastUsedAt = stamped
+            row.isOwned = owned
             modelContext.insert(row)
         }
         try modelContext.save()
@@ -99,7 +131,14 @@ extension LocalStore {
         )
         var total = rows.reduce(0) { $0 + $1.byteCount }
         var evicted = 0
-        for row in rows where total > limit {
+        // **Owned rows count toward the total and are never dropped from it.**
+        // Counting them is right — they occupy the disk either way, and a
+        // store full of owned bytes should stop caching new ones rather than
+        // pretend it has room. Dropping them is not: nothing else holds them.
+        // The consequence, said rather than discovered: a store whose owned
+        // bytes exceed the bound evicts every cached row and stays over it,
+        // which is the correct answer to an impossible instruction.
+        for row in rows where total > limit && !row.isOwned {
             total -= row.byteCount
             modelContext.delete(row)
             evicted += 1

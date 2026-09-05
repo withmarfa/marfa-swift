@@ -208,4 +208,106 @@ struct OfflineBlobTests {
         #expect(try await store.cachedBlob(hash: localHash) == nil)
         await engine.stop()
     }
+
+    // MARK: - A store with no server behind it
+
+    /// **The gap that made `core.file.*` unreachable offline.** `upload`
+    /// refused on a pure-local client, so the cache could only ever hold what
+    /// an earlier synced session had left, and an app with no server could
+    /// open a file and never make one.
+    @Test("a local-only client keeps the bytes it is given, and reads them back")
+    func aLocalClientCanPutBytesIn() async throws {
+        let client = try await MarfaClient.local(path: ":memory:")
+        let bytes = Data("a picture of a bassoon".utf8)
+
+        let response = try await client.blobs.upload(data: bytes, mimeType: "image/png")
+        #expect(response.size == bytes.count)
+        #expect(response.hash.hasPrefix("sha256:"), "the address is the server's shape")
+
+        let (readBack, mime) = try await client.blobs.download(hash: response.hash)
+        #expect(readBack == bytes)
+        #expect(mime == "image/png")
+    }
+
+    /// **The hash is the one the server would compute**, so a store that later
+    /// gains a server addresses the same blob rather than a private name.
+    @Test("a local upload addresses the blob the way the server does")
+    func theHashIsTheServersHash() async throws {
+        let local = try await MarfaClient.local(path: ":memory:")
+        let bytes = Data("identical bytes".utf8)
+
+        let localResponse = try await local.blobs.upload(data: bytes, mimeType: "text/plain")
+
+        // The network-only path computes nothing locally, so the comparison is
+        // against the synced path, which returns the hash it will send under.
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let transport = MockTransport()
+        let synced = MarfaClient(
+            configuration: ClientConfiguration(url: URL(string: "http://test")!, apiKey: "k"),
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            syncEngine: SyncEngine(
+                transport: transport, localStore: store, mutationQueue: queue,
+                connectionManager: ConnectionStateManager()
+            )
+        )
+        let syncedResponse = try await synced.blobs.upload(data: bytes, mimeType: "text/plain")
+
+        #expect(localResponse.hash == syncedResponse.hash)
+    }
+
+    /// **Owned bytes are not a copy of anything**, so neither of the two ways
+    /// the cache is allowed to lose a row may touch them. A cached blob beside
+    /// them is still evictable, which is what keeps the bound meaningful.
+    @Test("eviction takes the cached blob and leaves the owned one")
+    func evictionLeavesOwnedBytesAlone() async throws {
+        let (store, _, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+
+        try await store.ownBlob(hash: "sha256:owned", data: Data(repeating: 1, count: 60), mimeType: "application/octet-stream")
+        try await store.cacheBlob(hash: "sha256:cached", data: Data(repeating: 2, count: 60), mimeType: "application/octet-stream", limit: 1_000)
+
+        // Both older than anything written after, and the owned one older
+        // still — so a rule that ignored ownership would take it first.
+        try await store.stampBlobUseForTesting(hash: "sha256:owned", at: "2020-01-01T00:00:00.000Z")
+        try await store.stampBlobUseForTesting(hash: "sha256:cached", at: "2020-01-02T00:00:00.000Z")
+
+        let evicted = try await store.evictBlobs(over: 100)
+        #expect(evicted == 1)
+        #expect(try await store.cachedBlob(hash: "sha256:owned") != nil, "the only copy was dropped")
+        #expect(try await store.cachedBlob(hash: "sha256:cached") == nil)
+    }
+
+    /// A blob larger than the whole bound is declined for the cache, because
+    /// the server still has it. **Owned bytes have no server**, so declining
+    /// one returns a hash addressing nothing.
+    @Test("a blob over the bound is kept when it is owned and declined when it is not")
+    func theBoundDoesNotRefuseOwnedBytes() async throws {
+        let (store, _, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let big = Data(repeating: 7, count: 500)
+
+        try await store.cacheBlob(hash: "sha256:toobig", data: big, mimeType: "video/mp4", limit: 100)
+        #expect(try await store.cachedBlob(hash: "sha256:toobig") == nil, "the server still has it")
+
+        try await store.ownBlob(hash: "sha256:onlycopy", data: big, mimeType: "video/mp4")
+        let held = try await store.cachedBlob(hash: "sha256:onlycopy")
+        #expect(held?.data == big, "nothing else holds these")
+    }
+
+    /// Ownership promotes and never demotes: a download of bytes this device
+    /// already owns must not turn the only copy back into a cached one.
+    @Test("a later download does not demote bytes this device owns")
+    func ownershipPromotesAndNeverDemotes() async throws {
+        let (store, _, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let bytes = Data(repeating: 3, count: 40)
+
+        try await store.ownBlob(hash: "sha256:x", data: bytes, mimeType: "image/png")
+        try await store.cacheBlob(hash: "sha256:x", data: bytes, mimeType: "image/png")
+
+        try await store.stampBlobUseForTesting(hash: "sha256:x", at: "2020-01-01T00:00:00.000Z")
+        try await store.cacheBlob(hash: "sha256:filler", data: Data(repeating: 4, count: 90), mimeType: "application/octet-stream", limit: 1_000)
+
+        _ = try await store.evictBlobs(over: 50)
+        #expect(try await store.cachedBlob(hash: "sha256:x") != nil, "the download demoted the only copy")
+    }
 }
