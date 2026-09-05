@@ -13,9 +13,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   **A subtree has two roots, not one, and resolving either alone is wrong.** The dotted identifier is a namespace and a type's `parent` is a declared lineage; registration has never required a child's id to start with its parent's, so `user.annotated_note` may declare `core.note` as its parent and sit outside `core.note.*` entirely. Resolving names alone missed it. Resolving declarations alone would break the other half, since nothing declares a parent of `google` yet `google.*` plainly means the Google types. Both halves are now resolved and each is pinned by its own test.
 
-  **The declared half needs the cached graph and is empty without it**, which is the same answer a read gave before a registry existed rather than a wrong one. The namespace half needs nothing and holds on a device that has never reached a server. `core.entity` and `core.entity.*` are synonyms, and `*` means every type — again matching the server.
+  **The declared half needs the cached graph and is empty without it**, which is the same answer a read gave before a registry existed rather than a wrong one. The namespace half needs nothing and holds on a device that has never reached a server. `core.entity` and `core.entity.*` are synonyms, as they are on the server.
 
-  Descent stops at a dot, so `core.note` does not reach `core.notebook`.
+  Descent stops at a dot, so `core.note` does not reach `core.notebook`. **`system` is not `system.*`**, because the server decides its operational-row exclusion from the raw filter string: naming a system type outright opts in to seeing those rows, naming the bare namespace does not.
+
+  **A pattern the server refuses now narrows to nothing rather than to everything.** `GET /items` answers `400` to `?type=*` — everything is a listing with no type at all, and a filter matching every type would slip past the per-type enforcement levers keyed off the parameter. A device cannot answer `400` from inside a fetch descriptor, so `*`, `*.*`, `.*` and a trailing dot come back empty. Different in kind from the server, identical in what a caller sees, and wrong only in the direction that shows too little rather than too much.
 
 - **`ListFilters.since` and `.until` are now `timestampAfter` and `timestampBefore`, and they send the names the server takes.** This is a shipped defect rather than a tidy-up: the server renamed those query parameters and refuses the old ones with a `400` naming their replacement, so **every date-bounded remote read this kit made was refused**, and had been since the rename deployed. `timestamp_after` and `timestamp_before` appeared nowhere in the kit. The same two fields on `BulkActionFilter` are renamed with it.
 

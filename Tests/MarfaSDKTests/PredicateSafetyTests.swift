@@ -234,7 +234,7 @@ struct PredicateSafetyTests {
     @Test("Subtree narrowing composes without crashing") func subtreeDescriptorShapes() async throws {
         let (context, _) = try await seededContext()
 
-        let subtree = TypeSubtree(root: "core.task", declaredExtras: ["user.chore"])
+        let subtree = TypeSubtree(root: "core.task", declaredExtras: ["user.chore"], namesASystemType: false)
         let matched = try context.fetch(
             LocalStore.makeItemsDescriptor(
                 filters: ListFilters(type: "core.task"), subtree: subtree
@@ -247,7 +247,7 @@ struct PredicateSafetyTests {
         let empty = try context.fetch(
             LocalStore.makeItemsDescriptor(
                 filters: ListFilters(type: "no.such.root"),
-                subtree: TypeSubtree(root: "no.such.root", declaredExtras: ["also.nothing"])
+                subtree: TypeSubtree(root: "no.such.root", declaredExtras: ["also.nothing"], namesASystemType: false)
             )
         )
         #expect(empty.isEmpty)

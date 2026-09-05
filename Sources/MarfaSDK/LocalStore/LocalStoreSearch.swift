@@ -229,18 +229,17 @@ extension LocalStore {
     ) -> FetchDescriptor<MarfaItemModel> {
         // Same subtree rule as a listing, because the server applies it in
         // both places and nowhere else. See `TypeSubtree`.
-        let resolved = filters?.type.map { subtree ?? TypeSubtree(filter: $0) }
-        let typeFilter = resolved?.root ?? ""
-        let hasTypeFilter = resolved.map { !$0.isGlobal } ?? false
-        let typeNamespace = typeFilter + "."
-        let systemPrefix = "system."
-        // Scrubbed for the reason the typed branch below carries no separate
-        // system exclusion. See `makeItemsDescriptor`.
-        var subtreeIds = (resolved?.declaredExtras ?? []).union([typeFilter])
-        if !typeFilter.hasPrefix(systemPrefix) {
-            subtreeIds = subtreeIds.filter { !$0.hasPrefix(systemPrefix) }
+        // An EMPTY type string is no filter at all, matching the server's own
+        // falsy check on the parameter. Anything else narrows — including a
+        // spelling the server would refuse, which resolves to a subtree
+        // nothing is in rather than to an unnarrowed read. See `TypeSubtree`.
+        let resolved = filters?.type.flatMap {
+            $0.isEmpty ? nil : (subtree ?? TypeSubtree(filter: $0))
         }
-        let typeSet = subtreeIds
+        let hasTypeFilter = resolved != nil
+        let typeSet = resolved?.matchedIds ?? []
+        let typeNamespace = resolved?.namespace ?? ""
+        let systemPrefix = TypeSubtree.systemPrefix
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
         let tierFilter = filters?.tier?.rawValue ?? ""

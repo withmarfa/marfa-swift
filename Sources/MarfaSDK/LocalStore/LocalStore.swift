@@ -1025,21 +1025,20 @@ public actor LocalStore {
         // SwiftData has no runtime `Predicate<T>` composition, so we
         // capture booleans alongside string defaults and let the
         // predicate engine optimize constant-true branches away.
-        // A `type` filter selects a SUBTREE, not one identifier — see
-        // `TypeSubtree`. The namespace half costs nothing and is always
-        // applied; the declared half arrives only when a caller resolved it
-        // against a registry, and is empty otherwise.
-        let resolved = filters?.type.map { subtree ?? TypeSubtree(filter: $0) }
-        let typeFilter = resolved?.root ?? ""
-        let hasTypeFilter = resolved.map { !$0.isGlobal } ?? false
-        // `starts(with:)` on the root plus a dot, never on the root alone:
-        // `core.note` must not reach `core.notebook`, and the dot is the only
-        // thing that separates a child from a sibling sharing a prefix.
-        let typeNamespace = typeFilter + "."
-        // The root travels WITH the declared extras rather than as its own
-        // comparison. One captured set and one prefix test is two disjuncts
-        // instead of three, and this predicate has no type-checker budget to
-        // spare — the comments above are the scars of finding that out.
+        //
+        // A `type` filter selects a SUBTREE, not one identifier. An EMPTY
+        // type string is no filter at all, matching the server's own
+        // falsy check on the parameter. Anything else narrows — including a
+        // spelling the server would refuse, which resolves to a subtree
+        // nothing is in rather than to an unnarrowed read. See `TypeSubtree`.
+        let resolved = filters?.type.flatMap {
+            $0.isEmpty ? nil : (subtree ?? TypeSubtree(filter: $0))
+        }
+        let hasTypeFilter = resolved != nil
+        let typeSet = resolved?.matchedIds ?? []
+        let typeNamespace = resolved?.namespace ?? ""
+        let systemPrefix = TypeSubtree.systemPrefix
+
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
         let lowerBound = filters?.timestampAfter ?? ""
@@ -1052,33 +1051,6 @@ public actor LocalStore {
         let hasTierFilter = filters?.tier != nil
         let sourceFilter = filters?.source ?? ""
         let hasSourceFilter = filters?.source != nil
-
-        // `system.*` records are operational rather than user data, and the
-        // server drops them from a listing unless the caller names a system
-        // type outright. The same clause as `makeSearchDescriptor`, and it has
-        // to be here too: search and list are the only two places the server
-        // applies it, so they are the only two places a local store mirroring
-        // the server should.
-        //
-        // **Conditional, not absolute.** `ConnectionsNamespace.list` is
-        // `items.list(type: "system.connection")`, so an unconditional
-        // exclusion here would return nothing to the one API whose whole job
-        // is reading these rows — the same failure as leaking them, one turn
-        // further on.
-        //
-        // This became reachable when the import began asking for `system`
-        // rows. Before that the prune deleted them again on every re-import,
-        // so the leak was intermittent and partly hidden by a second defect
-        // rather than absent.
-        let systemPrefix = "system."
-        // Scrubbed of `system.` unless the filter names one, because the
-        // typed branch below carries no separate system exclusion.
-        var subtreeIds = (resolved?.declaredExtras ?? []).union([typeFilter])
-        if !typeFilter.hasPrefix(systemPrefix) {
-            subtreeIds = subtreeIds.filter { !$0.hasPrefix(systemPrefix) }
-        }
-        let typeSet = subtreeIds
-
 
         // The date bounds narrow here but do not decide here. The server
         // compares `COALESCE(timestamp, created_at)`, and a row that reached

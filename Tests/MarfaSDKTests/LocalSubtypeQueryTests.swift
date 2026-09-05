@@ -121,4 +121,75 @@ struct LocalSubtypeQueryTests {
         let listed = try await client.items.list(filters: ListFilters(type: "core.entity.*"))
         #expect(listed.data.map(\.type) == ["core.entity.person"])
     }
+
+    // MARK: - The spellings the server refuses
+
+    /// The regression descent introduced and a review caught: `system` is not
+    /// `system.*`.
+    ///
+    /// The server decides the operational-row exclusion from the **raw**
+    /// filter — `type.startsWith("system.")` — so `system` and `system.*` are
+    /// different questions to it. Stripping the wildcard makes them one root
+    /// here, and a naive descent then answered `system.*`'s question for both,
+    /// putting every device, connection and activity row into an ordinary
+    /// listing.
+    @Test("a bare system namespace does not return operational rows")
+    func bareSystemNamespaceIsNotASystemTarget() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        _ = try await client.items.create(
+            CreateItemInput(type: "system.connection", properties: [
+                "kind": .string("app"), "status": .string("active"),
+                "granted_at": .string("2026-09-05T00:00:00.000Z"),
+            ])
+        )
+
+        let bare = try await client.items.list(filters: ListFilters(type: "system"))
+        #expect(bare.data.isEmpty)
+
+        // The discriminator: naming a system type outright still works, so the
+        // assertion above is about the spelling rather than about system rows
+        // having become unreachable.
+        let named = try await client.items.list(filters: ListFilters(type: "system.connection"))
+        #expect(named.data.map(\.type) == ["system.connection"])
+    }
+
+    @Test("a bare system namespace does not leak into search either")
+    func bareSystemNamespaceIsNotASystemTargetInSearch() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        _ = try await client.items.create(
+            CreateItemInput(type: "system.connection", properties: [
+                "kind": .string("app"), "status": .string("active"),
+                "granted_at": .string("2026-09-05T00:00:00.000Z"),
+                "title": .string("findme"),
+            ])
+        )
+        let found = try await client.search(query: "findme", filters: SearchFilters(type: "system"))
+        #expect(found.isEmpty)
+    }
+
+    /// `GET /items` refuses `?type=*` outright: everything is a listing with
+    /// no type at all, and a filter matching every type would slip past the
+    /// per-type enforcement levers keyed off the parameter.
+    ///
+    /// A device cannot answer `400` from inside a fetch descriptor, so an
+    /// unresolvable spelling resolves to a subtree nothing is in. **The
+    /// direction is the point**: showing too little is recoverable by the
+    /// caller noticing, and showing everything is not.
+    @Test("a wildcard the server refuses matches nothing rather than everything")
+    func unresolvableSpellingsFailClosed() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        _ = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: ["body": .string("here")])
+        )
+
+        for spelling in ["*", "*.*", ".*", "core.note."] {
+            let listed = try await client.items.list(filters: ListFilters(type: spelling))
+            #expect(listed.data.isEmpty, "\(spelling) should narrow to nothing")
+        }
+
+        // And an absent filter still returns the row, so the loop above is not
+        // passing because the store is empty.
+        let all = try await client.items.list(filters: nil)
+        #expect(all.data.map(\.type) == ["core.note"])
+    }
 }

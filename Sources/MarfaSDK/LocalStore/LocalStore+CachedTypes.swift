@@ -101,7 +101,6 @@ extension LocalStore {
     /// actor, and a second copy of this would drift from the first.
     nonisolated static func subtree(in context: ModelContext, for filter: String) throws -> TypeSubtree {
         let bare = TypeSubtree(filter: filter)
-        guard !bare.isGlobal else { return bare }
 
         let platform = MarfaTypeRegistry.platform
         var parents: [String: String] = [:]
@@ -120,7 +119,10 @@ extension LocalStore {
             root: bare.root,
             declaredExtras: MarfaTypeRegistry.declaredDescendantsOutsideNamespace(
                 of: bare.root, parents: parents
-            )
+            ),
+            // Asked of the raw filter, not of `bare.root`, which has already
+            // discarded the distinction between `system` and `system.*`.
+            namesASystemType: filter.hasPrefix(TypeSubtree.systemPrefix)
         )
     }
 }
