@@ -25,6 +25,22 @@ public enum PendingMutationBlockReason: String, Sendable, Equatable, CaseIterabl
     /// holds against another row. Only the app can say what should win, so the
     /// mutation waits for it to settle the conflict and call
     /// ``SyncEngine/retry(id:)``.
+    ///
+    /// **One cause does not fit that remedy, and an app should expect it.** A
+    /// write refused because history no longer retains the version it names
+    /// arrives here under `.manual` and `.callback` — and `retry(id:)` re-sends
+    /// that same version, so it is refused identically however often anyone
+    /// retries. The row's error is an ``AncestorUnavailableError`` carrying the
+    /// version the server does hold; settling it means writing against that
+    /// version rather than retrying this row.
+    ///
+    /// **`.auto` reaches this state too, and routinely.** A `409` the server
+    /// could not resolve surfaces as a `ConflictError` and parks here, which
+    /// is the ordinary outcome for an `.auto` write the server declined — an
+    /// app that handles no `.auto` case is mishandling the likeliest one. What
+    /// `.auto` does not do is park on a *first* thinned ancestor: the loop
+    /// rebases and goes again, and only reaches here once that budget is
+    /// spent.
     case conflictUnresolved
 
     /// A refusal that is neither permanent nor one of the above failed as often

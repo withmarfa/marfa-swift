@@ -96,8 +96,24 @@ final class URLSessionTransport: Transport {
         body: (any Encodable & Sendable)?,
         query: [(String, String)]?
     ) async throws -> T {
+        // **A write reaching this overload still gets a key, minted here.**
+        // This is the door a client with no local store uses, and it has no
+        // queue behind it — but it does have the retry loop below, which
+        // retries `.timedOut` and `.networkConnectionLost` on any method. A
+        // timeout does not mean the write did not land; it means this side
+        // stopped waiting, and the server may have committed and lost only
+        // the response. Unkeyed, that retry is a second create.
+        //
+        // Minted per call, so the retries of one call share it and two calls
+        // never do — a key shared across calls would make the second write a
+        // replay of the first and drop it silently, which is worse than the
+        // duplicate it would be preventing.
         try await request(
-            method: method, path: path, body: body, query: query, idempotencyKey: nil
+            method: method,
+            path: path,
+            body: body,
+            query: query,
+            idempotencyKey: HTTPMethod.isWrite(method) ? UUIDv7.generateString() : nil
         )
     }
 
@@ -116,6 +132,25 @@ final class URLSessionTransport: Transport {
         )
 
         if response.statusCode == 409 {
+            // **The two 409 bodies are mutually exclusive by required key, so
+            // neither can swallow the other and the order here is not
+            // load-bearing** — swapping these two branches changes no
+            // behaviour, which was measured rather than assumed. Two
+            // independent guards hold it up and *either one alone is enough*:
+            // this branch requires `requested_version`, which the merge body
+            // never carries, and requires a `code` that decodes as the
+            // single-case enum, which `version_conflict` never does. Relaxing
+            // one is survivable; relaxing both is what silently turns every
+            // merge conflict into a thinned ancestor, and that is the case
+            // `AncestorUnavailableTests` exists to catch. This body means
+            // there is no ancestor left to diff against.
+            if let thinned = try? decoder.decode(AncestorUnavailableResponse.self, from: data) {
+                throw AncestorUnavailableError(
+                    current: thinned.current,
+                    requestedVersion: thinned.requestedVersion,
+                    message: thinned.error.message
+                )
+            }
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 throw ConflictError(
                     current: conflict.current,
@@ -150,15 +185,36 @@ final class URLSessionTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String?
     ) async throws -> ConflictResult<T> {
         let bodyData = try encodeBody(body)
         let (data, response) = try await rawRequest(
             method: method, path: path, body: bodyData,
-            contentType: body != nil ? "application/json" : nil, query: query
+            contentType: body != nil ? "application/json" : nil, query: query,
+            idempotencyKey: idempotencyKey
         )
 
         if response.statusCode == 409 {
+            // **The two 409 bodies are mutually exclusive by required key, so
+            // neither can swallow the other and the order here is not
+            // load-bearing** — swapping these two branches changes no
+            // behaviour, which was measured rather than assumed. Two
+            // independent guards hold it up and *either one alone is enough*:
+            // this branch requires `requested_version`, which the merge body
+            // never carries, and requires a `code` that decodes as the
+            // single-case enum, which `version_conflict` never does. Relaxing
+            // one is survivable; relaxing both is what silently turns every
+            // merge conflict into a thinned ancestor, and that is the case
+            // `AncestorUnavailableTests` exists to catch. This body means
+            // there is no ancestor left to diff against.
+            if let thinned = try? decoder.decode(AncestorUnavailableResponse.self, from: data) {
+                throw AncestorUnavailableError(
+                    current: thinned.current,
+                    requestedVersion: thinned.requestedVersion,
+                    message: thinned.error.message
+                )
+            }
             if let conflict = try? decoder.decode(ConflictResponse.self, from: data) {
                 return .conflict(conflict)
             }

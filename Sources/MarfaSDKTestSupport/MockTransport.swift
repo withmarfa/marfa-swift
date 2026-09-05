@@ -176,11 +176,15 @@ public final class MockTransport: Transport, @unchecked Sendable {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
         let outcome: Dequeue<Data> = lock.withLock {
-            _calls.append(Call(method: method, path: path, body: bodyData, query: query))
+            _calls.append(Call(
+                method: method, path: path, body: bodyData, query: query,
+                idempotencyKey: idempotencyKey
+            ))
             if !errors.isEmpty { return .error(errors.removeFirst()) }
             if responses.isEmpty { return .missing }
             return .value(responses.removeFirst())

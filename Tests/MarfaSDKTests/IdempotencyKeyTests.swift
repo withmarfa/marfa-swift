@@ -133,11 +133,10 @@ struct IdempotencyKeyTests {
     /// narrow the claim rather than widen the mechanism.** A key identifies
     /// one request: the server fingerprints method, path, credential and
     /// **body**, and answers a repeat carrying a different body with a `422`
-    /// rather than a replay. The conflict loop sends a different body on every
-    /// attempt by design — it re-reads the server's copy, resolves against it
-    /// and re-sends — and `keepBothFlow` inside it makes a `POST /items` that
-    /// shares nothing with the parent `PATCH`. Keying any of that turns a
-    /// merge into a refusal, so the loop gets the unwrapped transport.
+    /// rather than a replay. A `.callback` resolution sends a different body on
+    /// every attempt by design — it re-reads the server's copy, hands it to the
+    /// resolver and re-sends — so keying it turns a resolution into a refusal,
+    /// and the loop gets the unwrapped transport.
     ///
     /// Nothing is lost: the conflict machinery is itself the recovery for the
     /// case a key would have covered — a server that moved under this write.
@@ -258,49 +257,60 @@ struct IdempotencyHeaderTests {
 
     /// The discriminator. Without it the test above passes against a transport
     /// that stamps the header unconditionally from some other value.
-    @Test("an unkeyed request carries no header")
-    func unkeyedRequestSetsNoHeader() async throws {
+    ///
+    /// **A read is what makes it a discriminator now.** A write reaching the
+    /// unkeyed overload is given a minted key, because that overload is the
+    /// direct-mode door and the retry loop behind it would otherwise replay a
+    /// write that may already have landed. So the thing that must carry no
+    /// header is a request the server would not key anyway.
+    @Test("a read carries no header even though a write on the same door is keyed")
+    func readSetsNoHeader() async throws {
         IdempotencyStubProtocol.reset()
         let transport = stubbedTransport()
 
         let _: EmptyResponse = try await transport.request(
+            method: .get, path: "/items", body: nil, query: nil
+        )
+        #expect(try #require(IdempotencyStubProtocol.requests().first)
+            .value(forHTTPHeaderField: "Idempotency-Key") == nil)
+
+        let _: EmptyResponse = try await transport.request(
             method: .post, path: "/items", body: nil, query: nil
         )
-
-        let sent = try #require(IdempotencyStubProtocol.requests().first)
-        #expect(sent.value(forHTTPHeaderField: "Idempotency-Key") == nil)
+        #expect(try #require(IdempotencyStubProtocol.requests().last)
+            .value(forHTTPHeaderField: "Idempotency-Key") != nil,
+            "an unkeyed write door is a duplicate waiting on a timeout")
     }
 
-    /// **Asserted on the wire, not through the mock**, and the first draft of
-    /// this test could not fail.
-    ///
-    /// `MockTransport.Call.idempotencyKey` defaults to `nil` for a
-    /// `requestWithConflict`, because that method has no key parameter to
-    /// record and never had one — so an assertion that it is `nil` holds
-    /// whatever the code does. Reverting the fix left it green. That is the
-    /// exact defect this branch exists to have learned from, reproduced in the
-    /// fix, guarding the one decision worth guarding.
-    @Test("a versioned update is deliberately not keyed")
-    func versionedUpdatesAreNotKeyed() async throws {
+    /// **Asserted against the wire, not against `MockTransport.Call`.** That
+    /// record used to carry no key for a `requestWithConflict` at all, so an
+    /// assertion that it was `nil` held whatever the code did and stayed green
+    /// through a revert. The door now takes a key, and this reads the header
+    /// that actually left.
+    @Test("the conflict door forwards the key it is given rather than the row's")
+    func conflictDoorForwardsTheCallersKey() async throws {
         IdempotencyStubProtocol.reset()
         let wrapped = KeyedTransport(base: stubbedTransport(), key: "row-key")
 
-        // The conflict door, reached the way the replay reaches it.
+        // **The wrapper must not substitute the row's key here.** Only the
+        // conflict loop knows which attempt it is on, and only the first
+        // attempt can carry a key: a resolver-driven retry re-sends a
+        // different body, which a keyed repeat is answered with a `422`. So
+        // the wrapper forwards, and passing `nil` has to mean `nil`.
         let _: ConflictResult<EmptyResponse> = try await wrapped.requestWithConflict(
-            method: .patch, path: "/items/x", body: nil, query: nil
+            method: .patch, path: "/items/x", body: nil, query: nil, idempotencyKey: nil
         )
+        #expect(try #require(IdempotencyStubProtocol.requests().first)
+            .value(forHTTPHeaderField: "Idempotency-Key") == nil)
 
-        let sent = try #require(IdempotencyStubProtocol.requests().first)
-        #expect(sent.value(forHTTPHeaderField: "Idempotency-Key") == nil)
-
-        // The discriminator: an ordinary write through the same wrapper does
-        // carry it, so the absence above is about this door rather than about
-        // the wrapper being inert.
-        let _: EmptyResponse = try await wrapped.request(
-            method: .patch, path: "/items/x", body: nil, query: nil
+        // And a key it *is* given reaches the wire — the half that was
+        // missing, and the reason a replayed update used to come back as a
+        // conflict over the edit its own first attempt landed.
+        let _: ConflictResult<EmptyResponse> = try await wrapped.requestWithConflict(
+            method: .patch, path: "/items/x", body: nil, query: nil, idempotencyKey: "first-attempt"
         )
-        let second = try #require(IdempotencyStubProtocol.requests().last)
-        #expect(second.value(forHTTPHeaderField: "Idempotency-Key") == "row-key")
+        #expect(try #require(IdempotencyStubProtocol.requests().last)
+            .value(forHTTPHeaderField: "Idempotency-Key") == "first-attempt")
     }
 
     /// A key on a read is never right, and the wrapper covers whole replays —

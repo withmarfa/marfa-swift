@@ -15,15 +15,14 @@ public protocol Transport: Sendable {
 
     /// Sends a JSON request carrying an `Idempotency-Key`.
     ///
-    /// **There is no keyed `requestWithConflict`, and that is the design
-    /// rather than an omission.** A key identifies one *request*, not one
-    /// queued row: the server fingerprints method, path, credential **and
-    /// body**, and answers a repeat carrying a different body with a `422`
-    /// rather than a replay. The conflict loop deliberately sends a different
-    /// body on every attempt — it re-reads the server's copy, resolves against
-    /// it and re-sends — so a stable key there turns a merge into a refusal.
-    /// The conflict machinery is itself the recovery for the case a key would
-    /// have covered, which is why nothing is lost by leaving it unkeyed.
+    /// A key identifies one *request*, not one queued row: the server
+    /// fingerprints method, path, credential **and body**, and answers a
+    /// repeat carrying a different body with a `422` rather than a replay.
+    /// ``requestWithConflict(method:path:body:query:idempotencyKey:)`` takes a
+    /// key for the same reason every other write door does, and leaves it to
+    /// the conflict loop to decide which attempt may carry one — only the
+    /// first, because a resolver-driven retry sends a different body by
+    /// design.
     ///
     /// **A default implementation drops the key** and forwards to
     /// ``request(method:path:body:query:)``, so an existing conformer keeps
@@ -50,7 +49,8 @@ public protocol Transport: Sendable {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String?
     ) async throws -> ConflictResult<T>
 
     /// Sends a raw HTTP request and returns the response data and metadata.

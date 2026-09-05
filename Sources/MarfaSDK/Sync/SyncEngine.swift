@@ -2404,16 +2404,14 @@ public actor SyncEngine {
                     }
                 }
                 let result = try await handleConflictUpdateWithStats(
-                    // `self.transport`, NOT the keyed shadow above, and the
-                    // explicit `self.` is the point of the line. A key
-                    // identifies one request: the server fingerprints the body
-                    // and answers a repeat carrying a different one with a
-                    // `422`. This loop sends a different body on every attempt
-                    // by design — it re-reads the server's copy, resolves
-                    // against it, re-sends — and `keepBothFlow` inside it makes
-                    // a `POST /items` that shares nothing with the parent
-                    // `PATCH` but the row it came from. Handing any of that the
-                    // row's key turns a merge into a refusal.
+                    // **`self.transport`, NOT the keyed shadow, and the key is
+                    // passed as an argument instead.** The shadow would stamp
+                    // the row's key on every attempt, and only the first one
+                    // can carry it: a resolver-driven retry re-reads the
+                    // server's copy and re-sends a different body, which a
+                    // keyed repeat is answered with a `422`. The loop is the
+                    // only code that knows which attempt it is on, so it is
+                    // the only code that can make that call.
                     transport: self.transport,
                     itemId: p.id,
                     clientPatch: p.properties,
@@ -2421,7 +2419,8 @@ public actor SyncEngine {
                     strategy: strategy,
                     resolver: resolver,
                     tier: p.tier,
-                    sourceId: p.sourceId
+                    sourceId: p.sourceId,
+                    idempotencyKey: record.idempotencyKey
                 )
                 if let summary = result.mergeSummary {
                     emit(.conflictAutoMerged(payload: summary))

@@ -8,8 +8,10 @@ import Foundation
 /// the app can navigate or scroll to it.
 ///
 /// The single producer of this payload is ``SyncEngine`` during mutation
-/// replay (`updateItem` paths that hit a 409 and resolved via
-/// ``ConflictStrategy/auto``).
+/// replay, from the `conflict_resolution` block the server returns on a
+/// successful `updateItem` it resolved under ``ConflictStrategy/auto``. It
+/// arrives with a `200`, not after a `409`: the server resolves inside the
+/// write's own transaction.
 public struct ConflictAutoMergedPayload: Sendable, Hashable {
     /// The original item the client tried to update. Stable across retries.
     public let itemId: String

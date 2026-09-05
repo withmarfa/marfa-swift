@@ -733,7 +733,8 @@ private actor HoldsFirstReplayTransport: Transport {
 
     func requestWithConflict<T: Decodable & Sendable>(
         method: HTTPMethod, path: String,
-        body: (any Encodable & Sendable)?, query: [(String, String)]?
+        body: (any Encodable & Sendable)?, query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         .success(try await request(method: method, path: path, body: body, query: query))
     }

@@ -14,7 +14,8 @@
     "weekly_snapshot_days",
     "max_versions",
     "feed_days",
-    "item_count"
+    "item_count",
+    "requested_version"
   ],
   "types": [
     {
@@ -209,6 +210,28 @@
         "current": "ConflictSnapshot",
         "ancestor": "ConflictSnapshot",
         "merge_policy": "MergePolicy"
+      }
+    },
+    {
+      "name": "AncestorUnavailableResponse",
+      "pointer": "/paths/~1items~1{id}/patch/responses/409/content/application~1json/schema/anyOf/1",
+      "conformances": [
+        "Codable",
+        "Sendable"
+      ],
+      "fieldOverrides": {
+        "current": "ConflictSnapshot"
+      }
+    },
+    {
+      "name": "ConflictResolution",
+      "pointer": "/paths/~1items~1{id}/patch/responses/200/content/application~1json/schema/properties/conflict_resolution",
+      "conformances": [
+        "Codable",
+        "Sendable"
+      ],
+      "fieldOverrides": {
+        "strategy": "[String: MergePolicyStrategy]"
       }
     },
     {

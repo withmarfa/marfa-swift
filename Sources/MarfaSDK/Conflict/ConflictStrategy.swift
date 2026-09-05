@@ -18,10 +18,18 @@ import Foundation
 /// on a synced client the write lands locally and is queued, so the closure
 /// is never what resolves the collision. The replay is.
 public enum ConflictStrategy: String, Codable, Sendable {
-    /// Auto-merge non-conflicting fields. For conflicting fields, follow
-    /// the type's `merge_policy` (server-resolved, embedded in the 409
-    /// response): `last_writer_wins` keeps the server's value; `keep_both_copies`
-    /// spawns a sibling item tagged `conflicted-copy`. Retries up to 3 times.
+    /// **Ask the server to resolve**, which it does inside this write's own
+    /// transaction by the type's `merge_policy`: a `last_writer_wins` field
+    /// takes this write's value, and a `keep_both_copies` field leaves the
+    /// server's value on the item while the losing value lands on a sibling
+    /// tagged ``conflictedCopyTag``. What it did comes back on the response
+    /// and reaches an app as ``SyncEvent/conflictAutoMerged``.
+    ///
+    /// **The device does not merge and does not retry a conflict.** A `409`
+    /// that comes back anyway is one the server could not resolve rather than
+    /// one it declined, and it is thrown. The one thing retried here is a
+    /// write refused because history no longer retains the version it named:
+    /// that rebases onto the version the server does hold and goes again.
     case auto
 
     /// Throw `ConflictError` immediately, letting the caller handle resolution.
@@ -55,7 +63,9 @@ public struct ConflictData: Sendable {
     public let clientPatch: [String: JSONValue]
 
     /// The type's resolved merge policy, as emitted by the server in the 409
-    /// response. The SDK falls back to last-writer-wins per field when absent.
+    /// response, for a caller resolving it by hand. Nothing in the kit reads
+    /// it any more: `.auto` is resolved by the server, and `.manual` and
+    /// `.callback` hand the whole envelope to the caller.
     public let mergePolicy: MergePolicy?
 
     /// The SDK builds these; an app only reads them. Exposed to test support
