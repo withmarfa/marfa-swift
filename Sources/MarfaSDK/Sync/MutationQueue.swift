@@ -878,39 +878,6 @@ public actor MutationQueue {
 
     // MARK: - Sync state (Last-Event-ID cursor)
 
-    /// Claims the store for an origin, or refuses if it is already somebody
-    /// else's.
-    ///
-    /// **Stamped on first use rather than at creation**, because a store built
-    /// in local mode has no origin and may be handed one later. An unclaimed
-    /// store takes whichever origin opens it; a claimed one only opens for
-    /// that same origin.
-    ///
-    /// The comparison is on the URL's `absoluteString` as the configuration
-    /// carries it. That is deliberately literal: `https://api.marfa.so` and
-    /// `https://api.marfa.so/` are the same server and would compare unequal,
-    /// which is a false refusal — so the caller normalizes before it gets
-    /// here, and this stays the one place the value is written.
-    func claimOrigin(_ origin: String) throws {
-        guard let recorded = try loadSyncState(key: Self.originKey) else {
-            try saveSyncState(key: Self.originKey, value: origin)
-            return
-        }
-        guard recorded == origin else {
-            throw StoreIdentityMismatchError(
-                axis: .origin, recorded: recorded, found: origin
-            )
-        }
-    }
-
-    /// The origin this store belongs to, or `nil` if it has never been
-    /// claimed.
-    func claimedOrigin() throws -> String? {
-        try loadSyncState(key: Self.originKey)
-    }
-
-    static let originKey = "store_origin"
-
     func loadSyncState(key: String) throws -> String? {
         let predicate = #Predicate<SyncStateModel> { $0.key == key }
         var descriptor = FetchDescriptor<SyncStateModel>(predicate: predicate)

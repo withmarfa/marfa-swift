@@ -142,7 +142,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   **Only a writer claims**, so a read-only client cannot stamp an origin the writer never chose. A store built in local mode is unclaimed and takes whichever origin first opens it, because it has no server until it is given one.
 
-  Two spellings of one server are one origin: a trailing slash and letter case are normalized, since `ClientConfiguration` takes whatever URL a consumer passes and refusing over that would be a false refusal on a difference nobody made.
+  **Every client compares; only a writer records.** Gating both on the writer lock left a read-only client serving one server's rows through a client configured for another, which is the same failure on the read side. A reader over an unclaimed store correctly leaves it unclaimed.
+
+  **The origin is checked before the store is opened**, and it lives in a file beside the store rather than inside it — because opening runs the migration plan and, for a store this build cannot read, the fail-safe that moves it into quarantine. A check that waited for the store to be open would already have let a client with no business touching it migrate the thing. The cost of a sidecar is that a copy taking the database and not the file looks unclaimed; that is a fail-open, and it is the behaviour from before this existed.
+
+  Two spellings of one server are one origin: a trailing slash, a default port and the case of the **scheme and host** are normalized, since `ClientConfiguration` takes whatever URL a consumer passes. The path is deliberately left alone — it is case-significant, and lowercasing it collapsed `gw.example.com/TenantA` and `gw.example.com/tenanta` into one origin, which is the exact false merge this check exists to prevent arriving through the normalization written to prevent false refusals. Credentials, query and fragment are stripped rather than recorded: this value is written beside the store and interpolated into an error a consumer logs.
 
   New public types: `StoreIdentityMismatchError` and `StoreIdentityAxis`. **The space and account axes are not here** — both need a credential resolved against the server, where the origin is known offline at the moment it matters. `MarfaClient.storeOwnership(resolvedWith:)` already answers the account question for a consumer that asks.
 

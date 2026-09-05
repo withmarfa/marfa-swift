@@ -206,26 +206,32 @@ struct RetryCeilingTests {
         #expect(afterTheOutage.attemptCount == 20)
         #expect(afterTheOutage.refusalCount == 0)
 
-        // Now the first real answers the device has ever received. Four
-        // refusals is one short of the ceiling, so the row must still be
-        // replayable — and would not be if the outage had counted.
-        for _ in 0..<60 { transport.enqueueError(refusal()) }
+        // **Exactly one refusal, then nothing but outage.** A started engine
+        // drains on its own, so how many refusals land is not something this
+        // test gets to decide — and a first version enqueued sixty, watched
+        // background drains push the count past the ceiling, and failed
+        // intermittently on a row that had blocked for a perfectly good
+        // reason. Following the one refusal with network errors keeps
+        // `refusalCount` pinned at 1 while `attemptCount` climbs, which is the
+        // relationship under test.
+        transport.enqueueError(refusal())
+        for _ in 0..<60 { transport.enqueueError(offline()) }
         transport.enqueueEvents([])
         await engine.start()
-        for _ in 0..<4 { await engine.replayMutationsForTesting() }
-        // **Waits for EITHER outcome, not just the healthy one.** A wait that
-        // only admits success turns a real failure into a sixty-second
-        // timeout naming a condition rather than a property — the row blocks
-        // immediately under the defect, so the count it is waiting for never
-        // arrives. Admitting the blocked state too means the assertion below
-        // is what reports, in milliseconds, with the reason.
-        try await SyncEngineTestKit.awaitCondition(description: "the refusals settled") {
+        await engine.replayMutationsForTesting()
+
+        // Waits for EITHER outcome. A wait admitting only success turns a real
+        // failure into a sixty-second timeout naming a condition rather than a
+        // property, because the row blocks immediately under the defect and
+        // the count being waited for never arrives.
+        try await SyncEngineTestKit.awaitCondition(description: "the refusal settled") {
             let row = try await queue.fetchAll().first
-            return row?.state == .blocked || (row?.refusalCount ?? 0) >= 4
+            return row?.state == .blocked || (row?.refusalCount ?? 0) >= 1
         }
 
         let row = try #require(await queue.fetchAll().first)
         #expect(row.state != .blocked, "an outage must not spend the refusal budget")
+        #expect(row.refusalCount == 1, "one refusal, however many attempts")
         #expect(row.attemptCount > 20, "and the displayed count kept counting")
         await engine.stop()
     }
