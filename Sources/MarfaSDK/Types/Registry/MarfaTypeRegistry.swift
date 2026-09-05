@@ -49,6 +49,74 @@ public struct MarfaTypeRegistry: Sendable {
         MarfaTypeRegistry(definitions: definitions.merging(overlay) { _, new in new })
     }
 
+    /// Every definition flattened against the graph, the way the server
+    /// flattens one when it is asked for it.
+    ///
+    /// **`GET /types` answers with schemas as declared**, so a type reaching
+    /// the device through the cache carries its own fields and a `parent` id
+    /// and nothing more. A validator run against that refuses nothing a
+    /// parent required, which is the safe direction but not the server's
+    /// answer — and it fails in a second, less obvious way: a cached copy of
+    /// a *platform* type overlays the generated one, and since the generated
+    /// set is flattened at build time, one successful refresh would otherwise
+    /// replace resolved definitions with declared ones and quietly stop
+    /// checking everything inherited.
+    ///
+    /// The order mirrors the server's exactly: seed the universal fields,
+    /// then merge the chain from the root down, so a child overrides its
+    /// parent and any type may override a universal. Idempotent, so running
+    /// it over the already-flat platform set changes nothing.
+    ///
+    /// A cycle or a chain past ``maxResolutionDepth`` resolves to what was
+    /// reached before the walk stopped rather than throwing. A malformed
+    /// graph arriving from a server is not a reason to refuse every write on
+    /// the device.
+    public func resolved() -> MarfaTypeRegistry {
+        MarfaTypeRegistry(
+            definitions: definitions.mapValues { definition in
+                var fields = Self.universalFields
+                for ancestor in chain(from: definition) {
+                    fields.merge(ancestor.fields) { _, nearer in nearer }
+                }
+                return MarfaTypeDefinition(
+                    id: definition.id,
+                    parent: definition.parent,
+                    fields: fields,
+                    titleField: definition.titleField,
+                    bodyField: definition.bodyField,
+                    schemaVersion: definition.schemaVersion
+                )
+            }
+        )
+    }
+
+    /// The inheritance chain root-first, so a later entry overrides an
+    /// earlier one.
+    private func chain(from definition: MarfaTypeDefinition) -> [MarfaTypeDefinition] {
+        var chain: [MarfaTypeDefinition] = [definition]
+        var seen: Set<String> = [definition.id]
+        var current = definition.parent
+        while let parentId = current, seen.count < Self.maxResolutionDepth {
+            guard let parent = definitions[parentId], seen.insert(parentId).inserted else { break }
+            chain.insert(parent, at: 0)
+            current = parent.parent
+        }
+        return chain
+    }
+
+    /// Fields every type carries whether it declares them or not, matching
+    /// the server's own universal set. A type that declares one of these
+    /// overrides it, which is why they are the seed rather than an overlay.
+    static let universalFields: [String: MarfaFieldDefinition] = [
+        "attachments": MarfaFieldDefinition(type: .array),
+        "links": MarfaFieldDefinition(type: .array),
+    ]
+
+    /// How far a resolution walk goes before it gives up. The server carries
+    /// the same backstop for the same reason: a registry assembled from a
+    /// space's own types can hold a cycle.
+    static let maxResolutionDepth = 32
+
     // MARK: - The graph
 
     /// Whether `typeId` is `ancestorId` or descends from it.

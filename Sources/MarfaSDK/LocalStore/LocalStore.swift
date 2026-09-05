@@ -46,7 +46,7 @@ public actor LocalStore {
         date.ISO8601Format(.init(includingFractionalSeconds: true))
     }
 
-    private func now() -> String {
+    func now() -> String {
         LocalStore.iso8601(Date())
     }
 

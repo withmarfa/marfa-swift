@@ -436,10 +436,18 @@ struct MarfaStoreTests {
 
         _ = try await client.items.create(noteInput(body: "a note someone wrote"))
         _ = try await client.items.create(
-            CreateItemInput(type: "system.activity", properties: ["body": .string("a sync happened")])
+            CreateItemInput(type: "system.activity", properties: [
+                "summary": .string("a sync happened"),
+                "severity": .string("info"),
+                "connection_id": .string("conn-1"),
+            ])
         )
         _ = try await client.items.create(
-            CreateItemInput(type: "system.connection", properties: ["body": .string("an integration")])
+            CreateItemInput(type: "system.connection", properties: [
+                "kind": .string("integration"),
+                "status": .string("active"),
+                "granted_at": .string("2026-09-03T09:00:00Z"),
+            ])
         )
 
         // Waits for the first refetch to settle, which is a weaker condition
@@ -478,7 +486,10 @@ struct MarfaStoreTests {
         _ = try await client.items.create(
             CreateItemInput(
                 type: "core.note",
-                properties: ["body": .string(String(repeating: "long. ", count: 20_000))]
+                // Large, but inside the bound the server puts on a string:
+                // this test is about the query not decoding the body, and a
+                // body no server would accept would not prove that.
+                properties: ["body": .string(String(repeating: "long. ", count: 16_000))]
             )
         )
 
