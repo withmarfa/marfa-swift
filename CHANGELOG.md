@@ -7,6 +7,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [17.1.0] — 2026-09-05
+
 ### Added
 
 - **A blocked write can be discarded, which releases the item it was holding back.** `SyncEngine.discard(id:)`.
