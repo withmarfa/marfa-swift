@@ -513,6 +513,78 @@ public actor SyncEngine {
         }
     }
 
+    /// Discards a blocked write, releasing the item it was holding back.
+    ///
+    /// **A blocked row is a lock on its item, not only a write that failed.**
+    /// ``replayableRecords`` defers every later write to an item behind that
+    /// item's earliest blocked row — deliberately, because releasing them out
+    /// of order is how an edit gets lost. Exactly one reason is exempt:
+    /// ``PendingMutationBlockReason/resolverMissing`` once a resolver is
+    /// registered.
+    ///
+    /// So a row nothing can release strands the item as well as itself, and
+    /// two reasons have nothing that releases them. A spent idempotency key is
+    /// refused identically however often it is sent. And a conflict the server
+    /// declined comes back from the server's own idempotency record, because
+    /// the row's key is minted once and its body re-encodes identically — which
+    /// makes ``PendingMutationBlockReason/conflictUnresolved`` the same trap
+    /// under `.auto` and `.manual`, and that is the ordinary outcome for an
+    /// `.auto` write rather than an edge case. `.callback` escapes it, because
+    /// the resolver's answer goes out under a fresh key.
+    ///
+    /// Before this, ``retry(id:)`` and ``retryAll(reason:)`` were the whole
+    /// release surface and both put the row back into the same refusal. There
+    /// was no way to stop asking.
+    ///
+    /// **What is discarded is kept.** The row moves to the dead-letter log with
+    /// ``MarfaError/discardedByAppCode``, which is not a server code — nobody
+    /// refused this write, the app stopped asking — so an app reading that log
+    /// can tell the two apart. ``MarfaStore/queryDroppedMutations()`` is where
+    /// it surfaces.
+    ///
+    /// **Only a blocked row.** A pending one belongs to the drain, which may
+    /// already be sending it; that throws ``DiscardNotBlockedError``. A row
+    /// that is not there at all is not an error, because two taps on the same
+    /// row, and a discard racing a drain that already dropped it, both leave
+    /// the caller's intent satisfied.
+    ///
+    /// - Parameter id: the queue id, as ``PendingMutationSummary/id`` carries it.
+    public func discard(id: String) async throws {
+        guard let record = try await mutationQueue.fetchAll().first(where: { $0.id == id })
+        else { return }
+        guard record.state == .blocked else {
+            throw DiscardNotBlockedError(mutationId: id, state: record.state)
+        }
+        try await mutationQueue.recordDropped(
+            record: record,
+            droppedAt: Date(),
+            error: MarfaError(
+                code: MarfaError.discardedByAppCode,
+                message: "Discarded by the app. This write was never sent.",
+                status: 0
+            )
+        )
+        logger.log.info(
+            "sync.queue.discarded id=\(id, privacy: .public) kind=\(record.kind.rawValue, privacy: .public)"
+        )
+        // The item is free now, so anything that was waiting behind this row
+        // should go. Same shape as `retry(id:)`: a cycle already running takes
+        // them on the pass that follows, an idle engine schedules one.
+        //
+        // **Not covered by a test, and worth saying so.** Mutating these four
+        // lines away leaves the suite green, because a fixture asserts release
+        // by driving the drain itself — and `scheduleProactiveDrain` is gated
+        // on the engine running, which the test seam fakes. Observing the real
+        // scheduling wants a started engine against a transport prepared for
+        // one, which `retry(id:)` has never had either. The gap is the same
+        // shape and the same age; it is not new here.
+        if draining {
+            drainRequestedDuringCycle = true
+        } else {
+            scheduleProactiveDrain()
+        }
+    }
+
     // MARK: - Lifecycle
 
     /// Starts the sync engine. Idempotent — calling again while already running

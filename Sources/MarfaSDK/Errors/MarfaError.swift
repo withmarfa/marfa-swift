@@ -98,9 +98,21 @@ open class MarfaError: Error, @unchecked Sendable {
     /// Public for the same reason as the one above: the queue parks on this
     /// rather than retrying it, so an app showing why a write has stopped
     /// should not have to hardcode the string to recognize it. The remedy is
-    /// not a retry — the key is spent, not the write — so an app re-applies
-    /// the edit, which makes a fresh mutation carrying a fresh key.
+    /// not a retry — the key is spent, not the write. Nor is it re-applying
+    /// the edit, which this comment claimed until 17.1.0: the queue defers
+    /// every later write to an item behind that item's blocked row, so the
+    /// fresh mutation waits behind the one it was meant to route around.
+    /// ``SyncEngine/discard(id:)`` is what releases both.
     public static let idempotencyKeyReusedCode = "idempotency_key_reused"
+
+    /// The code a dead-letter row carries when the app discarded a blocked
+    /// write through ``SyncEngine/discard(id:)``.
+    ///
+    /// **Not a server code.** No server refused this write; the app stopped
+    /// asking, which is a different thing and worth being able to tell apart
+    /// when reading the dead-letter log. Everything else in that log is a
+    /// refusal somebody received.
+    public static let discardedByAppCode = "discarded_by_app"
 }
 
 extension MarfaError: LocalizedError {
@@ -223,6 +235,34 @@ public final class SchemaVersionMismatchError: MarfaError {
             message: message,
             status: 422,
             details: details
+        )
+    }
+}
+
+/// 409 — ``SyncEngine/discard(id:)`` was called on a row that is not blocked.
+///
+/// **A pending row belongs to the drain**, which may already be sending it, so
+/// discarding one races the cycle rather than cancelling it — and "I have given
+/// up on that" is not a thing anyone can mean about a write still being
+/// attempted. Only a row the engine has stopped asking about can be discarded.
+///
+/// `status` is the row's current state, so a caller that raced a drain can tell
+/// "it already went" from "it is still going".
+public final class DiscardNotBlockedError: MarfaError {
+    /// The queue id the caller named.
+    public let mutationId: String
+
+    /// What that row is doing instead of being blocked.
+    public let state: PendingMutationState
+
+    public init(mutationId: String, state: PendingMutationState) {
+        self.mutationId = mutationId
+        self.state = state
+        super.init(
+            code: "discard_not_blocked",
+            message:
+                "Mutation \(mutationId) is \(state.rawValue) rather than blocked, and only a blocked write can be discarded.",
+            status: 409
         )
     }
 }

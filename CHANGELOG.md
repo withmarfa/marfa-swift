@@ -7,6 +7,27 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Added
+
+- **A blocked write can be discarded, which releases the item it was holding back.** `SyncEngine.discard(id:)`.
+
+  **A blocked row is a lock on its item, not only a write that failed.** The replay defers every later write to an item behind that item's earliest blocked row — deliberately, because releasing them out of order is how an edit gets lost — and exactly one reason is exempt, `resolverMissing` once a resolver is registered.
+
+  So a row that nothing can release strands the item as well as itself, and **two reasons have nothing that releases them**. A spent idempotency key is refused identically however often it is sent. And a conflict the server declined comes back from the server's own idempotency record, because the row's key is minted once and its body re-encodes identically — which makes `conflictUnresolved` the same trap under `.auto` and `.manual`, and that is the ordinary outcome for an `.auto` write rather than an edge case. `.callback` escapes it, because the resolver's answer goes out under a fresh key.
+
+  Until now `retry(id:)` and `retryAll(reason:)` were the whole release surface and both put the row back into the same refusal. There was no way to stop asking.
+
+  **What is discarded is kept.** The row moves to the dead-letter log under the new `MarfaError.discardedByAppCode`, which is deliberately not a server code — nobody refused this write, the app stopped asking — so a reader can tell it from every other row in that log, all of which are refusals somebody received. It surfaces through `MarfaStore.queryDroppedMutations()`.
+
+  **Only a blocked row.** A pending one belongs to the drain, which may already be sending it, so discarding one would race the cycle rather than cancel it; that throws the new `DiscardNotBlockedError`, carrying the row's actual state so a caller who raced a drain can tell "it already went" from "it is still going". Discarding a row that is not there is not an error — two taps, or a discard racing a drain that already dropped it, both leave the caller's intent satisfied.
+
+  New public API: `SyncEngine.discard(id:)`, `DiscardNotBlockedError`, `MarfaError.discardedByAppCode`.
+
+### Fixed
+
+- **`MarfaError.idempotencyKeyReusedCode`'s documentation named a remedy that does not work.** It said an app re-applies the edit, which makes a fresh mutation carrying a fresh key. The fresh mutation is a new row under the same local id, queued after the blocked one, so the deferral holds it behind the row it was meant to route around. It names `discard(id:)` now.
+
+
 ## [17.0.0] — 2026-09-05
 
 ### Fixed
