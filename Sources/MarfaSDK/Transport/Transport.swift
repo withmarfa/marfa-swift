@@ -15,6 +15,16 @@ public protocol Transport: Sendable {
 
     /// Sends a JSON request carrying an `Idempotency-Key`.
     ///
+    /// **There is no keyed `requestWithConflict`, and that is the design
+    /// rather than an omission.** A key identifies one *request*, not one
+    /// queued row: the server fingerprints method, path, credential **and
+    /// body**, and answers a repeat carrying a different body with a `422`
+    /// rather than a replay. The conflict loop deliberately sends a different
+    /// body on every attempt — it re-reads the server's copy, resolves against
+    /// it and re-sends — so a stable key there turns a merge into a refusal.
+    /// The conflict machinery is itself the recovery for the case a key would
+    /// have covered, which is why nothing is lost by leaving it unkeyed.
+    ///
     /// **A default implementation drops the key** and forwards to
     /// ``request(method:path:body:query:)``, so an existing conformer keeps
     /// compiling and keeps behaving exactly as it did. That is a deliberate
@@ -41,17 +51,6 @@ public protocol Transport: Sendable {
         path: String,
         body: (any Encodable & Sendable)?,
         query: [(String, String)]?
-    ) async throws -> ConflictResult<T>
-
-    /// Sends a JSON request that may return a 409, carrying an
-    /// `Idempotency-Key`. Defaults to dropping the key, as the keyed
-    /// ``request(method:path:body:query:idempotencyKey:)`` does.
-    func requestWithConflict<T: Decodable & Sendable>(
-        method: HTTPMethod,
-        path: String,
-        body: (any Encodable & Sendable)?,
-        query: [(String, String)]?,
-        idempotencyKey: String?
     ) async throws -> ConflictResult<T>
 
     /// Sends a raw HTTP request and returns the response data and metadata.
@@ -105,17 +104,6 @@ public extension Transport {
         idempotencyKey: String?
     ) async throws -> T {
         try await request(method: method, path: path, body: body, query: query)
-    }
-
-    /// Default keyed `requestWithConflict`, which drops the key.
-    func requestWithConflict<T: Decodable & Sendable>(
-        method: HTTPMethod,
-        path: String,
-        body: (any Encodable & Sendable)?,
-        query: [(String, String)]?,
-        idempotencyKey: String?
-    ) async throws -> ConflictResult<T> {
-        try await requestWithConflict(method: method, path: path, body: body, query: query)
     }
 
     /// Default `eventStream` that signals unsupported. Concrete transports

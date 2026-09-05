@@ -370,9 +370,15 @@ public actor MutationQueue {
         model.sourceId = sourceId
         model.localId = localId
         model.createdAt = now
-        // Minted once, here, for every kind — this is the only door into the
-        // queue, which is what makes "the same key on every attempt" a
-        // property of the row rather than a discipline at ten call sites.
+        // Minted once, here, for every kind that comes through this door —
+        // which is what makes "the same key on every attempt" a property of
+        // the row rather than a discipline at ten call sites.
+        //
+        // `enqueueBlobUpload` builds its row directly and does not pass
+        // through here, so a blob upload carries no key. That is correct
+        // rather than missed: a blob is addressed by the hash of its own
+        // bytes, so sending it twice is already the same write, and the
+        // route is not one the server keys.
         model.idempotencyKey = UUIDv7.generateString()
         model.attemptCount = 0
         model.lastError = nil

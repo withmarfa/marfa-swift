@@ -378,6 +378,15 @@ final class URLSessionTransport: Transport {
         let requestId = UUIDv7.generateString()
         request.setValue(requestId, forHTTPHeaderField: "X-Request-ID")
 
+        // Stamped on every attempt at one queued write, and the SAME value
+        // each time — that sameness is the entire mechanism, and it is why
+        // this sits beside `X-Request-ID` rather than reusing it. That one is
+        // deliberately the opposite: a fresh value per attempt, so two
+        // attempts can be told apart in a log.
+        if let idempotencyKey {
+            request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        }
+
         if let contentType {
             request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         }

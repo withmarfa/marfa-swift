@@ -43,6 +43,13 @@ struct KeyedTransport: Transport {
         )
     }
 
+    /// **Forwarded WITHOUT the key, deliberately.** A key identifies one
+    /// request and the server fingerprints the body; the conflict loop sends a
+    /// different body on every attempt, so a stable key would turn a merge
+    /// into a `422`. Nothing routes a conflict-aware write through this
+    /// wrapper today — the replay hands that path the unwrapped transport —
+    /// and this is here so that if something ever does, it does not silently
+    /// acquire a key.
     func requestWithConflict<T: Decodable & Sendable>(
         method: HTTPMethod,
         path: String,
@@ -50,20 +57,7 @@ struct KeyedTransport: Transport {
         query: [(String, String)]?
     ) async throws -> ConflictResult<T> {
         try await base.requestWithConflict(
-            method: method, path: path, body: body, query: query, idempotencyKey: key
-        )
-    }
-
-    func requestWithConflict<T: Decodable & Sendable>(
-        method: HTTPMethod,
-        path: String,
-        body: (any Encodable & Sendable)?,
-        query: [(String, String)]?,
-        idempotencyKey: String?
-    ) async throws -> ConflictResult<T> {
-        try await base.requestWithConflict(
-            method: method, path: path, body: body, query: query,
-            idempotencyKey: idempotencyKey ?? key
+            method: method, path: path, body: body, query: query
         )
     }
 
