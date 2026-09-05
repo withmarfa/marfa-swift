@@ -85,9 +85,16 @@ struct SyncEngineRemovalTests {
     }
 
     private func storedIds(_ store: LocalStore) async throws -> Set<String> {
-        // `nil` filters is every state, so a row that only went to the bin is
-        // still counted here — this has to tell "gone" from "trashed" apart.
-        Set(try await store.fetchItems(filters: nil).data.map(\.id))
+        // **Two reads, because this has to tell "gone" from "trashed" apart
+        // and one read no longer can.** An unfiltered fetch now excludes
+        // trashed rows, matching what the server returns for the same absent
+        // parameter, so a row that only went to the bin would look removed.
+        // Asking for the bin as well is the whole of the difference.
+        let kept = try await store.fetchItems(filters: nil).data
+        let binned = try await store.fetchItems(
+            filters: ListFilters(state: .trashed)
+        ).data
+        return Set((kept + binned).map(\.id))
     }
 
     // MARK: - The re-import

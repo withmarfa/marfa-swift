@@ -26,6 +26,95 @@ struct LocalStoreTests {
         return CreateItemInput(type: "core.note", properties: props)
     }
 
+    // MARK: - State filtering matches the server
+
+    /// **The same filters must select the same rows here as at the server.**
+    /// Omitting `state` at the server excludes trashed rows and keeps archived
+    /// ones — the parameter's own description says so and a live read confirms
+    /// it. Locally no state filter was applied at all, so an app listing notes
+    /// offline saw rows in the bin that its online view had never shown it.
+    ///
+    /// Found by a live scenario that trashed a row on one device and compared
+    /// what each side then listed.
+    @Test("an unfiltered list excludes trashed rows, as the server's does")
+    func unfilteredListExcludesTrashed() async throws {
+        let store = try await makeStore()
+        let kept = try await store.createItem(noteInput(body: "kept"))
+        let binned = try await store.createItem(noteInput(body: "binned"))
+        try await store.trashItem(id: binned.id)
+
+        let listed = try await store.fetchItems(filters: ListFilters(type: "core.note"))
+        let ids = listed.data.map(\.id)
+        #expect(ids.contains(kept.id))
+        #expect(!ids.contains(binned.id), "a trashed row appeared in an unfiltered list")
+    }
+
+    /// **Archived is not trashed**, and a filter that excluded both would be
+    /// as wrong as one that excluded neither — the server keeps archived rows
+    /// in an unfiltered read, which was measured rather than assumed.
+    @Test("an unfiltered list keeps archived rows")
+    func unfilteredListKeepsArchived() async throws {
+        let store = try await makeStore()
+        let archived = try await store.createItem(noteInput(body: "archived"))
+        _ = try await store.transitionItem(id: archived.id, to: .archived)
+
+        let listed = try await store.fetchItems(filters: ListFilters(type: "core.note"))
+        #expect(listed.data.map(\.id).contains(archived.id))
+    }
+
+    /// **The capability the default's narrowing would otherwise have taken.**
+    /// "Every state in one read" was reachable before, by passing no filters
+    /// at all, and a bin view and a resuming client both need it. A single
+    /// `ItemState` cannot say `any`, so this is how it is said.
+    @Test("includeTrashed returns every state, as the server's any does")
+    func includeTrashedReturnsEveryState() async throws {
+        let store = try await makeStore()
+        let kept = try await store.createItem(noteInput(body: "kept"))
+        let binned = try await store.createItem(noteInput(body: "binned"))
+        try await store.trashItem(id: binned.id)
+        let archived = try await store.createItem(noteInput(body: "archived"))
+        _ = try await store.transitionItem(id: archived.id, to: .archived)
+
+        let all = try await store.fetchItems(
+            filters: ListFilters(type: "core.note", includeTrashed: true)
+        )
+        let ids = Set(all.data.map(\.id))
+        #expect(ids.contains(kept.id))
+        #expect(ids.contains(archived.id))
+        #expect(ids.contains(binned.id), "includeTrashed must reach the bin")
+    }
+
+    /// **A named state wins**, matching what the query string sends. Answering
+    /// a narrower request with everything would return rows the caller
+    /// deliberately excluded.
+    @Test("a named state beats includeTrashed")
+    func namedStateBeatsIncludeTrashed() async throws {
+        let store = try await makeStore()
+        let kept = try await store.createItem(noteInput(body: "kept"))
+        let binned = try await store.createItem(noteInput(body: "binned"))
+        try await store.trashItem(id: binned.id)
+
+        let onlyBin = try await store.fetchItems(
+            filters: ListFilters(type: "core.note", state: .trashed, includeTrashed: true)
+        )
+        #expect(onlyBin.data.map(\.id) == [binned.id])
+        #expect(!onlyBin.data.map(\.id).contains(kept.id))
+    }
+
+    /// Asking for trashed rows explicitly still returns them, so the change
+    /// above narrows a default rather than removing a capability.
+    @Test("asking for trashed rows explicitly still returns them")
+    func explicitTrashedFilterStillWorks() async throws {
+        let store = try await makeStore()
+        let binned = try await store.createItem(noteInput(body: "binned"))
+        try await store.trashItem(id: binned.id)
+
+        let listed = try await store.fetchItems(
+            filters: ListFilters(type: "core.note", state: .trashed)
+        )
+        #expect(listed.data.map(\.id).contains(binned.id))
+    }
+
     // MARK: - Schema / lifecycle
 
     @Test("In-memory store opens without error") func openStore() async throws {

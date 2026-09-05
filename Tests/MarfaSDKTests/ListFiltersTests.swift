@@ -7,6 +7,33 @@ struct ListFiltersTests {
 
     // MARK: - tier
 
+    /// **The remote half of the trashed-row default**, which nothing else
+    /// tested. The local store and the query string have to agree, and they
+    /// are implemented in different files by different mechanisms — one drops
+    /// a predicate clause, the other adds a parameter.
+    @Test("includeTrashed sends state=any")
+    func includeTrashedSendsAny() {
+        let params = ListFilters(type: "core.note", includeTrashed: true).toQueryParams()
+        #expect(params.contains { $0.0 == "state" && $0.1 == "any" })
+    }
+
+    /// A named state wins, because it is the narrower request. Inverting the
+    /// branch would send `any` and return rows the caller excluded.
+    @Test("a named state beats includeTrashed on the wire")
+    func namedStateWinsOnTheWire() {
+        let params = ListFilters(state: .trashed, includeTrashed: true).toQueryParams()
+        #expect(params.contains { $0.0 == "state" && $0.1 == "trashed" })
+        #expect(!params.contains { $0.0 == "state" && $0.1 == "any" })
+    }
+
+    /// Absent by default, so an ordinary list keeps the server's own default
+    /// rather than asking for everything.
+    @Test("no state parameter is sent when neither is set")
+    func noStateParameterByDefault() {
+        let params = ListFilters(type: "core.note").toQueryParams()
+        #expect(!params.contains { $0.0 == "state" })
+    }
+
     @Test("tier filter omitted when nil")
     func tierNilOmitsParam() {
         let filters = ListFilters(type: "core.note")
