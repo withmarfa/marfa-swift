@@ -305,6 +305,52 @@ public actor SyncEngine {
         }
     }
 
+    // MARK: - Rule 19, the engine reports itself
+
+    /// Whether the engine can currently reach the server.
+    ///
+    /// **Forwarded rather than left to the caller to have kept.** An app had
+    /// to hold on to the ``ConnectionStateManager`` it passed into the synced
+    /// factory in order to answer this, which meant every consumer inventing
+    /// the same piece of plumbing to reach a value the engine already had.
+    public nonisolated var connectionState: ConnectionState {
+        connectionManager.state
+    }
+
+    /// The current state, then every change to it.
+    ///
+    /// Yields immediately so a view has something to render on first draw,
+    /// rather than an empty state until the connection next changes — which,
+    /// on a device that is simply online, may be never.
+    public nonisolated var connectionStateUpdates: AsyncStream<ConnectionState> {
+        connectionManager.stateUpdates
+    }
+
+    /// The engine's account of itself: connection, outbox, last clean drain
+    /// and hydration progress.
+    ///
+    /// **Assembled on demand rather than cached**, so it cannot drift from the
+    /// store it describes. The cost is three counts against the database,
+    /// which is cheaper than the arrays a caller would otherwise fetch and
+    /// measure.
+    /// **Throws rather than defaulting when the queue cannot be read.** A
+    /// store that will not answer is not a store with nothing in it, and
+    /// returning zeroes would report `isSettled` — a green tick from a
+    /// measurement that failed. That is the same claim `MarfaClient/syncStatus`
+    /// returns `nil` to avoid making for a client with no engine, and it would
+    /// be worse here, because there *is* a queue and its contents are unknown
+    /// rather than absent.
+    public var status: SyncStatus {
+        get async throws {
+            SyncStatus(
+                connection: connectionManager.state,
+                queue: try await mutationQueue.counts,
+                lastCleanDrainAt: await lastCleanDrainAt,
+                hydration: hydrationProgress
+            )
+        }
+    }
+
     /// Timestamp of the most recent clean drain cycle — both the SSE
     /// event application and the queued-mutation replay completed
     /// without an outstanding error. Stamped from inside
@@ -752,12 +798,52 @@ public actor SyncEngine {
         }
     }
 
+    /// The most recent hydration progress, or `nil` if no import has run in
+    /// this process. Read by ``status``.
+    private(set) var hydrationProgress: HydrationProgress?
+
+    /// The server's own count of what it holds, summed across states because
+    /// the import reads every state.
+    private func statsTotal() async throws -> Int? {
+        let stats: [String: Int] = try await transport.request(
+            method: .get, path: "/items/stats", body: nil, query: nil
+        )
+        // An empty answer is not a total of zero — it is a route that told us
+        // nothing, and showing "0 of 0" while rows arrive is worse than
+        // showing no bar at all.
+        return stats.isEmpty ? nil : stats.values.reduce(0, +)
+    }
+
     /// The import itself, with no refusal and no coalescing — both belong to
     /// the callers above, which is what lets the catch-up drain first and then
     /// reach the same passes an explicit caller reaches.
     private func importPasses(pageSize: Int) async throws -> Int {
         var cursor: String? = nil
         var imported = 0
+
+        // **The denominator is bought only when it is worth buying**, which is
+        // after the first page says there is more. A page-based import knows
+        // what it has taken and nothing about what is left, so progress from
+        // pages alone is a guess that reaches nine tenths and stays there —
+        // and `GET /items/stats` answers with a count per state, which summed
+        // is the figure to show against because this import reads every state.
+        //
+        // Deferring it costs nothing and saves a request on every import that
+        // fits in one page, which is most of them and all the small ones. A
+        // progress bar for twenty rows is not worth a round trip, and the
+        // import that needs one is by definition the import with pages left to
+        // pay for it.
+        //
+        // Best effort either way: a space that will not answer this is a space
+        // that can still be imported, so progress is reported as absent rather
+        // than as a wrong number.
+        // **Cleared at the top, so a later import never reports an earlier
+        // one's numbers.** Without this a re-import that fits in one page
+        // leaves the previous fill's figures standing, and one that throws
+        // partway leaves a stalled fraction that reads exactly like an import
+        // still running.
+        hydrationProgress = nil
+        var total: Int?
         // Every id the answer mentioned. What the prune below is for: a row the
         // server purged while this device was away is absent from the answer
         // rather than changed in it, so no event describes it and nothing else
@@ -806,6 +892,19 @@ public actor SyncEngine {
                 try await localStore.upsertMetadata(pair.metadata)
                 seenItemIds.insert(pair.item.id)
                 imported += 1
+            }
+
+            // Asked for once, on learning the import will not fit in a page.
+            if total == nil, page.hasMore {
+                total = try? await statsTotal()
+            }
+
+            // Once per page, not once per row. A progress event per item on a
+            // ten-thousand-row import is ten thousand main-actor hops to move
+            // a bar by a pixel.
+            if let total {
+                hydrationProgress = HydrationProgress(imported: imported, total: total)
+                emit(.hydrationProgress(imported: imported, total: total))
             }
 
             if !page.hasMore {

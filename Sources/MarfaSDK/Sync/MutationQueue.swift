@@ -876,6 +876,46 @@ public actor MutationQueue {
         }
     }
 
+    /// The queue broken down by what a person would do about each part.
+    ///
+    /// **Counted rather than fetched.** A consumer rendering "3 unsent
+    /// changes" wants a number, and handing it three arrays to measure means
+    /// loading every payload to display none of them. `fetchCount` reaches the
+    /// database's own count instead.
+    ///
+    /// ``pendingCount`` above deliberately counts every row whatever its
+    /// state, because its caller is asking "is there anything outstanding".
+    /// This one separates them, because "2 waiting" and "2 stuck" are
+    /// different news and an app that shows one for the other is lying to
+    /// someone who could act.
+    var counts: MutationQueueCounts {
+        get throws {
+            let pending = PendingMutationState.pending.rawValue
+            let inFlight = PendingMutationState.inFlight.rawValue
+            let blocked = PendingMutationState.blocked.rawValue
+            return MutationQueueCounts(
+                pending: try modelContext.fetchCount(
+                    FetchDescriptor<PendingMutationModel>(
+                        predicate: #Predicate { $0.stateRaw == pending }
+                    )
+                ),
+                inFlight: try modelContext.fetchCount(
+                    FetchDescriptor<PendingMutationModel>(
+                        predicate: #Predicate { $0.stateRaw == inFlight }
+                    )
+                ),
+                blocked: try modelContext.fetchCount(
+                    FetchDescriptor<PendingMutationModel>(
+                        predicate: #Predicate { $0.stateRaw == blocked }
+                    )
+                ),
+                deadLettered: try modelContext.fetchCount(
+                    FetchDescriptor<DroppedMutationModel>()
+                )
+            )
+        }
+    }
+
     // MARK: - Sync state (Last-Event-ID cursor)
 
     func loadSyncState(key: String) throws -> String? {

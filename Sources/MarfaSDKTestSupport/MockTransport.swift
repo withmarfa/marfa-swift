@@ -31,6 +31,26 @@ public struct MissingMockResponseError: Error, CustomStringConvertible {
 
 private let mockTransportLogger = Logger(subsystem: "sdk.marfa", category: "transport-mock")
 
+/// A test staged responses positionally while the engine also read a route it
+/// consults for its own bookkeeping. Answering the engine would hand it the
+/// test's response, or leave the test's response for the next request — either
+/// way a silent desynchronization.
+///
+/// Stage the route explicitly with ``MockTransport/stage(_:for:)`` if the test
+/// cares about it; if it does not, the queue being empty is what tells the
+/// double nobody is watching.
+public struct IncidentalRouteNeedsStagingError: Error, CustomStringConvertible {
+    public let path: String
+    public var description: String {
+        """
+        MockTransport: the engine read \(path) while responses were queued. \
+        That route is answered from a slot of its own — stage it with \
+        stage(_:for:) if this test cares about it, so a queued response is \
+        not silently handed to the wrong request.
+        """
+    }
+}
+
 public final class MockTransport: Transport, @unchecked Sendable {
 
     public struct Call: Sendable {
@@ -73,6 +93,10 @@ public final class MockTransport: Transport, @unchecked Sendable {
     private let lock = NSLock()
     private var _calls: [Call] = []
     private var responses: [Data] = []
+
+    /// Answers keyed by path, consulted before the positional queue and never
+    /// consumed — a staged route answers every time it is asked.
+    private var staged: [String: Data] = [:]
     private var rawResponses: [(Data, HTTPURLResponse)] = []
     private var errors: [Error?] = []
     private var eventStreams: [[SSEEvent]] = []
@@ -87,6 +111,31 @@ public final class MockTransport: Transport, @unchecked Sendable {
     // MARK: - Configuration
 
     /// Queue a typed response for the next `request()` or `requestWithConflict()` call.
+    /// Routes the engine may read for its own bookkeeping rather than because
+    /// a caller asked. Answered with an empty body unless a test stages one
+    /// through ``stage(_:for:)``.
+    ///
+    /// Kept deliberately short: the point is not to make the double lenient,
+    /// it is that a positional queue cannot tell "the answer to the request I
+    /// staged" from "the answer to a request the engine happens to make", so
+    /// an incidental read consumes somebody else's response and desynchronizes
+    /// every staged sequence after it — a failure with no good diagnostic, in
+    /// tests that never mentioned the route.
+    private static let incidentalRoutes: Set<String> = ["/items/stats"]
+
+    /// Answer one path from a slot of its own rather than from the positional
+    /// queue. For a route in ``incidentalRoutes`` this is how a test that
+    /// actually cares about it says so.
+    ///
+    /// **Covers the JSON request doors only** — `request` in both its forms.
+    /// `requestWithConflict`, `rawRequest` and `rawUpload` still take the
+    /// positional queue, because nothing reads those incidentally and widening
+    /// the slot would make two mechanisms answer one call.
+    public func stage<T: Encodable>(_ response: T, for path: String) {
+        let data = try! JSONEncoder().encode(response)
+        lock.withLock { staged[path] = data }
+    }
+
     public func enqueue<T: Encodable>(_ response: T) {
         let data = try! JSONEncoder().encode(response)
         lock.withLock { responses.append(data) }
@@ -126,6 +175,18 @@ public final class MockTransport: Transport, @unchecked Sendable {
         let outcome: Dequeue<Data> = lock.withLock {
             _calls.append(Call(method: method, path: path, body: bodyData, query: query))
             if !errors.isEmpty { return .error(errors.removeFirst()) }
+            if let staged = staged[path] { return .value(staged) }
+            if Self.incidentalRoutes.contains(path) {
+                // **Refused rather than answered `{}` when a test has staged
+                // something.** Answering would leave that response in the
+                // queue for the next request — the same desynchronization this
+                // exists to prevent, with the sign reversed, and silent: a
+                // test asserting only the path would pass while testing
+                // nothing. An empty queue means nobody is watching, and the
+                // engine's own read is answered.
+                if responses.isEmpty { return .value(Data("{}".utf8)) }
+                return .error(IncidentalRouteNeedsStagingError(path: path))
+            }
             if responses.isEmpty { return .missing }
             return .value(responses.removeFirst())
         }
@@ -156,6 +217,24 @@ public final class MockTransport: Transport, @unchecked Sendable {
                 idempotencyKey: idempotencyKey
             ))
             if !errors.isEmpty { return .error(errors.removeFirst()) }
+            // **An incidental read does not eat somebody else's response.**
+            // The queue is positional, so any request the engine makes that a
+            // test did not stage consumes the answer meant for the next one it
+            // did — turning "the import asks one more question now" into a
+            // silent desynchronization of every staged sequence. A test that
+            // cares about such a route stages it and this never fires.
+            if let staged = staged[path] { return .value(staged) }
+            if Self.incidentalRoutes.contains(path) {
+                // **Refused rather than answered `{}` when a test has staged
+                // something.** Answering would leave that response in the
+                // queue for the next request — the same desynchronization this
+                // exists to prevent, with the sign reversed, and silent: a
+                // test asserting only the path would pass while testing
+                // nothing. An empty queue means nobody is watching, and the
+                // engine's own read is answered.
+                if responses.isEmpty { return .value(Data("{}".utf8)) }
+                return .error(IncidentalRouteNeedsStagingError(path: path))
+            }
             if responses.isEmpty { return .missing }
             return .value(responses.removeFirst())
         }

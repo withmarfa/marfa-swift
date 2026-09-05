@@ -9,6 +9,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **The engine reports itself, which is rule 19 and was the one rule with nothing behind it.** An app had to keep hold of the `ConnectionStateManager` it passed into the synced factory in order to answer "am I online", and had to fetch three arrays and measure them to answer "how much is outstanding". Both are on the client object now.
+
+  **Counts rather than rows.** A status line wants a number, and handing it arrays makes it load every payload to display none of them — so `MutationQueueCounts` reaches the database's own count. Pending, in-flight, blocked and dead-lettered are separate, because "2 waiting" and "2 stuck" mean opposite things to someone who could act. Dead letters are excluded from `outstanding` on purpose: a refusal is finished business, and "1 unsent change" for a write nobody will ever send again tells a person to wait for something that will not happen.
+
+  **Hydration progress against a total the server gave**, not one inferred from pages — a page-based import knows what it has taken and nothing about what is left, so progress derived from pages reaches nine tenths and stays there. The total is asked for **once, and only after the first page says there is more**: an import that fits in one page pays nothing, which is most of them and all the small ones, and the import that needs a progress bar is by definition the one with pages left to pay for it. A space that will not answer reports no progress rather than a wrong number.
+
+  **What the total cannot see, stated rather than found later:** it is a snapshot from before the import began, so a space written to during a fill can push `imported` past it. `fraction` clamps; `imported` stays honest.
+
 - **A request body now encodes to stable bytes, without which an idempotency key made things worse rather than better.** The server fingerprints method, path, credential and **body**, and refuses a key replayed with a different request. Swift's synthesized `Codable` fills a keyed container backed by a dictionary, so the same value could encode as `{"version":1,"properties":{…}}` one time and `{"properties":{…},"version":1}` the next — two different requests as far as the fingerprint is concerned.
 
   **So a replay of an unchanged write was refused as `idempotency_key_reused`.** That is worse than sending no key at all: unkeyed, a replay after a lost response merely conflicted, and the conflict machinery could settle it. Refused, it cannot succeed however often it is retried. Every keyed door was affected, which is every write door the server keys.
@@ -60,6 +68,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **`SyncStatus`, `MutationQueueCounts` and `HydrationProgress`**, reachable as `MarfaClient.syncStatus` and `SyncEngine.status`.
+- **`MarfaClient.connectionState` and `.connectionStateUpdates`**, forwarded from the engine. A client with no engine reports `.offline` and a stream that finishes rather than one that hangs a view awaiting it. **`syncStatus` is `nil` there rather than a zeroed status**, because reporting "0 pending, 0 blocked" claims a state of health nobody measured — an app showing a green tick because it forgot to build a synced client is the failure this prevents. **Both `status` and `syncStatus` throw rather than defaulting when the queue cannot be read**, for the same reason: a store that will not answer is not a store with nothing in it.
+- **`SyncEngine.connectionState` and `.connectionStateUpdates`.**
+- **`MutationQueueCounts.isSettled` and `.outstanding`**, the two derived answers a status line actually renders.
+- **`MockTransport.stage(_:for:)` and `IncidentalRouteNeedsStagingError`** in `MarfaSDKTestSupport`. **A consumer's tests can go red on this**, so it is worth the detail: the engine now reads `GET /items/stats` during a multi-page import, and the double's response queue is positional — so answering that read from the queue would hand the engine a response staged for something else. A test that stages responses *and* triggers such a read now gets a named refusal telling it to stage the route by path, rather than a silently desynchronized sequence.
+- **`SyncEvent` gains `hydrationProgress(imported:total:)`, and an exhaustive switch over it stops compiling.** Reported as the enum rather than as the case, for the same reason `storeRecovered` was below: a consumer who added no `default:` meets a build error, and naming the case alone reads like something they could ignore. Emitted once per page rather than per row.
 - **`ListFilters.includeTrashed`**, the local equivalent of the server's `state=any`, which a single `ItemState` cannot express. Without it, narrowing the unfiltered default above would have removed a capability rather than corrected one — "every state in one read" was reachable before by passing no filters at all, and a bin view and a resuming client both need it. A named `state` wins over it, because that is the narrower request.
 
 - `AncestorUnavailableError`, plus the `AncestorUnavailableResponse` wire type it decodes from and its nested `AncestorUnavailableResponseError` and `AncestorUnavailableResponseErrorCode`.

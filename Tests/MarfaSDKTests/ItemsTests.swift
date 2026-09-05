@@ -181,7 +181,11 @@ struct ItemsTests {
     func stats() async throws {
         let (client, mock) = makeClient()
         let statsData: [String: Int] = ["new": 5, "active": 10, "archived": 3, "trashed": 1]
-        mock.enqueue(statsData)
+        // Staged for its path rather than enqueued positionally: the engine
+        // reads this route for its own bookkeeping, so the double answers it
+        // with an empty body unless a test says otherwise. This is the test
+        // that says otherwise.
+        mock.stage(statsData, for: "/items/stats")
 
         let stats = try await client.items.stats()
 

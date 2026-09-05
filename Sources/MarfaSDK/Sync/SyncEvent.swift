@@ -181,6 +181,18 @@ public enum SyncEvent: Sendable {
     /// send back.
     case storeRecovered(StoreRecovery)
 
+    /// A first fill has taken `imported` of `total` rows.
+    ///
+    /// Emitted once per page rather than per row, and only when the server
+    /// answered with a count to measure against — an import that could not get
+    /// a denominator emits none of these rather than a fraction of an unknown.
+    ///
+    /// **`total` is a snapshot from before the import began**, so a space
+    /// being written to while a device fills can push `imported` past it.
+    /// `imported` is the figure to trust; the pair is progress, not an
+    /// invariant.
+    case hydrationProgress(imported: Int, total: Int)
+
     /// A blob upload has started. Fires once per upload attempt, before
     /// any bytes hit the network. `totalBytes` comes from the queued
     /// payload — the same value `BlobUploadResponse.size` returned when
