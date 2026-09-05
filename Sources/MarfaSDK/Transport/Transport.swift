@@ -13,6 +13,37 @@ public protocol Transport: Sendable {
         query: [(String, String)]?
     ) async throws -> T
 
+    /// Sends a JSON request carrying an `Idempotency-Key`.
+    ///
+    /// **There is no keyed `requestWithConflict`, and that is the design
+    /// rather than an omission.** A key identifies one *request*, not one
+    /// queued row: the server fingerprints method, path, credential **and
+    /// body**, and answers a repeat carrying a different body with a `422`
+    /// rather than a replay. The conflict loop deliberately sends a different
+    /// body on every attempt — it re-reads the server's copy, resolves against
+    /// it and re-sends — so a stable key there turns a merge into a refusal.
+    /// The conflict machinery is itself the recovery for the case a key would
+    /// have covered, which is why nothing is lost by leaving it unkeyed.
+    ///
+    /// **A default implementation drops the key** and forwards to
+    /// ``request(method:path:body:query:)``, so an existing conformer keeps
+    /// compiling and keeps behaving exactly as it did. That is a deliberate
+    /// trade and it has a cost worth stating: a transport that does not
+    /// override this gets no protection against a repeated write, because the
+    /// server cannot recognize a retry it was never told about. The SDK's own
+    /// `URLSessionTransport` and the bundled `MockTransport` both override.
+    ///
+    /// The alternative — adding the parameter to the existing requirement —
+    /// breaks every conformer, and this protocol exists partly so consumers
+    /// can inject their own.
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?,
+        idempotencyKey: String?
+    ) async throws -> T
+
     /// Sends a JSON request that may return a 409 conflict.
     /// Returns `.success` with the decoded response, or `.failure` with conflict data.
     func requestWithConflict<T: Decodable & Sendable>(
@@ -63,6 +94,18 @@ public protocol Transport: Sendable {
 }
 
 public extension Transport {
+    /// Default keyed `request`, which drops the key. See the requirement's
+    /// documentation for what that costs.
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?,
+        idempotencyKey: String?
+    ) async throws -> T {
+        try await request(method: method, path: path, body: body, query: query)
+    }
+
     /// Default `eventStream` that signals unsupported. Concrete transports
     /// (URLSessionTransport, and test-support MockTransport) override.
     func eventStream(

@@ -148,6 +148,14 @@ public struct ItemsNamespace: Sendable {
     /// captured with the queued mutation so replay applies the strategy the
     /// caller chose.
     ///
+    /// **Passing `version:` changes what a replay guarantees.** A versioned
+    /// update takes the conflict door, and that door carries no
+    /// `Idempotency-Key`: the server fingerprints the request body, and the
+    /// conflict loop deliberately sends a different one on every attempt, so a
+    /// stable key would turn a merge into a refusal. An unversioned update is
+    /// keyed. Both are correct; the versioned one relies on the conflict loop
+    /// rather than on the key to recover from a lost response.
+    ///
     /// A `.callback` strategy in synced mode resolves through the resolver
     /// registered on the client rather than the per-call closure, because a
     /// closure cannot be written to the mutation queue. Calling it with no

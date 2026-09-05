@@ -2224,6 +2224,15 @@ public actor SyncEngine {
     private func replayRecord(_ record: PendingMutationRecord, decoder: JSONDecoder) async throws -> Bool {
         let data = record.payloadJson.data(using: .utf8) ?? Data()
 
+        // Every write below goes out under this row's key, and it is applied
+        // by SHADOWING the engine's transport rather than by passing it to
+        // sixteen call sites. That is deliberate: the switch has one arm per
+        // mutation kind, and a seventeenth kind added later would compile,
+        // ship, and silently send no key — a defect invisible until a lost
+        // response duplicated somebody's data. A wrapper cannot be forgotten
+        // by a case that has not been written yet.
+        let transport = KeyedTransport(base: self.transport, key: record.idempotencyKey)
+
         switch record.kind {
 
         case .createItem:
@@ -2301,7 +2310,17 @@ public actor SyncEngine {
                     }
                 }
                 let result = try await handleConflictUpdateWithStats(
-                    transport: transport,
+                    // `self.transport`, NOT the keyed shadow above, and the
+                    // explicit `self.` is the point of the line. A key
+                    // identifies one request: the server fingerprints the body
+                    // and answers a repeat carrying a different one with a
+                    // `422`. This loop sends a different body on every attempt
+                    // by design — it re-reads the server's copy, resolves
+                    // against it, re-sends — and `keepBothFlow` inside it makes
+                    // a `POST /items` that shares nothing with the parent
+                    // `PATCH` but the row it came from. Handing any of that the
+                    // row's key turns a merge into a refusal.
+                    transport: self.transport,
                     itemId: p.id,
                     clientPatch: p.properties,
                     version: v,
