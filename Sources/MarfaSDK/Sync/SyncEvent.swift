@@ -68,6 +68,14 @@ public enum SyncEvent: Sendable {
     /// ``FullSyncStateQuery`` — use this as the "we are now syncing"
     /// signal without subscribing to
     /// ``ConnectionStateManager/stateUpdates`` directly.
+    ///
+    /// **One other site emits it, and neither clause above holds there.**
+    /// ``SyncEngine/retryAll(reason:)`` emits it on releasing a queue that was
+    /// parked on a refused credential, to say the park is over — no cycle has
+    /// started, and on an offline device none can. It is the least wrong of
+    /// the states available: a person who has just signed in seeing "syncing"
+    /// until connectivity returns is a much cheaper inaccuracy than one still
+    /// being told to sign in again.
     case syncing
 
     /// A sync round failed: the cycle could not drain. The error is the last

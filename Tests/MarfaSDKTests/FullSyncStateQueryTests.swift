@@ -460,7 +460,7 @@ struct FullSyncStateQueryTests {
     /// defect in the other direction.
     @Test("releasing an unrelated reason does not announce a release")
     func releasingAnUnrelatedReasonAnnouncesNothing() async throws {
-        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let (_, queue, _, connManager, engine) = try await makeFixture()
         let events = engine.events
 
         var input = CreateItemInput(type: "core.note", properties: ["body": .string("conflicted")])
@@ -470,7 +470,6 @@ struct FullSyncStateQueryTests {
         try await queue.recordBlocked(
             id: rows[0].id, reason: .conflictUnresolved, error: "settle me"
         )
-        _ = transport
         await connManager.applyStateForTesting(.offline)
 
         #expect(try await engine.retryAll(reason: .conflictUnresolved) == 1)

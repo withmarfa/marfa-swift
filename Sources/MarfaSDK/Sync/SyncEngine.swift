@@ -1145,8 +1145,22 @@ public actor SyncEngine {
         // *other* reason on a queue that was never parked would announce a
         // release of something that never happened, moving an app off a
         // `.synced` that was correct.
+        //
+        // **A queue that cannot be read announces the release anyway**, which
+        // is the opposite of what `fullSyncState` does with the same read a
+        // few lines up, and is deliberate rather than an oversight. The
+        // release has already happened — `retryAll` on the queue is
+        // unconditional and `released > 0` proves it — so this read only
+        // narrows the case where something re-parked inside the `await`.
+        // Failing toward announcing fails toward *not* telling somebody who
+        // has just signed in to sign in again, which is the whole point of the
+        // announcement.
+        //
+        // `try?` already flattens here, so there is no second optional to
+        // collapse; an earlier spelling had a `?? nil` that read as a decision
+        // about the throwing case and encoded nothing.
         if reason == .credentialRefused,
-            ((try? await mutationQueue.counts.blocked[.credentialRefused]) ?? nil) == nil
+            (try? await mutationQueue.counts.blocked[.credentialRefused]) == nil
         {
             emit(.syncing)
         }
