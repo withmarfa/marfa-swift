@@ -123,6 +123,15 @@ public struct PendingMutationSummary: Sendable, Identifiable, Equatable {
         case .blocked:
             // A row in this state always carries a reason: `toRecord()`
             // supplies one whether or not the stored value could be read.
+            //
+            // **This default is unreachable and is a poor place to assert
+            // against.** It looks defensive and is a second answer for a
+            // question the record has already answered: with `toRecord()`
+            // returning `nil` for every blocked row, two suites still passed
+            // because this filled the reason in for them. It stays because
+            // the alternative is a force unwrap or a public case nobody
+            // needs — but a test about a *stored* reason reads the queue,
+            // never this projection.
             status = .blocked(
                 reason: record.blockedReason ?? .retriesExhausted,
                 attemptCount: record.attemptCount,

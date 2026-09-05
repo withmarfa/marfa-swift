@@ -7,7 +7,8 @@ import SwiftData
 /// - V1 (5.0.x): initial versioned schema.
 /// - V2 (5.2.0): adds a dropped-mutation table. Additive, so the stage is
 ///   lightweight.
-/// - V3: adds `space_id` to the item model and the cached-types table.
+/// - V3: adds `space_id` to the item model, the cached-types table, and
+///   `blocked_reason` to the pending-mutation model.
 ///   Additive on both counts, so the stage is lightweight again.
 ///
 /// ## Where the model classes live

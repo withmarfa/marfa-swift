@@ -21,6 +21,48 @@ struct BlockReasonColumnTests {
         return (queue, container, id)
     }
 
+    /// **Every case, read off the row rather than through `toRecord()`.**
+    /// The accessor's fallback resolves an unreadable value to
+    /// `retriesExhausted`, so a build that stored garbage for exactly that
+    /// case would be indistinguishable from one that stored it correctly —
+    /// and every existing assertion went through that accessor. Reading the
+    /// column is the only way the write itself is under test.
+    @Test("every reason round-trips through the column as itself",
+          arguments: PendingMutationBlockReason.allCases)
+    func everyReasonRoundTrips(_ reason: PendingMutationBlockReason) async throws {
+        let (queue, container, id) = try await enqueued()
+        try await queue.recordBlocked(id: id, reason: reason, error: "why")
+
+        let context = ModelContext(container)
+        let model = try #require(
+            context.fetch(FetchDescriptor<PendingMutationModel>()).first { $0.id == id }
+        )
+        #expect(model.blockedReason == reason.rawValue)
+        #expect(model.lastError == "why")
+    }
+
+    /// The gate `toRecord()` applies, which nothing pinned: change it and
+    /// every `.pending` row starts reporting a reason through a public field.
+    ///
+    /// It is reachable rather than theoretical. The engine re-admits a
+    /// `resolverMissing` row the moment a resolver registers, without clearing
+    /// the block, so a transient failure after that leaves a `.pending` row
+    /// carrying a reason — invisible only because of this gate.
+    @Test("a row that is not blocked reports no reason, whatever the column holds")
+    func anUnblockedRowReportsNoReason() async throws {
+        let (queue, container, id) = try await enqueued()
+        let context = ModelContext(container)
+        let model = try #require(
+            context.fetch(FetchDescriptor<PendingMutationModel>()).first { $0.id == id }
+        )
+        model.blockedReason = PendingMutationBlockReason.resolverMissing.rawValue
+        model.state = .pending
+        try context.save()
+
+        let record = try #require(await queue.fetchAll().first { $0.id == id })
+        #expect(record.blockedReason == nil)
+    }
+
     @Test("the reason is in the store, not in the writer's memory")
     func reasonIsPersisted() async throws {
         let (queue, container, id) = try await enqueued()
@@ -34,18 +76,6 @@ struct BlockReasonColumnTests {
         let record = try #require(await reopened.fetchAll().first { $0.id == id })
         #expect(record.blockedReason == .resolverMissing)
         #expect(record.lastError == "no resolver")
-    }
-
-    /// The message no longer carries a prefix a consumer has to strip, which
-    /// is the whole reason the smuggling was worth removing.
-    @Test("the message is the message, with nothing stamped on the front")
-    func messageIsNotDecorated() async throws {
-        let (queue, _, id) = try await enqueued()
-        try await queue.recordBlocked(id: id, reason: .conflictUnresolved, error: "409 from the server")
-
-        let record = try #require(await queue.fetchAll().first { $0.id == id })
-        #expect(record.lastError == "409 from the server")
-        #expect(record.lastError?.contains("[blocked:") == false)
     }
 
     /// The one property the string form had that had to be kept. A build
@@ -91,5 +121,77 @@ struct BlockReasonColumnTests {
         )
         #expect(model.blockedReason == nil)
         #expect(model.state == .pending)
+    }
+
+    // MARK: - The rows a shipped build already wrote
+
+    /// `v16.0.0` ships schema V2 and wrote the reason as a
+    /// `[blocked:<reason>] message` prefix inside `lastError`. Those rows are
+    /// on devices now, and the V2 to V3 migration adds the column as NULL — so
+    /// reading the column alone loses the reason on upgrade.
+    ///
+    /// **It loses it in the worst direction.** A `resolverMissing` row read as
+    /// `retriesExhausted` stops auto-replaying when a resolver is registered,
+    /// which is the recovery `16.0.0` advertised, and the raw prefix starts
+    /// appearing in front of the error text an app shows a person.
+    @Test("a row written before the column reports its reason and a clean message")
+    func aLegacyRowIsStillReadable() async throws {
+        let (queue, container, id) = try await enqueued()
+
+        // Exactly what `16.0.0` left behind: the prefix in the message, no
+        // column.
+        let context = ModelContext(container)
+        let model = try #require(
+            context.fetch(FetchDescriptor<PendingMutationModel>()).first { $0.id == id }
+        )
+        model.lastError = "[blocked:resolverMissing] no conflict resolver registered"
+        model.blockedReason = nil
+        model.state = .blocked
+        try context.save()
+
+        let record = try #require(await queue.fetchAll().first { $0.id == id })
+        #expect(record.blockedReason == .resolverMissing)
+        #expect(record.lastError == "no conflict resolver registered")
+    }
+
+    /// Retrying such a row scrubs the prefix, because nothing else ever
+    /// rewrites that column — left alone it would sit in front of the error
+    /// text for ever.
+    @Test("retrying a legacy row scrubs the prefix from its message")
+    func retryingALegacyRowScrubsThePrefix() async throws {
+        let (queue, container, id) = try await enqueued()
+        let context = ModelContext(container)
+        let model = try #require(
+            context.fetch(FetchDescriptor<PendingMutationModel>()).first { $0.id == id }
+        )
+        model.lastError = "[blocked:conflictUnresolved] the server refused it"
+        model.state = .blocked
+        try context.save()
+
+        try await queue.clearBlock(id: id)
+
+        let record = try #require(await queue.fetchAll().first { $0.id == id })
+        #expect(record.lastError == "the server refused it")
+    }
+
+    /// The distinction the fallback turns on, and the reason `nil` and
+    /// unrecognized cannot share a branch: an unreadable token means a newer
+    /// build wrote something this one cannot name, while a missing column on a
+    /// blocked row means a legacy row whose answer is in the message.
+    @Test("a blocked row with neither a column nor a prefix reads as retries exhausted")
+    func aBlockedRowWithNoReasonAnywhereFallsBack() async throws {
+        let (queue, container, id) = try await enqueued()
+        let context = ModelContext(container)
+        let model = try #require(
+            context.fetch(FetchDescriptor<PendingMutationModel>()).first { $0.id == id }
+        )
+        model.lastError = "something went wrong"
+        model.blockedReason = nil
+        model.state = .blocked
+        try context.save()
+
+        let record = try #require(await queue.fetchAll().first { $0.id == id })
+        #expect(record.blockedReason == .retriesExhausted)
+        #expect(record.lastError == "something went wrong")
     }
 }

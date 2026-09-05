@@ -100,3 +100,42 @@ extension PendingMutationBlockReason {
         return attemptCount + 1 >= ceiling ? .retriesExhausted : nil
     }
 }
+
+// MARK: - The prefix a shipped build wrote
+
+/// Reads the `[blocked:<reason>] message` form that `v16.0.0` stored inside
+/// `lastError`, before the reason had a column.
+///
+/// **This is read-only and stays read-only.** Nothing writes the prefix any
+/// more; this exists because `v16.0.0` ships schema V2 and its blocked rows
+/// are on devices now, and the V2 to V3 migration adds the new column as
+/// NULL. Without it an upgrade loses the reason, and loses it in the worst
+/// direction: a `resolverMissing` row read as `retriesExhausted` stops
+/// auto-replaying when a resolver is registered, which is the recovery
+/// `16.0.0` advertised. The raw prefix would also start appearing in front of
+/// the error text an app shows a person.
+///
+/// It can be deleted once no store written by `16.x` can still be opened,
+/// which is not a date this file can know.
+enum LegacyBlockedPrefix {
+    private static let open = "[blocked:"
+    private static let close = "] "
+
+    /// The reason a legacy message carries, or `nil` if it carries none.
+    static func reason(_ stored: String?) -> PendingMutationBlockReason? {
+        guard let stored, stored.hasPrefix(open), let end = stored.range(of: close) else {
+            return nil
+        }
+        let token = String(stored[stored.index(stored.startIndex, offsetBy: open.count)..<end.lowerBound])
+        return PendingMutationBlockReason(rawValue: token)
+    }
+
+    /// The message without its prefix. A string that never had one is
+    /// returned unchanged, which is every string this build writes.
+    static func strip(_ stored: String?) -> String? {
+        guard let stored, stored.hasPrefix(open), let end = stored.range(of: close) else {
+            return stored
+        }
+        return String(stored[end.upperBound...])
+    }
+}

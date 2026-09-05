@@ -97,7 +97,8 @@ struct SyncEngineBlockedMutationTests {
         if case let .blocked(reason, attemptCount, lastError) = blocked.status {
             #expect(reason == .resolverMissing)
             #expect(attemptCount == 1)
-            // The message survives the encoding that carries the reason.
+            // The message is the message, with the reason beside it in its
+            // own column rather than stamped onto the front.
             #expect(lastError.contains("no resolver is registered"))
         } else {
             Issue.record("expected .blocked, got \(blocked.status)")
@@ -685,10 +686,10 @@ struct SyncEngineBlockedMutationTests {
             )
         }
 
-        // A fresh container over the same file, as a relaunch would build. The
-        // state is a raw value in an existing column and the reason rides in
-        // the message beside it, so both have to survive a round trip through
-        // SQLite rather than only through one process's memory.
+        // A fresh container over the same file, as a relaunch would build.
+        // The state and the reason are both raw values in their own columns,
+        // so both have to survive a round trip through SQLite rather than
+        // only through one process's memory.
         let reopened = try MarfaModelContainer.make(path: path)
         let queue = await Task.detached { MutationQueue(modelContainer: reopened) }.value
         let record = try #require(await queue.fetchAll().first)
@@ -698,7 +699,7 @@ struct SyncEngineBlockedMutationTests {
             PendingMutationSummary.make(from: record).status {
             #expect(reason == .conflictUnresolved)
             #expect(attemptCount == 1)
-            // Stripped on the way out: the prefix is storage, not a message.
+            // The message, unmodified: nothing is stamped onto it any more.
             #expect(lastError == "code=version_conflict status=409")
         } else {
             Issue.record("expected .blocked after reopening the store")
