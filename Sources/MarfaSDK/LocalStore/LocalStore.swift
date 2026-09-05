@@ -152,12 +152,19 @@ public actor LocalStore {
         // whole one.
         let datesNeedSettling = filters?.timestampAfter != nil || filters?.timestampBefore != nil
 
+        // Resolved once for both descriptor calls below. A listing selects a
+        // subtree rather than one identifier, and the declared half of that
+        // subtree lives in the store — so it is read here, where every caller
+        // including the reactive queries passes through, rather than at each
+        // of them.
+        let subtree = try filters?.type.map { try Self.subtree(in: modelContext, for: $0) }
+
         guard !required.isEmpty || datesNeedSettling else {
             // One row past the limit, so truncation is known without a second
             // count query. The extra row is dropped before the caller sees it.
             var probe = filters
             if let limit = filters?.limit { probe?.limit = limit + 1 }
-            let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe))
+            let models = try modelContext.fetch(Self.makeItemsDescriptor(filters: probe, subtree: subtree))
             let page = Self.page(models, limit: filters?.limit)
             return (page.rows, page.hasMore, offset)
         }
@@ -165,7 +172,7 @@ public actor LocalStore {
         var unwindowed = filters
         unwindowed?.limit = nil
         unwindowed?.cursor = nil
-        var candidates = try modelContext.fetch(Self.makeItemsDescriptor(filters: unwindowed))
+        var candidates = try modelContext.fetch(Self.makeItemsDescriptor(filters: unwindowed, subtree: subtree))
         candidates = Self.applyDateBounds(candidates, filters: filters)
         if !required.isEmpty {
             candidates = try filterByTags(in: modelContext, candidates, required: required)
@@ -1010,13 +1017,29 @@ public actor LocalStore {
     /// enum, the expression is dropped here, and an unnarrowed set comes back
     /// with nothing to indicate it. Those three are a defect rather than a
     /// documented limitation, and they are filed as one.
-    nonisolated static func makeItemsDescriptor(filters: ListFilters?) -> FetchDescriptor<MarfaItemModel> {
+    nonisolated static func makeItemsDescriptor(
+        filters: ListFilters?,
+        subtree: TypeSubtree? = nil
+    ) -> FetchDescriptor<MarfaItemModel> {
         // Captured-value short-circuit pattern (predicate convention 8):
         // SwiftData has no runtime `Predicate<T>` composition, so we
         // capture booleans alongside string defaults and let the
         // predicate engine optimize constant-true branches away.
-        let typeFilter = filters?.type ?? ""
-        let hasTypeFilter = filters?.type != nil
+        // A `type` filter selects a SUBTREE, not one identifier — see
+        // `TypeSubtree`. The namespace half costs nothing and is always
+        // applied; the declared half arrives only when a caller resolved it
+        // against a registry, and is empty otherwise.
+        let resolved = filters?.type.map { subtree ?? TypeSubtree(filter: $0) }
+        let typeFilter = resolved?.root ?? ""
+        let hasTypeFilter = resolved.map { !$0.isGlobal } ?? false
+        // `starts(with:)` on the root plus a dot, never on the root alone:
+        // `core.note` must not reach `core.notebook`, and the dot is the only
+        // thing that separates a child from a sibling sharing a prefix.
+        let typeNamespace = typeFilter + "."
+        // The root travels WITH the declared extras rather than as its own
+        // comparison. One captured set and one prefix test is two disjuncts
+        // instead of three, and this predicate has no type-checker budget to
+        // spare — the comments above are the scars of finding that out.
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
         let lowerBound = filters?.timestampAfter ?? ""
@@ -1048,7 +1071,14 @@ public actor LocalStore {
         // so the leak was intermittent and partly hidden by a second defect
         // rather than absent.
         let systemPrefix = "system."
-        let excludeSystemTypes = !(filters?.type?.hasPrefix(systemPrefix) ?? false)
+        // Scrubbed of `system.` unless the filter names one, because the
+        // typed branch below carries no separate system exclusion.
+        var subtreeIds = (resolved?.declaredExtras ?? []).union([typeFilter])
+        if !typeFilter.hasPrefix(systemPrefix) {
+            subtreeIds = subtreeIds.filter { !$0.hasPrefix(systemPrefix) }
+        }
+        let typeSet = subtreeIds
+
 
         // The date bounds narrow here but do not decide here. The server
         // compares `COALESCE(timestamp, created_at)`, and a row that reached
@@ -1062,14 +1092,40 @@ public actor LocalStore {
         // `createdAt` afterwards. Permissive rather than strict on purpose: a
         // row wrongly excluded here cannot be recovered later, whereas one
         // wrongly included is dropped a moment later at no cost.
-        let predicate = #Predicate<MarfaItemModel> { item in
-            (!hasTypeFilter  || item.type == typeFilter) &&
-            (!hasStateFilter || item.stateRaw == stateFilter) &&
-            (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
-            (!hasUpperBound || item.timestamp <= upperBound) &&
-            (!hasTierFilter  || item.tierRaw == tierFilter) &&
-            (!hasSourceFilter || item.source == sourceFilter) &&
-            (!excludeSystemTypes || !item.type.starts(with: systemPrefix))
+        // TWO predicates, chosen here rather than one predicate with a
+        // `hasTypeFilter` short-circuit, and this is a compiler constraint
+        // rather than a preference. Narrowing to a subtree needs two terms —
+        // the set, and the namespace — where matching one identifier needed
+        // one, and `#Predicate` will not type-check the combined expression:
+        // it is already six conjuncts deep and the macro gives up. Splitting
+        // is what the compiler asks for when it does, and each branch reads
+        // more simply than the merged one did.
+        //
+        // The `system.` exclusion lives only in the untyped branch. With a
+        // type filter present it is redundant: the filter narrows to its own
+        // subtree, so it either names `system.` outright or cannot reach a
+        // system row, and `typeSet` is scrubbed above for the one case that
+        // could — a declared child of an ordinary type that happens to be
+        // named under `system.`.
+        let predicate: Predicate<MarfaItemModel>
+        if hasTypeFilter {
+            predicate = #Predicate<MarfaItemModel> { item in
+                (typeSet.contains(item.type) || item.type.starts(with: typeNamespace)) &&
+                (!hasStateFilter || item.stateRaw == stateFilter) &&
+                (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
+                (!hasUpperBound || item.timestamp <= upperBound) &&
+                (!hasTierFilter || item.tierRaw == tierFilter) &&
+                (!hasSourceFilter || item.source == sourceFilter)
+            }
+        } else {
+            predicate = #Predicate<MarfaItemModel> { item in
+                (!hasStateFilter || item.stateRaw == stateFilter) &&
+                (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
+                (!hasUpperBound || item.timestamp <= upperBound) &&
+                (!hasTierFilter || item.tierRaw == tierFilter) &&
+                (!hasSourceFilter || item.source == sourceFilter) &&
+                !item.type.starts(with: systemPrefix)
+            }
         }
 
         var descriptor = FetchDescriptor<MarfaItemModel>(

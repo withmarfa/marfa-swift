@@ -9,6 +9,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **A local query naming a parent type now finds the rows stored under its subtypes, as the server has always done.** `?type=core.entity` returns `core.entity.person` on the server and returned only `core.entity` on a device — no error, just a short answer, on a filter the caller had every reason to think was understood. Listing and offline search both take the rule, because those are the two places the server applies it and the only two a local store should.
+
+  **A subtree has two roots, not one, and resolving either alone is wrong.** The dotted identifier is a namespace and a type's `parent` is a declared lineage; registration has never required a child's id to start with its parent's, so `user.annotated_note` may declare `core.note` as its parent and sit outside `core.note.*` entirely. Resolving names alone missed it. Resolving declarations alone would break the other half, since nothing declares a parent of `google` yet `google.*` plainly means the Google types. Both halves are now resolved and each is pinned by its own test.
+
+  **The declared half needs the cached graph and is empty without it**, which is the same answer a read gave before a registry existed rather than a wrong one. The namespace half needs nothing and holds on a device that has never reached a server. `core.entity` and `core.entity.*` are synonyms, and `*` means every type — again matching the server.
+
+  Descent stops at a dot, so `core.note` does not reach `core.notebook`.
+
 - **`ListFilters.since` and `.until` are now `timestampAfter` and `timestampBefore`, and they send the names the server takes.** This is a shipped defect rather than a tidy-up: the server renamed those query parameters and refuses the old ones with a `400` naming their replacement, so **every date-bounded remote read this kit made was refused**, and had been since the rename deployed. `timestamp_after` and `timestamp_before` appeared nowhere in the kit. The same two fields on `BulkActionFilter` are renamed with it.
 
   Local resolution was unaffected — a client with a store answers a date-filtered read from the store, which is why the defect was invisible where most callers meet it. It bit on every remote path.

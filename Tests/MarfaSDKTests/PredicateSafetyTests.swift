@@ -226,6 +226,41 @@ struct PredicateSafetyTests {
         #expect(none.isEmpty)
     }
 
+    /// The typed branch of the items descriptor, which is a **separate**
+    /// `#Predicate` from the untyped one and so gets no coverage from the test
+    /// above. Both of its terms are exercised: the captured-set membership
+    /// that reaches a declared child named outside the namespace, and the
+    /// prefix walk that reaches one named inside it.
+    @Test("Subtree narrowing composes without crashing") func subtreeDescriptorShapes() async throws {
+        let (context, _) = try await seededContext()
+
+        let subtree = TypeSubtree(root: "core.task", declaredExtras: ["user.chore"])
+        let matched = try context.fetch(
+            LocalStore.makeItemsDescriptor(
+                filters: ListFilters(type: "core.task"), subtree: subtree
+            )
+        )
+        #expect(matched.map(\.id) == ["c"])
+
+        // A root nothing is stored under, so the assertion above cannot be
+        // satisfied by a predicate that stopped narrowing.
+        let empty = try context.fetch(
+            LocalStore.makeItemsDescriptor(
+                filters: ListFilters(type: "no.such.root"),
+                subtree: TypeSubtree(root: "no.such.root", declaredExtras: ["also.nothing"])
+            )
+        )
+        #expect(empty.isEmpty)
+
+        // And the search descriptor's typed branch, likewise its own predicate.
+        let searched = try context.fetch(
+            LocalStore.makeSearchDescriptor(
+                filters: SearchFilters(type: "core.task"), subtree: subtree
+            )
+        )
+        #expect(searched.map(\.id).contains("c"))
+    }
+
     // MARK: - Range comparisons (used by the timestamp bounds)
 
     @Test("String >= comparison filters correctly") func stringGreaterEqual() async throws {

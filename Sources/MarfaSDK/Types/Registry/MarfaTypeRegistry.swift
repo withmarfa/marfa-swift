@@ -148,6 +148,52 @@ public struct MarfaTypeRegistry: Sendable {
         return Set(known).union([ancestorId]).sorted()
     }
 
+    /// The types a read filter naming `rootId` reaches that its *name* cannot.
+    ///
+    /// A subtree has two roots, not one. The dotted identifier is a namespace
+    /// and the registry's `parent` is a declared lineage, and registration has
+    /// never required a child's identifier to start with its parent's — so
+    /// `user.annotated_note` may declare `core.note` as its parent and sit
+    /// outside `core.note.*` entirely. The server resolves the union of both,
+    /// and a device resolving names alone gives a short answer with no error.
+    ///
+    /// Only the ones the namespace walk misses are returned, because the
+    /// caller already matches `rootId.` by prefix and every id this set
+    /// carries has to travel into a fetch predicate as a captured collection.
+    public func declaredDescendantsOutsideNamespace(of rootId: String) -> Set<String> {
+        Self.declaredDescendantsOutsideNamespace(
+            of: rootId,
+            parents: definitions.compactMapValues(\.parent)
+        )
+    }
+
+    /// The same walk over a bare `child: parent` map.
+    ///
+    /// A store answers this from two indexed columns rather than by decoding
+    /// every cached type, and descent is the one question that needs nothing
+    /// else. Kept beside the instance method so the two cannot drift.
+    static func declaredDescendantsOutsideNamespace(
+        of rootId: String,
+        parents: [String: String]
+    ) -> Set<String> {
+        let namespace = rootId + "."
+        var found: Set<String> = []
+        for id in parents.keys where id != rootId && !id.hasPrefix(namespace) {
+            // Bounded by the number of types rather than trusted to
+            // terminate: a graph assembled from a server's custom types can
+            // carry a cycle, and a `while parent != nil` over one would hang
+            // the caller rather than answer.
+            var seen: Set<String> = [id]
+            var current = parents[id]
+            while let parent = current {
+                if parent == rootId { found.insert(id); break }
+                guard seen.insert(parent).inserted else { break }
+                current = parents[parent]
+            }
+        }
+        return found
+    }
+
     /// The fields offline search matches over, for a type.
     ///
     /// Falls back to `title` and `body` when the type names no hints, which is
