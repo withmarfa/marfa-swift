@@ -289,11 +289,20 @@ struct SyncEngineBlockedMutationTests {
         // Each is a statement about the environment rather than about the
         // write, and each clears without the app doing anything. Blocking a
         // valid write behind an outage would be the worse defect.
+        //
+        // **"Clears without the app doing anything" is the whole membership
+        // test**, and it is what a `401` failed once it was asked directly.
         let failures: [(String, Error)] = [
             ("offline", NetworkError(NSError(domain: "t", code: 0, userInfo: [NSLocalizedDescriptionKey: "offline"]))),
             ("503", MarfaError(code: "unavailable", message: "down", status: 503)),
             ("429", MarfaError(code: "rate_limited", message: "slow down", status: 429)),
-            ("401", MarfaError(code: "unauthorized", message: "stale token", status: 401)),
+            // **A `401` used to be in this list and is not any more.** It looked
+            // environmental and is not: a connectivity failure, a `5xx` and a
+            // `429` all clear on their own, while a credential the server has
+            // refused clears only when a person replaces it. Retrying it for
+            // ever left an app showing a count of unsent writes that never
+            // moved, with nothing saying what to do about it. It parks now —
+            // see `CredentialRefusedTests`.
             // Reached in production wherever the transport translates a
             // cancelled URLSession task. `stop()` cancels an in-flight replay,
             // and the throw lands in the same catch, so without the exemption a

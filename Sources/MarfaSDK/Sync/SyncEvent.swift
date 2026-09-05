@@ -167,6 +167,21 @@ public enum SyncEvent: Sendable {
     /// or local id, and `nil` for records that carry none.
     case mutationBlocked(kind: String, itemId: String?, reason: PendingMutationBlockReason)
 
+    /// Every live mutation has parked together, under one reason that is about
+    /// the client rather than about any one write. `count` is how many.
+    ///
+    /// **Today that reason is a refused credential and only that.** A `401` the
+    /// transport's single refresh did not clear refuses every queued write
+    /// equally, so draining the rest one at a time spends a request per write
+    /// to learn what the first one already said.
+    ///
+    /// This is the event an app shows a person something for. A count of
+    /// unsent writes that does not move says nothing about what to do; this
+    /// says the credential is spent, which is a thing somebody can act on.
+    /// Release the queue with ``SyncEngine/retryAll(reason:)`` once a working
+    /// credential is in place.
+    case queueParked(reason: PendingMutationBlockReason, count: Int)
+
     /// The local store could not be opened and was rebuilt empty, so this
     /// device is starting from nothing until the first import finishes.
     ///

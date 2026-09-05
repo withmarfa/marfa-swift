@@ -18,21 +18,34 @@ public struct MutationQueueCounts: Sendable, Equatable {
 
     /// Stopped, with a reason, and waiting for the app or the person. This is
     /// the count that means something is wrong.
-    public let blocked: Int
+    ///
+    /// **Split by reason rather than totaled, because what clears each one
+    /// differs.** A credential a person must replace and a conflict an app
+    /// must settle are both stopped, and one number can only say that
+    /// something is. An interface that wants the total has ``blockedTotal``.
+    public let blocked: [PendingMutationBlockReason: Int]
 
     /// Refused for good and moved to the dead-letter log. Kept rather than
     /// dropped, so it stays countable until someone dismisses it.
     public let deadLettered: Int
 
-    public init(pending: Int, inFlight: Int, blocked: Int, deadLettered: Int) {
+    public init(
+        pending: Int,
+        inFlight: Int,
+        blocked: [PendingMutationBlockReason: Int],
+        deadLettered: Int
+    ) {
         self.pending = pending
         self.inFlight = inFlight
         self.blocked = blocked
         self.deadLettered = deadLettered
     }
 
+    /// Every stopped mutation, whatever stopped it.
+    public var blockedTotal: Int { blocked.values.reduce(0, +) }
+
     /// Everything not yet acknowledged by the server, however it is faring.
-    public var outstanding: Int { pending + inFlight + blocked }
+    public var outstanding: Int { pending + inFlight + blockedTotal }
 
     /// Nothing waiting and nothing stuck. Dead letters are excluded on
     /// purpose: they are finished, and a queue that will never move again is

@@ -89,7 +89,8 @@ struct EngineReportsItselfTests {
         let counts = try await queue.counts
         #expect(counts.pending == 2)
         #expect(counts.inFlight == 3)
-        #expect(counts.blocked == 1)
+        #expect(counts.blocked[.conflictUnresolved] == 1)
+        #expect(counts.blockedTotal == 1)
         #expect(counts.deadLettered == 4)
         #expect(counts.outstanding == 6, "a dead letter is finished business, not outstanding work")
         #expect(!counts.isSettled)
@@ -106,7 +107,7 @@ struct EngineReportsItselfTests {
     /// something that will not happen.
     @Test("dead letters do not count as outstanding")
     func deadLettersAreNotOutstanding() {
-        let counts = MutationQueueCounts(pending: 0, inFlight: 0, blocked: 0, deadLettered: 3)
+        let counts = MutationQueueCounts(pending: 0, inFlight: 0, blocked: [:], deadLettered: 3)
         #expect(counts.outstanding == 0)
         #expect(counts.isSettled)
     }

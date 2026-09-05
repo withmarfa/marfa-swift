@@ -47,6 +47,30 @@ public enum PendingMutationBlockReason: String, Sendable, Equatable, CaseIterabl
     /// as the engine is willing to try. Nothing here promises a further attempt
     /// would differ, which is why an unreadable stored reason falls back to it.
     case retriesExhausted
+
+    /// The server refused the credential, and the transport had already spent
+    /// its one refresh on it. Every queued write parks together, because they
+    /// all carry the same credential and none of them can succeed until a
+    /// person replaces it.
+    ///
+    /// **This is the one refusal that looks environmental and is not.** A
+    /// connectivity failure, a `5xx` and a `429` all clear on their own; a
+    /// spent credential clears only when somebody signs in again. Treated as
+    /// environmental, as it was, the queue retried for ever and an app could
+    /// show only a count of unsent writes that never moved — with nothing
+    /// anywhere saying what the person had to do.
+    case credentialRefused
+
+    /// The idempotency key on this write has already been answered for a
+    /// different body, so the server refuses it with `idempotency_key_reused`.
+    ///
+    /// **Parks on the first refusal, because the key is spent rather than the
+    /// write.** Repeating it is refused identically however often anyone tries,
+    /// so the retry ceiling would be spent on guaranteed refusals and the row
+    /// would then park under a reason naming the wrong cause. What clears it is
+    /// the app re-applying the edit, which makes a fresh mutation carrying a
+    /// fresh key; `retry(id:)` does not.
+    case idempotencyKeyReused
 }
 
 // MARK: - Classification
@@ -119,6 +143,32 @@ extension PendingMutationBlockReason {
         // `ResponseDecodingError` all carry `status == 0` and mean three
         // different things.
         if error is ConflictResolverMissingError { return .resolverMissing }
+
+        // **Before the environmental sweep, which used to swallow this.** A
+        // `401` reaching the queue is one the transport's single refresh did
+        // not clear, so it is a statement about the credential rather than
+        // about the network — and unlike everything else in that class it does
+        // not clear on its own. Ordered first because `isEnvironmental` still
+        // answers `true` for a 401: that answer is what keeps the refusal from
+        // spending the ceiling, and only the ordering here decides which of
+        // the two readings wins.
+        if let marfaError = error as? MarfaError,
+            !(marfaError is NetworkError),
+            marfaError.status == 401
+        {
+            return .credentialRefused
+        }
+
+        // A key answered for a different body cannot be replayed into a
+        // different answer, so this parks rather than spending the ceiling on
+        // refusals that are all the same refusal.
+        if let marfaError = error as? MarfaError,
+            marfaError.status == 422,
+            marfaError.code == MarfaError.idempotencyKeyReusedCode
+        {
+            return .idempotencyKeyReused
+        }
+
         // The environmental class never blocks, however often it fails, and
         // `isEnvironmental` is the one place that says what is in it — a
         // suspended space is a 403, so it has to be named rather than caught

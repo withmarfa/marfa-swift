@@ -92,7 +92,7 @@ extension PendingMutationModel {
     /// automatic recovery is what stops an old build replaying a row forever.
     /// A missing column on a blocked row means a legacy row, and its answer is
     /// in the message.
-    private var resolvedBlockReason: PendingMutationBlockReason {
+    fileprivate var resolvedBlockReason: PendingMutationBlockReason {
         if let stored = blockedReason {
             return PendingMutationBlockReason(rawValue: stored) ?? .retriesExhausted
         }
@@ -904,11 +904,19 @@ public actor MutationQueue {
                         predicate: #Predicate { $0.stateRaw == inFlight }
                     )
                 ),
-                blocked: try modelContext.fetchCount(
+                // **Counted by reason rather than totaled, because what
+                // clears each one differs.** A credential a person must replace
+                // and a conflict an app must settle are both "blocked", and an
+                // interface that shows one number can only say that something
+                // is wrong. This is a fetch rather than a count for the same
+                // reason: the breakdown is the answer.
+                blocked: try modelContext.fetch(
                     FetchDescriptor<PendingMutationModel>(
                         predicate: #Predicate { $0.stateRaw == blocked }
                     )
-                ),
+                ).reduce(into: [PendingMutationBlockReason: Int]()) { tally, model in
+                    tally[model.resolvedBlockReason, default: 0] += 1
+                },
                 deadLettered: try modelContext.fetchCount(
                     FetchDescriptor<DroppedMutationModel>()
                 )
@@ -926,6 +934,59 @@ public actor MutationQueue {
     /// window rather than narrowing it.
     func countsAndSyncState(key: String) throws -> (MutationQueueCounts, String?) {
         (try counts, try loadSyncState(key: key))
+    }
+
+    /// Parks every mutation that is still live, under one reason.
+    ///
+    /// **For a refusal that is about the credential rather than about a
+    /// write.** A `401` the transport's refresh did not clear refuses every
+    /// queued row equally, so draining the rest to be refused one at a time
+    /// spends a request per write to learn what the first one said. Returns how
+    /// many were parked, which is what an app is told.
+    ///
+    /// Rows already blocked keep the reason they have: a conflict awaiting
+    /// review is not resolved by a new credential, and overwriting it would
+    /// send an app to the wrong remedy and lose the right one.
+    func parkAllLive(reason: PendingMutationBlockReason, error: String) throws -> Int {
+        let pending = PendingMutationState.pending.rawValue
+        let inFlight = PendingMutationState.inFlight.rawValue
+        let live = try modelContext.fetch(
+            FetchDescriptor<PendingMutationModel>(
+                predicate: #Predicate { $0.stateRaw == pending || $0.stateRaw == inFlight }
+            )
+        )
+        guard !live.isEmpty else { return 0 }
+        for model in live {
+            model.lastError = error
+            model.blockedReason = reason.rawValue
+            model.state = .blocked
+        }
+        try modelContext.save()
+        return live.count
+    }
+
+    /// Releases every mutation parked under one reason, and only that one.
+    ///
+    /// **By reason rather than wholesale.** Sweeping everything on a credential
+    /// recovery would spend a request re-parking each write awaiting review and
+    /// would tell an app those writes were moving again when nothing has
+    /// changed for them.
+    func retryAll(reason: PendingMutationBlockReason) throws -> Int {
+        let blocked = PendingMutationState.blocked.rawValue
+        let rows = try modelContext.fetch(
+            FetchDescriptor<PendingMutationModel>(
+                predicate: #Predicate { $0.stateRaw == blocked }
+            )
+        ).filter { $0.resolvedBlockReason == reason }
+        guard !rows.isEmpty else { return 0 }
+        for model in rows {
+            model.state = .pending
+            model.blockedReason = nil
+            model.refusalCount = 0
+            model.attemptCount = 0
+        }
+        try modelContext.save()
+        return rows.count
     }
 
     // MARK: - Sync state (Last-Event-ID cursor)

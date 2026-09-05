@@ -1069,6 +1069,26 @@ public actor SyncEngine {
         return imported
     }
 
+    /// Releases every mutation parked under one reason, and only that one.
+    ///
+    /// **By reason rather than wholesale, because what clears each differs.** A
+    /// working credential releases everything parked on the old one; it settles
+    /// nothing about a conflict awaiting review, and sweeping those up would
+    /// spend a request re-parking each of them while telling an app they were
+    /// moving again.
+    ///
+    /// Returns how many were released. The next drain sends them.
+    @discardableResult
+    public func retryAll(reason: PendingMutationBlockReason) async throws -> Int {
+        let released = try await mutationQueue.retryAll(reason: reason)
+        if released > 0 {
+            logger.log.info(
+                "sync.queue.released reason=\(reason.rawValue, privacy: .public) count=\(released, privacy: .public)"
+            )
+        }
+        return released
+    }
+
     // MARK: - Main run loop
 
     private func runLoop() async {
@@ -2050,6 +2070,33 @@ public actor SyncEngine {
                     emit(.mutationBlocked(
                         kind: record.kind.rawValue, itemId: record.localId, reason: reason
                     ))
+
+                    // **One refusal that is not about this write.** The
+                    // credential every queued row carries has been refused, so
+                    // sending the rest to be refused one at a time spends a
+                    // request per write to learn what this one already said —
+                    // and leaves an app showing a count that drops to zero
+                    // through failure. Rows already blocked keep the reason
+                    // they have: a conflict awaiting review is not resolved by
+                    // a new credential.
+                    if reason == .credentialRefused {
+                        let parked = (try? await mutationQueue.parkAllLive(
+                            reason: .credentialRefused,
+                            error: formatLastError(error)
+                        )) ?? 0
+                        // **And the pass ends here.** Parking the rows in the
+                        // store is not enough on its own: this loop is walking
+                        // a list it fetched before any of them changed, so
+                        // without this it goes on to send every one of them and
+                        // be refused identically — spending a request per write
+                        // to learn what this one already said, and reclassifying
+                        // each on the way.
+                        remaining.removeAll()
+                        logger.log.error(
+                            "sync.queue.parked reason=\(reason.rawValue, privacy: .public) count=\(parked + 1, privacy: .public)"
+                        )
+                        emit(.queueParked(reason: .credentialRefused, count: parked + 1))
+                    }
 
                     // Deliberately does not set `transientError`. The engine
                     // has stopped asking about this row, so it is not something
