@@ -19,9 +19,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   Until now `retry(id:)` and `retryAll(reason:)` were the whole release surface and both put the row back into the same refusal. There was no way to stop asking.
 
-  **What is discarded is kept.** The row moves to the dead-letter log under the new `MarfaError.discardedByAppCode`, which is deliberately not a server code — nobody refused this write, the app stopped asking — so a reader can tell it from every other row in that log, all of which are refusals somebody received. It surfaces through `MarfaStore.queryDroppedMutations()`.
+  **What is discarded is kept.** The row moves to the dead-letter log under the new `MarfaError.discardedByAppCode`, which is deliberately not a server code — nobody refused this write, the app stopped asking — so a reader can tell it from a refusal. Branch on the code rather than the status: a refused entry of a bulk call also carries status `0`. It surfaces through `MarfaStore.queryDroppedMutations()`.
 
-  **Only a blocked row.** A pending one belongs to the drain, which may already be sending it, so discarding one would race the cycle rather than cancel it; that throws the new `DiscardNotBlockedError`, carrying the row's actual state so a caller who raced a drain can tell "it already went" from "it is still going". Discarding a row that is not there is not an error — two taps, or a discard racing a drain that already dropped it, both leave the caller's intent satisfied.
+  **Only a blocked row.** A pending or in-flight one belongs to the drain, which may already be sending it, so discarding one would race the cycle rather than cancel it; that throws the new `DiscardNotBlockedError`, carrying the row's state. Discarding a row that is not there is not an error — two taps, or a discard racing a drain that already dropped it, both leave the caller's intent satisfied.
+
+  **It cleans up after the row, the way a permanent drop does.** A discarded `createItem` cascades: every later write to that item is dead-lettered with it, in the same transaction, and the local item row is purged so nothing is left that can never sync. A `createEdge` has its local edge removed. A discarded `uploadBlob` frees its staged bytes — but only when no other queued write still owes them, because enqueuing the same content twice keeps one copy and two rows.
+
+  **The cascade is inside the queue's own transaction, and that is load-bearing.** Removing the blocking row lifts the deferral holding the writes behind it, so anything between the two is a window where a drain can send writes whose create has just been discarded.
 
   New public API: `SyncEngine.discard(id:)`, `DiscardNotBlockedError`, `MarfaError.discardedByAppCode`.
 
