@@ -1,3 +1,3 @@
 # Provenance of scripts/openapi.json. Written by sync-openapi.sh; do not edit.
-monorepo_head=dc7ff8fe837fbaa64aee8834269915776d7c0582
-spec_last_written_by=86e43d62e7c5796ca0fdc9f807acd429a0a083f3
+monorepo_head=cc6434df8d3c53b97e4a3bd525d5df53e3318906
+spec_last_written_by=01013b690dc554e5432fb6498ef96947f9c47f96
