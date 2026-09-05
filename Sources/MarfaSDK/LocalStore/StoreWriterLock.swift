@@ -73,9 +73,15 @@ public struct StoreWriterLock: Sendable {
 extension StoreWriterLock {
 
     /// Holds taken by this process, so a second opener here is refused
-    /// without going near the filesystem. A hard link cannot contend with
-    /// itself: this process could link over its own lock and both callers
-    /// would believe they held it.
+    /// without going near the filesystem.
+    ///
+    /// **Not because a link can contend with itself — it cannot**, and a
+    /// first version said so wrongly: a second `link` over an existing target
+    /// from the same process returns `EEXIST` like any other. What this
+    /// narrows is the window between clearing a stale lock and claiming it,
+    /// where two callers in one process would otherwise both go looking. It
+    /// is also faster than a filesystem round trip for the common case of an
+    /// app opening its own store twice.
     private static let inProcess = InProcessHolds()
 
     /// Takes the writer lock for a store, or reports who has it.

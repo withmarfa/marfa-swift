@@ -369,6 +369,10 @@ public actor SyncEngine {
         conflictResolvers: ConflictResolverRegistry? = nil,
         maxReplayAttempts: Int = 5,
         storeRecovery: StoreRecovery? = nil,
+        /// Defaults to `true`, so an engine built directly — every test
+        /// fixture, and any consumer assembling one itself — keeps writing.
+        /// `MarfaClient.synced` is the door that takes a real lock and passes
+        /// what it got; nothing else can know.
         isStoreWriter: Bool = true
     ) {
         self.transport = transport

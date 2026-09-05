@@ -72,6 +72,16 @@ struct StoreWriterLockTests {
 
         let lock = try StoreWriterLock.acquire(storePath: path)
         #expect(lock.writer)
+        // The discriminator: the lock now names *this* process. Without it the
+        // test cannot tell a takeover because the holder was dead from one
+        // because the holder was never read at all.
+        let now = try #require(
+            try JSONDecoder().decode(
+                StoreLockHolder.self,
+                from: #require(FileManager.default.contents(atPath: lockPath))
+            )
+        )
+        #expect(now.pid == ProcessInfo.processInfo.processIdentifier)
         lock.release()
     }
 
@@ -151,9 +161,16 @@ struct StoreWriterLockTests {
 
         // Somebody else's hold, in place of mine.
         let lockPath = try #require(StoreWriterLock.lockPath(for: path))
+        // **This process's own pid, with a different token.** A first version
+        // used a foreign pid, so a build comparing pids instead of tokens
+        // declined for the wrong reason and the test passed anyway — it did
+        // not test what its own failure message claimed.
         let theirs = StoreLockHolder(
-            pid: 4242, token: "theirs", since: "now",
-            bootedAt: StoreWriterLock.machineBootedAt(), startedAt: nil
+            pid: ProcessInfo.processInfo.processIdentifier, token: "theirs", since: "now",
+            bootedAt: StoreWriterLock.machineBootedAt(),
+            startedAt: StoreWriterLock.processStartedAt(
+                pid: ProcessInfo.processInfo.processIdentifier
+            )
         )
         try JSONEncoder().encode(theirs).write(to: URL(fileURLWithPath: lockPath))
 
@@ -205,34 +222,60 @@ struct StoreWriterLockTests {
     /// The lock is only worth having if an engine respects it. A second engine
     /// over one store is the failure: two cursors, each believing it is the
     /// one draining, with half the writes replayed twice.
+    /// **Paced off the writer, not asserted synchronously.** A first version
+    /// checked the reader's calls immediately after `start()` returned, which
+    /// passes with the guard deleted — the reader had simply not got round to
+    /// its first request yet. The writer reaching `/events` is a real signal
+    /// that enough time has passed for a reader to have done the same.
     @Test("an engine without the writer lock does not start")
     func aNonWriterEngineDoesNotStart() async throws {
         let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
-        let transport = MockTransport()
+        let readerTransport = MockTransport()
+        let writerTransport = MockTransport()
         let connManager = ConnectionStateManager()
-        let engine = SyncEngine(
-            transport: transport, localStore: store, mutationQueue: queue,
+
+        let reader = SyncEngine(
+            transport: readerTransport, localStore: store, mutationQueue: queue,
             connectionManager: connManager, isStoreWriter: false
         )
-
-        transport.enqueueEvents([])
-        await engine.start()
-        await connManager.applyStateForTesting(.connecting)
-        #expect(transport.calls.isEmpty, "a reader must not open a stream or drain")
-
-        // The discriminator: the same engine holding the lock does start, so
-        // the silence above is about the lock rather than about the fixture
-        // being inert.
         let writer = SyncEngine(
-            transport: transport, localStore: store, mutationQueue: queue,
+            transport: writerTransport, localStore: store, mutationQueue: queue,
             connectionManager: connManager, isStoreWriter: true
         )
-        transport.enqueueEvents([])
+
+        readerTransport.enqueueEvents([])
+        writerTransport.enqueueEvents([])
+        await reader.start()
         await writer.start()
+
+        // The writer getting to the wire is the clock. By the time it has, a
+        // reader that was going to open a stream would have.
         try await SyncEngineTestKit.awaitCondition(description: "the writer opened a stream") {
-            transport.calls.contains { $0.path == "/events" }
+            writerTransport.calls.contains { $0.path == "/events" }
         }
+        #expect(readerTransport.calls.isEmpty, "a reader must not open a stream or drain")
         await writer.stop()
+        await reader.stop()
+    }
+
+    /// An import is not only reads — it prunes, taking the ids the server
+    /// returned as the whole answer and removing the rest. A client without
+    /// the write running that can delete rows the real writer created and has
+    /// not yet pushed, so it is refused rather than skipped: this caller asked
+    /// and is waiting on a count.
+    @Test("a non-writer engine refuses to import")
+    func aNonWriterEngineRefusesToImport() async throws {
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let transport = MockTransport()
+        let engine = SyncEngine(
+            transport: transport, localStore: store, mutationQueue: queue,
+            connectionManager: ConnectionStateManager(), isStoreWriter: false
+        )
+
+        await #expect(throws: (any Error).self) {
+            _ = try await engine.performInitialSync()
+        }
+        #expect(transport.calls.isEmpty, "and it refused before asking for a page")
     }
 
     // MARK: - The window a review found
@@ -275,5 +318,77 @@ struct StoreWriterLockTests {
             return won
         }
         #expect(winners == 1, "both openers cleared the same stale lock")
+    }
+
+    // MARK: - What the readings actually say
+
+    /// The boot instant and the process start time are the whole staleness
+    /// mechanism, and every test above compares them only with themselves —
+    /// so a build where both return a constant passes all of them.
+    @Test("the kernel readings are plausible, not merely self-consistent")
+    func theReadingsAreReal() throws {
+        let boot = StoreWriterLock.machineBootedAt()
+        #expect(boot > 0, "0 is the kernel-declined fallback, not an answer")
+        #expect(boot < Int64(Date().timeIntervalSince1970 * 1000), "the machine booted in the past")
+        #expect(boot == StoreWriterLock.machineBootedAt(), "and it does not move between calls")
+
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let started = try #require(StoreWriterLock.processStartedAt(pid: pid))
+        #expect(started >= boot, "this process did not start before the machine did")
+        #expect(started <= Int64(Date().timeIntervalSince1970 * 1000))
+        // A process that does not exist has no start time, so the reading is
+        // answering about the pid rather than returning something constant.
+        #expect(StoreWriterLock.processStartedAt(pid: 999_999) == nil)
+    }
+
+    // MARK: - Contention across processes
+
+    /// **The refusal the lock exists for, and every other test short-circuits
+    /// it.** `acquire` refuses a second opener in this process before it ever
+    /// reads the file, so `stillHolding` is only exercised as a pure function
+    /// and never as the decision `acquire` makes. A build that took over
+    /// *every* lock, live holders included, passed the whole suite.
+    @Test("a lock held by a live process is refused, and named")
+    func aLiveHolderIsRefusedAndNamed() throws {
+        let path = tempStorePath()
+        let lockPath = try #require(StoreWriterLock.lockPath(for: path))
+        try FileManager.default.createDirectory(
+            atPath: (lockPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+
+        // A holder naming a process that really is running — this one — but
+        // under a token this caller has never held, which is what another
+        // process's lock looks like from here.
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let live = StoreLockHolder(
+            pid: pid, token: "someone-elses-token", since: "now",
+            bootedAt: StoreWriterLock.machineBootedAt(),
+            startedAt: StoreWriterLock.processStartedAt(pid: pid)
+        )
+        try JSONEncoder().encode(live).write(to: URL(fileURLWithPath: lockPath))
+
+        let refused = try StoreWriterLock.acquire(storePath: path)
+        #expect(refused.writer == false)
+        // Named from the file, not from the in-process sentinel — which is
+        // what proves the refusal came from reading the holder.
+        #expect(refused.heldBy?.token == "someone-elses-token")
+        try? FileManager.default.removeItem(atPath: lockPath)
+    }
+
+    /// Concurrent openers over one path produce exactly one writer. The clear
+    /// is atomic on its own; this is the whole `acquire` under contention.
+    @Test("concurrent openers produce exactly one writer")
+    func concurrentOpenersProduceOneWriter() async throws {
+        let path = tempStorePath()
+        let taken = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<16 {
+                group.addTask { ((try? StoreWriterLock.acquire(storePath: path))?.writer) ?? false }
+            }
+            var writers = 0
+            for await didWrite in group where didWrite { writers += 1 }
+            return writers
+        }
+        #expect(taken == 1)
     }
 }

@@ -82,6 +82,11 @@ public final class MarfaClient: Sendable {
     /// holds it. A read-only client answers reads from the store and does not
     /// drain, so its queue is somebody else's to send. ``storeHeldBy`` says
     /// whose.
+    ///
+    /// **`true` for a client that never took a lock**, which is a client with
+    /// no store or a pure-local one. There is nothing to exclude there and
+    /// nothing to contend with, so answering `false` would report a
+    /// restriction that does not exist.
     public var holdsStoreWriteLock: Bool { storeWriterLock?.writer ?? true }
 
     /// Who holds the store's writer lock, when this client does not.
