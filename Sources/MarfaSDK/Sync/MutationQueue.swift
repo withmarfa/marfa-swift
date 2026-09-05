@@ -22,6 +22,10 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var lastError: String?
     public var state: PendingMutationState
 
+    /// Attempts the server refused — what the retry ceiling counts. See ``PendingMutationModel/refusalCount``; ``attemptCount``
+    /// is the number a consumer displays and counts every attempt made.
+    public var refusalCount: Int
+
     /// The `Idempotency-Key` every attempt at this mutation carries, so the
     /// server can recognize a retry whose first response was lost.
     ///
@@ -47,6 +51,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         localId: String? = nil,
         createdAt: String,
         attemptCount: Int = 0,
+        refusalCount: Int = 0,
         lastError: String? = nil,
         state: PendingMutationState = .pending,
         blockedReason: PendingMutationBlockReason? = nil,
@@ -59,6 +64,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         self.localId = localId
         self.createdAt = createdAt
         self.attemptCount = attemptCount
+        self.refusalCount = refusalCount
         self.lastError = lastError
         self.state = state
         self.blockedReason = blockedReason
@@ -102,6 +108,7 @@ extension PendingMutationModel {
             localId: localId,
             createdAt: createdAt,
             attemptCount: attemptCount,
+            refusalCount: refusalCount,
             lastError: LegacyBlockedPrefix.strip(lastError),
             state: state,
             blockedReason: state == .blocked ? resolvedBlockReason : nil,
@@ -743,12 +750,18 @@ public actor MutationQueue {
     /// Records a failed replay attempt. Also resets `state` to `.pending`
     /// so a `.inFlight` row doesn't appear stuck in the consumer-facing
     /// observable after a transient failure.
-    func recordFailure(id: String, error: String) throws {
+    /// `wasRefusedByTheServer` is what separates the two counters: every
+    /// attempt raises ``PendingMutationRecord/attemptCount``, and only one the
+    /// server actually refused raises the refusal count the ceiling reads.
+    func recordFailure(
+        id: String, error: String, wasRefusedByTheServer: Bool = true
+    ) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
+        if wasRefusedByTheServer { model.refusalCount += 1 }
         model.lastError = error
         // A row leaving the blocked state does not keep the reason it was
         // blocked for. Nothing observable breaks if it does — `toRecord()`
@@ -779,6 +792,11 @@ public actor MutationQueue {
         model.attemptCount += 1
         model.lastError = error
         model.blockedReason = reason.rawValue
+        // **`refusalCount` is deliberately not raised here.** `classify` counts
+        // the refusal in hand alongside the recorded ones — `refusalCount + 1
+        // >= ceiling` — so the attempt that triggers the block is already
+        // accounted for. Adding it would double-count it, and a blocked row
+        // therefore records exactly one fewer refusal than the ceiling.
         model.state = .blocked
         try modelContext.save()
     }
@@ -815,6 +833,7 @@ public actor MutationQueue {
             model.state = .pending
         }
         model.attemptCount = 0
+        model.refusalCount = 0
         try modelContext.save()
         emitDrainRequest()
     }

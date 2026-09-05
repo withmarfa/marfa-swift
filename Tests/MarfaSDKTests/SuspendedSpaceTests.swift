@@ -114,7 +114,7 @@ struct SuspendedSpaceTests {
         let ceiling = 5
         // One past the ceiling, which is what blocks anything else.
         #expect(PendingMutationBlockReason.classify(
-            error: suspended(), kind: .createItem, attemptCount: ceiling, ceiling: ceiling
+            error: suspended(), kind: .createItem, refusalCount: ceiling, ceiling: ceiling
         ) == nil)
 
         // **The discriminator is an ordinary 403**, and a first draft used a
@@ -124,7 +124,7 @@ struct SuspendedSpaceTests {
         // the comment claiming this guarded the code was false.
         #expect(PendingMutationBlockReason.classify(
             error: ordinaryForbidden(),
-            kind: .createItem, attemptCount: ceiling, ceiling: ceiling
+            kind: .createItem, refusalCount: ceiling, ceiling: ceiling
         ) == .retriesExhausted)
     }
 

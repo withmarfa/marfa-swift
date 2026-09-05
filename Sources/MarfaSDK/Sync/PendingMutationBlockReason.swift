@@ -39,9 +39,9 @@ extension PendingMutationBlockReason {
 
     /// The single place that decides whether a replay failure can be retried.
     ///
-    /// `nil` means the next drain should try again. `attemptCount` is the count
-    /// *before* this failure, so the ceiling below is compared against the
-    /// attempt that has just happened.
+    /// `nil` means the next drain should try again. `refusalCount` is the
+    /// count *before* this failure, so the ceiling below is compared against
+    /// the refusal that has just happened.
     ///
     /// **The network class never blocks, however often it fails.** A
     /// connectivity failure, a `5xx`, a `429`, a `401` and a suspended space
@@ -58,8 +58,10 @@ extension PendingMutationBlockReason {
     /// Whether a failure is about the environment rather than about the
     /// write: connectivity, a `5xx`, a `429`, a `401`, a suspended space.
     ///
-    /// The one definition of that class, so the ceiling and the attempt count
-    /// cannot disagree about which failures they are counting.
+    /// The one definition of that class, so nothing that consults it can
+    /// disagree about which failures it means. It is transport-shaped: see
+    /// ``isServerRefusal(_:)`` for what the ceiling counts, which excludes a
+    /// class this cannot see.
     static func isEnvironmental(_ error: Error) -> Bool {
         if error is CancellationError { return true }
         guard let marfaError = error as? MarfaError else { return false }
@@ -76,10 +78,24 @@ extension PendingMutationBlockReason {
         }
     }
 
+    /// Whether the server refused this write, which is what the retry ceiling
+    /// counts.
+    ///
+    /// **Narrower than "not environmental", and the difference is a class the
+    /// transport never sees.** A replay writes to the local store *after* a
+    /// `2xx` — it adopts the row the server returned — so a store that refuses
+    /// there is a write the server accepted. That is not a refusal, and a
+    /// store failing for its own environmental reason (a locked device, a full
+    /// disk) would otherwise spend the whole budget on an answer that was yes.
+    static func isServerRefusal(_ error: Error) -> Bool {
+        guard error is MarfaError else { return false }
+        return !isEnvironmental(error)
+    }
+
     static func classify(
         error: Error,
         kind: MutationKind,
-        attemptCount: Int,
+        refusalCount: Int,
         ceiling: Int
     ) -> PendingMutationBlockReason? {
         // Keyed by type before status, because status cannot separate these:
@@ -119,7 +135,10 @@ extension PendingMutationBlockReason {
         // that nothing has proven final: a 4xx outside the permanent set, a
         // response the SDK could not decode, a store that refused the write.
         // Try a bounded number of times, then stop.
-        return attemptCount + 1 >= ceiling ? .retriesExhausted : nil
+        // **Refusals, not attempts.** The two coincided until a device could
+        // stay offline for a week; counting an attempt nobody could make
+        // conflates "we could not ask" with "we asked and were refused".
+        return refusalCount + 1 >= ceiling ? .retriesExhausted : nil
     }
 }
 

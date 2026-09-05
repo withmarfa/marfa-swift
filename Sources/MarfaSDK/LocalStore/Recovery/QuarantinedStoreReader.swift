@@ -40,7 +40,7 @@ enum QuarantinedStoreReader {
                 // the freeze above: a store written before the column existed
                 // simply has no such column, and the mapping skips what it
                 // does not find rather than mis-assigning it.
-                "blockedReason",
+                "blockedReason", "refusalCount",
             ]
         ),
         (
