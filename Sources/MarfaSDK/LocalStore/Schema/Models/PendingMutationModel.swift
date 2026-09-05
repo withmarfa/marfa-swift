@@ -59,8 +59,8 @@ final class PendingMutationModel {
     /// Number of failed replay attempts. Incremented by `recordFailure`.
     var attemptCount: Int = 0
 
-    /// Attempts that **reached the server and were refused**, which is the
-    /// number the retry ceiling is about.
+    /// Attempts **the server refused**, which is the number the retry ceiling
+    /// is about.
     ///
     /// **A different quantity from ``attemptCount``, which they coincided with
     /// until a device could stay offline for a week.** A retry ceiling exists

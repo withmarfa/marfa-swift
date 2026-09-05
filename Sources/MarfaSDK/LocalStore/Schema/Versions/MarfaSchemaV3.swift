@@ -5,7 +5,7 @@ import SwiftData
 /// under. Its models are the live classes in `Schema/Models/`, so the current
 /// shape is always readable in one place.
 ///
-/// Five changes over V2, all additive:
+/// Six changes over V2, all additive:
 ///
 /// - ``MarfaItemModel/spaceId`` — the wire has carried `space_id` on an item
 ///   since before this store existed and the store dropped it on the way in,
@@ -22,6 +22,9 @@ import SwiftData
 ///   read through `LegacyBlockedPrefix`.
 /// - ``PendingMutationModel/idempotencyKey`` — the value sent as
 ///   `Idempotency-Key` on every attempt at a queued write.
+/// - ``PendingMutationModel/refusalCount`` — attempts the server refused,
+///   which is what the retry ceiling counts. Distinct from `attemptCount`,
+///   which is every attempt made and is what a consumer displays.
 /// - ``CachedBlobModel`` — bytes this device already has, so a blob it can
 ///   see does not need the network to be seen again. Distinct from
 ///   ``PendingBlobModel``, which is the outbound buffer and used to be the

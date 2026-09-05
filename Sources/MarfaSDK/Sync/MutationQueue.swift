@@ -22,8 +22,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var lastError: String?
     public var state: PendingMutationState
 
-    /// Attempts that reached the server and were refused — what the retry
-    /// ceiling counts. See ``PendingMutationModel/refusalCount``; ``attemptCount``
+    /// Attempts the server refused — what the retry ceiling counts. See ``PendingMutationModel/refusalCount``; ``attemptCount``
     /// is the number a consumer displays and counts every attempt made.
     public var refusalCount: Int
 
@@ -751,18 +750,18 @@ public actor MutationQueue {
     /// Records a failed replay attempt. Also resets `state` to `.pending`
     /// so a `.inFlight` row doesn't appear stuck in the consumer-facing
     /// observable after a transient failure.
-    /// Records a failed attempt.
-    ///
-    /// `reachedTheServer` is what separates the two counters: every attempt
-    /// raises ``PendingMutationRecord/attemptCount``, and only one the server
-    /// actually answered raises the refusal count the ceiling reads.
-    func recordFailure(id: String, error: String, reachedTheServer: Bool = true) throws {
+    /// `wasRefusedByTheServer` is what separates the two counters: every
+    /// attempt raises ``PendingMutationRecord/attemptCount``, and only one the
+    /// server actually refused raises the refusal count the ceiling reads.
+    func recordFailure(
+        id: String, error: String, wasRefusedByTheServer: Bool = true
+    ) throws {
         let predicate = #Predicate<PendingMutationModel> { $0.id == id }
         var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
-        if reachedTheServer { model.refusalCount += 1 }
+        if wasRefusedByTheServer { model.refusalCount += 1 }
         model.lastError = error
         // A row leaving the blocked state does not keep the reason it was
         // blocked for. Nothing observable breaks if it does — `toRecord()`

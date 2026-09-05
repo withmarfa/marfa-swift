@@ -120,4 +120,42 @@ struct RetryCeilingTests {
         #expect(row.refusalCount == 0)
         await engine.stop()
     }
+
+    // MARK: - The class the transport never sees
+
+    /// A store failure during replay is not a refusal, and a review found it
+    /// counted as one.
+    ///
+    /// **The replay writes to the store *after* a `2xx`** — it adopts the row
+    /// the server returned — so a store that refuses there is a write the
+    /// server accepted. Counting that spends the budget on an answer that was
+    /// yes, and a store failing for its own environmental reason, a locked
+    /// device or a full disk, spends all of it: the row ends blocked as
+    /// "ran out of retries" for a write the server already holds, and every
+    /// later write to that item stalls behind it.
+    ///
+    /// `isEnvironmental` cannot see this class, because it is transport-shaped
+    /// and a `LocalStoreError` never reaches a transport. `isServerRefusal` is
+    /// the narrower question the ceiling actually asks.
+    @Test("a store failure is not a refusal the server made")
+    func aStoreFailureIsNotARefusal() {
+        let storeFailure = LocalStoreError.databaseSetupFailed("disk is full")
+        #expect(PendingMutationBlockReason.isServerRefusal(storeFailure) == false)
+
+        // The discriminators, both directions. A real refusal counts, and an
+        // environmental one does not — so the assertion above is about the
+        // error's origin rather than about the ceiling having stopped
+        // counting anything.
+        #expect(PendingMutationBlockReason.isServerRefusal(refusal()))
+        #expect(PendingMutationBlockReason.isServerRefusal(offline()) == false)
+    }
+
+    /// A response the server sent and the kit could not read *is* a refusal:
+    /// the question was asked and answered, and repeating it will produce the
+    /// same unreadable answer.
+    @Test("an unreadable response still counts, because the server answered")
+    func anUndecodableResponseIsARefusal() {
+        struct Boom: Error {}
+        #expect(PendingMutationBlockReason.isServerRefusal(ResponseDecodingError(Boom())))
+    }
 }
