@@ -44,9 +44,9 @@ extension PendingMutationBlockReason {
     /// attempt that has just happened.
     ///
     /// **The network class never blocks, however often it fails.** A
-    /// connectivity failure, a `5xx`, a `429` and a `401` are statements about
-    /// the environment rather than about the write, and each clears without the
-    /// app doing anything. Counting them would strand a valid write behind an
+    /// connectivity failure, a `5xx`, a `429`, a `401` and a suspended space
+    /// are statements about the environment rather than about the write, and
+    /// each clears without the app doing anything. Counting them would strand a valid write behind an
     /// outage and then need a person to release it — a worse defect than the one
     /// this mechanism exists to fix.
     ///
@@ -55,6 +55,22 @@ extension PendingMutationBlockReason {
     /// here before the loop's `running` check unwinds the cycle, so a row would
     /// accrue one failure per stop. Without this, a handful of ordinary app
     /// backgrounds would block a mutation nothing had ever refused.
+    /// Whether a failure is about the environment rather than about the
+    /// write: connectivity, a `5xx`, a `429`, a `401`, a suspended space.
+    ///
+    /// The one definition of that class, so the ceiling and the attempt count
+    /// cannot disagree about which failures they are counting.
+    static func isEnvironmental(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        guard let marfaError = error as? MarfaError else { return false }
+        if marfaError is NetworkError { return true }
+        if marfaError.code == MarfaError.spaceSuspendedCode { return true }
+        switch marfaError.status {
+        case 401, 429, 500...599: return true
+        default: return false
+        }
+    }
+
     static func classify(
         error: Error,
         kind: MutationKind,
@@ -66,13 +82,14 @@ extension PendingMutationBlockReason {
         // `ResponseDecodingError` all carry `status == 0` and mean three
         // different things.
         if error is ConflictResolverMissingError { return .resolverMissing }
-        if error is CancellationError { return nil }
+        // The environmental class never blocks, however often it fails, and
+        // `isEnvironmental` is the one place that says what is in it — a
+        // suspended space is a 403, so it has to be named rather than caught
+        // by a status band.
+        if isEnvironmental(error) { return nil }
 
         if let marfaError = error as? MarfaError {
-            if marfaError is NetworkError { return nil }
             switch marfaError.status {
-            case 401, 429, 500...599:
-                return nil
             case 409 where kind == .updateItem:
                 // Narrowed to the one kind the conflict machinery covers,
                 // because the remedy this reason names — resolve the conflict,

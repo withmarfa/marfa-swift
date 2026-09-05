@@ -43,7 +43,10 @@ func parseMarfaError(
     // unable to tell a rolled-back page from any other bad request.
     case 400: return ValidationError(code: code ?? "validation_error", message: message, details: details)
     case 401: return UnauthorizedError(message: message, details: details)
-    case 403: return ForbiddenError(message: message, details: details)
+    // A 403 keeps its code for the same reason a 400 and a 409 do. It is not
+    // decoration: `space_suspended` is the one 403 a queued write must survive,
+    // and collapsing every 403 to `forbidden` made it unrecognizable.
+    case 403: return ForbiddenError(code: code ?? "forbidden", message: message, details: details)
     case 404: return NotFoundError(message: message, details: details)
     // A 409 reaching here is one the caller could not read as a version
     // conflict: `URLSessionTransport` decodes `ConflictResponse` first and

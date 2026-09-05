@@ -921,8 +921,23 @@ public actor SyncEngine {
     ///   before. The retention-gap branch sets it: the server has discarded
     ///   the events this device's cursor points at, so the store is behind by
     ///   an unknown amount and only a fresh import closes that.
+    /// What a catch-up did, which is three answers rather than two.
+    ///
+    /// **`skipped` and `failed` are not the same and one caller has to tell
+    /// them apart.** A catch-up that declined to import — because the queue
+    /// has not drained — left the store exactly as it was, so anything the
+    /// caller did *in anticipation* of the import is now a lie. The
+    /// `catchup_too_old` handler is that caller: it used to clear the event
+    /// cursor first and ask afterwards, which is fine when a refusal is rare
+    /// and permanent when a queue can stay undrained for a week.
+    enum CatchUpOutcome {
+        case imported
+        case skipped
+        case failed(Error)
+    }
+
     @discardableResult
-    private func catchUp(forceImport: Bool = false) async -> Error? {
+    private func catchUp(forceImport: Bool = false) async -> CatchUpOutcome {
         // A queue that cannot be read is drained rather than skipped:
         // `replayMutations` reports the storage failure, where assuming empty
         // would walk into an import that overwrites whatever is in there.
@@ -943,12 +958,12 @@ public actor SyncEngine {
             let drained = (try? await mutationQueue.isEmpty) ?? false
             guard drained else {
                 logger.log.info("sync.catch_up.import_skipped reason=queue_not_drained")
-                return nil
+                return .skipped
             }
         }
 
         let hasImported = await lastFullSyncAt != nil
-        guard forceImport || !hasImported else { return nil }
+        guard forceImport || !hasImported else { return .skipped }
 
         do {
             _ = try await performInitialSync()
@@ -958,7 +973,7 @@ public actor SyncEngine {
             // state would sit at `.notYetSynced` until something closed the
             // stream, and against a live server nothing does.
             await recordCleanDrainIfQueueIsEmpty()
-            return nil
+            return .imported
         } catch {
             // Recorded and left visible rather than escalated. The caller
             // opens the stream after this returns either way: a device whose
@@ -967,7 +982,7 @@ public actor SyncEngine {
             // nothing. Returned as well as recorded so a caller with more
             // context than this can say where it happened.
             recordSyncFailure(error)
-            return error
+            return .failed(error)
         }
     }
 
@@ -1491,15 +1506,34 @@ public actor SyncEngine {
             // our cursor and run a fresh full resync so the next reconnect
             // opens a stream with no cursor.
             //
-            logger.log.info("sync.catchup_too_old — clearing cursor and triggering full resync")
-            try? await mutationQueue.clearSyncState(key: cursorKey)
+            logger.log.info("sync.catchup_too_old — running a full resync")
             // The same catch-up the engine runs when it comes online, forced
             // past the never-imported test because this store has imported
             // before and still needs another one. It drains before importing
             // for the same reason it always does, and two of these events
             // landing on actor reentry share one import through the slot the
             // catch-up publishes rather than racing over the store.
-            if let error = await catchUp(forceImport: true) {
+            //
+            // **The cursor is cleared after the import, not before it, and the
+            // order is the whole point.** Clearing first meant the next stream
+            // opened fresh whether or not the import had run — so a catch-up
+            // that declined, because the queue had not drained, left the
+            // cursor gone and the gap unrepairable: the reconnect asks for
+            // everything since now, and the later catch-up returns at the
+            // `hasImported` test without ever filling the hole. Keeping the
+            // cursor means the server refuses it again on the next reconnect,
+            // which looks like a loop and is the retry — it repairs itself the
+            // moment the queue drains. A suspended space is exactly the case
+            // that keeps a queue undrained for longer than a retention window.
+            let outcome = await catchUp(forceImport: true)
+            switch outcome {
+            case .imported:
+                try? await mutationQueue.clearSyncState(key: cursorKey)
+            case .skipped:
+                logger.log.error(
+                    "sync.catchup_too_old.resync_skipped reason=queue_not_drained — cursor kept so a later reconnect can repair the gap"
+                )
+            case .failed(let error):
                 if error is InitialSyncError {
                     // Distinct from a transport failure. Reaching here means a
                     // write landed between the drain and the import, so the gap
@@ -1510,8 +1544,9 @@ public actor SyncEngine {
                     logger.log.error("sync.catchup_too_old.resync_failed reason=\(String(describing: type(of: error)), privacy: .public)")
                 }
             }
-            // SSE stream was closed by the server; outer reconnect loop will
-            // reopen it with no `Last-Event-ID` header.
+            // The stream was closed by the server. The outer reconnect loop
+            // reopens it — with no cursor when the import ran, and with the
+            // old one when it did not, so the refusal repeats until it can.
 
         default:
             // A type this build has no case for. Reported rather than dropped
@@ -1617,7 +1652,9 @@ public actor SyncEngine {
         let decoder = JSONDecoder()
 
         // Track only transient errors for the cycle-level `.failed` emit.
-        // Permanent errors (400/403/404) drop the offending record and emit
+        // Permanent errors (400/403/404, but not a `space_suspended` 403 —
+        // that is the environment rather than the write) drop the offending
+        // record and emit
         // `.mutationDropped` — they don't mean "sync failed," they mean
         // "this mutation will never succeed, don't keep trying."
         var transientError: Error?
