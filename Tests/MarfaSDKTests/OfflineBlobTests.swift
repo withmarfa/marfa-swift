@@ -261,6 +261,36 @@ struct OfflineBlobTests {
         )
     }
 
+    /// **The other exemption `ownBlob` buys, through the door this time.** The
+    /// eviction case above covers one of the two; this covers the one whose
+    /// failure a reader most needs to believe — bytes larger than the whole
+    /// cache bound are silently declined for a cached row, because the server
+    /// still has them, and declining an owned one returns a hash addressing
+    /// nothing at all.
+    ///
+    /// It drives the bound rather than the default, because a fixture the size
+    /// of 256 MB is not a fixture. That is the same correction the size test
+    /// at the store level needed.
+    @Test("a local client keeps bytes the cache bound would have declined")
+    func theUploadDoorKeepsAnOverBoundBlob() async throws {
+        let container = try MarfaModelContainer.make(path: ":memory:")
+        let client = try await MarfaClient.local(container: container)
+        let store = await Task.detached { LocalStore(modelContainer: container) }.value
+
+        let big = Data(repeating: 4, count: 500)
+        let response = try await client.blobs.upload(data: big, mimeType: "video/mp4")
+
+        // What the cache would have done with the same bytes under the same
+        // bound, for contrast: nothing.
+        try await store.cacheBlob(
+            hash: "sha256:not-ours", data: big, mimeType: "video/mp4", limit: 100
+        )
+        #expect(try await store.cachedBlob(hash: "sha256:not-ours") == nil)
+
+        let held = try await store.cachedBlob(hash: response.hash)
+        #expect(held?.data == big, "the door declined the only copy there is")
+    }
+
     /// **Ownership has to promote an existing row, and only the demote
     /// direction was covered.** The case below writes `ownBlob` first, so the
     /// row is created owned and the later `cacheBlob` only has to leave the
@@ -285,7 +315,7 @@ struct OfflineBlobTests {
             mimeType: "application/octet-stream", limit: 1_000
         )
 
-        _ = try await store.evictBlobs(over: 100)
+        #expect(try await store.evictBlobs(over: 100) == 1, "the filler should have gone")
         #expect(
             try await store.cachedBlob(hash: "sha256:p") != nil,
             "the local write did not take ownership of the row already there"
