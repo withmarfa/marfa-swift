@@ -49,7 +49,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - **The client-side merge and its primitives**: `autoMergeWithPolicy`, `keepBothFlow`, `strategyForField` and `autoMergeLastWriterWins`, together with `ConflictResolutionOutcome`, which described their result. All were internal; no public type changes shape. `conflictedCopyTag` stays — the server still applies that tag, and an app filtering for siblings still wants it.
 
-- **`CreatedKey.expiresAt` is gone, and its initializer loses the parameter**, because `POST /keys` stopped declaring `expires_at` in its `201`. This is a server contract change the kit is reporting, not one it chose: `GET /keys` and `PATCH /keys/{id}` still declare the field, so a key can still carry an expiry — the create response no longer tells you what it is. Read it back with `GET /keys` until the create response declares it again.
+- **`CreatedKey.expiresAt` is gone, and its initializer loses the parameter.** `POST /keys` stopped declaring `expires_at` in its `201`, and **that is a correction rather than a loss**: an expiry can only be set through a path no route reaches, and the create input cannot carry one, so every key either create door mints has none. The field was always `null` there and could never be anything else — declaring it promised generated clients a property that could not arrive.
+
+  It stays real on the read side, where it means something: `GET /keys` returns stored rows, so an expiry set out of band does reach a caller listing keys. Nothing is lost, but a consumer reading `expiresAt` off a create response has code to remove.
 
 - **A refused write now carries the code the server sent, whatever its status.** A `403` learned this when a suspended space needed telling apart from an ordinary refusal; `400` and `409` already knew it. Everything else stamped `server_error` over the answer, and `401` and `404` stamped their own — so `quota_exceeded` and `rate_limited` were the same thing at `429`, and `blob_too_large`, `compatible_with_violation` and `idempotency_key_reused` were the same thing across `413` and `422`.
 
