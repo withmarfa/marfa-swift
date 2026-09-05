@@ -5,7 +5,7 @@ import SwiftData
 /// under. Its models are the live classes in `Schema/Models/`, so the current
 /// shape is always readable in one place.
 ///
-/// Six changes over V2, all additive:
+/// Seven changes over V2, all additive:
 ///
 /// - ``MarfaItemModel/spaceId`` — the wire has carried `space_id` on an item
 ///   since before this store existed and the store dropped it on the way in,
@@ -29,12 +29,16 @@ import SwiftData
 ///   see does not need the network to be seen again. Distinct from
 ///   ``PendingBlobModel``, which is the outbound buffer and used to be the
 ///   only copy a device held.
+/// - ``CachedBlobModel/isOwned`` — whether this device is the only thing
+///   holding the bytes, which is the case for anything a client with no
+///   server wrote. Eviction skips those rows and the size bound does not
+///   refuse them, because there is nowhere for them to be fetched back from.
 ///
 /// **V3 has never been released**, which is why all of these are here
 /// rather than a fourth version. `v16.0.0` ships V2; V3 exists only on
 /// `main`, so no device holds a store in this shape and adding to it costs
 /// nobody a migration. The moment V3 ships that stops being true and the next
-/// column needs V4.
+/// column needs V4 — `isOwned` above went in on the last day that was free.
 ///
 /// Version `3.0.0` per Apple's `Schema.Version` semantics.
 @_spi(MarfaSDKTestSupport) public enum MarfaSchemaV3: VersionedSchema {

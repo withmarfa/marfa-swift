@@ -14,9 +14,11 @@ import CryptoKit
 /// In **network-only mode** (`MarfaClient(url:apiKey:)`) `upload` hits the
 /// transport directly, identical to the previous behavior.
 ///
-/// A client created via ``MarfaClient/local(path:)`` has no live server;
-/// calling `upload`, `download`, `exists`, or `presignedURL` throws
-/// ``LocalModeUnsupportedError``.
+/// A client created via ``MarfaClient/local(path:)`` has no live server.
+/// `upload` writes into that client's own store and `download` answers from
+/// it; `exists` and `presignedURL` throw ``LocalModeUnsupportedError``, and so
+/// does `download` for a hash the store does not hold — each of those is a
+/// question only a server can answer.
 public struct BlobsNamespace: Sendable {
 
     let transport: any Transport
@@ -25,9 +27,13 @@ public struct BlobsNamespace: Sendable {
     let mutationQueue: MutationQueue?
     let localStore: LocalStore?
 
-    /// `true` when this namespace is attached to a pure-local client. When
-    /// set, every method except ``url(hash:)`` throws before touching the
-    /// transport.
+    /// `true` when this namespace is attached to a pure-local client.
+    ///
+    /// When set, every method that needs an answer only a server has throws
+    /// before touching the transport. ``url(hash:)`` is pure string work and
+    /// always answers; ``upload(data:mimeType:onProgress:)`` writes to the
+    /// local store; ``download(hash:)`` serves the store first and throws only
+    /// for a hash it does not hold.
     let isLocalMode: Bool
 
     private func ensureRemote(_ operation: String) throws {
@@ -59,7 +65,29 @@ public struct BlobsNamespace: Sendable {
         mimeType: String,
         onProgress: (@Sendable (Int64, Int64) -> Void)? = nil
     ) async throws -> BlobUploadResponse {
-        try ensureRemote("blobs.upload")
+        // **A client with no server keeps the bytes rather than refusing
+        // them.** This used to be an `ensureRemote` refusal, which left the
+        // read-through cache able to hold only what an earlier synced session
+        // had put there — so a pure-local app could open a file and never make
+        // one, and no `core.file.*` item on such a device could point at
+        // anything. The store has had the table all along; what was missing
+        // was a door into it.
+        //
+        // Owned rather than cached, because on this client the bytes are the
+        // only copy: nothing can fetch them back, so neither the eviction rule
+        // nor the size bound may drop them.
+        //
+        // **The hash is the server's hash.** It is computed from the bytes by
+        // the same function the synced path uses, so a store that later gains
+        // a server addresses the same blob the server would.
+        if isLocalMode {
+            guard let localStore else {
+                throw LocalModeUnsupportedError(operation: "blobs.upload")
+            }
+            let hash = sha256Hash(of: data)
+            try await localStore.ownBlob(hash: hash, data: data, mimeType: mimeType)
+            return BlobUploadResponse(hash: hash, mimeType: mimeType, size: data.count)
+        }
 
         if let queue = mutationQueue {
             // Synced mode: compute hash locally, queue, return immediately.
@@ -124,9 +152,9 @@ public struct BlobsNamespace: Sendable {
     ///
     /// A client with a store keeps what it uploads and what it fetches, under
     /// a least-recently-used bound. Without a store, every call is a fetch, as
-    /// before. In pure-local mode the cache can only hold what an earlier
-    /// synced session put there — this client cannot fill it, since `upload`
-    /// refuses before it writes anything.
+    /// before. In pure-local mode this is the whole of it: ``upload(data:mimeType:onProgress:)``
+    /// writes the bytes into the same store as owned, and there is no server
+    /// behind the cache to reach for a hash it does not hold.
     public func download(hash: String) async throws -> (Data, String) {
         let cleanHash = hash.hasPrefix("sha256:") ? hash : "sha256:\(hash)"
 

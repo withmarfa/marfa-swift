@@ -17,6 +17,10 @@ import SwiftData
 /// so a row is immutable: same hash, same bytes, and a re-fetch can never
 /// disagree with what is stored.
 ///
+/// **A client with no server writes here too, and those rows are owned rather
+/// than cached.** See ``isOwned``: there is nowhere else for those bytes to
+/// be, so the eviction rule and the size bound both have to leave them alone.
+///
 /// `data` carries `@Attribute(.externalStorage)` for the reason
 /// ``PendingBlobModel/data`` does — SwiftData keeps large payloads in a
 /// sibling file rather than inline in the row.
@@ -42,6 +46,19 @@ final class CachedBlobModel {
     /// outlive one fetched once and never opened again, and a
     /// write-time-only stamp gets that backwards.
     var lastUsedAt: String = ""
+
+    /// Whether this device is the only thing holding these bytes.
+    ///
+    /// **Eviction skips an owned row, and the bound does not refuse one.**
+    /// Everything else here is a second copy of something the server has, so
+    /// dropping it costs a round trip and nothing more. Bytes written by a
+    /// client with no server are not a copy of anything: evicting them, or
+    /// silently declining to store one over the cache bound, loses the file.
+    ///
+    /// The name is about provenance rather than policy — `pinned` would say
+    /// what happens and not why, and the next person to tune the eviction
+    /// rule needs the why.
+    var isOwned: Bool = false
 
     init() {}
 
