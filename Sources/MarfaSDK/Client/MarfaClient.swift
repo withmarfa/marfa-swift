@@ -89,6 +89,47 @@ public final class MarfaClient: Sendable {
     /// restriction that does not exist.
     public var holdsStoreWriteLock: Bool { storeWriterLock?.writer ?? true }
 
+    /// The origin string a store records, normalized so two spellings of one
+    /// server do not read as two servers.
+    ///
+    /// A trailing slash is the case that bites: `ClientConfiguration` takes
+    /// whatever URL a consumer passes, and `https://api.marfa.so` and
+    /// `https://api.marfa.so/` are the same server. Refusing to open a store
+    /// over that would be a false refusal on a difference nobody made.
+    static func canonicalOrigin(_ url: URL) -> String {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url.absoluteString
+        }
+        // **Scheme and host only.** A first version lowercased the whole
+        // absolute string, and a path is case-significant — so
+        // `gw.example.com/TenantA` and `gw.example.com/tenanta` became one
+        // origin. Path-prefix multi-tenancy behind a gateway is an ordinary
+        // shape, and collapsing it is the exact false merge this check exists
+        // to prevent, arriving through the normalization written to prevent
+        // false refusals.
+        parts.scheme = parts.scheme?.lowercased()
+        parts.host = parts.host?.lowercased()
+
+        // A default port spelled out is the same server; refusing over it
+        // would be a false refusal on a difference nobody made.
+        if let scheme = parts.scheme, let port = parts.port,
+           (scheme == "https" && port == 443) || (scheme == "http" && port == 80) {
+            parts.port = nil
+        }
+
+        // Credentials never reach the store. This value is written to a file
+        // beside it and interpolated into an error a consumer logs, and a
+        // password has no business in either.
+        parts.user = nil
+        parts.password = nil
+        parts.query = nil
+        parts.fragment = nil
+
+        var text = parts.string ?? url.absoluteString
+        while text.hasSuffix("/") { text.removeLast() }
+        return text
+    }
+
     /// Who holds the store's writer lock, when this client does not.
     public var storeHeldBy: StoreLockHolder? { storeWriterLock?.heldBy }
 
@@ -439,6 +480,30 @@ public final class MarfaClient: Sendable {
         // — an app and a share extension over an App Group container got two
         // drains and two cursors with nothing anywhere saying so.
         let writerLock = try StoreWriterLock.acquire(storePath: storePath)
+        // **Released on any throw before the client owns it.** The lock is a
+        // struct and the only release is `MarfaClient.deinit`, so a `synced`
+        // that threw between here and that construction left the hold in a
+        // process-global set for ever. An origin mismatch throws
+        // deterministically every time, which turns a latent leak into a
+        // certain one: the intended refusal, and then every later open in that
+        // process silently read-only — including against the right server.
+        var handedToClient = false
+        defer { if !handedToClient { writerLock.release() } }
+
+        // **Checked before the store is opened.** `open` runs the migration
+        // plan and, for a store this build cannot read, the fail-safe that
+        // moves it into quarantine — so a client with no business touching the
+        // store would migrate it, and could quarantine it, before being told
+        // so. There is nothing to undo afterwards.
+        //
+        // Every client compares and only a writer records. Gating both on the
+        // lock left a reader serving one server's rows through a client
+        // configured for another, which is the same failure on the read side.
+        try StoreOriginFile.check(
+            storePath: storePath,
+            origin: Self.canonicalOrigin(config.url),
+            claiming: writerLock.writer
+        )
 
         // **The lock is consulted here, and taking it before the open was
         // pointless until it was.** The stated reason for that ordering is
@@ -461,6 +526,15 @@ public final class MarfaClient: Sendable {
         // One registry, shared by the write path and the replay path. The
         // write path checks a `.callback` update can reach a resolver before
         // queueing it; the replay path is what actually calls it.
+        // **Claimed before anything reads or writes the store.** A store holds
+        // one server's rows, one event cursor and a queue of writes addressed
+        // to that server; opening it against a different origin overwrites
+        // rows that are not the same rows and replays somebody's edits at a
+        // server that has never heard of them. Nothing later distinguishes
+        // that from ordinary drift, so it is refused here or not at all.
+        //
+        // Only a writer claims. A reader opening somebody else's store would
+        // otherwise stamp an origin the writer never chose.
         let resolvers = ConflictResolverRegistry()
         let engine = SyncEngine(
             transport: transport,
@@ -472,6 +546,7 @@ public final class MarfaClient: Sendable {
             storeRecovery: opened.recovery,
             isStoreWriter: writerLock.writer
         )
+        handedToClient = true
         return MarfaClient(
             configuration: config,
             transport: transport,
