@@ -26,9 +26,15 @@ struct DiscardBlockedRowTests {
     /// A queue whose only row is blocked on a spent key, plus a later edit to
     /// the same item sitting behind it.
     private func queueWithABlockedRowAndAnEditBehindIt()
-        async throws -> (MutationQueue, blockedId: String, laterId: String)
+        async throws -> (LocalStore, MutationQueue, blockedId: String, laterId: String)
     {
-        let (_, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        // **The pair, not two halves of two pairs.** `makeInMemoryStorePair`
+        // returns a store and a queue sharing one container, which is the shape
+        // `MarfaClient.synced` produces. Calling it twice and keeping one half
+        // of each gave an engine whose store and queue were unrelated
+        // databases — a configuration production cannot make, and the reason
+        // nothing here could assert on the store side of a discard.
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
         try await SyncEngineTestKit.markImported(queue)
 
         try await queue.enqueueUpdateItem(
@@ -42,6 +48,14 @@ struct DiscardBlockedRowTests {
             error: "code=idempotency_key_reused status=422 message=key already answered a different body"
         )
 
+        // **Separated deliberately.** `createdAt` is millisecond-resolution
+        // ISO, and the deferral compares `>=` — so two enqueues in the same
+        // millisecond tie, and a tie waits. The test would still pass, but
+        // through the liveness branch rather than the ordering property it
+        // claims to set up, and a future `>` would make it flake rather than
+        // fail. `SyncEngineBlockedMutationTests` separates for the same reason.
+        try await Task.sleep(for: .milliseconds(5))
+
         // Queued after the block, against the same item. This is the write the
         // deferral holds, and the one a person makes when they try again.
         try await queue.enqueueUpdateItem(
@@ -51,14 +65,15 @@ struct DiscardBlockedRowTests {
         let later = try #require(
             try await queue.fetchAll().first { $0.id != first.id }
         )
-        return (queue, blockedId: first.id, laterId: later.id)
+        // The ordering the deferral turns on, asserted rather than assumed.
+        #expect(later.createdAt > first.createdAt)
+        return (store, queue, blockedId: first.id, laterId: later.id)
     }
 
     /// An engine over that queue, plus the transport it talks to.
-    private func engine(over queue: MutationQueue) async throws
+    private func engine(over store: LocalStore, _ queue: MutationQueue) async throws
         -> (SyncEngine, MockTransport, ConnectionStateManager)
     {
-        let (store, _, _) = try await MarfaSDKTest.makeInMemoryStorePair()
         let transport = MockTransport()
         let connManager = ConnectionStateManager()
         let engine = SyncEngine(
@@ -77,8 +92,8 @@ struct DiscardBlockedRowTests {
 
     @Test("a blocked row holds back a later write to the same item")
     func aBlockedRowHoldsBackALaterWrite() async throws {
-        let (queue, _, _) = try await queueWithABlockedRowAndAnEditBehindIt()
-        let (engine, transport, connManager) = try await engine(over: queue)
+        let (store, queue, _, _) = try await queueWithABlockedRowAndAnEditBehindIt()
+        let (engine, transport, connManager) = try await engine(over: store, queue)
 
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
@@ -95,8 +110,8 @@ struct DiscardBlockedRowTests {
 
     @Test("discarding releases the item, and keeps what was discarded")
     func discardingReleasesTheItem() async throws {
-        let (queue, blockedId, laterId) = try await queueWithABlockedRowAndAnEditBehindIt()
-        let (engine, transport, connManager) = try await engine(over: queue)
+        let (store, queue, blockedId, laterId) = try await queueWithABlockedRowAndAnEditBehindIt()
+        let (engine, transport, connManager) = try await engine(over: store, queue)
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
         #expect(await sentItemIds(transport).isEmpty)
@@ -132,10 +147,94 @@ struct DiscardBlockedRowTests {
         #expect(record.errorStatus == 0, "nobody refused this write")
     }
 
+    @Test("discarding a blocked create takes the ghost item and its orphans with it")
+    func discardingACreateCascades() async throws {
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        try await SyncEngineTestKit.markImported(queue)
+        let (engine, transport, connManager) = try await engine(over: store, queue)
+
+        // A create and an edit of the thing it creates, which is the ordinary
+        // offline shape: make a note, type into it.
+        let created = try await store.createItem(
+            CreateItemInput(type: "core.note", properties: ["body": .string("new")])
+        )
+        try await queue.enqueueCreateItem(
+            CreateItemInput(
+                type: "core.note",
+                properties: ["body": .string("new")],
+                id: created.id
+            ),
+            localId: created.id
+        )
+        try await Task.sleep(for: .milliseconds(5))
+        try await queue.enqueueUpdateItem(
+            id: created.id, properties: ["body": .string("edited")],
+            version: 1, conflict: .auto, tier: nil, sourceId: nil
+        )
+        let createRow = try #require(
+            try await queue.fetchAll().first { $0.kind == .createItem }
+        )
+        // **One refused credential parks every live row**, creates included —
+        // `parkAllLive` filters on state and not on kind. So this is not an
+        // exotic way to get a blocked create in front of the door; it is the
+        // ordinary one.
+        _ = try await queue.parkAllLive(
+            reason: .credentialRefused, error: "code=unauthorized status=401 message=key revoked"
+        )
+
+        try await engine.discard(id: createRow.id)
+
+        // **The edit must not be released.** Freed, it would go to a server
+        // that has never heard of this item, 404, and be dead-lettered on its
+        // own — so "releases the item it was holding back" would be exactly
+        // inverted for a create.
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+        #expect(await sentItemIds(transport).isEmpty, "an orphaned edit reached the server")
+        #expect(try await queue.fetchAll().isEmpty, "the orphaned edit is still queued")
+
+        // Both rows are in the dead-letter log, and the ghost item is gone from
+        // the store rather than sitting there unsyncable forever.
+        let dropped = try await queue.fetchDropped()
+        #expect(dropped.count == 2)
+        // `fetchItem` throws for a row that is not there, which is the
+        // assertion: the ghost is gone rather than merely hidden.
+        await #expect(throws: (any Error).self, "a ghost item survived the discard") {
+            _ = try await store.fetchItem(id: created.id)
+        }
+    }
+
+    @Test("discarding a blocked upload does not strand its bytes")
+    func discardingAnUploadReleasesItsBytes() async throws {
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        try await SyncEngineTestKit.markImported(queue)
+        let (engine, _, _) = try await engine(over: store, queue)
+
+        let bytes = Data("some image bytes".utf8)
+        let hash = "sha256:" + String(repeating: "b", count: 64)
+        try await queue.enqueueBlobUpload(hash: hash, data: bytes, mimeType: "image/jpeg")
+        let row = try #require(try await queue.fetchAll().first { $0.kind == .uploadBlob })
+        _ = try await queue.parkAllLive(
+            reason: .credentialRefused, error: "code=unauthorized status=401 message=key revoked"
+        )
+        #expect(try await queue.fetchPendingBlob(hash: hash) != nil, "the fixture staged no bytes")
+
+        try await engine.discard(id: row.id)
+
+        // **Staged bytes sit outside the eviction walk on purpose** — they are
+        // owed to a server. Nothing is owed once the row is discarded, and the
+        // only other deleter is the successful-upload path, so without this
+        // they are unreachable by every query and never freed.
+        #expect(
+            try await queue.fetchPendingBlob(hash: hash) == nil,
+            "the staged bytes outlived the write that owned them"
+        )
+    }
+
     @Test("only a blocked row can be discarded")
     func onlyABlockedRowCanBeDiscarded() async throws {
-        let (queue, _, laterId) = try await queueWithABlockedRowAndAnEditBehindIt()
-        let (engine, _, _) = try await engine(over: queue)
+        let (store, queue, _, laterId) = try await queueWithABlockedRowAndAnEditBehindIt()
+        let (engine, _, _) = try await engine(over: store, queue)
 
         // **A pending row is the drain's to own.** Discarding one races the
         // cycle that may already be sending it, and "I gave up on that" is not
@@ -148,8 +247,8 @@ struct DiscardBlockedRowTests {
 
     @Test("discarding a row that is not there is not an error")
     func discardingAnAbsentRowIsQuiet() async throws {
-        let (_, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
-        let (engine, _, _) = try await engine(over: queue)
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let (engine, _, _) = try await engine(over: store, queue)
 
         // Two taps on the same row, or a discard racing a drain that dropped
         // it. The caller's intent is already satisfied, so this is not news.

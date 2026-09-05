@@ -747,6 +747,61 @@ public actor MutationQueue {
         try modelContext.save()
     }
 
+    /// The outcome of a discard attempt, decided inside the transaction that
+    /// performs it.
+    enum DiscardOutcome: Sendable {
+        /// The row was blocked and is now in the dead-letter log. Carries what
+        /// was discarded, because the caller has cascading and store cleanup to
+        /// do and cannot re-read a row it has just deleted.
+        case discarded(PendingMutationRecord)
+        /// The row is present and not blocked, so it belongs to the drain.
+        case notBlocked(PendingMutationState)
+        /// No such row. Two taps, or a discard racing a drain that already
+        /// dropped it: the caller's intent is satisfied either way.
+        case absent
+    }
+
+    /// Dead-letters a blocked row, deciding *inside the transaction* whether it
+    /// is eligible.
+    ///
+    /// **The check and the act have to be one hop.** `SyncEngine` is a
+    /// reentrant actor and this queue is another, so a caller that fetches,
+    /// inspects and then drops is holding a snapshot across two suspensions —
+    /// and a drain can run to completion in between. A row blocked on
+    /// `resolverMissing` becomes replayable the moment a resolver is
+    /// registered, so the sequence "register a resolver, discard the row" can
+    /// replay it, succeed, and then dead-letter it under a message saying it
+    /// was never sent. `insertDroppedRow` is first-write-wins by id, so the
+    /// same race in the other direction hides a real server refusal behind a
+    /// `discarded_by_app` row.
+    ///
+    /// `clearBlock(id:)` already works this way; this is the same discipline.
+    func discardIfBlocked(
+        id: String,
+        droppedAt: Date,
+        error: MarfaError
+    ) throws -> DiscardOutcome {
+        let predicate = #Predicate<PendingMutationModel> { $0.id == id }
+        var descriptor = FetchDescriptor<PendingMutationModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try modelContext.fetch(descriptor).first else { return .absent }
+        guard model.state == .blocked else { return .notBlocked(model.state) }
+
+        let record = model.toRecord()
+        insertDroppedRow(
+            from: record,
+            droppedAt: Self.iso8601(droppedAt),
+            error: error,
+            // **No attempt was made**, so the count must not claim one. Every
+            // other producer of a dropped row writes `attemptCount + 1`
+            // because a real attempt just failed; here nothing was sent.
+            attemptCount: record.attemptCount
+        )
+        modelContext.delete(model)
+        try modelContext.save()
+        return .discarded(record)
+    }
+
     /// Records a failed replay attempt. Also resets `state` to `.pending`
     /// so a `.inFlight` row doesn't appear stuck in the consumer-facing
     /// observable after a transient failure.
@@ -1360,7 +1415,11 @@ public actor MutationQueue {
         from record: PendingMutationRecord,
         droppedAt: String,
         error: MarfaError,
-        entry: DroppedBulkEntry? = nil
+        entry: DroppedBulkEntry? = nil,
+        /// Defaults to one more than the row has, because every producer but
+        /// one is recording an attempt that has just failed. A discard is the
+        /// exception: nothing was sent, so it passes the count unchanged.
+        attemptCount: Int? = nil
     ) {
         let rowId = entry.map { "\(record.id)#\($0.key)" } ?? record.id
 
@@ -1389,7 +1448,7 @@ public actor MutationQueue {
         model.localId = entry?.localId ?? record.localId
         model.enqueuedAt = record.createdAt
         model.droppedAt = droppedAt
-        model.attemptCount = record.attemptCount + 1
+        model.attemptCount = attemptCount ?? (record.attemptCount + 1)
         model.errorStatus = error.status
         model.errorCode = error.code
         // Cap the message at 1KB so a pathological server response

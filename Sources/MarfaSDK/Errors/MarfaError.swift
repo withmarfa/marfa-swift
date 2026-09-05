@@ -99,7 +99,7 @@ open class MarfaError: Error, @unchecked Sendable {
     /// rather than retrying it, so an app showing why a write has stopped
     /// should not have to hardcode the string to recognize it. The remedy is
     /// not a retry — the key is spent, not the write. Nor is it re-applying
-    /// the edit, which this comment claimed until 17.1.0: the queue defers
+    /// the edit, which this comment claimed until the door below existed: the queue defers
     /// every later write to an item behind that item's blocked row, so the
     /// fresh mutation waits behind the one it was meant to route around.
     /// ``SyncEngine/discard(id:)`` is what releases both.
@@ -246,8 +246,11 @@ public final class SchemaVersionMismatchError: MarfaError {
 /// up on that" is not a thing anyone can mean about a write still being
 /// attempted. Only a row the engine has stopped asking about can be discarded.
 ///
-/// `status` is the row's current state, so a caller that raced a drain can tell
-/// "it already went" from "it is still going".
+/// ``state`` carries what the row is doing instead — `.pending` or
+/// `.inFlight`, both of which mean the drain still owns it. A row that has
+/// already left the queue does not reach here at all:
+/// ``SyncEngine/discard(id:)`` returns quietly for one, because the caller's
+/// intent is satisfied either way.
 public final class DiscardNotBlockedError: MarfaError {
     /// The queue id the caller named.
     public let mutationId: String

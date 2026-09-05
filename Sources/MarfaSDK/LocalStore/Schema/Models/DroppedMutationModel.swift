@@ -94,10 +94,17 @@ final class DroppedMutationModel {
     /// HTTP status code from the dropping error (typically 400, 403, 404,
     /// or 409 on a create).
     ///
-    /// `0` means the failure had no HTTP status of its own. Two cases: the
-    /// blob-data-missing `ValidationError` synthesized inside the engine,
-    /// and a single refused entry of a bulk call, where the call itself
-    /// answered `200` and only the entry was rejected.
+    /// `0` means the failure had no HTTP status of its own. Three cases: a
+    /// single refused entry of a bulk call, where the call itself answered
+    /// `200` and only the entry was rejected; a failure synthesized inside the
+    /// engine rather than received; and — since 17.1.0 — a write the app
+    /// discarded through ``SyncEngine/discard(id:)``, which no server ever
+    /// refused because it was never sent.
+    ///
+    /// **Branch on ``errorCode`` rather than on this**, which the third case
+    /// makes plainly necessary: ``MarfaError/discardedByAppCode`` is the one
+    /// row in this log that is not a refusal, and an app rendering it as one
+    /// tells somebody their write failed when they withdrew it.
     var errorStatus: Int = 0
 
     /// ``MarfaError/code`` string (e.g. `"validation_error"`,

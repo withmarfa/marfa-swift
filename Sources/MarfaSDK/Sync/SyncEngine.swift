@@ -523,14 +523,26 @@ public actor SyncEngine {
     /// registered.
     ///
     /// So a row nothing can release strands the item as well as itself, and
-    /// two reasons have nothing that releases them. A spent idempotency key is
-    /// refused identically however often it is sent. And a conflict the server
-    /// declined comes back from the server's own idempotency record, because
-    /// the row's key is minted once and its body re-encodes identically — which
-    /// makes ``PendingMutationBlockReason/conflictUnresolved`` the same trap
-    /// under `.auto` and `.manual`, and that is the ordinary outcome for an
-    /// `.auto` write rather than an edge case. `.callback` escapes it, because
-    /// the resolver's answer goes out under a fresh key.
+    /// some reasons have nothing that releases them.
+    ///
+    /// A spent idempotency key is refused identically however often it is sent.
+    /// And a conflict the server declined comes back from the server's own
+    /// record: the row's key is minted once and its body re-encodes
+    /// identically, and the server retains a `409` against a key rather than
+    /// releasing it — confirmed against `packages/server/src/middleware/idempotency.ts`,
+    /// whose `RELEASED_STATUSES` is `{401, 403}` and whose comment says a
+    /// conflict is a property of the request. So
+    /// ``PendingMutationBlockReason/conflictUnresolved`` is the same trap under
+    /// `.auto` and `.manual`, and that is the ordinary outcome for an `.auto`
+    /// write rather than an edge case. `.callback` escapes it, because the
+    /// resolver's answer goes out under a fresh key — though it can still park
+    /// here if those answers keep being refused.
+    ///
+    /// **That mechanism is not obviously limited to those two.** Every replay
+    /// carries the row's key, so any recorded non-2xx is a candidate for the
+    /// same replay-from-record. Which other reasons it reaches has not been
+    /// measured, so this says what was checked rather than drawing the wider
+    /// conclusion.
     ///
     /// Before this, ``retry(id:)`` and ``retryAll(reason:)`` were the whole
     /// release surface and both put the row back into the same refusal. There
@@ -550,23 +562,52 @@ public actor SyncEngine {
     ///
     /// - Parameter id: the queue id, as ``PendingMutationSummary/id`` carries it.
     public func discard(id: String) async throws {
-        guard let record = try await mutationQueue.fetchAll().first(where: { $0.id == id })
-        else { return }
-        guard record.state == .blocked else {
-            throw DiscardNotBlockedError(mutationId: id, state: record.state)
-        }
-        try await mutationQueue.recordDropped(
-            record: record,
-            droppedAt: Date(),
-            error: MarfaError(
-                code: MarfaError.discardedByAppCode,
-                message: "Discarded by the app. This write was never sent.",
-                status: 0
-            )
+        let droppedAt = Date()
+        let marfaError = MarfaError(
+            code: MarfaError.discardedByAppCode,
+            // **"Stopped asking", not "never sent".** This string reaches a
+            // person through `DroppedMutationRecord.errorMessage`, and "never
+            // sent" is false for most of the reasons that get here: a
+            // `retriesExhausted` row was sent up to the ceiling and refused
+            // each time, and a `conflictUnresolved` one was sent and answered
+            // `409`. What is true of every discard is that the app stopped.
+            message: "Discarded by the app, which stopped trying to send it.",
+            status: 0
         )
+        // **One hop, so the row cannot change under the decision.** See
+        // `MutationQueue.discardIfBlocked`: fetching, inspecting and then
+        // dropping across two suspensions lets a drain run in between, and the
+        // dead-letter log then records a write that actually landed.
+        let outcome = try await mutationQueue.discardIfBlocked(
+            id: id, droppedAt: droppedAt, error: marfaError
+        )
+        let record: PendingMutationRecord
+        switch outcome {
+        case .absent:
+            return
+        case .notBlocked(let state):
+            throw DiscardNotBlockedError(mutationId: id, state: state)
+        case .discarded(let discarded):
+            record = discarded
+        }
+
         logger.log.info(
             "sync.queue.discarded id=\(id, privacy: .public) kind=\(record.kind.rawValue, privacy: .public)"
         )
+        emit(.mutationDropped(
+            kind: record.kind.rawValue,
+            itemId: record.localId,
+            attempt: record.attemptCount,
+            error: marfaError
+        ))
+
+        // **The same cleanup a permanent refusal does**, because the row is
+        // gone for the same reason from everything downstream's point of view.
+        // Discarding was first written as the blocked-row half of `retry`, and
+        // that was the wrong model: `retry` leaves the row in the queue, so it
+        // owes nothing to the local store or to the writes behind it.
+        await cleanUpAfterDiscarding(record, droppedAt: droppedAt, error: marfaError)
+
         // The item is free now, so anything that was waiting behind this row
         // should go. Same shape as `retry(id:)`: a cycle already running takes
         // them on the pass that follows, an idle engine schedules one.
@@ -582,6 +623,71 @@ public actor SyncEngine {
             drainRequestedDuringCycle = true
         } else {
             scheduleProactiveDrain()
+        }
+    }
+
+    /// What a discarded row owes the rest of the store.
+    ///
+    /// Mirrors the drain's permanent-drop path, and for the same reasons: a
+    /// row that will never reach the server leaves behind a local item nothing
+    /// can sync, downstream writes that would each 404 in turn, and — for an
+    /// upload — staged bytes with no remaining owner.
+    ///
+    /// **`credentialRefused` is why every kind has to be handled rather than
+    /// just `updateItem`.** One refused credential parks *every* live row
+    /// through `parkAllLive`, with no filter on kind, so a `createItem`, a
+    /// `createEdge` and an `uploadBlob` can all be sitting in front of this
+    /// door at once.
+    private func cleanUpAfterDiscarding(
+        _ record: PendingMutationRecord,
+        droppedAt: Date,
+        error marfaError: MarfaError
+    ) async {
+        switch record.kind {
+        case .createEdge:
+            if let localId = record.localId {
+                try? await localStore.deleteEdge(id: localId)
+            }
+
+        case .uploadBlob:
+            // Staged bytes are keyed by content hash and live outside the
+            // eviction walk, deliberately — they are owed to a server. Nothing
+            // is owed once the row is discarded, and the only other deleter is
+            // the successful-upload path, so without this they are orphaned
+            // with no owner and no query that can find them.
+            if let payload = try? JSONDecoder().decode(
+                UploadBlobPayload.self,
+                from: Data(record.payloadJson.utf8)
+            ) {
+                try? await mutationQueue.deletePendingBlob(hash: payload.hash)
+            }
+
+        case .createItem:
+            // Every later write to this item would now be sent to a server
+            // that has never heard of it, 404 one at a time, and be dropped
+            // individually. Drop them together and purge the ghost row.
+            guard let localId = record.localId else { break }
+            let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(
+                localId, droppedAt: droppedAt, error: marfaError
+            )) ?? []
+            try? await localStore.purgeItem(id: localId)
+            for ghost in cascaded {
+                if ghost.kind == .createEdge, let ghostId = ghost.localId {
+                    try? await localStore.deleteEdge(id: ghostId)
+                }
+                logger.log.error(
+                    "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
+                )
+                emit(.mutationDropped(
+                    kind: ghost.kind.rawValue,
+                    itemId: ghost.localId,
+                    attempt: ghost.attemptCount + 1,
+                    error: marfaError
+                ))
+            }
+
+        default:
+            break
         }
     }
 
