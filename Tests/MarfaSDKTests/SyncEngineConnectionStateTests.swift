@@ -70,6 +70,11 @@ struct SyncEngineConnectionStateTests {
         #expect(await iterator.next() == nil)
     }
 
+    /// Also pins that `start()` clears the stopped flag: without that, the
+    /// stream this takes after the restart would be handed back already
+    /// finished. That property had a test of its own for a while and it was
+    /// redundant — this one and `oldStreamIsIsolatedAcrossRestart` both redden
+    /// on it, and both without opening a second real path monitor.
     @Test("start after stop creates a fresh monitor and stream")
     func startAfterStopRestartsMonitoring() async throws {
         let manager = ConnectionStateManager()
@@ -116,5 +121,32 @@ struct SyncEngineConnectionStateTests {
         #expect(await newIterator.next() == transition)
         #expect(await oldIterator.next() == nil)
         await manager.stop()
+    }
+
+    /// **A stream taken after `stop()` must end rather than hang.** `stop()`
+    /// finishes the subscribers it is holding, so one arriving afterwards
+    /// registered into a table nothing would read again: it received the
+    /// current state and then waited on a manager that had already said its
+    /// last word.
+    ///
+    /// The documentation on `stateUpdates` promised this property for the
+    /// other ordering — take a stream, then stop — which does work, and is why
+    /// the gap sat one line from a comment about it.
+    ///
+    /// **The shape that lands here is a re-subscription, not an outliving
+    /// one.** A subscriber that took its stream first is covered by that other
+    /// ordering and ends cleanly. This is the view whose `for await` ended at
+    /// teardown and whose `.task` immediately takes a fresh stream from the
+    /// same manager before the rebuild swaps the reference — which is an
+    /// ordinary SwiftUI shape rather than an exotic one.
+    @Test("a stream taken after stop ends rather than hanging")
+    func aStreamTakenAfterStopEnds() async {
+        let manager = ConnectionStateManager()
+        await manager.applyStateForTesting(.online)
+        await manager.stop()
+
+        var yielded: [ConnectionState] = []
+        for await state in manager.stateUpdates { yielded.append(state) }
+        #expect(yielded.isEmpty, "a stopped manager has nothing left to say")
     }
 }

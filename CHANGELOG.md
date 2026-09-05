@@ -7,6 +7,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Fixed
+
+- **A connection stream taken after the engine stopped waited forever.** `SyncEngine.stop()` stops the connection manager, which finishes every subscriber it is holding at the time. A subscriber arriving afterwards registered into a table nothing would read again: it was handed the current state and then waited on a manager that had already published its last value. `for await` never returned.
+
+  It surfaces as a view that stays alive across a teardown — a status line still iterating while the app tears its client down and rebuilds it. Taking the stream *before* `stop()` always worked, which is the property the code's own documentation described, and is why a gap one line away went unread.
+
+  A stopped manager now hands back a stream that is already finished, and a manager started again publishes again.
+
 ### Changed
 
 - **The engine reports itself, which is rule 19 and was the one rule with nothing behind it.** An app had to keep hold of the `ConnectionStateManager` it passed into the synced factory in order to answer "am I online", and had to fetch three arrays and measure them to answer "how much is outstanding". Both are on the client object now.

@@ -30,6 +30,17 @@ public actor ConnectionStateManager {
     private struct Broadcast {
         var state: ConnectionState = .offline
         var continuations: [UUID: AsyncStream<ConnectionState>.Continuation] = [:]
+        /// Set by ``stop()``, cleared by ``start()``. Under the mutex rather
+        /// than in actor storage because ``stateUpdates`` is `nonisolated` and
+        /// has to read it on the same synchronous path that registers.
+        ///
+        /// **Distinct from `started`, which this cannot be folded into.** A
+        /// manager that has never been started is not a stopped one, and that
+        /// is a documented public contract rather than a test convenience:
+        /// the usage example on this type takes a stream from a manager it
+        /// never starts, and `stateUpdatesYieldsCurrentStateImmediately`
+        /// pins it. Gating on `started` would finish both.
+        var stopped = false
     }
 
     private let broadcast = Mutex(Broadcast())
@@ -61,6 +72,7 @@ public actor ConnectionStateManager {
     /// Starts monitoring. Idempotent — calling again while already started is a no-op.
     public func start() {
         guard !started else { return }
+        broadcast.withLock { $0.stopped = false }
         let monitor = NWPathMonitor()
         let generation = UUID()
         self.monitor = monitor
@@ -86,6 +98,7 @@ public actor ConnectionStateManager {
         // `finish()` can run a continuation's termination handler inline, and
         // that handler reaches back for this same lock to deregister.
         let open = broadcast.withLock { broadcast -> [AsyncStream<ConnectionState>.Continuation] in
+            broadcast.stopped = true
             defer { broadcast.continuations.removeAll() }
             return Array(broadcast.continuations.values)
         }
@@ -139,9 +152,21 @@ public actor ConnectionStateManager {
         continuation.onTermination = { [weak self] _ in
             self?.removeContinuation(id: id)
         }
-        let current = broadcast.withLock { broadcast -> ConnectionState in
+        // **A manager that has stopped has already published its last value.**
+        // Registering here would put the continuation into a table nothing
+        // will ever read again: `stop()` finishes the subscribers it holds at
+        // the time, so one arriving afterwards is handed the current state and
+        // then waits forever. The comment above promised the opposite property
+        // for the adjacent ordering — take a stream and then stop — which is
+        // why this was not noticed.
+        let current = broadcast.withLock { broadcast -> ConnectionState? in
+            if broadcast.stopped { return nil }
             broadcast.continuations[id] = continuation
             return broadcast.state
+        }
+        guard let current else {
+            continuation.finish()
+            return stream
         }
         continuation.yield(current)
         return stream
