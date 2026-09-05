@@ -136,6 +136,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **A store records which server it belongs to, and refuses to open against another one.** `MarfaClient.synced(...)` claims the origin on first use and compares it on every later open; a mismatch throws the new `StoreIdentityMismatchError`, carrying the axis that disagreed and both values.
+
+  **There is nothing to reconcile, which is why this refuses rather than merging.** A store holds one server's rows, one event cursor and a queue of writes addressed to that server. Opening it against a different origin does not give you a store with two servers' data in it — it gives you one where every later answer overwrites rows that were never the same rows, and a queue that replays somebody's edits at a server that has never heard of them. Nothing afterwards distinguishes that from ordinary drift, so it is caught at the door or not at all.
+
+  **Only a writer claims**, so a read-only client cannot stamp an origin the writer never chose. A store built in local mode is unclaimed and takes whichever origin first opens it, because it has no server until it is given one.
+
+  Two spellings of one server are one origin: a trailing slash and letter case are normalized, since `ClientConfiguration` takes whatever URL a consumer passes and refusing over that would be a false refusal on a difference nobody made.
+
+  New public types: `StoreIdentityMismatchError` and `StoreIdentityAxis`. **The space and account axes are not here** — both need a credential resolved against the server, where the origin is known offline at the moment it matters. `MarfaClient.storeOwnership(resolvedWith:)` already answers the account question for a consumer that asks.
+
 - **A blob this device already has is readable without the network, and the one it just uploaded is the case that was broken.** The only copy a device held of a blob it had sent was the outbound buffer, and that row is deleted the moment the upload succeeds. So a person could save a picture, watch it sync, and then not open it on a train — every read went back to the network for a file the device had held minutes earlier.
 
   **A hash is a content address, so a cached copy can never be the wrong answer.** There is no version to be behind and no staleness to reason about, which is what makes a read-through cache correct here rather than merely fast, and why it works with no server at all. `blobs.download(hash:)` on a client with a store now serves what the store holds and writes through what it fetches; on a pure-local client it answers from the cache instead of refusing outright, and refuses only for a hash it has never seen.

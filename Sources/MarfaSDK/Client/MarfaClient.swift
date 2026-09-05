@@ -89,6 +89,19 @@ public final class MarfaClient: Sendable {
     /// restriction that does not exist.
     public var holdsStoreWriteLock: Bool { storeWriterLock?.writer ?? true }
 
+    /// The origin string a store records, normalized so two spellings of one
+    /// server do not read as two servers.
+    ///
+    /// A trailing slash is the case that bites: `ClientConfiguration` takes
+    /// whatever URL a consumer passes, and `https://api.marfa.so` and
+    /// `https://api.marfa.so/` are the same server. Refusing to open a store
+    /// over that would be a false refusal on a difference nobody made.
+    static func canonicalOrigin(_ url: URL) -> String {
+        var text = url.absoluteString
+        while text.hasSuffix("/") { text.removeLast() }
+        return text.lowercased()
+    }
+
     /// Who holds the store's writer lock, when this client does not.
     public var storeHeldBy: StoreLockHolder? { storeWriterLock?.heldBy }
 
@@ -461,6 +474,19 @@ public final class MarfaClient: Sendable {
         // One registry, shared by the write path and the replay path. The
         // write path checks a `.callback` update can reach a resolver before
         // queueing it; the replay path is what actually calls it.
+        // **Claimed before anything reads or writes the store.** A store holds
+        // one server's rows, one event cursor and a queue of writes addressed
+        // to that server; opening it against a different origin overwrites
+        // rows that are not the same rows and replays somebody's edits at a
+        // server that has never heard of them. Nothing later distinguishes
+        // that from ordinary drift, so it is refused here or not at all.
+        //
+        // Only a writer claims. A reader opening somebody else's store would
+        // otherwise stamp an origin the writer never chose.
+        if writerLock.writer {
+            try await queue.claimOrigin(Self.canonicalOrigin(config.url))
+        }
+
         let resolvers = ConflictResolverRegistry()
         let engine = SyncEngine(
             transport: transport,
