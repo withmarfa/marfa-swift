@@ -280,6 +280,8 @@ struct FullSyncStateQueryTests {
         let (store, queue, transport, connManager, engine) = try await makeFixture()
         let query = try #require(store.queryFullSyncState())
 
+        let events = engine.events
+
         // Two rows: the first meets the network, the second meets the 401.
         for label in ["flaky", "refused"] {
             var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
@@ -292,18 +294,35 @@ struct FullSyncStateQueryTests {
         await connManager.applyStateForTesting(.online)
         await engine.triggerProactiveDrainForTesting()
 
-        // **Waited on the terminal state rather than on `.parked` itself.**
-        // Written the other way this passed with the fix removed: the cycle
-        // does reach `.parked` for an instant on its way to emitting the
-        // earlier row's failure, and a poll for a value it briefly holds
-        // cannot tell that from a value it settles on.
-        try await awaitCondition(description: "the cycle to reach a terminal state") {
-            if case .syncing = query.state { return false }
-            if case .notYetSynced = query.state { return false }
-            return true
+        // **Asserted on the cycle's last event, not on a state polled for.**
+        // Two rewrites of this were vanity and a mutation caught each. Polling
+        // for `.parked` finds it on the way past — the unfixed engine
+        // announced the park mid-loop and the failure at the tail — and
+        // polling for "not `.syncing`" stops on that same passing `.parked`.
+        // The property is an ordering one, so the assertion is on the order.
+        // Read back after `stop()` finishes the stream, which is what makes
+        // this finite and exact rather than a poll that can land mid-cycle.
+        let seen = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        let terminal = seen.last { event in
+            switch event {
+            case .synced, .failed, .queueParked: return true
+            default: return false
+            }
         }
+        guard case .queueParked(let reason, let count)? = terminal else {
+            Issue.record("the cycle's last word was \(String(describing: terminal))")
+            query.stop()
+            return
+        }
+        #expect(reason == .credentialRefused)
+        // Both, not one: the row that met the network is still live when the
+        // credential is refused, and a refused credential parks everything
+        // live. Its own transient failure is not the reason it has stopped.
+        #expect(count == 2)
+
+        // And the fold agrees, which is the consumer-visible half.
         if case .parked = query.state {} else {
-            Issue.record("the earlier row's failure overwrote the park: \(query.state)")
+            Issue.record("the query settled on \(query.state)")
         }
         query.stop()
     }
@@ -317,6 +336,8 @@ struct FullSyncStateQueryTests {
     func aLaterFailureDoesNotOverwriteAStandingPark() async throws {
         let (store, queue, transport, connManager, engine) = try await makeFixture()
         let query = try #require(store.queryFullSyncState())
+
+        let events = engine.events
 
         var first = CreateItemInput(type: "core.note", properties: ["body": .string("refused")])
         first.id = UUIDv7.generateString()
@@ -337,15 +358,26 @@ struct FullSyncStateQueryTests {
         transport.enqueueError(NetworkError(URLError(.notConnectedToInternet)))
         await engine.triggerProactiveDrainForTesting()
 
-        // Wait for the cycle's terminal event to be folded rather than for a
-        // value: the query moves to `.syncing` first, and asserting on the
-        // instant the drain returns reads that rather than its outcome.
-        try await awaitCondition(description: "the cycle to reach a terminal state") {
-            if case .syncing = query.state { return false }
-            return true
+        // **The same ordering assertion, for the same reason.** Waiting for
+        // "not `.syncing`" here can return before the second cycle's
+        // `.syncing` has even been folded, in which case it reads the park
+        // left by the first cycle and asserts nothing about the second.
+        // Read back after `stop()` finishes the stream, which is what makes
+        // this finite and exact rather than a poll that can land mid-cycle.
+        let seen = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        let terminal = seen.last { event in
+            switch event {
+            case .synced, .failed, .queueParked: return true
+            default: return false
+            }
+        }
+        guard case .queueParked? = terminal else {
+            Issue.record("a later failure was the cycle's last word: \(String(describing: terminal))")
+            query.stop()
+            return
         }
         if case .parked = query.state {} else {
-            Issue.record("a later failure overwrote the park: \(query.state)")
+            Issue.record("the query settled on \(query.state)")
         }
         query.stop()
     }
@@ -381,4 +413,73 @@ struct FullSyncStateQueryTests {
         }
         query.stop()
     }
+
+    /// **A conflict awaiting review sits alongside the park, by design**, and
+    /// the announcement was first keyed on the total number of blocked rows —
+    /// so releasing the credential while that conflict stood left the query on
+    /// `.parked`, telling somebody who had just signed in to sign in again.
+    /// Which is the sentence the announcement exists to prevent.
+    @Test("releasing the credential announces it even with another reason still blocked")
+    func releasingAnnouncesWithAnotherReasonStillBlocked() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let query = try #require(store.queryFullSyncState())
+
+        for label in ["conflicted", "refused"] {
+            var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
+            input.id = UUIDv7.generateString()
+            try await queue.enqueueCreateItem(input, localId: input.id!)
+        }
+        // One row parked on something a new credential cannot settle.
+        let rows = try await queue.fetchAll()
+        try await queue.recordBlocked(
+            id: rows[0].id, reason: .conflictUnresolved, error: "somebody has to settle this"
+        )
+
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+        try await awaitCondition(description: "query.state becomes .parked") {
+            if case .parked = query.state { return true }
+            return false
+        }
+
+        // Offline, so nothing but the announcement can move it.
+        await connManager.applyStateForTesting(.offline)
+        #expect(try await engine.retryAll(reason: .credentialRefused) == 1)
+        #expect(try await queue.counts.blocked[.conflictUnresolved] == 1, "the conflict stands")
+
+        try await awaitCondition(description: "query.state leaves .parked") {
+            if case .parked = query.state { return false }
+            return true
+        }
+        query.stop()
+    }
+
+    /// And releasing a reason that never parked the queue announces nothing,
+    /// because moving an app off a `.synced` that was correct is the same
+    /// defect in the other direction.
+    @Test("releasing an unrelated reason does not announce a release")
+    func releasingAnUnrelatedReasonAnnouncesNothing() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let events = engine.events
+
+        var input = CreateItemInput(type: "core.note", properties: ["body": .string("conflicted")])
+        input.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(input, localId: input.id!)
+        let rows = try await queue.fetchAll()
+        try await queue.recordBlocked(
+            id: rows[0].id, reason: .conflictUnresolved, error: "settle me"
+        )
+        _ = transport
+        await connManager.applyStateForTesting(.offline)
+
+        #expect(try await engine.retryAll(reason: .conflictUnresolved) == 1)
+
+        let seen = await SyncEngineTestKit.publishedEvents(from: events, closing: engine)
+        #expect(
+            !seen.contains { if case .syncing = $0 { return true } else { return false } },
+            "announced a release of a park that never happened: \(seen)"
+        )
+    }
 }
+

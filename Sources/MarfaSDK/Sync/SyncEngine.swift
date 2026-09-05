@@ -404,6 +404,10 @@ public actor SyncEngine {
     ///    persisted.
     /// 5. ``FullSyncState/notYetSynced`` otherwise.
     ///
+    /// A queue that cannot be read reports ``FullSyncState/failed(at:error:)``
+    /// rather than falling through, for the reason ``status`` gives: a store
+    /// that will not answer is not a store with nothing in it.
+    ///
     /// **The park is read here and not only written.** Suppressing the clean
     /// drain stops a *new* timestamp being stamped and does nothing about the
     /// one already there, so a store that synced before the credential died
@@ -1128,10 +1132,22 @@ public actor SyncEngine {
         // **And say that the park is over.** Nothing else does: the drain
         // scheduled above may not run for a long time — the device may be
         // offline — and a consumer folding events would sit on `.parked` while
-        // the queue holds no blocks at all, telling somebody who has just
-        // signed in to sign in again. `.syncing` is the honest word for it:
-        // the work has been released and is on its way.
-        if (try? await mutationQueue.counts.blockedTotal) == 0 {
+        // the credential that caused it has been replaced, telling somebody who
+        // has just signed in to sign in again. `.syncing` is the honest word
+        // for it: the work has been released and is on its way.
+        //
+        // **Keyed on the reason rather than on the total, which is what this
+        // was first written as and is wrong in two directions.** A queue can
+        // hold a conflict awaiting review alongside the credential park —
+        // `parkAllLive` leaves an already-blocked row on its own reason, by
+        // design — so a total that is still non-zero would withhold the
+        // announcement for a park that really is over. And releasing some
+        // *other* reason on a queue that was never parked would announce a
+        // release of something that never happened, moving an app off a
+        // `.synced` that was correct.
+        if reason == .credentialRefused,
+            ((try? await mutationQueue.counts.blocked[.credentialRefused]) ?? nil) == nil
+        {
             emit(.syncing)
         }
         return released
