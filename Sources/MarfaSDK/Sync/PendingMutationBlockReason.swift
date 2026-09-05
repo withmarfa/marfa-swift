@@ -47,6 +47,30 @@ public enum PendingMutationBlockReason: String, Sendable, Equatable, CaseIterabl
     /// as the engine is willing to try. Nothing here promises a further attempt
     /// would differ, which is why an unreadable stored reason falls back to it.
     case retriesExhausted
+
+    /// The server refused the credential, and the transport had already spent
+    /// its one refresh on it. Every queued write parks together, because they
+    /// all carry the same credential and none of them can succeed until a
+    /// person replaces it.
+    ///
+    /// **This is the one refusal that looks environmental and is not.** A
+    /// connectivity failure, a `5xx` and a `429` all clear on their own; a
+    /// spent credential clears only when somebody signs in again. Treated as
+    /// environmental, as it was, the queue retried for ever and an app could
+    /// show only a count of unsent writes that never moved — with nothing
+    /// anywhere saying what the person had to do.
+    case credentialRefused
+
+    /// The idempotency key on this write has already been answered for a
+    /// different body, so the server refuses it with `idempotency_key_reused`.
+    ///
+    /// **Parks on the first refusal, because the key is spent rather than the
+    /// write.** Repeating it is refused identically however often anyone tries,
+    /// so the retry ceiling would be spent on guaranteed refusals and the row
+    /// would then park under a reason naming the wrong cause. What clears it is
+    /// the app re-applying the edit, which makes a fresh mutation carrying a
+    /// fresh key; `retry(id:)` does not.
+    case idempotencyKeyReused
 }
 
 // MARK: - Classification
@@ -59,12 +83,18 @@ extension PendingMutationBlockReason {
     /// count *before* this failure, so the ceiling below is compared against
     /// the refusal that has just happened.
     ///
-    /// **The network class never blocks, however often it fails.** A
-    /// connectivity failure, a `5xx`, a `429`, a `401` and a suspended space
-    /// are statements about the environment rather than about the write, and
-    /// each clears without the app doing anything. Counting them would strand a valid write behind an
-    /// outage and then need a person to release it — a worse defect than the one
-    /// this mechanism exists to fix.
+    /// **The environmental class never blocks, however often it fails.** A
+    /// connectivity failure, a `5xx`, a `429` and a suspended space are
+    /// statements about the environment rather than about the write, and each
+    /// clears without the app doing anything. Counting them would strand a
+    /// valid write behind an outage and then need a person to release it — a
+    /// worse defect than the one this mechanism exists to fix.
+    ///
+    /// **A `401` was in that list and is not any more.** It clears only when a
+    /// person replaces the credential, so retrying it for ever left an app with
+    /// nothing to say beyond an unsent count that did not move. It is
+    /// classified above this, as
+    /// ``PendingMutationBlockReason/credentialRefused``.
     ///
     /// `CancellationError` is exempt for a less obvious reason.
     /// ``SyncEngine/stop()`` cancels an in-flight replay and the throw lands
@@ -72,7 +102,13 @@ extension PendingMutationBlockReason {
     /// accrue one failure per stop. Without this, a handful of ordinary app
     /// backgrounds would block a mutation nothing had ever refused.
     /// Whether a failure is about the environment rather than about the
-    /// write: connectivity, a `5xx`, a `429`, a `401`, a suspended space.
+    /// write: connectivity, a `5xx`, a `429`, a suspended space — and a `401`,
+    /// which is the one entry that is true of this function and no longer true
+    /// of the kit. `classify` returns `credentialRefused` before ever asking,
+    /// so this answer is never the one that decides a 401. It stays because it
+    /// remains a true statement about the transport class, and because a
+    /// reordering that put this first would otherwise start counting a dead
+    /// credential toward the ceiling in silence.
     ///
     /// The one definition of that class, so nothing that consults it can
     /// disagree about which failures it means. It is transport-shaped: see
@@ -119,6 +155,40 @@ extension PendingMutationBlockReason {
         // `ResponseDecodingError` all carry `status == 0` and mean three
         // different things.
         if error is ConflictResolverMissingError { return .resolverMissing }
+
+        // **Before the environmental sweep, which used to swallow this.** A
+        // `401` reaching the queue is one the transport's single refresh did
+        // not clear, so it is a statement about the credential rather than
+        // about the network — and unlike everything else in that class it does
+        // not clear on its own.
+        //
+        // `isEnvironmental` still answers `true` for a 401 and is never asked:
+        // this returns first, so the `case 401` below is unreachable from
+        // here. It is left in place because it remains a true statement about
+        // the transport class, and because a future reordering that put the
+        // sweep first would otherwise start counting a dead credential toward
+        // the ceiling silently.
+        //
+        // **What keeps this off the ceiling is `recordBlocked`**, which does
+        // not raise `refusalCount` — not the sweep. That distinction matters:
+        // a reader who believes the sweep is load-bearing here will preserve
+        // the wrong thing.
+        if let marfaError = error as? MarfaError, marfaError.status == 401 {
+            return .credentialRefused
+        }
+
+        // A key answered for a different body cannot be replayed into a
+        // different answer, so this parks rather than spending the ceiling on
+        // refusals that are all the same refusal.
+        if let marfaError = error as? MarfaError,
+            marfaError.status == 422,
+            // 422 confirmed against the server's own code-to-status map
+            // in `packages/shared/src/errors.ts`, not inferred from the kit.
+            marfaError.code == MarfaError.idempotencyKeyReusedCode
+        {
+            return .idempotencyKeyReused
+        }
+
         // The environmental class never blocks, however often it fails, and
         // `isEnvironmental` is the one place that says what is in it — a
         // suspended space is a 403, so it has to be named rather than caught

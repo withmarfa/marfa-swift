@@ -396,11 +396,25 @@ public actor SyncEngine {
     ///
     /// Order of precedence:
     /// 1. ``FullSyncState/syncing`` if a drain cycle is currently in flight.
-    /// 2. ``FullSyncState/failed(at:error:)`` if the most recent cycle
+    /// 2. ``FullSyncState/parked(reason:count:)`` if the queue has stopped on
+    ///    a refused credential.
+    /// 3. ``FullSyncState/failed(at:error:)`` if the most recent cycle
     ///    bailed and no later clean drain has cleared it.
-    /// 3. ``FullSyncState/synced(at:)`` if a clean drain timestamp is
+    /// 4. ``FullSyncState/synced(at:)`` if a clean drain timestamp is
     ///    persisted.
-    /// 4. ``FullSyncState/notYetSynced`` otherwise.
+    /// 5. ``FullSyncState/notYetSynced`` otherwise.
+    ///
+    /// A queue that cannot be read reports ``FullSyncState/failed(at:error:)``
+    /// rather than falling through, for the reason ``status`` gives: a store
+    /// that will not answer is not a store with nothing in it.
+    ///
+    /// **The park is read here and not only written.** Suppressing the clean
+    /// drain stops a *new* timestamp being stamped and does nothing about the
+    /// one already there, so a store that synced before the credential died
+    /// went on answering `.synced(at:)` from it — and a transient failure
+    /// recorded before the parking would otherwise stand for ever, because a
+    /// clean drain is the only thing that clears one and a parked queue cannot
+    /// produce a clean drain.
     ///
     /// ``MarfaStore/queryFullSyncState()`` returns a reactive
     /// `@Observable` view backed by the same signals; prefer that for
@@ -408,10 +422,29 @@ public actor SyncEngine {
     public var fullSyncState: FullSyncState {
         get async {
             if draining { return .syncing }
+            // **One read, and a store that will not answer says so.** `status`
+            // states both rules about itself seventy lines up: it takes the
+            // counts and the drain stamp together because a park landing
+            // between two reads yields a green tick over a parked queue, and it
+            // throws rather than defaulting because a store that will not
+            // answer is not a store with nothing in it. This cannot throw
+            // without a source break, so it reports the failure instead.
+            let counts: MutationQueueCounts
+            let drainStamp: String?
+            do {
+                (counts, drainStamp) = try await mutationQueue.countsAndSyncState(
+                    key: cleanDrainKey
+                )
+            } catch {
+                return .failed(at: Date(), error: error)
+            }
+            if let parked = counts.blocked[.credentialRefused], parked > 0 {
+                return .parked(reason: .credentialRefused, count: parked)
+            }
             if let err = lastFailedError, let at = lastFailedAt {
                 return .failed(at: at, error: err)
             }
-            if let stamped = await lastCleanDrainAt {
+            if let stamped = Self.parseDrainStamp(drainStamp) {
                 return .synced(at: stamped)
             }
             return .notYetSynced
@@ -1067,6 +1100,71 @@ public actor SyncEngine {
         finished = true
         emit(.hydrationEnded(imported: imported, completed: true))
         return imported
+    }
+
+    /// Releases every mutation parked under one reason, and only that one.
+    ///
+    /// **By reason rather than wholesale, because what clears each differs.** A
+    /// working credential releases everything parked on the old one; it settles
+    /// nothing about a conflict awaiting review, and sweeping those up would
+    /// spend a request re-parking each of them while telling an app they were
+    /// moving again.
+    ///
+    /// Returns how many were released. The next drain sends them.
+    @discardableResult
+    public func retryAll(reason: PendingMutationBlockReason) async throws -> Int {
+        let released = try await mutationQueue.retryAll(reason: reason)
+        guard released > 0 else { return 0 }
+        logger.log.info(
+            "sync.queue.released reason=\(reason.rawValue, privacy: .public) count=\(released, privacy: .public)"
+        )
+        // **Releasing is not sending, and this method's name promises the
+        // second.** `retry(id:)` says why the queue's own ping is not enough on
+        // its own — it needs a listener attached and idle — and the same holds
+        // here. The two cover different conditions: the ping wakes an idle
+        // engine, and this takes the pass after a cycle that is already
+        // running.
+        if draining {
+            drainRequestedDuringCycle = true
+        } else {
+            scheduleProactiveDrain()
+        }
+        // **And say that the park is over.** Nothing else does: the drain
+        // scheduled above may not run for a long time — the device may be
+        // offline — and a consumer folding events would sit on `.parked` while
+        // the credential that caused it has been replaced, telling somebody who
+        // has just signed in to sign in again. `.syncing` is the honest word
+        // for it: the work has been released and is on its way.
+        //
+        // **Keyed on the reason rather than on the total, which is what this
+        // was first written as and is wrong in two directions.** A queue can
+        // hold a conflict awaiting review alongside the credential park —
+        // `parkAllLive` leaves an already-blocked row on its own reason, by
+        // design — so a total that is still non-zero would withhold the
+        // announcement for a park that really is over. And releasing some
+        // *other* reason on a queue that was never parked would announce a
+        // release of something that never happened, moving an app off a
+        // `.synced` that was correct.
+        //
+        // **A queue that cannot be read announces the release anyway**, which
+        // is the opposite of what `fullSyncState` does with the same read a
+        // few lines up, and is deliberate rather than an oversight. The
+        // release has already happened — `retryAll` on the queue is
+        // unconditional and `released > 0` proves it — so this read only
+        // narrows the case where something re-parked inside the `await`.
+        // Failing toward announcing fails toward *not* telling somebody who
+        // has just signed in to sign in again, which is the whole point of the
+        // announcement.
+        //
+        // `try?` already flattens here, so there is no second optional to
+        // collapse; an earlier spelling had a `?? nil` that read as a decision
+        // about the throwing case and encoded nothing.
+        if reason == .credentialRefused,
+            (try? await mutationQueue.counts.blocked[.credentialRefused]) == nil
+        {
+            emit(.syncing)
+        }
+        return released
     }
 
     // MARK: - Main run loop
@@ -1879,6 +1977,8 @@ public actor SyncEngine {
         // cycle, where the queue holds writes on both sides of the block.
         var stoppedThisCycle = Set<String>()
 
+
+
         // Records this cycle chose not to attempt. The clean-drain decision
         // reads it: a row deferred behind a blocked one is not outstanding work
         // the cycle failed to do, and counting it as such is what withheld
@@ -2051,6 +2151,38 @@ public actor SyncEngine {
                         kind: record.kind.rawValue, itemId: record.localId, reason: reason
                     ))
 
+                    // **One refusal that is not about this write.** The
+                    // credential every queued row carries has been refused, so
+                    // sending the rest to be refused one at a time spends a
+                    // request per write to learn what this one already said —
+                    // and leaves an app showing a count that drops to zero
+                    // through failure. Rows already blocked keep the reason
+                    // they have: a conflict awaiting review is not resolved by
+                    // a new credential.
+                    if reason == .credentialRefused {
+                        let parked = (try? await mutationQueue.parkAllLive(
+                            reason: .credentialRefused,
+                            error: formatLastError(error)
+                        )) ?? 0
+                        // **And the pass ends here.** Parking the rows in the
+                        // store is not enough on its own: this loop is walking
+                        // a list it fetched before any of them changed, so
+                        // without this it goes on to send every one of them and
+                        // be refused identically — spending a request per write
+                        // to learn what this one already said, and reclassifying
+                        // each on the way.
+                        //
+                        // The announcement is left to the tail, which reads the
+                        // queue and so needs no arithmetic, and which is where
+                        // it has to be anyway: a park announced here and a
+                        // failure recorded there would reach a latched consumer
+                        // in that order.
+                        remaining.removeAll()
+                        logger.log.error(
+                            "sync.queue.parked reason=\(reason.rawValue, privacy: .public) count=\(parked + 1, privacy: .public)"
+                        )
+                    }
+
                     // Deliberately does not set `transientError`. The engine
                     // has stopped asking about this row, so it is not something
                     // the cycle failed to do — and one such row used to make
@@ -2086,6 +2218,26 @@ public actor SyncEngine {
                     }
                 }
             }
+        }
+
+        // **A parked queue is the cycle's outcome, whatever else happened in
+        // it.** Two things made this necessary rather than tidy. A row that
+        // failed transiently *before* another was refused leaves
+        // `transientError` set, so the cycle emitted `.queueParked` and then
+        // `.failed` — and a consumer folding events into a latched state, which
+        // is what `FullSyncStateQuery` is, keeps the last one. And a park laid
+        // down in an *earlier* cycle is overwritten by any later cycle that
+        // fails, because nothing re-emits the park: `queueParked` is not
+        // latched, by design, since it answers "this just happened".
+        //
+        // So the engine says it rather than leaving a reader to re-derive it.
+        // `.failed` is withheld rather than the park being re-emitted after it,
+        // because a cycle that parked did not fail — it stopped, and the two
+        // want different words from an app.
+        let parkedNow = (try? await mutationQueue.counts.blocked[.credentialRefused]) ?? nil
+        if let parkedNow, parkedNow > 0 {
+            emit(.queueParked(reason: .credentialRefused, count: parkedNow))
+            return
         }
 
         if let transientError {
@@ -2381,14 +2533,31 @@ public actor SyncEngine {
         // path, left the `.failed` from the attempt before the block standing in
         // `fullSyncState` for good, since a clean drain is the only thing that
         // clears it.
-        let outstanding: [PendingMutationRecord]
+        //
+        // **One reason is excepted, because it does not stop a row — it stops
+        // the queue.** Every other block is one write waiting on one decision,
+        // and the rest of the queue really did drain. A refused credential
+        // parks all of them, so "nothing outstanding" becomes true for the
+        // worst reason there is, and a status line built on this says "synced
+        // just now" over work that cannot move until a person signs in again.
+        //
+        // Read from the store rather than remembered from the pass that
+        // parked. That was the first shape of this fix and it covered one
+        // pass: a fully parked queue has no replayable rows, so the *next*
+        // drain takes an early return that never reaches here, and the
+        // engine's own catch-up and stream-close paths produce one within
+        // milliseconds. Per-pass state cannot answer a question about the
+        // queue's condition.
+        let rows: [PendingMutationRecord]
         do {
-            outstanding = try await mutationQueue.fetchAll().filter {
-                $0.state != .blocked && !skipped.contains($0.id)
-            }
+            rows = try await mutationQueue.fetchAll()
         } catch {
             recordSyncFailure(error)
             return
+        }
+        if rows.contains(where: { $0.blockedReason == .credentialRefused }) { return }
+        let outstanding = rows.filter {
+            $0.state != .blocked && !skipped.contains($0.id)
         }
         guard running, outstanding.isEmpty else { return }
         await recordCleanDrain()

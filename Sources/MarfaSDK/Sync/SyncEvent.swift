@@ -68,6 +68,14 @@ public enum SyncEvent: Sendable {
     /// ``FullSyncStateQuery`` — use this as the "we are now syncing"
     /// signal without subscribing to
     /// ``ConnectionStateManager/stateUpdates`` directly.
+    ///
+    /// **One other site emits it, and neither clause above holds there.**
+    /// ``SyncEngine/retryAll(reason:)`` emits it on releasing a queue that was
+    /// parked on a refused credential, to say the park is over — no cycle has
+    /// started, and on an offline device none can. It is the least wrong of
+    /// the states available: a person who has just signed in seeing "syncing"
+    /// until connectivity returns is a much cheaper inaccuracy than one still
+    /// being told to sign in again.
     case syncing
 
     /// A sync round failed: the cycle could not drain. The error is the last
@@ -79,6 +87,13 @@ public enum SyncEvent: Sendable {
     /// Watch ``SyncEvent/mutationBlocked(kind:itemId:reason:)`` and
     /// ``PendingMutationStatus/blocked(reason:attemptCount:lastError:)`` for
     /// those.
+    ///
+    /// **One reason is excepted, because it stops the queue rather than a
+    /// row.** A refused credential parks every unsent write, so "the only
+    /// outstanding rows are blocked" becomes true for the worst reason there
+    /// is. That reports neither this nor `synced`: it reports
+    /// ``SyncEvent/queueParked(reason:count:)``, and
+    /// ``FullSyncState/parked(reason:count:)`` while it stands.
     case failed(error: Error)
 
     /// The mutation-queue replay auto-merged a server conflict using
@@ -166,6 +181,29 @@ public enum SyncEvent: Sendable {
     /// ``SyncEvent/mutationDropped``'s field. `itemId` is the target item, edge
     /// or local id, and `nil` for records that carry none.
     case mutationBlocked(kind: String, itemId: String?, reason: PendingMutationBlockReason)
+
+    /// Every live mutation has parked together, under one reason that is about
+    /// the client rather than about any one write. `count` is how many.
+    ///
+    /// **Today that reason is a refused credential and only that.** A `401` the
+    /// transport's single refresh did not clear refuses every queued write
+    /// equally, so draining the rest one at a time spends a request per write
+    /// to learn what the first one already said.
+    ///
+    /// This is the event an app shows a person something for. A count of
+    /// unsent writes that does not move says nothing about what to do; this
+    /// says the credential is spent, which is a thing somebody can act on.
+    /// Release the queue with ``SyncEngine/retryAll(reason:)`` once a working
+    /// credential is in place.
+    ///
+    /// **Not latched.** A write made while the credential is still dead is
+    /// attempted, refused, and parks the queue again — so this fires once per
+    /// *new* write rather than once per queued write, which is the saving, but
+    /// an app that raises an alert here will raise one each time. Reading
+    /// ``SyncEngine/status`` for a non-empty
+    /// `queue.blocked[.credentialRefused]` is the way to ask whether the state
+    /// is still true rather than whether it just changed.
+    case queueParked(reason: PendingMutationBlockReason, count: Int)
 
     /// The local store could not be opened and was rebuilt empty, so this
     /// device is starting from nothing until the first import finishes.

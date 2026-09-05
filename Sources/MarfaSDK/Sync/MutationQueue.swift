@@ -92,7 +92,7 @@ extension PendingMutationModel {
     /// automatic recovery is what stops an old build replaying a row forever.
     /// A missing column on a blocked row means a legacy row, and its answer is
     /// in the message.
-    private var resolvedBlockReason: PendingMutationBlockReason {
+    fileprivate var resolvedBlockReason: PendingMutationBlockReason {
         if let stored = blockedReason {
             return PendingMutationBlockReason(rawValue: stored) ?? .retriesExhausted
         }
@@ -904,16 +904,38 @@ public actor MutationQueue {
                         predicate: #Predicate { $0.stateRaw == inFlight }
                     )
                 ),
-                blocked: try modelContext.fetchCount(
-                    FetchDescriptor<PendingMutationModel>(
-                        predicate: #Predicate { $0.stateRaw == blocked }
-                    )
-                ),
+                // **Counted by reason rather than totaled, because what
+                // clears each one differs.** A credential a person must replace
+                // and a conflict an app must settle are both "blocked", and an
+                // interface that shows one number can only say that something
+                // is wrong. This is a fetch rather than a count for the same
+                // reason: the breakdown is the answer.
+                blocked: try modelContext.fetch(blockedReasonDescriptor(blocked))
+                    .reduce(into: [PendingMutationBlockReason: Int]()) { tally, model in
+                        tally[model.resolvedBlockReason, default: 0] += 1
+                    },
                 deadLettered: try modelContext.fetchCount(
                     FetchDescriptor<DroppedMutationModel>()
                 )
             )
         }
+    }
+
+    /// Blocked rows, carrying only the two columns a reason is read from.
+    ///
+    /// **A count per reason cannot be a `fetchCount`**, because a row written
+    /// by `16.x` carries its reason as a prefix inside `lastError` rather than
+    /// in a column, so the grouping has to run in Swift. What it can avoid is
+    /// dragging `payloadJson` along with it — a bulk row holds a whole page —
+    /// and that matters more since a refused credential parks the entire queue
+    /// at once, making "every row blocked" an ordinary state rather than an
+    /// exceptional one.
+    private func blockedReasonDescriptor(_ blocked: String) -> FetchDescriptor<PendingMutationModel> {
+        var descriptor = FetchDescriptor<PendingMutationModel>(
+            predicate: #Predicate { $0.stateRaw == blocked }
+        )
+        descriptor.propertiesToFetch = [\.blockedReason, \.lastError]
+        return descriptor
     }
 
     /// The counts and one sync-state value, read in a single hop.
@@ -926,6 +948,69 @@ public actor MutationQueue {
     /// window rather than narrowing it.
     func countsAndSyncState(key: String) throws -> (MutationQueueCounts, String?) {
         (try counts, try loadSyncState(key: key))
+    }
+
+    /// Parks every mutation that is still live, under one reason.
+    ///
+    /// **For a refusal that is about the credential rather than about a
+    /// write.** A `401` the transport's refresh did not clear refuses every
+    /// queued row equally, so draining the rest to be refused one at a time
+    /// spends a request per write to learn what the first one said. Returns how
+    /// many were parked, which is what an app is told.
+    ///
+    /// Rows already blocked keep the reason they have: a conflict awaiting
+    /// review is not resolved by a new credential, and overwriting it would
+    /// send an app to the wrong remedy and lose the right one.
+    func parkAllLive(reason: PendingMutationBlockReason, error: String) throws -> Int {
+        let pending = PendingMutationState.pending.rawValue
+        let inFlight = PendingMutationState.inFlight.rawValue
+        let live = try modelContext.fetch(
+            FetchDescriptor<PendingMutationModel>(
+                predicate: #Predicate { $0.stateRaw == pending || $0.stateRaw == inFlight }
+            )
+        )
+        guard !live.isEmpty else { return 0 }
+        for model in live {
+            // Each row's own last failure is replaced by the refusal that
+            // parked it. That is the honest answer to "why is this stopped" —
+            // whatever a row failed on before, what stops it now is the
+            // credential — and it is what an app renders beside the reason.
+            model.lastError = error
+            model.blockedReason = reason.rawValue
+            model.state = .blocked
+        }
+        try modelContext.save()
+        return live.count
+    }
+
+    /// Releases every mutation parked under one reason, and only that one.
+    ///
+    /// **By reason rather than wholesale.** Sweeping everything on a credential
+    /// recovery would spend a request re-parking each write awaiting review and
+    /// would tell an app those writes were moving again when nothing has
+    /// changed for them.
+    func retryAll(reason: PendingMutationBlockReason) throws -> Int {
+        let blocked = PendingMutationState.blocked.rawValue
+        let rows = try modelContext.fetch(
+            FetchDescriptor<PendingMutationModel>(
+                predicate: #Predicate { $0.stateRaw == blocked }
+            )
+        ).filter { $0.resolvedBlockReason == reason }
+        guard !rows.isEmpty else { return 0 }
+        for model in rows {
+            model.state = .pending
+            model.blockedReason = nil
+            model.refusalCount = 0
+            model.attemptCount = 0
+            // The same scrub `clearBlock` does, for the same reason: nothing
+            // else rewrites this column, so a `16.x` row's `[blocked:…]`
+            // prefix would stay in front of the message an app shows a person
+            // for ever.
+            model.lastError = LegacyBlockedPrefix.strip(model.lastError)
+        }
+        try modelContext.save()
+        emitDrainRequest()
+        return rows.count
     }
 
     // MARK: - Sync state (Last-Event-ID cursor)

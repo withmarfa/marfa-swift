@@ -91,6 +91,16 @@ open class MarfaError: Error, @unchecked Sendable {
     /// find out. A `SyncEvent.failed` carries the error; this is what its
     /// `code` equals.
     public static let spaceSuspendedCode = "space_suspended"
+
+    /// The server's code for a key that has already been answered for a
+    /// different request body.
+    ///
+    /// Public for the same reason as the one above: the queue parks on this
+    /// rather than retrying it, so an app showing why a write has stopped
+    /// should not have to hardcode the string to recognize it. The remedy is
+    /// not a retry — the key is spent, not the write — so an app re-applies
+    /// the edit, which makes a fresh mutation carrying a fresh key.
+    public static let idempotencyKeyReusedCode = "idempotency_key_reused"
 }
 
 extension MarfaError: LocalizedError {
