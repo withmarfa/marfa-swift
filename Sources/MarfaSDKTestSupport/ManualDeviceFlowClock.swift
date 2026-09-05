@@ -35,6 +35,10 @@ public final class ManualDeviceFlowClock: DeviceFlowClock, @unchecked Sendable {
     private var unconsumedSleepDurations: [TimeInterval] = []
     private var pendingWaiter: CheckedContinuation<TimeInterval, Never>?
 
+    /// Returned when a wait for the next sleep is cancelled. Negative, so it
+    /// cannot be mistaken for a duration anything asked to wait.
+    public static let cancelledSleepRequest: TimeInterval = -1
+
     public init(initialTime: Date = Date()) {
         self._currentTime = initialTime
     }
@@ -90,13 +94,30 @@ public final class ManualDeviceFlowClock: DeviceFlowClock, @unchecked Sendable {
     /// the duration it asked to wait for. If a sleep arrived before this
     /// call (no waiter was active when it landed), returns immediately
     /// with that buffered duration.
+    /// **Cancellable, like its sibling twenty lines above.** A `Never`-failure
+    /// continuation ignores cancellation by construction, so a test waiting
+    /// for a sleep that never comes hung the run rather than failing at the
+    /// suite's limit. It resumes with a sentinel rather than throwing, because
+    /// the signature returns a duration and every caller reads it as one; a
+    /// negative duration is not a wait anything could have asked for.
     public func nextSleepRequest() async -> TimeInterval {
-        await withCheckedContinuation { (cont: CheckedContinuation<TimeInterval, Never>) in
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<TimeInterval, Never>) in
+                lock.withLock {
+                    if Task.isCancelled {
+                        cont.resume(returning: Self.cancelledSleepRequest)
+                    } else if !unconsumedSleepDurations.isEmpty {
+                        cont.resume(returning: unconsumedSleepDurations.removeFirst())
+                    } else {
+                        pendingWaiter = cont
+                    }
+                }
+            }
+        } onCancel: { [self] in
             lock.withLock {
-                if !unconsumedSleepDurations.isEmpty {
-                    cont.resume(returning: unconsumedSleepDurations.removeFirst())
-                } else {
-                    pendingWaiter = cont
+                if let waiter = pendingWaiter {
+                    pendingWaiter = nil
+                    waiter.resume(returning: Self.cancelledSleepRequest)
                 }
             }
         }

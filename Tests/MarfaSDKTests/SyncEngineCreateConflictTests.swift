@@ -208,7 +208,12 @@ struct SyncEngineCreateConflictTests {
         // The ghost is purged; the dependents half is the cascade's own test.
         #expect((try? await store.fetchItem(id: id)) == nil)
 
-        let collected = await collector.value
+        let collected = await awaitCancellable(collector)
+        // Cancellation hands back whatever the collector had gathered, so
+        // without this a timed-out run reports the honest limit *and* a
+        // content failure on a partial array — a clock dressed as a logic
+        // error, which is the shape the racing timeouts were removed for.
+        guard !Task.isCancelled else { return }
         let drop = collected.first { if case .mutationDropped = $0 { return true } else { return false } }
         #expect(drop != nil)
         if case let .mutationDropped(kind, itemId, attempt, error) = drop {

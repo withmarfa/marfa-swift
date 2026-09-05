@@ -24,6 +24,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - **`Edge.init` gains a required `version`.** Anything constructing an `Edge` — a test double, a fake transport — needs the extra argument, the same break `ConflictResponseError` takes above.
 
 - **`Edge` carries a `version`,** which the wire has sent since edges gained one, and the local store now keeps it. A locally created edge starts at 1 and the server's value replaces it on the first echo back. Wire fixtures and the `409` envelope's new `message` field moved with the refreshed snapshot.
+- **`performInitialSync` now stops when its caller is cancelled**, where before it ran to completion regardless. A consumer whose `.task {}` goes away no longer waits for an import it has stopped caring about — it throws `CancellationError` and abandons a partial one, which is recoverable: `last_full_sync_at` is not stamped, so the next cycle imports again from the start.
+
+  **One cost is carried rather than hidden.** The import is shared between callers, and a cancelled caller cancels the shared task, so anyone else joined to that same import receives `CancellationError` too. Making the cancel conditional on nobody else waiting was tried and is worse — it protects the joiners and strands the caller, which cannot abandon the shared task any more than they can. Both halves have one fix, and it is a restructure rather than a line, so it is filed rather than folded in here.
+
+- **`ManualDeviceFlowClock.nextSleepRequest` can be cancelled**, and returns the new `ManualDeviceFlowClock.cancelledSleepRequest` sentinel when it is. A test waiting for a sleep that never arrives now fails at its suite's limit instead of hanging the run.
+
+- **`MarfaSDKTestSupport` no longer imports `Testing`.** The polling helper that needed it has moved into the SDK's own test target, where all of its call sites already were. `Testing` is a developer-only library absent from a shipped app's runtime, so a consumer linking this target into an app target rather than a test target was inheriting a dependency for a function it could not call.
 
 - **A bulk action on a client with a local store now refuses before it acts, where three of its refusals used to happen afterwards or not at all.** Each of these applied the action first and objected second, which is the same defect wearing three faces.
 

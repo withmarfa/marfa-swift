@@ -625,7 +625,7 @@ struct SyncEngineBlockedMutationTests {
         let heard = Task { for await _ in requests { return true }; return false }
 
         try await queue.clearBlock(id: id)
-        #expect(await heard.value, "clearBlock must ask for a drain, not just change a column")
+        #expect(await awaitCancellable(heard), "clearBlock must ask for a drain, not just change a column")
     }
 
     @Test("a retry during a running cycle replays without another trigger")
@@ -659,7 +659,7 @@ struct SyncEngineBlockedMutationTests {
         // server, where the stream stays open, may never come.
         try await engine.retry(id: blockedId)
         await transport.release()
-        await cycle.value
+        await awaitCancellable(cycle)
 
         #expect(try await queue.isEmpty, "the retried row should replay on the pass that follows")
     }

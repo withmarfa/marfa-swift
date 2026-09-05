@@ -397,7 +397,7 @@ struct OAuthDiscoveryTests {
         #expect(fresh.token.host == "fresh.test")
 
         await staleHTTP.complete()
-        let stale = try await staleRequest.value
+        let stale = try await awaitCancellable(staleRequest)
         #expect(stale.token.host == "stale.test")
 
         let unusedHTTP = FakeDeviceFlowHTTPClient()

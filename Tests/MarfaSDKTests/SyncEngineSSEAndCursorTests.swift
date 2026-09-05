@@ -52,7 +52,7 @@ struct SyncEngineSSEAndCursorTests {
         #expect(await !connManager.isStartedForTesting)
 
         await engine.resumeStartPublicationForTesting()
-        await startTask.value
+        await awaitCancellable(startTask)
         #expect(await !engine.isRunningForTesting)
         #expect(await !engine.hasLifecycleTasksForTesting)
         #expect(await !connManager.isStartedForTesting)
@@ -86,8 +86,8 @@ struct SyncEngineSSEAndCursorTests {
         }
         let restartTask = Task { await engine.start() }
         await transport.releaseRequest()
-        await stopTask.value
-        await restartTask.value
+        await awaitCancellable(stopTask)
+        await awaitCancellable(restartTask)
 
         #expect(await engine.isRunningForTesting)
         await connManager.applyStateForTesting(.connecting)
@@ -99,7 +99,7 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStoppingForTesting
         }
         await transport.releaseRequest()
-        await finalStopTask.value
+        await awaitCancellable(finalStopTask)
     }
 
     @Test("start cannot open a new lifecycle while a stop is still in flight")
@@ -125,6 +125,15 @@ struct SyncEngineSSEAndCursorTests {
         }
 
         let restartTask = Task { await engine.start() }
+        // Released on every exit, not only the one where the assertions
+        // pass. `expectRemainsFalse` throws on cancellation, so a time limit
+        // firing in its window skipped the release below and left a
+        // deliberately uncancellable request held for good — after which
+        // `stopTask` never completes and `stopBlocking` is never reached.
+        // The helper's own docblock names releasing a blocked transport as one
+        // of the three things this pattern strands; this is that case.
+        defer { Task { await transport.stopBlocking() } }
+
         // The blocked replay holds the barrier open. A start that does not
         // wait for it opens a second lifecycle on top of a teardown that has
         // already snapshotted the first one, so the two overlap: the barrier
@@ -136,8 +145,8 @@ struct SyncEngineSSEAndCursorTests {
         }
 
         await transport.releaseRequest()
-        await stopTask.value
-        await restartTask.value
+        await awaitCancellable(stopTask)
+        await awaitCancellable(restartTask)
 
         #expect(await engine.isRunningForTesting)
         #expect(await connManager.isStartedForTesting)
@@ -165,7 +174,7 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStoppingForTesting
         }
         await engine.resumeStreamForTesting()
-        await stopTask.value
+        await awaitCancellable(stopTask)
 
         // The nudge is an unstructured task: it does not inherit the stream
         // task's cancellation, so one installed after the snapshot outlives
@@ -193,7 +202,7 @@ struct SyncEngineSSEAndCursorTests {
             await engine.isStoppingForTesting
         }
         await engine.resumeStreamForTesting()
-        await stopTask.value
+        await awaitCancellable(stopTask)
 
         // `markOnline` is a no-op once the manager is offline, so the state
         // machine records nothing either way; the call count is what proves

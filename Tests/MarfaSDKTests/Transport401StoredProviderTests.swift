@@ -360,7 +360,7 @@ struct Transport401StoredProviderTests {
         #expect(try await storage.get(for: tokenKey) == nil)
 
         collector.cancel()
-        let events = await collector.value
+        let events = await awaitCancellable(collector)
         #expect(events == [.signedOut(reason: .refreshTokenRejected)])
     }
 }

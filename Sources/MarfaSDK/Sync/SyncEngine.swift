@@ -600,15 +600,18 @@ public actor SyncEngine {
     /// - Throws: Transport errors from the pagination requests, or upsert
     ///   errors from the local store.
     /// Counts callers currently inside ``performInitialSync(pageSize:)``,
-    /// owner and joiners alike. A test proving that two callers share one
-    /// import has to know both have arrived before it releases the first, and
-    /// every other way of knowing that is a sleep racing the thing it measures.
-    internal private(set) var importCallerCountForTesting = 0
+    /// owner and joiners alike.
+    ///
+    /// A test proving that two callers share one import has to know both have
+    /// arrived before it releases the first, and every other way of knowing
+    /// that is a sleep racing the thing it measures.
+    internal private(set) var importCallerCount = 0
+
 
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
-        importCallerCountForTesting += 1
-        defer { importCallerCountForTesting -= 1 }
+        importCallerCount += 1
+        defer { importCallerCount -= 1 }
 
         // Join a run already going, or publish this one — with nothing
         // suspending between the two, so a caller entering on actor reentry
@@ -623,6 +626,15 @@ public actor SyncEngine {
             // import began is still asking to overwrite it, and arriving late
             // is not consent.
             try await refuseIfWorkIsStillQueued()
+            // A joiner does **not** cancel the import when it is cancelled
+            // itself. The task belongs to the caller that started it, and
+            // abandoning that caller's work because a later arrival went away
+            // is the opposite of what coalescing is for. The cost is stated
+            // rather than hidden: a cancelled joiner keeps waiting, because
+            // `await` on another task's value cannot be interrupted without
+            // cancelling it. Closing that needs joiners to observe completion
+            // through something they can be released from, which is a larger
+            // change than this one.
             return try await importTask.value
         }
         let task = Task { [self] in
@@ -631,7 +643,34 @@ public actor SyncEngine {
         }
         importTask = task
         defer { if importTask == task { importTask = nil } }
-        return try await task.value
+        // The owner forwards its cancellation, which nothing here used to do.
+        // An unstructured task inherits none from whoever awaits it, so a
+        // cancelled caller stayed suspended on a value that would never
+        // arrive — and because the inner task was never cancelled, neither was
+        // anything it awaited, so a transport holding a request open never
+        // learned to let go either. `stop()` has always cancelled-then-awaited
+        // its lifecycle tasks; this was the one place on this path that did
+        // neither.
+        //
+        // **And it cancels unconditionally, which costs a joiner its import.**
+        // `task.value` rethrows the child's error, so a cancelled owner hands
+        // `CancellationError` to everyone joined to it — none of them
+        // cancelled, none consulted, and the owner is only whoever arrived
+        // first. Making the cancel conditional on there being no joiners was
+        // tried and is worse: it protects the joiners and strands the owner,
+        // which cannot abandon `task.value` any more than a joiner can.
+        //
+        // Both halves have the same root, and one fix answers both: waiters
+        // registering their own continuations, so any of them can be released
+        // without touching the shared task, which is the shape the blocking
+        // transports in the test support already use. That is a restructure of
+        // this function rather than a line in it, so the cost is recorded here
+        // and carried rather than swapped for a different one.
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     /// Refuses the import while the queue still holds work, rather than

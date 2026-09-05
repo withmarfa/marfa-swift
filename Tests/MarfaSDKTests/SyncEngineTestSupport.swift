@@ -109,6 +109,7 @@ enum SyncEngineTestKit {
     static func awaitCondition(
         every: Duration = .milliseconds(10),
         description: String,
+        sourceLocation: SourceLocation = #_sourceLocation,
         _ condition: @Sendable () async throws -> Bool
     ) async throws {
         while true {
@@ -120,6 +121,15 @@ enum SyncEngineTestKit {
                 try Task.checkCancellation()
                 try await Task.sleep(for: every)
             } catch is CancellationError {
+                // Recorded as well as thrown, for the reason the free sibling
+                // states: a bare throw out of a cancelled body is discarded,
+                // so the description reaches nobody. This helper has the
+                // larger share of the call sites, and the first pass at this
+                // fix reached only the other one.
+                Issue.record(
+                    "awaitCondition cancelled while waiting for \(description)",
+                    sourceLocation: sourceLocation
+                )
                 throw AwaitConditionCancelled(description: description)
             }
         }
@@ -197,6 +207,113 @@ func expectRemains(
     }
 }
 
+/// Polls a main-actor condition until it holds, with **no test-owned
+/// deadline**. The suite's `.timeLimit` trait owns the clock.
+///
+/// This is the shape for a condition that can be *starved* rather than merely
+/// delayed. A test-owned bound on such a condition is a clock wearing an
+/// assertion's clothes: nothing in the output says `timed out`, no elapsed
+/// figure appears and no budget is named, so a load-induced red sends the next
+/// reader to study a diff that is fine. Most suites in this repository
+/// already carry `.timeLimit(.minutes(1))`, which means the budget exists and
+/// a sub-second wait merely fires before it can.
+///
+/// A minute is coarse, and that is the point: a test that hangs for a minute
+/// and then names itself a timeout is strictly more useful than one that fails
+/// in half a second saying the wrong thing. **Every suite using this must
+/// carry a `.timeLimit`,** or a starved condition hangs the run instead.
+///
+/// **And a `.timeLimit` bounds a *cancellable* wait only**, which is the part
+/// that is easy to get wrong and was got wrong here once. The trait cancels
+/// the test task; it does not kill it. Every poll below suspends in
+/// `Task.sleep`, which throws on cancellation, so the trait reaches them. An
+/// unstructured `Task` does not inherit that cancellation, and `await
+/// someTask.value` on a non-throwing `Task` cannot throw `CancellationError`
+/// at all — so a test awaiting one hangs forever under a trait that looks like
+/// it covers the case. Wrap such a wait in `withTaskCancellationHandler` and
+/// cancel the task in `onCancel:`, or keep its own bound.
+@MainActor
+func awaitCondition(
+    every: Duration = .milliseconds(10),
+    description: String,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ condition: @MainActor () async throws -> Bool
+) async throws {
+    while true {
+        if try await condition() { return }
+        // The suite's time limit works by *cancelling* the test task, and
+        // cancellation on its own reports only the trait's message — which
+        // names a duration and not what was being waited for. Translating it
+        // here is what makes `description` load-bearing rather than a string
+        // every call site composes and nothing prints.
+        do {
+            try Task.checkCancellation()
+            // Yield so the debounced refetch task lands on the main actor
+            // before the sleep, for the same reason `waitUntil` does it.
+            await Task.yield()
+            try await Task.sleep(for: every)
+        } catch is CancellationError {
+            // Recorded *and* thrown, and both halves are load-bearing. The
+            // throw stops the caller's next line running against state the
+            // wait never established. The record is the only half that
+            // reaches a reader: Swift Testing reports the trait's own "time
+            // limit was exceeded" and discards whatever the cancelled body
+            // threw, so a bare throw left `description` composed at every call
+            // site and printed at none of them.
+            Issue.record(
+                "awaitCondition cancelled while waiting for \(description)",
+                sourceLocation: sourceLocation
+            )
+            throw AwaitConditionCancelled(description: description)
+        }
+    }
+}
+
+/// Awaits an unstructured task's value, forwarding the awaiting task's
+/// cancellation to it.
+///
+/// **`await someTask.value` does not do this, and that is the trap.** A
+/// `.timeLimit` trait bounds a test by *cancelling* it, and an unstructured
+/// `Task` inherits no cancellation from whoever awaits it, so a collector
+/// waiting on an event that never arrives hangs the run with no output rather
+/// than failing at the limit. Measured: three and a half minutes and still
+/// going, against sixty seconds once the cancellation is forwarded.
+///
+/// **A fourth form lives in the callee, and nothing a test writes can reach
+/// it.** The three forms above are all properties of code the test controls.
+/// But the code under test spawns its own unstructured tasks —
+/// `SyncEngine.performInitialSync` puts its work in one and awaits its value,
+/// deliberately, so a second caller joins the running import rather than
+/// starting a second. A test can therefore make every wait *it* writes
+/// cancellable and still be unbounded. That is the cause of the one deadlock
+/// this repository still has, and it is filed rather than fixed here: the
+/// coalescing is wanted, so the answer is to let a cancelled caller stop
+/// waiting without abandoning the import for everyone else.
+///
+/// It is not about the failure type. A throwing `Task` behaves identically —
+/// `try` rethrows the child's own error and says nothing about the parent's
+/// cancellation — so the non-throwing case is merely the one where you cannot
+/// even write a `catch` to notice.
+func awaitCancellable<T: Sendable>(_ task: Task<T, Never>) async -> T {
+    await withTaskCancellationHandler {
+        await task.value
+    } onCancel: {
+        task.cancel()
+    }
+}
+
+/// The throwing sibling, and it exists because the docblock above would
+/// otherwise be contradicted by its own signature: taking only `Never` would
+/// exclude every `try await task.value` from a fix whose whole argument is
+/// that the failure type is irrelevant.
+func awaitCancellable<T: Sendable>(_ task: Task<T, Error>) async throws -> T {
+    try await withTaskCancellationHandler {
+        try await task.value
+    } onCancel: {
+        task.cancel()
+    }
+}
+
 /// One-shot flag for observing that an async consumer finished.
 actor TestLatch {
     private(set) var isSet = false
@@ -212,17 +329,57 @@ actor TestLatch {
 // side mirrors MockTransport's minimal semantics.
 actor BlockingTransport: Transport {
     private var eventStreams: [[SSEEvent]] = []
-    private var continuation: CheckedContinuation<Data, Never>?
+    /// Every held request, not just the latest.
+    ///
+    /// This was a single slot, and a second concurrent request overwrote it —
+    /// orphaning the first with no way to ever resume it. That is invisible
+    /// while a test holds one request open, and a permanent hang the moment
+    /// one holds two, which is exactly the shape the concurrency-guard tests
+    /// construct on purpose. Releasing stays first-in-first-out so a test that
+    /// releases once still unblocks one request.
+    private var held: [CheckedContinuation<Data, Never>] = []
     private(set) var itemsCallCount = 0
+
+    /// Holds a continuation, or resumes it immediately if cancellation has
+    /// already happened.
+    ///
+    /// `withTaskCancellationHandler` runs `onCancel` *immediately* when the
+    /// task is already cancelled on entry — before `operation` runs, so before
+    /// this is called. Nothing is held at that instant, the handler resumes
+    /// nothing, and `onCancel` is one-shot: appending afterwards installs a
+    /// continuation nothing will ever answer. Reachable on a retry, where the
+    /// first pass resumed with empty bytes, the decode threw, and the second
+    /// re-enters with the flag already set.
+    func hold(_ continuation: CheckedContinuation<Data, Never>) {
+        guard !Task.isCancelled else {
+            continuation.resume(returning: Data())
+            return
+        }
+        held.append(continuation)
+    }
+
+    /// Resumes every held request so a cancelled test unwinds instead of
+    /// hanging.
+    ///
+    /// Resumes with no bytes rather than a plausible page: the decode then
+    /// throws, which is the honest outcome for a request the runner has given
+    /// up on, and it cannot be mistaken for a server that answered. **Every**
+    /// held request rather than the latest, because a test holding two and
+    /// resuming one still hangs on the other.
+    func resumeEveryHeldRequest() {
+        let outstanding = held
+        held.removeAll()
+        for continuation in outstanding { continuation.resume(returning: Data()) }
+    }
 
     func enqueueEvents(_ events: [SSEEvent]) {
         eventStreams.append(events)
     }
 
     func release<T: Encodable>(result: T) {
+        guard !held.isEmpty else { return }
         let data = try! JSONEncoder().encode(result)
-        continuation?.resume(returning: data)
-        continuation = nil
+        held.removeFirst().resume(returning: data)
     }
 
     func request<T: Decodable & Sendable>(
@@ -233,8 +390,18 @@ actor BlockingTransport: Transport {
     ) async throws -> T {
         if path == "/items" && method == .get {
             itemsCallCount += 1
-            let data: Data = await withCheckedContinuation { cont in
-                self.continuation = cont
+            // Cancellable, or the trait cannot reach a test suspended here.
+            // A `CheckedContinuation` with `Never` failure ignores
+            // cancellation by construction, and structured concurrency does
+            // not save the caller: an `async let` child *is* cancelled, but a
+            // child suspended on such a continuation never notices. Resuming
+            // it on cancel is what hands the bound back to the runner.
+            let data: Data = await withTaskCancellationHandler {
+                await withCheckedContinuation { cont in
+                    self.hold(cont)
+                }
+            } onCancel: {
+                Task { await self.resumeEveryHeldRequest() }
             }
             return try JSONDecoder().decode(T.self, from: data)
         }
@@ -297,11 +464,35 @@ actor BlockingReplayTransport: Transport {
     private var blocking = true
     private(set) var requestCallCount = 0
 
+    /// Waits for the transport to be asked for something.
+    ///
+    /// **Cancellable, unlike the request itself, and the distinction is the
+    /// point.** This transport holds a *request* open on purpose — that is
+    /// what it exists to prove — so making that cancellable would defeat the
+    /// test. But this is the *test's* own wait for the request to start, and a
+    /// request that never starts should fail at the suite's limit rather than
+    /// hang the run. A `Never`-failure continuation ignores cancellation, so
+    /// the wait needs the handler even though the request must not have one.
     func waitUntilRequestStarted() async {
         if requestStarted { return }
-        await withCheckedContinuation { continuation in
-            requestStartedWaiters.append(continuation)
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume()
+                } else {
+                    requestStartedWaiters.append(continuation)
+                }
+            }
+        } onCancel: {
+            Task { await self.releaseStartedWaiters() }
         }
+    }
+
+    /// Resumes anything waiting for a request that will now never start.
+    func releaseStartedWaiters() {
+        let waiting = requestStartedWaiters
+        requestStartedWaiters.removeAll()
+        for continuation in waiting { continuation.resume() }
     }
 
     func releaseRequest() {
@@ -379,11 +570,35 @@ actor BlockingSuccessfulReplayTransport: Transport {
     private var requestStarted = false
     private var requestStartedWaiters: [CheckedContinuation<Void, Never>] = []
 
+    /// Waits for the transport to be asked for something.
+    ///
+    /// **Cancellable, unlike the request itself, and the distinction is the
+    /// point.** This transport holds a *request* open on purpose — that is
+    /// what it exists to prove — so making that cancellable would defeat the
+    /// test. But this is the *test's* own wait for the request to start, and a
+    /// request that never starts should fail at the suite's limit rather than
+    /// hang the run. A `Never`-failure continuation ignores cancellation, so
+    /// the wait needs the handler even though the request must not have one.
     func waitUntilRequestStarted() async {
         if requestStarted { return }
-        await withCheckedContinuation { continuation in
-            requestStartedWaiters.append(continuation)
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume()
+                } else {
+                    requestStartedWaiters.append(continuation)
+                }
+            }
+        } onCancel: {
+            Task { await self.releaseStartedWaiters() }
         }
+    }
+
+    /// Resumes anything waiting for a request that will now never start.
+    func releaseStartedWaiters() {
+        let waiting = requestStartedWaiters
+        requestStartedWaiters.removeAll()
+        for continuation in waiting { continuation.resume() }
     }
 
     func releaseRequest() {
