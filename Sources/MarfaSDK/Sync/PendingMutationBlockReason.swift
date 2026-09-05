@@ -81,7 +81,7 @@ public enum PendingMutationBlockReason: String, Sendable, Equatable, CaseIterabl
     ///
     /// **What clears it is ``SyncEngine/discard(id:)``.** `retry(id:)` re-sends
     /// the spent key. Re-applying the edit — which this comment recommended
-    /// until 17.1.0 — does not route around it either: the fresh mutation is a
+    /// until the discard door existed — does not route around it either: the fresh mutation is a
     /// new row under the same local id, queued after the blocked one, and the
     /// replay defers every later write to an item behind that item's blocked
     /// row. So it waits behind the row it was meant to replace, and the item

@@ -86,22 +86,25 @@ final class DroppedMutationModel {
     /// `dismissDroppedOlderThan` cutoff.
     var droppedAt: String = ""
 
-    /// Number of failed replay attempts before the permanent drop. The
-    /// last attempt is the one that produced ``errorStatus`` /
-    /// ``errorCode`` / ``errorMessage``.
+    /// Number of failed replay attempts before the row left the queue.
+    ///
+    /// **A discarded row is the exception**: nothing was attempted to produce
+    /// its error, so the count is the row's own rather than one more than it.
+    /// For every other producer the last attempt is the one that made
+    /// ``errorStatus`` / ``errorCode`` / ``errorMessage``.
     var attemptCount: Int = 0
 
     /// HTTP status code from the dropping error (typically 400, 403, 404,
     /// or 409 on a create).
     ///
-    /// `0` means the failure had no HTTP status of its own. Three cases: a
+    /// `0` means the failure had no HTTP status of its own. Two cases: a
     /// single refused entry of a bulk call, where the call itself answered
-    /// `200` and only the entry was rejected; a failure synthesized inside the
-    /// engine rather than received; and — since 17.1.0 — a write the app
-    /// discarded through ``SyncEngine/discard(id:)``, which no server ever
-    /// refused because it was never sent.
+    /// `200` and only the entry was rejected; and a write the app discarded
+    /// through ``SyncEngine/discard(id:)``, which no server refused — the app
+    /// stopped asking, which is a different thing and often follows attempts
+    /// that were made and refused.
     ///
-    /// **Branch on ``errorCode`` rather than on this**, which the third case
+    /// **Branch on ``errorCode`` rather than on this**, which the second case
     /// makes plainly necessary: ``MarfaError/discardedByAppCode`` is the one
     /// row in this log that is not a refusal, and an app rendering it as one
     /// tells somebody their write failed when they withdrew it.
