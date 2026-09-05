@@ -86,18 +86,30 @@ final class DroppedMutationModel {
     /// `dismissDroppedOlderThan` cutoff.
     var droppedAt: String = ""
 
-    /// Number of failed replay attempts before the permanent drop. The
-    /// last attempt is the one that produced ``errorStatus`` /
-    /// ``errorCode`` / ``errorMessage``.
+    /// Number of failed replay attempts before the row left the queue.
+    ///
+    /// **A discard is the exception**: nothing was attempted to produce its
+    /// error, so the count is not incremented. A row cascaded away by a
+    /// discarded `createItem` carries the *root's* count for the same reason —
+    /// one operation, one number, rather than each orphan reporting a deferral
+    /// it never got to attempt. For every other producer the last attempt is
+    /// the one that made ``errorStatus`` / ``errorCode`` / ``errorMessage``.
     var attemptCount: Int = 0
 
     /// HTTP status code from the dropping error (typically 400, 403, 404,
     /// or 409 on a create).
     ///
-    /// `0` means the failure had no HTTP status of its own. Two cases: the
-    /// blob-data-missing `ValidationError` synthesized inside the engine,
-    /// and a single refused entry of a bulk call, where the call itself
-    /// answered `200` and only the entry was rejected.
+    /// `0` means the failure had no HTTP status of its own. Two cases: a
+    /// single refused entry of a bulk call, where the call itself answered
+    /// `200` and only the entry was rejected; and a write the app discarded
+    /// through ``SyncEngine/discard(id:)``, which no server refused — the app
+    /// stopped asking, which is a different thing and often follows attempts
+    /// that were made and refused.
+    ///
+    /// **Branch on ``errorCode`` rather than on this**, which the second case
+    /// makes plainly necessary: ``MarfaError/discardedByAppCode`` is the one
+    /// row in this log that is not a refusal, and an app rendering it as one
+    /// tells somebody their write failed when they withdrew it.
     var errorStatus: Int = 0
 
     /// ``MarfaError/code`` string (e.g. `"validation_error"`,

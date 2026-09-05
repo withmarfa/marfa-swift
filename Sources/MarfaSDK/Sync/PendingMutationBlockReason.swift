@@ -41,6 +41,16 @@ public enum PendingMutationBlockReason: String, Sendable, Equatable, CaseIterabl
     /// `.auto` does not do is park on a *first* thinned ancestor: the loop
     /// rebases and goes again, and only reaches here once that budget is
     /// spent.
+    ///
+    /// **And under `.auto` and `.manual`, `retry(id:)` does not reach the
+    /// server at all.** The row's idempotency key is minted once and its body
+    /// re-encodes identically, and the server retains a `409` against a key
+    /// rather than releasing it — so the repeat is answered from its record
+    /// and the same refusal comes back. `.callback` escapes that, because the
+    /// resolver's answer goes out under a fresh key; it can still park here if
+    /// the resolver's answers keep being refused. Where retrying cannot help,
+    /// ``SyncEngine/discard(id:)`` is what releases the row and the item
+    /// behind it.
     case conflictUnresolved
 
     /// A refusal that is neither permanent nor one of the above failed as often
@@ -67,9 +77,15 @@ public enum PendingMutationBlockReason: String, Sendable, Equatable, CaseIterabl
     /// **Parks on the first refusal, because the key is spent rather than the
     /// write.** Repeating it is refused identically however often anyone tries,
     /// so the retry ceiling would be spent on guaranteed refusals and the row
-    /// would then park under a reason naming the wrong cause. What clears it is
-    /// the app re-applying the edit, which makes a fresh mutation carrying a
-    /// fresh key; `retry(id:)` does not.
+    /// would then park under a reason naming the wrong cause.
+    ///
+    /// **What clears it is ``SyncEngine/discard(id:)``.** `retry(id:)` re-sends
+    /// the spent key. Re-applying the edit — which this comment recommended
+    /// until the discard door existed — does not route around it either: the fresh mutation is a
+    /// new row under the same local id, queued after the blocked one, and the
+    /// replay defers every later write to an item behind that item's blocked
+    /// row. So it waits behind the row it was meant to replace, and the item
+    /// takes no further writes until something removes it.
     case idempotencyKeyReused
 }
 

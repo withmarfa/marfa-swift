@@ -513,6 +513,171 @@ public actor SyncEngine {
         }
     }
 
+    /// Discards a blocked write, releasing the item it was holding back.
+    ///
+    /// **A blocked row is a lock on its item, not only a write that failed.**
+    /// ``replayableRecords`` defers every later write to an item behind that
+    /// item's earliest blocked row — deliberately, because releasing them out
+    /// of order is how an edit gets lost. Exactly one reason is exempt:
+    /// ``PendingMutationBlockReason/resolverMissing`` once a resolver is
+    /// registered.
+    ///
+    /// So a row nothing can release strands the item as well as itself, and
+    /// some reasons have nothing that releases them.
+    ///
+    /// A spent idempotency key is refused identically however often it is sent.
+    /// And a conflict the server declined comes back from the server's own
+    /// record: the row's key is minted once and its body re-encodes
+    /// identically, and the server retains a `409` against a key rather than
+    /// releasing it — confirmed against `packages/server/src/middleware/idempotency.ts`,
+    /// whose `RELEASED_STATUSES` is `{401, 403}` and whose comment says a
+    /// conflict is a property of the request. So
+    /// ``PendingMutationBlockReason/conflictUnresolved`` is the same trap under
+    /// `.auto` and `.manual`, and that is the ordinary outcome for an `.auto`
+    /// write rather than an edge case. `.callback` escapes it, because the
+    /// resolver's answer goes out under a fresh key — though it can still park
+    /// here if those answers keep being refused.
+    ///
+    /// **That mechanism is not obviously limited to those two.** Every replay
+    /// carries the row's key, so any recorded non-2xx is a candidate for the
+    /// same replay-from-record. Which other reasons it reaches has not been
+    /// measured, so this says what was checked rather than drawing the wider
+    /// conclusion.
+    ///
+    /// Before this, ``retry(id:)`` and ``retryAll(reason:)`` were the whole
+    /// release surface and both put the row back into the same refusal. There
+    /// was no way to stop asking.
+    ///
+    /// **What is discarded is kept.** The row moves to the dead-letter log with
+    /// ``MarfaError/discardedByAppCode``, which is not a server code — nobody
+    /// refused this write, the app stopped asking — so an app reading that log
+    /// can tell the two apart. ``MarfaStore/queryDroppedMutations()`` is where
+    /// it surfaces.
+    ///
+    /// **Only a blocked row.** A pending one belongs to the drain, which may
+    /// already be sending it; that throws ``DiscardNotBlockedError``. A row
+    /// that is not there at all is not an error, because two taps on the same
+    /// row, and a discard racing a drain that already dropped it, both leave
+    /// the caller's intent satisfied.
+    ///
+    /// - Parameter id: the queue id, as ``PendingMutationSummary/id`` carries it.
+    public func discard(id: String) async throws {
+        let droppedAt = Date()
+        let marfaError = MarfaError(
+            code: MarfaError.discardedByAppCode,
+            // **"Stopped asking", not "never sent".** This string reaches a
+            // person through `DroppedMutationRecord.errorMessage`, and "never
+            // sent" is false for most of the reasons that get here: a
+            // `retriesExhausted` row was sent up to the ceiling and refused
+            // each time, and a `conflictUnresolved` one was sent and answered
+            // `409`. What is true of every discard is that the app stopped.
+            message: "Discarded by the app, which stopped trying to send it.",
+            status: 0
+        )
+        // **One hop, so the row cannot change under the decision.** See
+        // `MutationQueue.discardIfBlocked`: fetching, inspecting and then
+        // dropping across two suspensions lets a drain run in between, and the
+        // dead-letter log then records a write that actually landed.
+        let outcome = try await mutationQueue.discardIfBlocked(
+            id: id, droppedAt: droppedAt, error: marfaError
+        )
+        let record: PendingMutationRecord
+        var cascaded: [PendingMutationRecord] = []
+        switch outcome {
+        case .absent:
+            return
+        case .notBlocked(let state):
+            throw DiscardNotBlockedError(mutationId: id, state: state)
+        case .discarded(let discarded, let orphans):
+            record = discarded
+            cascaded = orphans
+        }
+
+        logger.log.info(
+            "sync.queue.discarded id=\(id, privacy: .public) kind=\(record.kind.rawValue, privacy: .public)"
+        )
+        emit(.mutationDropped(
+            kind: record.kind.rawValue,
+            itemId: record.localId,
+            attempt: record.attemptCount,
+            error: marfaError
+        ))
+
+        // **The same cleanup a permanent refusal does**, because the row is
+        // gone for the same reason from everything downstream's point of view.
+        // Discarding was first written as the blocked-row half of `retry`, and
+        // that was the wrong model: `retry` leaves the row in the queue, so it
+        // owes nothing to the local store or to the writes behind it.
+        await cleanUpAfterDiscarding(record, cascaded: cascaded, error: marfaError)
+
+        // The item is free now, so anything that was waiting behind this row
+        // should go. Same shape as `retry(id:)`: a cycle already running takes
+        // them on the pass that follows, an idle engine schedules one.
+        //
+        // **Not covered by a test, and worth saying so.** Mutating these four
+        // lines away leaves the suite green, because a fixture asserts release
+        // by driving the drain itself — and `scheduleProactiveDrain` is gated
+        // on the engine running, which the test seam fakes. Observing the real
+        // scheduling wants a started engine against a transport prepared for
+        // one, which `retry(id:)` has never had either. The gap is the same
+        // shape and the same age; it is not new here.
+        if draining {
+            drainRequestedDuringCycle = true
+        } else {
+            scheduleProactiveDrain()
+        }
+    }
+
+    /// The local-store half of a discard, after the queue has done its own.
+    ///
+    /// **`credentialRefused` is why every kind has to be handled rather than
+    /// just `updateItem`.** One refused credential parks *every* live row
+    /// through `parkAllLive`, with no filter on kind, so a `createItem`, a
+    /// `createEdge` and an `uploadBlob` can all be sitting in front of this
+    /// door at once.
+    ///
+    /// **Everything that has to be atomic with the drop now happens inside
+    /// `MutationQueue.discardIfBlocked`** — the cascade, because removing the
+    /// blocking row lifts the deferral and a drain firing in the gap would send
+    /// the orphans; and the staged-blob delete, because it has to check for
+    /// another owner in the same breath. What is left here touches the local
+    /// store, which is a different actor and cannot be in that transaction, and
+    /// is safe outside it: purging an item and deleting an edge are terminal,
+    /// so a drain interleaving changes nothing about the outcome.
+    private func cleanUpAfterDiscarding(
+        _ record: PendingMutationRecord,
+        cascaded: [PendingMutationRecord],
+        error marfaError: MarfaError
+    ) async {
+        if record.kind == .createEdge, let localId = record.localId {
+            try? await localStore.deleteEdge(id: localId)
+        }
+
+        guard record.kind == .createItem, let localId = record.localId else { return }
+        try? await localStore.purgeItem(id: localId)
+        for ghost in cascaded {
+            // An orphaned edge create has a local row too, pointing at an item
+            // that has just been purged.
+            if ghost.kind == .createEdge, let ghostId = ghost.localId {
+                try? await localStore.deleteEdge(id: ghostId)
+            }
+            logger.log.error(
+                "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
+            )
+            emit(.mutationDropped(
+                kind: ghost.kind.rawValue,
+                itemId: ghost.localId,
+                // The root's count, matching what the orphan's dead-letter row
+                // is written with. An orphan is deferred behind the root, so
+                // its own count is usually zero — reporting that beside a
+                // persisted row carrying the root's would be one drop
+                // described two ways.
+                attempt: record.attemptCount,
+                error: marfaError
+            ))
+        }
+    }
+
     // MARK: - Lifecycle
 
     /// Starts the sync engine. Idempotent — calling again while already running
