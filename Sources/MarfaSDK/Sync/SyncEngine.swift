@@ -582,13 +582,15 @@ public actor SyncEngine {
             id: id, droppedAt: droppedAt, error: marfaError
         )
         let record: PendingMutationRecord
+        var cascaded: [PendingMutationRecord] = []
         switch outcome {
         case .absent:
             return
         case .notBlocked(let state):
             throw DiscardNotBlockedError(mutationId: id, state: state)
-        case .discarded(let discarded):
+        case .discarded(let discarded, let orphans):
             record = discarded
+            cascaded = orphans
         }
 
         logger.log.info(
@@ -606,7 +608,7 @@ public actor SyncEngine {
         // Discarding was first written as the blocked-row half of `retry`, and
         // that was the wrong model: `retry` leaves the row in the queue, so it
         // owes nothing to the local store or to the writes behind it.
-        await cleanUpAfterDiscarding(record, droppedAt: droppedAt, error: marfaError)
+        await cleanUpAfterDiscarding(record, cascaded: cascaded, error: marfaError)
 
         // The item is free now, so anything that was waiting behind this row
         // should go. Same shape as `retry(id:)`: a cycle already running takes
@@ -638,56 +640,42 @@ public actor SyncEngine {
     /// through `parkAllLive`, with no filter on kind, so a `createItem`, a
     /// `createEdge` and an `uploadBlob` can all be sitting in front of this
     /// door at once.
+    /// The local-store half of a discard, after the queue has done its own.
+    ///
+    /// **Everything that has to be atomic with the drop now happens inside
+    /// `MutationQueue.discardIfBlocked`** — the cascade, because removing the
+    /// blocking row lifts the deferral and a drain firing in the gap would send
+    /// the orphans; and the staged-blob delete, because it has to check for
+    /// another owner in the same breath. What is left here touches the local
+    /// store, which is a different actor and cannot be in that transaction, and
+    /// is safe outside it: purging an item and deleting an edge are terminal,
+    /// so a drain interleaving changes nothing about the outcome.
     private func cleanUpAfterDiscarding(
         _ record: PendingMutationRecord,
-        droppedAt: Date,
+        cascaded: [PendingMutationRecord],
         error marfaError: MarfaError
     ) async {
-        switch record.kind {
-        case .createEdge:
-            if let localId = record.localId {
-                try? await localStore.deleteEdge(id: localId)
-            }
+        if record.kind == .createEdge, let localId = record.localId {
+            try? await localStore.deleteEdge(id: localId)
+        }
 
-        case .uploadBlob:
-            // Staged bytes are keyed by content hash and live outside the
-            // eviction walk, deliberately — they are owed to a server. Nothing
-            // is owed once the row is discarded, and the only other deleter is
-            // the successful-upload path, so without this they are orphaned
-            // with no owner and no query that can find them.
-            if let payload = try? JSONDecoder().decode(
-                UploadBlobPayload.self,
-                from: Data(record.payloadJson.utf8)
-            ) {
-                try? await mutationQueue.deletePendingBlob(hash: payload.hash)
+        guard record.kind == .createItem, let localId = record.localId else { return }
+        try? await localStore.purgeItem(id: localId)
+        for ghost in cascaded {
+            // An orphaned edge create has a local row too, pointing at an item
+            // that has just been purged.
+            if ghost.kind == .createEdge, let ghostId = ghost.localId {
+                try? await localStore.deleteEdge(id: ghostId)
             }
-
-        case .createItem:
-            // Every later write to this item would now be sent to a server
-            // that has never heard of it, 404 one at a time, and be dropped
-            // individually. Drop them together and purge the ghost row.
-            guard let localId = record.localId else { break }
-            let cascaded = (try? await mutationQueue.dropMutationsReferencingLocalId(
-                localId, droppedAt: droppedAt, error: marfaError
-            )) ?? []
-            try? await localStore.purgeItem(id: localId)
-            for ghost in cascaded {
-                if ghost.kind == .createEdge, let ghostId = ghost.localId {
-                    try? await localStore.deleteEdge(id: ghostId)
-                }
-                logger.log.error(
-                    "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
-                )
-                emit(.mutationDropped(
-                    kind: ghost.kind.rawValue,
-                    itemId: ghost.localId,
-                    attempt: ghost.attemptCount + 1,
-                    error: marfaError
-                ))
-            }
-
-        default:
-            break
+            logger.log.error(
+                "sync.mutation.dropped.cascade parent_kind=createItem parent_local_id=\(localId, privacy: .public) kind=\(ghost.kind.rawValue, privacy: .public) local_id=\(ghost.localId ?? "-", privacy: .public)"
+            )
+            emit(.mutationDropped(
+                kind: ghost.kind.rawValue,
+                itemId: ghost.localId,
+                attempt: ghost.attemptCount,
+                error: marfaError
+            ))
         }
     }
 

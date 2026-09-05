@@ -753,7 +753,7 @@ public actor MutationQueue {
         /// The row was blocked and is now in the dead-letter log. Carries what
         /// was discarded, because the caller has cascading and store cleanup to
         /// do and cannot re-read a row it has just deleted.
-        case discarded(PendingMutationRecord)
+        case discarded(PendingMutationRecord, cascaded: [PendingMutationRecord])
         /// The row is present and not blocked, so it belongs to the drain.
         case notBlocked(PendingMutationState)
         /// No such row. Two taps, or a discard racing a drain that already
@@ -798,8 +798,65 @@ public actor MutationQueue {
             attemptCount: record.attemptCount
         )
         modelContext.delete(model)
+
+        // **The cascade happens here, inside the same hop, and that placement
+        // is the whole point.** Removing the blocking row lifts the deferral
+        // holding every later write to that item, so between the two there is a
+        // window where those writes are replayable and the create they depend
+        // on is gone. A drain firing in it sends them to a server that never
+        // received the create, and each 404s and is dead-lettered on its own —
+        // exactly the inversion this door exists to prevent. The engine cannot
+        // close that window from outside: it does not hold `draining`, and
+        // taking it there would still leave two transactions.
+        var cascaded: [PendingMutationRecord] = []
+        if record.kind == .createItem, let localId = record.localId {
+            cascaded = try dropMutationsReferencingLocalId(
+                localId, droppedAt: droppedAt, error: error, attemptCount: record.attemptCount
+            )
+        }
+
+        // **Only when nothing else owns the bytes.** Enqueuing the same content
+        // twice while offline keeps one `PendingBlobModel` and inserts a second
+        // mutation row, and both can be blocked together — `parkAllLive` does
+        // not filter on kind. Deleting on hash alone would take the surviving
+        // row's bytes with it, and that row then replays, finds nothing, and is
+        // dead-lettered permanently: silent loss, in a shape the queue's own
+        // documentation calls supported.
+        if record.kind == .uploadBlob,
+            let payload = try? JSONDecoder().decode(
+                UploadBlobPayload.self, from: Data(record.payloadJson.utf8)
+            ),
+            !hasOtherPendingUpload(of: payload.hash, excluding: record.id) {
+            deletePendingBlobRow(hash: payload.hash)
+        }
+
         try modelContext.save()
-        return .discarded(record)
+        return .discarded(record, cascaded: cascaded)
+    }
+
+    /// Whether any *other* queued row still owes these bytes to a server.
+    private func hasOtherPendingUpload(of hash: String, excluding id: String) -> Bool {
+        let kind = MutationKind.uploadBlob.rawValue
+        let predicate = #Predicate<PendingMutationModel> {
+            $0.kindRaw == kind && $0.id != id
+        }
+        let rows = (try? modelContext.fetch(FetchDescriptor(predicate: predicate))) ?? []
+        return rows.contains { row in
+            guard let payload = try? JSONDecoder().decode(
+                UploadBlobPayload.self, from: Data(row.payloadJson.utf8)
+            ) else { return false }
+            return payload.hash == hash
+        }
+    }
+
+    /// Deletes the staged bytes without saving — the caller's transaction owns
+    /// the save, which is what keeps the whole discard one hop.
+    private func deletePendingBlobRow(hash: String) {
+        let predicate = #Predicate<PendingBlobModel> { $0.contentHash == hash }
+        var descriptor = FetchDescriptor<PendingBlobModel>(predicate: predicate)
+        descriptor.fetchLimit = 1
+        guard let model = try? modelContext.fetch(descriptor).first else { return }
+        modelContext.delete(model)
     }
 
     /// Records a failed replay attempt. Also resets `state` to `.pending`
@@ -1213,7 +1270,12 @@ public actor MutationQueue {
     func dropMutationsReferencingLocalId(
         _ localId: String,
         droppedAt: Date,
-        error: MarfaError
+        error: MarfaError,
+        /// Overrides the count written on each orphan. A drop leaves it `nil`,
+        /// because a real attempt just failed. A discard passes the root row's
+        /// own count, so one operation does not produce a root claiming no
+        /// attempt beside orphans claiming one.
+        attemptCount: Int? = nil
     ) throws -> [PendingMutationRecord] {
         // Pass 1 — item-scope direct matches (`localId` column).
         let directPredicate = #Predicate<PendingMutationModel> { $0.localId == localId }
@@ -1268,7 +1330,8 @@ public actor MutationQueue {
             insertDroppedRow(
                 from: model.toRecord(),
                 droppedAt: droppedAtStr,
-                error: error
+                error: error,
+                attemptCount: attemptCount
             )
             modelContext.delete(model)
         }

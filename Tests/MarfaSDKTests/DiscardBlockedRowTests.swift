@@ -231,6 +231,42 @@ struct DiscardBlockedRowTests {
         )
     }
 
+    @Test("discarding one upload does not take a sibling's bytes")
+    func discardingOneUploadKeepsASiblingsBytes() async throws {
+        let (store, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        try await SyncEngineTestKit.markImported(queue)
+        let (engine, _, _) = try await engine(over: store, queue)
+
+        // **One `PendingBlobModel`, two mutation rows.** Enqueuing the same
+        // content twice while offline is a shape the queue documents as
+        // supported: the bytes are stored once and each write gets its own row.
+        let bytes = Data("shared image bytes".utf8)
+        let hash = "sha256:" + String(repeating: "c", count: 64)
+        try await queue.enqueueBlobUpload(hash: hash, data: bytes, mimeType: "image/jpeg")
+        try await Task.sleep(for: .milliseconds(5))
+        try await queue.enqueueBlobUpload(hash: hash, data: bytes, mimeType: "image/jpeg")
+        let rows = try await queue.fetchAll().filter { $0.kind == .uploadBlob }
+        #expect(rows.count == 2, "the fixture did not produce two rows for one blob")
+        _ = try await queue.parkAllLive(
+            reason: .credentialRefused, error: "code=unauthorized status=401 message=key revoked"
+        )
+
+        try await engine.discard(id: rows[0].id)
+
+        // Deleting on hash alone would take these with it, and the surviving
+        // row would then replay, find nothing, and be dead-lettered on a
+        // permanent 400 — the bytes gone from the device with nothing said.
+        #expect(
+            try await queue.fetchPendingBlob(hash: hash) != nil,
+            "discarding one upload destroyed the bytes another queued write still owes"
+        )
+        #expect(try await queue.fetchAll().contains { $0.id == rows[1].id })
+
+        // And once the last owner goes, they are freed.
+        try await engine.discard(id: rows[1].id)
+        #expect(try await queue.fetchPendingBlob(hash: hash) == nil)
+    }
+
     @Test("only a blocked row can be discarded")
     func onlyABlockedRowCanBeDiscarded() async throws {
         let (store, queue, _, laterId) = try await queueWithABlockedRowAndAnEditBehindIt()
