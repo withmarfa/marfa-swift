@@ -193,6 +193,25 @@ public enum SyncEvent: Sendable {
     /// invariant.
     case hydrationProgress(imported: Int, total: Int)
 
+    /// A first fill has stopped, either because it finished or because it did
+    /// not. `imported` is how many items had landed; `completed` says which of
+    /// the two happened.
+    ///
+    /// **Without this the two surfaces disagreed, and the push surface was the
+    /// one left wrong.** ``SyncEngine/status`` clears its hydration figures
+    /// when an import throws, precisely so a bar frozen partway cannot claim a
+    /// fill is still running. Nothing said the same thing to a consumer reading
+    /// the event stream, so a view built on ``hydrationProgress`` — which is
+    /// the surface documented for drawing one — sat at the last fraction it
+    /// was given for the life of the process.
+    ///
+    /// **It is not enough to watch ``failed`` instead.** That fires on the
+    /// engine's own catch-up path and not for an app calling
+    /// ``SyncEngine/performInitialSync()`` directly, where the throw goes to
+    /// the caller, and it is skipped altogether when a `stop()` cancels the
+    /// import. This fires on every way out.
+    case hydrationEnded(imported: Int, completed: Bool)
+
     /// A blob upload has started. Fires once per upload attempt, before
     /// any bytes hit the network. `totalBytes` comes from the queued
     /// payload — the same value `BlobUploadResponse.size` returned when

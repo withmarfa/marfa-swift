@@ -338,8 +338,10 @@ public actor SyncEngine {
     /// actor together**, because reading them separately leaves a suspension
     /// between them and a drain landing inside it reports work outstanding
     /// beside a timestamp saying the queue had just emptied — a pair the
-    /// system was never in. Connection and hydration are this actor's own and
-    /// are read after that call, so they are the freshest of the four.
+    /// system was never in. Connection and hydration are read after that call
+    /// and are therefore the fresher two; hydration is this actor's own state,
+    /// and connection is a synchronous read of the manager's mutex rather than
+    /// another hop.
     /// **Throws rather than defaulting when the queue cannot be read.** A
     /// store that will not answer is not a store with nothing in it, and
     /// returning zeroes would report `isSettled` — a green tick from a
@@ -863,7 +865,19 @@ public actor SyncEngine {
         // running. A cancellation lands here as well, which is right: a
         // stopped engine is not a hydrating one.
         var finished = false
-        defer { if !finished { hydrationProgress = nil } }
+        var importedSoFar = 0
+        // **Both surfaces, or the push surface is left saying the opposite of
+        // the pull surface.** Clearing `hydrationProgress` fixes what `status`
+        // reports and nothing else: a consumer drawing a bar from
+        // `hydrationProgress` events — which is the surface documented for
+        // drawing one — has been told 2 of 10 and is never told anything after
+        // it.
+        defer {
+            if !finished {
+                hydrationProgress = nil
+                emit(.hydrationEnded(imported: importedSoFar, completed: false))
+            }
+        }
 
         // **Asked at most once, whatever the answer.** `total == nil` looks
         // like it says that and does not: a route that answers `{}` or fails
@@ -871,6 +885,13 @@ public actor SyncEngine {
         // and a twenty-page import against a space whose stats route is down
         // asks nineteen times. The flag records that the question was put,
         // which is the thing being paid for.
+        //
+        // **What that gives up, said rather than left to be discovered:** a
+        // stats route that fails once transiently is not asked again, so an
+        // import that would have got a denominator on page two now runs to the
+        // end without one and reports no progress at all. That is the right
+        // trade — a bar is not worth nineteen round trips against a route that
+        // is down — but it is a trade rather than a free saving.
         var askedForTotal = false
         var total: Int?
         // Every id the answer mentioned. What the prune below is for: a row the
@@ -932,6 +953,7 @@ public actor SyncEngine {
             // Once per page, not once per row. A progress event per item on a
             // ten-thousand-row import is ten thousand main-actor hops to move
             // a bar by a pixel.
+            importedSoFar = imported
             if let total {
                 hydrationProgress = HydrationProgress(imported: imported, total: total)
                 emit(.hydrationProgress(imported: imported, total: total))
@@ -1045,6 +1067,7 @@ public actor SyncEngine {
         // Everything that could throw is behind us, so the figures this import
         // reported are a finished account rather than a stalled one.
         finished = true
+        emit(.hydrationEnded(imported: imported, completed: true))
         return imported
     }
 

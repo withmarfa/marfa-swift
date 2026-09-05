@@ -10,6 +10,12 @@ import MarfaSDKTestSupport
 ///
 /// These assert the numbers rather than the plumbing, because a forwarding
 /// property that compiles is not evidence it forwards the right thing.
+/// Collects hydration endings from a detached watcher.
+private actor EndingBox {
+    private(set) var seen: [(imported: Int, completed: Bool)] = []
+    func add(imported: Int, completed: Bool) { seen.append((imported, completed)) }
+}
+
 /// Collects hydration events from a detached watcher.
 private actor EventBox {
     private(set) var pairs: [(imported: Int, total: Int)] = []
@@ -49,13 +55,13 @@ struct EngineReportsItselfTests {
     func queueCountsSeparateTheDispositions() async throws {
         let (_, queue, _, _, engine) = try await SyncEngineTestKit.makeFixture()
 
-        // **Four different counts, no two alike.** With equal counts a reader
-        // that had two of the predicates the wrong way round reports the same
-        // numbers, and this test passes against it — which it did, on a
-        // fixture of one pending and one blocked, until a mutation said so.
-        // Two of each is not enough either: any pair sharing a value can be
-        // swapped invisibly, and `outstanding` only catches a swap across the
-        // line it draws. So 2 waiting, 3 in flight, 1 stuck, 4 refused.
+        // **Four different counts, no two alike.** Any pair of counters sharing
+        // a value can be swapped invisibly, and `outstanding` only catches a
+        // swap across the line it draws. The fixture this replaces was two
+        // pending and one blocked, which did pin that pair — and left
+        // `inFlight` and `deadLettered` both at zero and both unasserted, so
+        // either could have been absent. So 2 waiting, 3 in flight, 1 stuck,
+        // 4 refused.
         for label in (1...10).map({ "row \($0)" }) {
             var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
             input.id = UUIDv7.generateString()
@@ -109,6 +115,10 @@ struct EngineReportsItselfTests {
 
     /// The value an app previously had to keep its own reference to reach.
     ///
+    /// **The engine's half only.** This was named for the client too and never
+    /// built one, which is exactly how the client's three forwards went
+    /// unmeasured — the name read as coverage. They have their own test now.
+    ///
     /// **Driven, not merely compared.** An earlier version of this asserted
     /// only that the engine and the manager agreed while both sat at
     /// `.offline` — which holds against a property returning a hardcoded
@@ -116,8 +126,8 @@ struct EngineReportsItselfTests {
     /// bypasses its transition guards, which the rest of the suite already
     /// uses twenty times over; the claim that this could not be driven was
     /// wrong and is what made the test vacuous.
-    @Test("connection state reaches the engine and the client, and follows the manager")
-    func connectionStateReachesTheClient() async throws {
+    @Test("connection state reaches the engine and follows the manager")
+    func connectionStateReachesTheEngine() async throws {
         let (_, _, _, manager, engine) = try await SyncEngineTestKit.makeFixture()
         #expect(engine.connectionState == .offline)
 
@@ -480,6 +490,130 @@ struct EngineReportsItselfTests {
         mock.enqueueError(MarfaError(code: "server_error", message: "meant for the list", status: 500))
 
         #expect(try await client.items.stats()["active"] == 7, "the staged answer, not the error")
+
+        await #expect(throws: MarfaError.self) {
+            _ = try await client.items.list()
+        }
+    }
+
+    /// **The clear has to cover the whole import, not the item loop.** Items
+    /// page, then prune, then edges — a throw anywhere after the last progress
+    /// event leaves the same stalled fraction, and only the item loop was
+    /// driven. This one gets its items and then finds no edge page.
+    @Test("an import that dies after the items still leaves no progress standing")
+    func aFailureAfterTheItemsAlsoClearsProgress() async throws {
+        let (_, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        transport.stage(["active": 10], for: "/items/stats")
+
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i1"), pair("i2")], cursor: "c1", hasMore: true
+        ))
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i3")], cursor: nil, hasMore: false
+        ))
+        // No edge page queued, so `/edges` is where this one dies.
+
+        await #expect(throws: (any Error).self) {
+            _ = try await engine.performInitialSync()
+        }
+
+        #expect(
+            try await engine.status.hydration == nil,
+            "the clear covers the item loop and stops there"
+        )
+    }
+
+    /// **A consumer watching events is told the fill stopped.** Clearing
+    /// `status` alone left the two surfaces contradicting each other: the pull
+    /// surface said no import, the push surface's last word was 2 of 10, and
+    /// the push surface is the one a progress bar is built on.
+    @Test("a failed import ends its hydration on the event stream too")
+    func aFailedImportEndsHydrationOnTheEventStream() async throws {
+        let (_, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        transport.stage(["active": 10], for: "/items/stats")
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i1"), pair("i2")], cursor: "c1", hasMore: true
+        ))
+
+        let events = engine.events
+        let endings = EndingBox()
+        let watcher = Task {
+            for await event in events {
+                if case .hydrationEnded(let imported, let completed) = event {
+                    await endings.add(imported: imported, completed: completed)
+                }
+            }
+        }
+        defer { watcher.cancel() }
+
+        await #expect(throws: (any Error).self) {
+            _ = try await engine.performInitialSync()
+        }
+
+        try await waitUntil(timeout: .seconds(2), description: "the hydration ending") {
+            await endings.seen.count >= 1
+        }
+        let seen = await endings.seen
+        #expect(seen.count == 1, "one ending per import: \(seen)")
+        #expect(seen.first?.completed == false, "the import did not finish")
+        #expect(seen.first?.imported == 2, "it carries what had landed")
+    }
+
+    /// And the ordinary case says so too, so a consumer has one signal for
+    /// "stopped" rather than one for failure and silence for success.
+    @Test("a finished import ends its hydration as completed")
+    func aFinishedImportEndsHydrationAsCompleted() async throws {
+        let (_, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        transport.stage(["active": 3], for: "/items/stats")
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i1"), pair("i2")], cursor: "c1", hasMore: true
+        ))
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i3")], cursor: nil, hasMore: false
+        ))
+        transport.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+
+        let events = engine.events
+        let endings = EndingBox()
+        let watcher = Task {
+            for await event in events {
+                if case .hydrationEnded(let imported, let completed) = event {
+                    await endings.add(imported: imported, completed: completed)
+                }
+            }
+        }
+        defer { watcher.cancel() }
+
+        #expect(try await engine.performInitialSync() == 3)
+
+        try await waitUntil(timeout: .seconds(2), description: "the hydration ending") {
+            await endings.seen.count >= 1
+        }
+        let seen = await endings.seen
+        #expect(seen.first?.completed == true)
+        #expect(seen.first?.imported == 3)
+    }
+
+    /// **The engine's own bookkeeping read must not eat a queued error
+    /// either.** The staged case is covered above and pins only that the
+    /// staged slot outranks the error queue. This one leaves `/items/stats`
+    /// unstaged, which is the path the engine actually takes when a test has
+    /// no opinion about it — and is where moving the error check back between
+    /// the staged slot and the incidental branch would still be wrong while
+    /// the other test stayed green.
+    @Test("an unstaged incidental read does not consume a queued error")
+    func anUnstagedIncidentalReadLeavesTheErrorQueueAlone() async throws {
+        let mock = MockTransport()
+        let client = MarfaClient(
+            configuration: ClientConfiguration(url: URL(string: "http://test")!, apiKey: "k"),
+            transport: mock
+        )
+        mock.enqueueError(MarfaError(code: "server_error", message: "meant for the list", status: 500))
+
+        // Nothing staged for it, and no responses queued, so the double answers
+        // the incidental route from its own empty object rather than reaching
+        // for the error.
+        _ = try await client.items.stats()
 
         await #expect(throws: MarfaError.self) {
             _ = try await client.items.list()

@@ -127,6 +127,12 @@ public final class MockTransport: Transport, @unchecked Sendable {
     /// queue. For a route in ``incidentalRoutes`` this is how a test that
     /// actually cares about it says so.
     ///
+    /// **A staged path also outranks an enqueued error**, which is a behavior
+    /// a test can meet: stage a path, enqueue an error, and the error is not
+    /// delivered to that path. That is the point — an error queued for a
+    /// request under test should not be taken by a route somebody staged
+    /// precisely because they had no opinion about it.
+    ///
     /// **Covers the JSON request doors only** — `request` in both its forms.
     /// `requestWithConflict`, `rawRequest` and `rawUpload` still take the
     /// positional queue, because nothing reads those incidentally and widening
