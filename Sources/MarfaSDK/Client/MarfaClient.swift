@@ -155,6 +155,37 @@ public final class MarfaClient: Sendable {
     /// ``SyncEngine/stop()`` to tear it down gracefully.
     public let syncEngine: SyncEngine?
 
+    // MARK: - Rule 19, reachable from the client object
+
+    /// Whether this client can currently reach the server.
+    ///
+    /// `.offline` for a client with no engine — a pure-local client is not
+    /// having connection trouble, it has nowhere to connect, and those look
+    /// the same to a status line that only asks whether writes are going out.
+    /// An app that needs to tell them apart has ``syncEngine`` to check.
+    public var connectionState: ConnectionState {
+        syncEngine?.connectionState ?? .offline
+    }
+
+    /// The current connection state, then every change to it. An empty stream
+    /// for a client with no engine, which finishes immediately rather than
+    /// hanging a view that awaits it.
+    public var connectionStateUpdates: AsyncStream<ConnectionState> {
+        guard let syncEngine else { return AsyncStream { $0.finish() } }
+        return syncEngine.connectionStateUpdates
+    }
+
+    /// The engine's account of itself, or `nil` when there is no engine.
+    ///
+    /// **`nil` rather than a zeroed status.** A client with no engine has no
+    /// queue, and reporting "0 pending, 0 blocked" claims a state of health
+    /// that was never measured — an app showing a green tick because it forgot
+    /// to build a synced client is exactly the failure this is meant to
+    /// prevent.
+    public var syncStatus: SyncStatus? {
+        get async throws { try await syncEngine?.status }
+    }
+
     /// Where a synced client's `.callback` conflict strategy finds its
     /// resolver. Non-nil there and `nil` on both other clients: a direct
     /// (server-only) client reaches the per-call closure itself and queues

@@ -181,6 +181,50 @@ public enum SyncEvent: Sendable {
     /// send back.
     case storeRecovered(StoreRecovery)
 
+    /// A first fill has taken `imported` of `total` rows.
+    ///
+    /// Emitted once per page rather than per row, and only when the server
+    /// answered with a count to measure against — an import that could not get
+    /// a denominator emits none of these rather than a fraction of an unknown.
+    ///
+    /// **`total` is a snapshot from before the import began**, so a space
+    /// being written to while a device fills can push `imported` past it.
+    /// `imported` is the figure to trust; the pair is progress, not an
+    /// invariant.
+    ///
+    /// **Terminated by ``hydrationEnded(imported:completed:)``**, which is what
+    /// says the fill stopped. Without handling that, a bar built on this sits
+    /// at the last fraction it was given.
+    case hydrationProgress(imported: Int, total: Int)
+
+    /// A first fill has stopped, either because it finished or because it did
+    /// not. `imported` is how many items had landed; `completed` says which of
+    /// the two happened.
+    ///
+    /// **Without this the two surfaces disagreed, and the push surface was the
+    /// one left wrong.** ``SyncEngine/status`` clears its hydration figures
+    /// when an import throws, precisely so a bar frozen partway cannot claim a
+    /// fill is still running. Nothing said the same thing to a consumer reading
+    /// the event stream, so a view built on ``hydrationProgress`` — which is
+    /// the surface documented for drawing one — sat at the last fraction it
+    /// was given for the life of the process.
+    ///
+    /// **It is not enough to watch ``failed`` instead.** That fires on the
+    /// engine's own catch-up path and not for an app calling
+    /// ``SyncEngine/performInitialSync()`` directly, where the throw goes to
+    /// the caller, and it is skipped altogether when a `stop()` cancels the
+    /// import. This fires on every way out **of the import itself**. The two
+    /// refusals ahead of it — a client that does not hold the store's writer
+    /// lock, and a queue with unsent work — emit nothing, and need nothing:
+    /// no progress was reported either, so there is no bar to take down.
+    ///
+    /// **A `stop()` mid-import arrives here as `completed: false`**, and is
+    /// deliberately not distinguished from a failure: for a progress bar the
+    /// two mean the same thing. An app that raises an error from this case
+    /// will raise one on an ordinary teardown, so `completed: false` is a
+    /// reason to stop drawing rather than a reason to complain.
+    case hydrationEnded(imported: Int, completed: Bool)
+
     /// A blob upload has started. Fires once per upload attempt, before
     /// any bytes hit the network. `totalBytes` comes from the queued
     /// payload — the same value `BlobUploadResponse.size` returned when

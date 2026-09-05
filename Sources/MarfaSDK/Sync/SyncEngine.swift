@@ -305,6 +305,72 @@ public actor SyncEngine {
         }
     }
 
+    // MARK: - Rule 19, the engine reports itself
+
+    /// Whether the engine can currently reach the server.
+    ///
+    /// **Forwarded rather than left to the caller to have kept.** An app had
+    /// to hold on to the ``ConnectionStateManager`` it passed into the synced
+    /// factory in order to answer this, which meant every consumer inventing
+    /// the same piece of plumbing to reach a value the engine already had.
+    public nonisolated var connectionState: ConnectionState {
+        connectionManager.state
+    }
+
+    /// The current state, then every change to it.
+    ///
+    /// Yields immediately so a view has something to render on first draw,
+    /// rather than an empty state until the connection next changes — which,
+    /// on a device that is simply online, may be never.
+    public nonisolated var connectionStateUpdates: AsyncStream<ConnectionState> {
+        connectionManager.stateUpdates
+    }
+
+    /// The engine's account of itself: connection, outbox, last clean drain
+    /// and hydration progress.
+    ///
+    /// **Assembled on demand rather than cached**, so it cannot drift from the
+    /// store it describes. The cost is four counts and one lookup against the
+    /// database, which is cheaper than the arrays a caller would otherwise
+    /// fetch and measure.
+    ///
+    /// **The queue's four counts and its last clean drain come off the queue
+    /// actor together**, because reading them separately leaves a suspension
+    /// between them and a drain landing inside it reports work outstanding
+    /// beside a timestamp saying the queue had just emptied — a pair the
+    /// system was never in. Connection and hydration are read after that call
+    /// and are therefore the fresher two; hydration is this actor's own state,
+    /// and connection is a synchronous read of the manager's mutex rather than
+    /// another hop.
+    /// **Throws rather than defaulting when the queue cannot be read.** A
+    /// store that will not answer is not a store with nothing in it, and
+    /// returning zeroes would report `isSettled` — a green tick from a
+    /// measurement that failed. That is the same claim `MarfaClient/syncStatus`
+    /// returns `nil` to avoid making for a client with no engine, and it would
+    /// be worse here, because there *is* a queue and its contents are unknown
+    /// rather than absent.
+    public var status: SyncStatus {
+        get async throws {
+            let (queue, drainStamp) = try await mutationQueue.countsAndSyncState(
+                key: cleanDrainKey
+            )
+            return SyncStatus(
+                connection: connectionManager.state,
+                queue: queue,
+                lastCleanDrainAt: Self.parseDrainStamp(drainStamp),
+                hydration: hydrationProgress
+            )
+        }
+    }
+
+    /// ISO 8601 with fractional seconds, or `nil` for absent or unparseable.
+    /// Shared by ``status`` and ``lastCleanDrainAt`` so the two cannot come to
+    /// different conclusions about the same stored string.
+    private static func parseDrainStamp(_ raw: String?) -> Date? {
+        guard let raw else { return nil }
+        return try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    }
+
     /// Timestamp of the most recent clean drain cycle — both the SSE
     /// event application and the queued-mutation replay completed
     /// without an outstanding error. Stamped from inside
@@ -322,13 +388,7 @@ public actor SyncEngine {
     /// when absent or unparseable.
     public var lastCleanDrainAt: Date? {
         get async {
-            guard
-                let raw = try? await mutationQueue.loadSyncState(key: cleanDrainKey),
-                let parsed = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
-            else {
-                return nil
-            }
-            return parsed
+            Self.parseDrainStamp(try? await mutationQueue.loadSyncState(key: cleanDrainKey))
         }
     }
 
@@ -752,12 +812,87 @@ public actor SyncEngine {
         }
     }
 
+    /// The most recent hydration progress, or `nil` if no import has run in
+    /// this process. Read by ``status``.
+    private(set) var hydrationProgress: HydrationProgress?
+
+    /// The server's own count of what it holds, summed across states because
+    /// the import reads every state.
+    private func statsTotal() async throws -> Int? {
+        let stats: [String: Int] = try await transport.request(
+            method: .get, path: "/items/stats", body: nil, query: nil
+        )
+        // An empty answer is not a total of zero — it is a route that told us
+        // nothing, and showing "0 of 0" while rows arrive is worse than
+        // showing no bar at all.
+        return stats.isEmpty ? nil : stats.values.reduce(0, +)
+    }
+
     /// The import itself, with no refusal and no coalescing — both belong to
     /// the callers above, which is what lets the catch-up drain first and then
     /// reach the same passes an explicit caller reaches.
     private func importPasses(pageSize: Int) async throws -> Int {
         var cursor: String? = nil
         var imported = 0
+
+        // **The denominator is bought only when it is worth buying**, which is
+        // after the first page says there is more. A page-based import knows
+        // what it has taken and nothing about what is left, so progress from
+        // pages alone is a guess that reaches nine tenths and stays there —
+        // and `GET /items/stats` answers with a count per state, which summed
+        // is the figure to show against because this import reads every state.
+        //
+        // Deferring it costs nothing and saves a request on every import that
+        // fits in one page, which is most of them and all the small ones. A
+        // progress bar for twenty rows is not worth a round trip, and the
+        // import that needs one is by definition the import with pages left to
+        // pay for it.
+        //
+        // Best effort either way: a space that will not answer this is a space
+        // that can still be imported, so progress is reported as absent rather
+        // than as a wrong number.
+        // **Cleared at the top, so a later import never reports an earlier
+        // one's numbers.** Without this a re-import that fits in one page
+        // leaves the previous fill's figures standing.
+        hydrationProgress = nil
+
+        // **And cleared again on the way out if this import did not finish.**
+        // The reset above was written as though it covered that too, and it
+        // does not: it only protects the *next* import, and an import that
+        // throws on page four may have no next one. What stands until the
+        // process ends is a fraction frozen partway, which is the one thing a
+        // progress bar must never show — indistinguishable from a fill still
+        // running. A cancellation lands here as well, which is right: a
+        // stopped engine is not a hydrating one.
+        var finished = false
+        // **Both surfaces, or the push surface is left saying the opposite of
+        // the pull surface.** Clearing `hydrationProgress` fixes what `status`
+        // reports and nothing else: a consumer drawing a bar from
+        // `hydrationProgress` events — which is the surface documented for
+        // drawing one — has been told 2 of 10 and is never told anything after
+        // it.
+        defer {
+            if !finished {
+                hydrationProgress = nil
+                emit(.hydrationEnded(imported: imported, completed: false))
+            }
+        }
+
+        // **Asked at most once, whatever the answer.** `total == nil` looks
+        // like it says that and does not: a route that answers `{}` or fails
+        // leaves `total` nil, so the condition is true again on the next page,
+        // and a twenty-page import against a space whose stats route is down
+        // asks nineteen times. The flag records that the question was put,
+        // which is the thing being paid for.
+        //
+        // **What that gives up, said rather than left to be discovered:** a
+        // stats route that fails once transiently is not asked again, so an
+        // import that would have got a denominator on page two now runs to the
+        // end without one and reports no progress at all. That is the right
+        // trade — a bar is not worth nineteen round trips against a route that
+        // is down — but it is a trade rather than a free saving.
+        var askedForTotal = false
+        var total: Int?
         // Every id the answer mentioned. What the prune below is for: a row the
         // server purged while this device was away is absent from the answer
         // rather than changed in it, so no event describes it and nothing else
@@ -806,6 +941,20 @@ public actor SyncEngine {
                 try await localStore.upsertMetadata(pair.metadata)
                 seenItemIds.insert(pair.item.id)
                 imported += 1
+            }
+
+            // Asked for once, on learning the import will not fit in a page.
+            if !askedForTotal, page.hasMore {
+                askedForTotal = true
+                total = try? await statsTotal()
+            }
+
+            // Once per page, not once per row. A progress event per item on a
+            // ten-thousand-row import is ten thousand main-actor hops to move
+            // a bar by a pixel.
+            if let total {
+                hydrationProgress = HydrationProgress(imported: imported, total: total)
+                emit(.hydrationProgress(imported: imported, total: total))
             }
 
             if !page.hasMore {
@@ -913,6 +1062,10 @@ public actor SyncEngine {
         let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
         try? await mutationQueue.saveSyncState(key: fullSyncKey, value: stamp)
 
+        // Everything that could throw is behind us, so the figures this import
+        // reported are a finished account rather than a stalled one.
+        finished = true
+        emit(.hydrationEnded(imported: imported, completed: true))
         return imported
     }
 
