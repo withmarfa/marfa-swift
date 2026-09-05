@@ -269,4 +269,116 @@ struct FullSyncStateQueryTests {
         }
         query.stop()
     }
+
+    /// **A row failing transiently before another is refused.** The cycle
+    /// emitted `.queueParked` and then, at its tail, `.failed` from the
+    /// earlier row — and a latched fold keeps the last one. Nothing put the
+    /// park back, because `queueParked` answers "this just happened" and a
+    /// fully parked queue produces no further events at all.
+    @Test("a transient failure in the parking cycle does not overwrite the park")
+    func aTransientFailureInTheSameCycleDoesNotOverwriteThePark() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let query = try #require(store.queryFullSyncState())
+
+        // Two rows: the first meets the network, the second meets the 401.
+        for label in ["flaky", "refused"] {
+            var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
+            input.id = UUIDv7.generateString()
+            try await queue.enqueueCreateItem(input, localId: input.id!)
+        }
+        transport.enqueueError(NetworkError(URLError(.notConnectedToInternet)))
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+
+        // **Waited on the terminal state rather than on `.parked` itself.**
+        // Written the other way this passed with the fix removed: the cycle
+        // does reach `.parked` for an instant on its way to emitting the
+        // earlier row's failure, and a poll for a value it briefly holds
+        // cannot tell that from a value it settles on.
+        try await awaitCondition(description: "the cycle to reach a terminal state") {
+            if case .syncing = query.state { return false }
+            if case .notYetSynced = query.state { return false }
+            return true
+        }
+        if case .parked = query.state {} else {
+            Issue.record("the earlier row's failure overwrote the park: \(query.state)")
+        }
+        query.stop()
+    }
+
+    /// **And a park laid down in an earlier cycle survives a later failure.**
+    /// The ordinary sequence: the credential dies, the person keeps working,
+    /// and the next write meets a network hiccup. Nothing re-emits the park,
+    /// so a fold that took the failure would tell somebody to check their
+    /// connection when the remedy is to sign in again.
+    @Test("a later transient failure does not overwrite a standing park")
+    func aLaterFailureDoesNotOverwriteAStandingPark() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let query = try #require(store.queryFullSyncState())
+
+        var first = CreateItemInput(type: "core.note", properties: ["body": .string("refused")])
+        first.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(first, localId: first.id!)
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+        try await awaitCondition(description: "query.state becomes .parked") {
+            if case .parked = query.state { return true }
+            return false
+        }
+
+        // The person carries on. This one meets the network rather than the
+        // credential, and its cycle ends in a failure.
+        var later = CreateItemInput(type: "core.note", properties: ["body": .string("later")])
+        later.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(later, localId: later.id!)
+        transport.enqueueError(NetworkError(URLError(.notConnectedToInternet)))
+        await engine.triggerProactiveDrainForTesting()
+
+        // Wait for the cycle's terminal event to be folded rather than for a
+        // value: the query moves to `.syncing` first, and asserting on the
+        // instant the drain returns reads that rather than its outcome.
+        try await awaitCondition(description: "the cycle to reach a terminal state") {
+            if case .syncing = query.state { return false }
+            return true
+        }
+        if case .parked = query.state {} else {
+            Issue.record("a later failure overwrote the park: \(query.state)")
+        }
+        query.stop()
+    }
+
+    /// **Releasing the queue has to say so.** The drain it schedules may not
+    /// run for a long time — the device may be offline — and a fold would sit
+    /// on `.parked` while the queue holds no blocks at all, telling somebody
+    /// who has just signed in to sign in again.
+    @Test("releasing the queue moves the query off parked")
+    func releasingMovesTheQueryOffParked() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let query = try #require(store.queryFullSyncState())
+
+        var input = CreateItemInput(type: "core.note", properties: ["body": .string("refused")])
+        input.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(input, localId: input.id!)
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+        try await awaitCondition(description: "query.state becomes .parked") {
+            if case .parked = query.state { return true }
+            return false
+        }
+
+        // Offline, so the drain this schedules cannot run. The state still has
+        // to stop saying the credential is refused.
+        await connManager.applyStateForTesting(.offline)
+        #expect(try await engine.retryAll(reason: .credentialRefused) == 1)
+
+        try await awaitCondition(description: "query.state leaves .parked") {
+            if case .parked = query.state { return false }
+            return true
+        }
+        query.stop()
+    }
 }

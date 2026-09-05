@@ -6,14 +6,22 @@ import Observation
 ///
 /// Folds two signals into a single discrete state:
 ///
-/// 1. The persisted `last_clean_drain_at` timestamp on init — sets the
-///    starting state to ``FullSyncState/synced(at:)`` when present, or
+/// 1. The engine's own ``SyncEngine/fullSyncState`` on init — which reads the
+///    persisted `last_clean_drain_at` timestamp *and* whether the queue is
+///    parked, so a store opened over a refused credential does not start on
+///    the timestamp a healthy session left behind. Sets the starting state, or
 ///    ``FullSyncState/notYetSynced`` when absent.
 /// 2. ``SyncEngine/events`` — ``SyncEvent/syncing`` lands as
 ///    ``FullSyncState/syncing``, ``SyncEvent/synced(at:)`` as
-///    ``FullSyncState/synced(at:)`` (clearing any prior failure), and
-///    ``SyncEvent/failed(error:)`` as
-///    ``FullSyncState/failed(at:error:)``.
+///    ``FullSyncState/synced(at:)`` (clearing any prior failure),
+///    ``SyncEvent/failed(error:)`` as ``FullSyncState/failed(at:error:)``,
+///    and ``SyncEvent/queueParked(reason:count:)`` as
+///    ``FullSyncState/parked(reason:count:)``.
+///
+/// **This is a latched fold, which is why the engine makes the park a
+/// cycle's terminal event.** `queueParked` on its own answers "this just
+/// happened" rather than "is this still true", so a later cycle that failed
+/// would otherwise overwrite a standing park with nothing to put it back.
 ///
 /// Subscribing to a single event stream — rather than to
 /// ``SyncEngine/events`` plus ``ConnectionStateManager/stateUpdates`` —
@@ -31,6 +39,7 @@ import Observation
 ///         case .syncing:      ProgressView("Syncing…")
 ///         case .synced(let at): Text("Last synced \(at, format: .relative(presentation: .named))")
 ///         case .failed(_, let error): Text("Couldn't sync: \(error.localizedDescription)")
+///         case .parked(_, let count): Text("Sign in again — \(count) unsent")
 ///         }
 ///     }
 ///

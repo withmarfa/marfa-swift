@@ -2,11 +2,13 @@ import Foundation
 
 /// Discrete state covering the engine's "is everything caught up?" axis.
 ///
-/// Composes two underlying signals into a single value apps can render
+/// Composes three underlying signals into a single value apps can render
 /// against without writing their own reducer:
 ///
 /// 1. The mutation queue's drain progress (`SyncEngine.replayMutations`).
 /// 2. The most recent drain's outcome (`SyncEvent.synced` / `SyncEvent.failed`).
+/// 3. Whether the queue has stopped on a refused credential, which outranks
+///    both of the above — see ``parked(reason:count:)``.
 ///
 /// "Caught up" here means a clean drain cycle finished — both the SSE
 /// event application and the queued-mutation replay completed without an
@@ -19,8 +21,12 @@ import Foundation
 /// `@Observable` view bound to the local store.
 ///
 /// Not `Equatable` — the ``failed(at:error:)`` case carries an `Error`
-/// which doesn't synthesize. SwiftUI animation can drive off the case
-/// discriminator (e.g. `state.caseId`) when comparison is needed.
+/// which doesn't synthesize. Where comparison is needed, match on the case
+/// with `if case` or a `switch` rather than on the value. **An earlier
+/// version of this paragraph suggested `state.caseId`, which has never
+/// existed in this package**; anyone who tried it got a build error rather
+/// than a wrong answer, but it is worth not sending the next reader after
+/// something that is not there.
 public enum FullSyncState: Sendable {
     /// Engine has not completed a clean drain cycle since this local
     /// store was opened, and no prior session left a persisted

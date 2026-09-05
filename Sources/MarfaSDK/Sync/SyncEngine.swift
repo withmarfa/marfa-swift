@@ -418,15 +418,29 @@ public actor SyncEngine {
     public var fullSyncState: FullSyncState {
         get async {
             if draining { return .syncing }
-            if let parked = try? await mutationQueue.counts.blocked[.credentialRefused],
-                parked > 0
-            {
+            // **One read, and a store that will not answer says so.** `status`
+            // states both rules about itself seventy lines up: it takes the
+            // counts and the drain stamp together because a park landing
+            // between two reads yields a green tick over a parked queue, and it
+            // throws rather than defaulting because a store that will not
+            // answer is not a store with nothing in it. This cannot throw
+            // without a source break, so it reports the failure instead.
+            let counts: MutationQueueCounts
+            let drainStamp: String?
+            do {
+                (counts, drainStamp) = try await mutationQueue.countsAndSyncState(
+                    key: cleanDrainKey
+                )
+            } catch {
+                return .failed(at: Date(), error: error)
+            }
+            if let parked = counts.blocked[.credentialRefused], parked > 0 {
                 return .parked(reason: .credentialRefused, count: parked)
             }
             if let err = lastFailedError, let at = lastFailedAt {
                 return .failed(at: at, error: err)
             }
-            if let stamped = await lastCleanDrainAt {
+            if let stamped = Self.parseDrainStamp(drainStamp) {
                 return .synced(at: stamped)
             }
             return .notYetSynced
@@ -1110,6 +1124,15 @@ public actor SyncEngine {
             drainRequestedDuringCycle = true
         } else {
             scheduleProactiveDrain()
+        }
+        // **And say that the park is over.** Nothing else does: the drain
+        // scheduled above may not run for a long time — the device may be
+        // offline — and a consumer folding events would sit on `.parked` while
+        // the queue holds no blocks at all, telling somebody who has just
+        // signed in to sign in again. `.syncing` is the honest word for it:
+        // the work has been released and is on its way.
+        if (try? await mutationQueue.counts.blockedTotal) == 0 {
+            emit(.syncing)
         }
         return released
     }
@@ -2118,11 +2141,16 @@ public actor SyncEngine {
                         // be refused identically — spending a request per write
                         // to learn what this one already said, and reclassifying
                         // each on the way.
+                        //
+                        // The announcement is left to the tail, which reads the
+                        // queue and so needs no arithmetic, and which is where
+                        // it has to be anyway: a park announced here and a
+                        // failure recorded there would reach a latched consumer
+                        // in that order.
                         remaining.removeAll()
                         logger.log.error(
                             "sync.queue.parked reason=\(reason.rawValue, privacy: .public) count=\(parked + 1, privacy: .public)"
                         )
-                        emit(.queueParked(reason: .credentialRefused, count: parked + 1))
                     }
 
                     // Deliberately does not set `transientError`. The engine
@@ -2160,6 +2188,26 @@ public actor SyncEngine {
                     }
                 }
             }
+        }
+
+        // **A parked queue is the cycle's outcome, whatever else happened in
+        // it.** Two things made this necessary rather than tidy. A row that
+        // failed transiently *before* another was refused leaves
+        // `transientError` set, so the cycle emitted `.queueParked` and then
+        // `.failed` — and a consumer folding events into a latched state, which
+        // is what `FullSyncStateQuery` is, keeps the last one. And a park laid
+        // down in an *earlier* cycle is overwritten by any later cycle that
+        // fails, because nothing re-emits the park: `queueParked` is not
+        // latched, by design, since it answers "this just happened".
+        //
+        // So the engine says it rather than leaving a reader to re-derive it.
+        // `.failed` is withheld rather than the park being re-emitted after it,
+        // because a cycle that parked did not fail — it stopped, and the two
+        // want different words from an app.
+        let parkedNow = (try? await mutationQueue.counts.blocked[.credentialRefused]) ?? nil
+        if let parkedNow, parkedNow > 0 {
+            emit(.queueParked(reason: .credentialRefused, count: parkedNow))
+            return
         }
 
         if let transientError {

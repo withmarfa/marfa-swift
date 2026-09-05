@@ -291,13 +291,14 @@ public final class MarfaStore {
     /// (pure-local clients) — those shapes never produce drain
     /// cycles, so there's no meaningful state to render against.
     ///
-    /// The query seeds its initial state from the persisted
-    /// `last_clean_drain_at` timestamp, then folds
-    /// ``SyncEngine/events`` (`.syncing` / `.synced(at:)` /
-    /// `.failed(error:)`) into the discrete state machine. Apps use
-    /// this to render confidence states — "waiting for first sync",
-    /// "syncing", "synced N minutes ago", "couldn't sync" — without
-    /// hand-rolling a reducer over the underlying signals.
+    /// The query seeds its initial state from ``SyncEngine/fullSyncState``,
+    /// which reads the persisted `last_clean_drain_at` timestamp *and*
+    /// whether the queue is parked, then folds ``SyncEngine/events``
+    /// (`.syncing` / `.synced(at:)` / `.failed(error:)` /
+    /// `.queueParked(reason:count:)`) into the discrete state machine. Apps
+    /// use this to render confidence states — "waiting for first sync",
+    /// "syncing", "synced N minutes ago", "couldn't sync", "sign in again" —
+    /// without hand-rolling a reducer over the underlying signals.
     public func queryFullSyncState() -> FullSyncStateQuery? {
         guard let syncEngine else { return nil }
         return FullSyncStateQuery(engine: syncEngine)
