@@ -75,13 +75,18 @@ struct SuspendedSpaceTests {
         // this test exists to rule out.
         let survived = try await queue.fetchAll()
         #expect(survived.count == 1, "a suspension must not discard the write")
+        // Required rather than expected: `first?.state != .blocked` is
+        // vacuously true on an empty array, which is exactly the outcome this
+        // test exists to rule out. The count above closes it, but a test
+        // should not depend on its neighbour for that.
+        let row = try #require(survived.first)
         // **Not blocked** is the claim, and asserting `.pending` was narrower
         // than that: a started engine may have re-marked the row `.inFlight`
         // for its next attempt by the time this reads it, which satisfies the
         // property and failed the assertion. Both states mean the same thing
         // here — the row is still the engine's to send.
-        #expect(survived.first?.state != .blocked)
-        #expect(survived.first?.blockedReason == nil)
+        #expect(row.state != .blocked)
+        #expect(row.blockedReason == nil)
 
         // The discriminator: an ordinary 403 still ends the mutation, so the
         // assertion above is about the code rather than about 403s having
@@ -153,7 +158,8 @@ struct SuspendedSpaceTests {
         }
         let waiting = try await queue.fetchAll()
         #expect(waiting.count == 1)
-        #expect(waiting.first?.state != .blocked, "still replayable, not blocked")
+        let stillThere = try #require(waiting.first)
+        #expect(stillThere.state != .blocked, "still replayable, not blocked")
 
         // The space comes back.
         let now = Date().ISO8601Format(.init(includingFractionalSeconds: true))
@@ -171,5 +177,28 @@ struct SuspendedSpaceTests {
         }
         #expect(try await queue.fetchDropped().isEmpty, "nothing was dead-lettered on the way")
         await engine.stop()
+    }
+
+    /// The guard that stopped being implicit.
+    ///
+    /// While the parser discarded codes outside 400, 403 and 409, this string
+    /// could only ever arrive on a 403 and the status check was redundant.
+    /// Once every status keeps what the server sent, a `404` or a `500`
+    /// reading `space_suspended` would be neither permanent nor blockable —
+    /// the one combination that retries for ever.
+    @Test("the suspension exemption is a 403 exemption, not a code one")
+    func theExemptionIsBoundToItsStatus() {
+        let elsewhere = parseMarfaError(
+            data: Data(#"{"error":{"code":"space_suspended","message":"?"}}"#.utf8),
+            statusCode: 404
+        )
+        #expect(elsewhere.code == "space_suspended", "the code still survives parsing")
+        #expect(elsewhere.isPermanent, "a 404 is permanent whatever it calls itself")
+        #expect(PendingMutationBlockReason.isEnvironmental(elsewhere) == false)
+
+        // The discriminator: the real one still works, so the assertions above
+        // are about the status rather than about the exemption being gone.
+        #expect(suspended().isPermanent == false)
+        #expect(PendingMutationBlockReason.isEnvironmental(suspended()))
     }
 }

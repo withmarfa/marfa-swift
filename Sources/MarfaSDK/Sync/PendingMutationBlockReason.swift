@@ -64,7 +64,12 @@ extension PendingMutationBlockReason {
         if error is CancellationError { return true }
         guard let marfaError = error as? MarfaError else { return false }
         if marfaError is NetworkError { return true }
-        if marfaError.code == MarfaError.spaceSuspendedCode { return true }
+        // Guarded on the status for the reason `isPermanent` is: this string
+        // could only arrive on a 403 while the parser discarded codes
+        // elsewhere, and it no longer does.
+        if marfaError.status == 403, marfaError.code == MarfaError.spaceSuspendedCode {
+            return true
+        }
         switch marfaError.status {
         case 401, 429, 500...599: return true
         default: return false

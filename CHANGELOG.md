@@ -13,6 +13,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   **This was the constraint underneath several other divergences rather than a cosmetic loss.** The dropped-mutation log the documentation promises carries the server's code could not carry one, and the classifier could not tell apart refusals that want opposite handling even where it needed to. `UnauthorizedError` and `NotFoundError` gain a `code` parameter defaulting to their old constants, matching `ForbiddenError`.
 
+  **A `404` is the door most apps will notice, and the changelog argued the case on `429` and `413` without mentioning it.** `DroppedMutationRecord.errorCode` used to read `not_found` for every missing thing and now reads what the server called it — `item_not_found`, `type_not_found`, `edge_not_found`, `blob_not_found` and others. Rows dead-lettered before the upgrade keep the old value, so an app grouping or filtering on that column sees both spellings for one failure. Nothing in the SDK reads it; this is app-facing only.
+
   `server_error` stays as the fallback for a body that named nothing, which is what it always described honestly. A test now asserts the rule across every status the kit parses, rather than one door at a time — three of these reached it separately and the fourth is only visible when you ask all of them at once.
 
 - **A blocked mutation now says why in its own column**, where the reason used to ride inside `lastError` as a `[blocked:<reason>]` string prefix, stamped in one place and parsed back out in another. Nothing public changes: `PendingMutationRecord.blockedReason` reads the same, and the message it reports no longer needs a prefix stripped off it first.

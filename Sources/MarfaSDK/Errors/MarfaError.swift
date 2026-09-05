@@ -69,7 +69,15 @@ open class MarfaError: Error, @unchecked Sendable {
         // on the first drain after a suspension, so the space came back and
         // the work did not. The same reasoning already exempts a 401, a 429
         // and a 5xx from the blocked-state ceiling.
-        if code == Self.spaceSuspendedCode { return false }
+        // **The status guard is not redundant, and it stopped being implicit
+        // in this same change.** Until every status kept the code the server
+        // sent, this string could only ever arrive on a 403 — the parser
+        // enforced it by discarding codes everywhere else. Now any status can
+        // carry it, and a `404` or a `500` reading `space_suspended` would be
+        // neither permanent nor blockable, which is the one combination that
+        // retries for ever. The server maps this code to 403 and nothing else;
+        // this says so rather than relying on it.
+        if status == 403, code == Self.spaceSuspendedCode { return false }
         switch status {
         case 400, 403, 404: return true
         default: return false
