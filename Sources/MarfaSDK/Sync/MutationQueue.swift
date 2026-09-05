@@ -18,14 +18,15 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var localId: String?
     public var createdAt: String
     public var attemptCount: Int
-    /// The most recent failure message, with any block-reason prefix already
-    /// removed — see ``blockedReason``.
+    /// The most recent failure message.
     public var lastError: String?
     public var state: PendingMutationState
 
-    /// Why this row is blocked, or `nil` when it is not. Parsed out of the
-    /// stored `lastError` at the actor boundary so no consumer meets the
-    /// encoding.
+    /// Why this row is blocked, or `nil` when it is not.
+    ///
+    /// Read from the row's own column, or — for a row a `16.x` build left
+    /// behind — from the prefix that build wrote into the message. Either way
+    /// a consumer meets a reason and never an encoding.
     public var blockedReason: PendingMutationBlockReason?
 
     public init(
@@ -55,16 +56,32 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
 
 extension PendingMutationModel {
     /// Snapshots this `@Model` row into a Sendable wire DTO.
-    /// The block reason and the human-readable message, split out of the single
-    /// stored column. The one place either is decoded — ``toRecord()`` and
-    /// ``MutationQueue/clearBlock(id:)`` both read it here rather than parsing
-    /// the column themselves.
-    var decodedError: (reason: PendingMutationBlockReason?, message: String?) {
-        BlockedErrorEncoding.decode(lastError)
+    /// The reason a blocked row reports, from the column or from the string
+    /// a shipped build wrote before the column existed.
+    ///
+    /// **The column is not the only place a reason can be.** `v16.0.0` ships
+    /// schema V2 and wrote the reason as a `[blocked:<reason>]` prefix inside
+    /// `lastError`; those rows are on real devices now, and the V2 to V3
+    /// migration adds the column as NULL. Reading the column alone would lose
+    /// the reason on upgrade — and lose it in the worst direction, since a
+    /// `resolverMissing` row read as `retriesExhausted` stops auto-replaying
+    /// when a resolver is registered, which is the recovery `16.0.0`
+    /// advertised.
+    ///
+    /// **`nil` and unrecognized are different questions and only one of them
+    /// falls back.** An unreadable token means a newer build wrote a reason
+    /// this one cannot name, and resolving that toward the reason promising no
+    /// automatic recovery is what stops an old build replaying a row forever.
+    /// A missing column on a blocked row means a legacy row, and its answer is
+    /// in the message.
+    private var resolvedBlockReason: PendingMutationBlockReason {
+        if let stored = blockedReason {
+            return PendingMutationBlockReason(rawValue: stored) ?? .retriesExhausted
+        }
+        return LegacyBlockedPrefix.reason(lastError) ?? .retriesExhausted
     }
 
     func toRecord() -> PendingMutationRecord {
-        let decoded = decodedError
         return PendingMutationRecord(
             id: id,
             kind: kind,
@@ -73,9 +90,9 @@ extension PendingMutationModel {
             localId: localId,
             createdAt: createdAt,
             attemptCount: attemptCount,
-            lastError: decoded.message,
+            lastError: LegacyBlockedPrefix.strip(lastError),
             state: state,
-            blockedReason: state == .blocked ? (decoded.reason ?? .retriesExhausted) : nil
+            blockedReason: state == .blocked ? resolvedBlockReason : nil
         )
     }
 }
@@ -699,6 +716,15 @@ public actor MutationQueue {
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
         model.lastError = error
+        // A row leaving the blocked state does not keep the reason it was
+        // blocked for. Nothing observable breaks if it does — `toRecord()`
+        // gates the reason on the state — but the engine re-admits a
+        // `resolverMissing` row without clearing the block, so a transient
+        // failure right after that is exactly how a `.pending` row ends up
+        // carrying one. The salvage reader takes raw columns and would report
+        // it. A column saying something false is a trap for whoever reads it
+        // next, which is the reason `clearBlock` scrubs it too.
+        model.blockedReason = nil
         model.state = .pending
         try modelContext.save()
     }
@@ -717,14 +743,15 @@ public actor MutationQueue {
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
-        model.lastError = BlockedErrorEncoding.encode(reason: reason, message: error)
+        model.lastError = error
+        model.blockedReason = reason.rawValue
         model.state = .blocked
         try modelContext.save()
     }
 
     /// Returns a blocked row to the queue: the block goes, the attempt count
-    /// starts again, and the message keeps its text without the reason prefix
-    /// so a consumer can still read what went wrong last time.
+    /// starts again, and the message keeps its text so a consumer can still
+    /// read what went wrong last time.
     ///
     /// Emits a drain request, as every other write to this queue does. A
     /// `retry` that only changed a column would sit untouched until something
@@ -744,7 +771,13 @@ public actor MutationQueue {
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else { return }
         if model.state == .blocked {
-            model.lastError = model.decodedError.message
+            model.blockedReason = nil
+            // A row written by `16.x` still carries its reason inside the
+            // message. Retrying it without scrubbing that leaves the prefix in
+            // front of the error text for ever, since nothing else rewrites
+            // the column. A message this build wrote has no prefix and comes
+            // back unchanged.
+            model.lastError = LegacyBlockedPrefix.strip(model.lastError)
             model.state = .pending
         }
         model.attemptCount = 0

@@ -41,6 +41,22 @@ final class PendingMutationModel {
     /// Most recent error message from `recordFailure`. Optional.
     var lastError: String?
 
+    /// Why this row is blocked, as `PendingMutationBlockReason.rawValue`, or
+    /// `nil` when it is not blocked.
+    ///
+    /// **This used to ride inside `lastError` as a `[blocked:<reason>]` string
+    /// prefix**, parsed back out at the actor boundary. The rationale written
+    /// at the time was sound — adding a property to a `@Model` needs a schema
+    /// version, and one added for this alone would cost every device a
+    /// migration. V3 has never shipped, so this one costs nobody anything.
+    ///
+    /// The smuggling had a failure the column does not: an unrecognized token
+    /// decoded as ``PendingMutationBlockReason/retriesExhausted``, so a build
+    /// meeting a reason a newer build had written was told the row would never
+    /// recover — a reason that clears itself, like a missing resolver, read as
+    /// one that does not.
+    var blockedReason: String?
+
     /// Stored as `PendingMutationState.rawValue`. Defaults to `"pending"`.
     /// `"inFlight"` is set by ``SyncEngine`` immediately before the
     /// transport call; cleared back to `"pending"` on transient failure

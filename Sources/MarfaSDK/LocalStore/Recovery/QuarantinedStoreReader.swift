@@ -36,6 +36,11 @@ enum QuarantinedStoreReader {
             [
                 "id", "kindRaw", "payloadJson", "sourceId", "localId",
                 "createdAt", "attemptCount", "lastError", "stateRaw",
+                // Additive, which is what makes it safe to name here despite
+                // the freeze above: a store written before the column existed
+                // simply has no such column, and the mapping skips what it
+                // does not find rather than mis-assigning it.
+                "blockedReason",
             ]
         ),
         (
