@@ -44,8 +44,11 @@ open class MarfaError: Error, @unchecked Sendable {
     ///
     /// Permanent: `400` (validation), `403` (forbidden), `404` (not found),
     /// and `version_bump_mismatch` (server-side semver-diff rejection at type
-    /// registration). Transient: everything else — network failures, `5xx`,
-    /// timeouts, `401` (credentials may be refreshed), `409` (resolvable via
+    /// registration) — **except a `403` whose code is `space_suspended`**,
+    /// which is a statement about the environment and clears with nothing the
+    /// app or the person can do. Transient: everything else — network
+    /// failures, `5xx`, timeouts, `401` (credentials may be refreshed), `409`
+    /// (resolvable via
     /// conflict strategy), `429` (rate-limited, caller should retry).
     ///
     /// This is context-free by design: it sees a status, not what the request
@@ -74,7 +77,12 @@ open class MarfaError: Error, @unchecked Sendable {
     }
 
     /// The server's code for a space the platform has paused.
-    static let spaceSuspendedCode = "space_suspended"
+    ///
+    /// Public because the SDK now models this state and an app that wants to
+    /// say *why* nothing is syncing should not have to hardcode the string to
+    /// find out. A `SyncEvent.failed` carries the error; this is what its
+    /// `code` equals.
+    public static let spaceSuspendedCode = "space_suspended"
 }
 
 extension MarfaError: LocalizedError {
