@@ -23,6 +23,7 @@ public struct BlobsNamespace: Sendable {
     let apiBaseURL: URL
     let cdnBaseURL: URL?
     let mutationQueue: MutationQueue?
+    let localStore: LocalStore?
 
     /// `true` when this namespace is attached to a pure-local client. When
     /// set, every method except ``url(hash:)`` throws before touching the
@@ -64,6 +65,10 @@ public struct BlobsNamespace: Sendable {
             // Synced mode: compute hash locally, queue, return immediately.
             let hash = sha256Hash(of: data)
             try await queue.enqueueBlobUpload(hash: hash, data: data, mimeType: mimeType)
+            // Cached at the moment it is made, not when it reaches the server.
+            // A person who saves a picture and opens it a second later is not
+            // waiting on a drain, and the bytes are already in hand.
+            try? await localStore?.cacheBlob(hash: hash, data: data, mimeType: mimeType)
             return BlobUploadResponse(hash: hash, mimeType: mimeType, size: data.count)
         }
 
@@ -104,9 +109,27 @@ public struct BlobsNamespace: Sendable {
     }
 
     /// Downloads a blob by its content hash. Returns the raw data and MIME type.
+    ///
+    /// **Served from the device when the device has it.** A blob is addressed
+    /// by the hash of its own bytes, so a cached copy can never be the wrong
+    /// answer — there is no version to be behind and no staleness to reason
+    /// about. That is what makes a read-through cache correct here rather than
+    /// merely fast, and it is why this works with no server at all.
+    ///
+    /// A client with a store keeps what it uploads and what it fetches, under
+    /// a least-recently-used bound. Without a store, every call is a fetch, as
+    /// before.
     public func download(hash: String) async throws -> (Data, String) {
-        try ensureRemote("blobs.download")
         let cleanHash = hash.hasPrefix("sha256:") ? hash : "sha256:\(hash)"
+
+        if let cached = try? await localStore?.cachedBlob(hash: cleanHash) {
+            return (cached.data, cached.mimeType)
+        }
+        // Only now does this need a server. A pure-local client that holds the
+        // blob has already returned; one that does not is being asked for
+        // bytes that exist nowhere it can reach.
+        try ensureRemote("blobs.download")
+
         let (data, response) = try await transport.rawRequest(
             method: .get, path: "/blobs/\(cleanHash)", body: nil,
             contentType: nil, query: nil
@@ -117,6 +140,7 @@ public struct BlobsNamespace: Sendable {
         }
 
         let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
+        try? await localStore?.cacheBlob(hash: cleanHash, data: data, mimeType: contentType)
         return (data, contentType)
     }
 

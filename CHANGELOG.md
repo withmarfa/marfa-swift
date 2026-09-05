@@ -110,6 +110,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **A blob this device already has is readable without the network, and the one it just uploaded is the case that was broken.** The only copy a device held of a blob it had sent was the outbound buffer, and that row is deleted the moment the upload succeeds. So a person could save a picture, watch it sync, and then not open it on a train — every read went back to the network for a file the device had held minutes earlier.
+
+  **A hash is a content address, so a cached copy can never be the wrong answer.** There is no version to be behind and no staleness to reason about, which is what makes a read-through cache correct here rather than merely fast, and why it works with no server at all. `blobs.download(hash:)` on a client with a store now serves what the store holds and writes through what it fetches; on a pure-local client it answers from the cache instead of refusing outright, and refuses only for a hash it has never seen.
+
+  Bytes reach the cache at three points, and the first is the one a person feels: an upload caches at the moment it is made rather than when it reaches the server, a successful upload **moves** its bytes across instead of dropping them, and a download writes through.
+
+  **The cache is bounded and the rule is stated:** least recently used, 256 MB by default, `MarfaClient`'s store evicting oldest-first as it writes. A read moves a row's place in that order, because a file opened every day should outlive one fetched once and never opened again. `lastUsedAt` has millisecond resolution, so rows touched in the same millisecond tie — deliberately left alone, since rows used at the same moment are equally recent.
+
+  **`LocalStore.defaultBlobCacheBytes`** is the bound, public so an app that knows its own storage situation can reason about it rather than discover it.
+
+  **`LocalStoreWriting` gains `cacheBlob(hash:data:mimeType:)` with no default implementation.** A default was tried and it shadowed the real one: `LocalStore`'s method stopped being chosen as the witness, every call landed on the empty default, and the cache silently held nothing while everything compiled. A conformer that wants no cache writes an empty body and says so.
+
 - **Every queued write now carries an `Idempotency-Key`, and a retry carries the same one.** A replay whose response was lost is indistinguishable from one the server never saw: the write happened, the acknowledgement did not, and the next drain sends it again.
 
   **Creates were already safe and are not what this fixes.** The kit stamps its own id on an item and an edge, and both routes answer a repeat carrying a caller-minted id. What had nothing was every other write door. The sharpest is `PATCH /items/:id`, which applies the edit **and bumps `version`** each time it runs: a lost response there costs one edit two version steps, leaves the device's idea of the version behind the server's, and turns the next ordinary edit into a conflict nobody caused. Transitions, restores, promotes and the edge patch and delete are the same shape.

@@ -188,6 +188,7 @@ public final class MarfaClient: Sendable {
             apiBaseURL: configuration.url,
             cdnBaseURL: configuration.cdnBaseURL,
             mutationQueue: syncEngine != nil ? mutationQueue : nil,
+            localStore: localStore,
             isLocalMode: isLocalMode
         )
         self.types = TypesNamespace(transport: transport, isLocalMode: isLocalMode)

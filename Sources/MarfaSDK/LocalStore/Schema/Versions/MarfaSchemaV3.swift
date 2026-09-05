@@ -5,7 +5,7 @@ import SwiftData
 /// under. Its models are the live classes in `Schema/Models/`, so the current
 /// shape is always readable in one place.
 ///
-/// Four changes over V2, all additive:
+/// Five changes over V2, all additive:
 ///
 /// - ``MarfaItemModel/spaceId`` — the wire has carried `space_id` on an item
 ///   since before this store existed and the store dropped it on the way in,
@@ -22,8 +22,12 @@ import SwiftData
 ///   read through `LegacyBlockedPrefix`.
 /// - ``PendingMutationModel/idempotencyKey`` — the value sent as
 ///   `Idempotency-Key` on every attempt at a queued write.
+/// - ``CachedBlobModel`` — bytes this device already has, so a blob it can
+///   see does not need the network to be seen again. Distinct from
+///   ``PendingBlobModel``, which is the outbound buffer and used to be the
+///   only copy a device held.
 ///
-/// **V3 has never been released**, which is why all three are columns here
+/// **V3 has never been released**, which is why all of these are here
 /// rather than a fourth version. `v16.0.0` ships V2; V3 exists only on
 /// `main`, so no device holds a store in this shape and adding to it costs
 /// nobody a migration. The moment V3 ships that stops being true and the next
@@ -43,6 +47,7 @@ import SwiftData
             PendingBlobModel.self,
             DroppedMutationModel.self,
             CachedTypeModel.self,
+            CachedBlobModel.self,
         ]
     }
 }

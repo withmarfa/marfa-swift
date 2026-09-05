@@ -260,6 +260,7 @@ public extension ItemsNamespace {
             apiBaseURL: apiBaseURL ?? URL(fileURLWithPath: "/dev/null"),
             cdnBaseURL: nil,
             mutationQueue: nil,
+            localStore: nil,
             isLocalMode: false
         )
 

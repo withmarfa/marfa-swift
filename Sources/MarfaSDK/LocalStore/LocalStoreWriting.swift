@@ -99,6 +99,17 @@ public protocol LocalStoreWriting: Sendable {
     /// Permanently removes an item. Idempotent — purging an absent item is a
     /// no-op.
     func purgeItem(id: String) async throws
+
+    /// Keeps bytes this device already has, so a blob it can see does not
+    /// need the network to be seen again.
+    ///
+    /// **Deliberately has no default implementation.** One was tried and it
+    /// shadowed the real thing: `LocalStore`'s own method stopped being
+    /// chosen as the witness, every call landed on the empty default, and the
+    /// whole cache silently held nothing while everything compiled and the
+    /// feature looked wired. A conformer that wants to hold no cache writes
+    /// an empty body and says so — which is one line, and visible.
+    func cacheBlob(hash: String, data: Data, mimeType: String) async throws
 }
 
 extension LocalStore: LocalStoreWriting {}
