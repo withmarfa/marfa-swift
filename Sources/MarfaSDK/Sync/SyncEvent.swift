@@ -180,6 +180,14 @@ public enum SyncEvent: Sendable {
     /// says the credential is spent, which is a thing somebody can act on.
     /// Release the queue with ``SyncEngine/retryAll(reason:)`` once a working
     /// credential is in place.
+    ///
+    /// **Not latched.** A write made while the credential is still dead is
+    /// attempted, refused, and parks the queue again — so this fires once per
+    /// *new* write rather than once per queued write, which is the saving, but
+    /// an app that raises an alert here will raise one each time. Reading
+    /// ``SyncEngine/status`` for a non-empty
+    /// `queue.blocked[.credentialRefused]` is the way to ask whether the state
+    /// is still true rather than whether it just changed.
     case queueParked(reason: PendingMutationBlockReason, count: Int)
 
     /// The local store could not be opened and was rebuilt empty, so this

@@ -910,18 +910,32 @@ public actor MutationQueue {
                 // interface that shows one number can only say that something
                 // is wrong. This is a fetch rather than a count for the same
                 // reason: the breakdown is the answer.
-                blocked: try modelContext.fetch(
-                    FetchDescriptor<PendingMutationModel>(
-                        predicate: #Predicate { $0.stateRaw == blocked }
-                    )
-                ).reduce(into: [PendingMutationBlockReason: Int]()) { tally, model in
-                    tally[model.resolvedBlockReason, default: 0] += 1
-                },
+                blocked: try modelContext.fetch(blockedReasonDescriptor(blocked))
+                    .reduce(into: [PendingMutationBlockReason: Int]()) { tally, model in
+                        tally[model.resolvedBlockReason, default: 0] += 1
+                    },
                 deadLettered: try modelContext.fetchCount(
                     FetchDescriptor<DroppedMutationModel>()
                 )
             )
         }
+    }
+
+    /// Blocked rows, carrying only the two columns a reason is read from.
+    ///
+    /// **A count per reason cannot be a `fetchCount`**, because a row written
+    /// by `16.x` carries its reason as a prefix inside `lastError` rather than
+    /// in a column, so the grouping has to run in Swift. What it can avoid is
+    /// dragging `payloadJson` along with it — a bulk row holds a whole page —
+    /// and that matters more since a refused credential parks the entire queue
+    /// at once, making "every row blocked" an ordinary state rather than an
+    /// exceptional one.
+    private func blockedReasonDescriptor(_ blocked: String) -> FetchDescriptor<PendingMutationModel> {
+        var descriptor = FetchDescriptor<PendingMutationModel>(
+            predicate: #Predicate { $0.stateRaw == blocked }
+        )
+        descriptor.propertiesToFetch = [\.blockedReason, \.lastError]
+        return descriptor
     }
 
     /// The counts and one sync-state value, read in a single hop.
@@ -957,6 +971,10 @@ public actor MutationQueue {
         )
         guard !live.isEmpty else { return 0 }
         for model in live {
+            // Each row's own last failure is replaced by the refusal that
+            // parked it. That is the honest answer to "why is this stopped" —
+            // whatever a row failed on before, what stops it now is the
+            // credential — and it is what an app renders beside the reason.
             model.lastError = error
             model.blockedReason = reason.rawValue
             model.state = .blocked
@@ -984,8 +1002,14 @@ public actor MutationQueue {
             model.blockedReason = nil
             model.refusalCount = 0
             model.attemptCount = 0
+            // The same scrub `clearBlock` does, for the same reason: nothing
+            // else rewrites this column, so a `16.x` row's `[blocked:…]`
+            // prefix would stay in front of the message an app shows a person
+            // for ever.
+            model.lastError = LegacyBlockedPrefix.strip(model.lastError)
         }
         try modelContext.save()
+        emitDrainRequest()
         return rows.count
     }
 

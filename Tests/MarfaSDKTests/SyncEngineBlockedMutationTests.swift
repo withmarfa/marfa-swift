@@ -303,6 +303,7 @@ struct SyncEngineBlockedMutationTests {
             // ever left an app showing a count of unsent writes that never
             // moved, with nothing saying what to do about it. It parks now —
             // see `CredentialRefusedTests`.
+            //
             // Reached in production wherever the transport translates a
             // cancelled URLSession task. `stop()` cancels an in-flight replay,
             // and the throw lands in the same catch, so without the exemption a

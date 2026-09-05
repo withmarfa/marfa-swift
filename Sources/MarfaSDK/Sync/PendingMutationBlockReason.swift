@@ -83,10 +83,15 @@ extension PendingMutationBlockReason {
     /// count *before* this failure, so the ceiling below is compared against
     /// the refusal that has just happened.
     ///
-    /// **The network class never blocks, however often it fails.** A
-    /// connectivity failure, a `5xx`, a `429`, a `401` and a suspended space
-    /// are statements about the environment rather than about the write, and
-    /// each clears without the app doing anything. Counting them would strand a valid write behind an
+    /// **The environmental class never blocks, however often it fails.** A
+    /// connectivity failure, a `5xx`, a `429` and a suspended space are
+    /// statements about the environment rather than about the write, and each
+    /// clears without the app doing anything.
+    ///
+    /// **A `401` was in that list and is not any more.** It clears only when a
+    /// person replaces the credential, so retrying it for ever left an app
+    /// with nothing to say beyond an unsent count that did not move. It is
+    /// classified above this, as ``PendingMutationBlockReason/credentialRefused``. Counting them would strand a valid write behind an
     /// outage and then need a person to release it — a worse defect than the one
     /// this mechanism exists to fix.
     ///
@@ -148,14 +153,20 @@ extension PendingMutationBlockReason {
         // `401` reaching the queue is one the transport's single refresh did
         // not clear, so it is a statement about the credential rather than
         // about the network — and unlike everything else in that class it does
-        // not clear on its own. Ordered first because `isEnvironmental` still
-        // answers `true` for a 401: that answer is what keeps the refusal from
-        // spending the ceiling, and only the ordering here decides which of
-        // the two readings wins.
-        if let marfaError = error as? MarfaError,
-            !(marfaError is NetworkError),
-            marfaError.status == 401
-        {
+        // not clear on its own.
+        //
+        // `isEnvironmental` still answers `true` for a 401 and is never asked:
+        // this returns first, so the `case 401` below is unreachable from
+        // here. It is left in place because it remains a true statement about
+        // the transport class, and because a future reordering that put the
+        // sweep first would otherwise start counting a dead credential toward
+        // the ceiling silently.
+        //
+        // **What keeps this off the ceiling is `recordBlocked`**, which does
+        // not raise `refusalCount` — not the sweep. That distinction matters:
+        // a reader who believes the sweep is load-bearing here will preserve
+        // the wrong thing.
+        if let marfaError = error as? MarfaError, marfaError.status == 401 {
             return .credentialRefused
         }
 
@@ -164,6 +175,8 @@ extension PendingMutationBlockReason {
         // refusals that are all the same refusal.
         if let marfaError = error as? MarfaError,
             marfaError.status == 422,
+            // 422 confirmed against the server's own code-to-status map
+            // in `packages/shared/src/errors.ts`, not inferred from the kit.
             marfaError.code == MarfaError.idempotencyKeyReusedCode
         {
             return .idempotencyKeyReused

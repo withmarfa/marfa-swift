@@ -1081,10 +1081,20 @@ public actor SyncEngine {
     @discardableResult
     public func retryAll(reason: PendingMutationBlockReason) async throws -> Int {
         let released = try await mutationQueue.retryAll(reason: reason)
-        if released > 0 {
-            logger.log.info(
-                "sync.queue.released reason=\(reason.rawValue, privacy: .public) count=\(released, privacy: .public)"
-            )
+        guard released > 0 else { return 0 }
+        logger.log.info(
+            "sync.queue.released reason=\(reason.rawValue, privacy: .public) count=\(released, privacy: .public)"
+        )
+        // **Releasing is not sending, and this method's name promises the
+        // second.** `retry(id:)` says why the queue's own ping is not enough on
+        // its own — it needs a listener attached and idle — and the same holds
+        // here. The two cover different conditions: the ping wakes an idle
+        // engine, and this takes the pass after a cycle that is already
+        // running.
+        if draining {
+            drainRequestedDuringCycle = true
+        } else {
+            scheduleProactiveDrain()
         }
         return released
     }
@@ -1899,6 +1909,17 @@ public actor SyncEngine {
         // cycle, where the queue holds writes on both sides of the block.
         var stoppedThisCycle = Set<String>()
 
+        // **Whether this pass parked the whole queue on one refusal**, which
+        // the clean-drain decision below has to know about. That decision
+        // excludes blocked rows on purpose — a row stopped for a stated reason
+        // is not work the cycle failed to do — and it was written when
+        // blocking was per-row and exceptional. Parking every row at once
+        // makes "nothing outstanding" true for the worst reason there is, so
+        // without this a refused credential stamps a clean drain and publishes
+        // `.synced`: a green tick and "synced just now" over a queue that
+        // cannot move until somebody signs in again.
+        var parkedTheQueue = false
+
         // Records this cycle chose not to attempt. The clean-drain decision
         // reads it: a row deferred behind a blocked one is not outstanding work
         // the cycle failed to do, and counting it as such is what withheld
@@ -2080,6 +2101,7 @@ public actor SyncEngine {
                     // they have: a conflict awaiting review is not resolved by
                     // a new credential.
                     if reason == .credentialRefused {
+                        parkedTheQueue = true
                         let parked = (try? await mutationQueue.parkAllLive(
                             reason: .credentialRefused,
                             error: formatLastError(error)
@@ -2137,7 +2159,7 @@ public actor SyncEngine {
 
         if let transientError {
             recordSyncFailure(transientError)
-        } else {
+        } else if !parkedTheQueue {
             await recordCleanDrainIfQueueIsEmpty(skipped: deferredRecordIds)
         }
     }
