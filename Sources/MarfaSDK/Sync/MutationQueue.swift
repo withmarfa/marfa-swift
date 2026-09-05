@@ -18,8 +18,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var localId: String?
     public var createdAt: String
     public var attemptCount: Int
-    /// The most recent failure message, with any block-reason prefix already
-    /// removed — see ``blockedReason``.
+    /// The most recent failure message.
     public var lastError: String?
     public var state: PendingMutationState
 
@@ -55,16 +54,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
 
 extension PendingMutationModel {
     /// Snapshots this `@Model` row into a Sendable wire DTO.
-    /// The block reason and the human-readable message, split out of the single
-    /// stored column. The one place either is decoded — ``toRecord()`` and
-    /// ``MutationQueue/clearBlock(id:)`` both read it here rather than parsing
-    /// the column themselves.
-    var decodedError: (reason: PendingMutationBlockReason?, message: String?) {
-        BlockedErrorEncoding.decode(lastError)
-    }
-
     func toRecord() -> PendingMutationRecord {
-        let decoded = decodedError
         return PendingMutationRecord(
             id: id,
             kind: kind,
@@ -73,9 +63,16 @@ extension PendingMutationModel {
             localId: localId,
             createdAt: createdAt,
             attemptCount: attemptCount,
-            lastError: decoded.message,
+            lastError: lastError,
             state: state,
-            blockedReason: state == .blocked ? (decoded.reason ?? .retriesExhausted) : nil
+            // A blocked row whose stored reason this build does not recognize
+            // falls back to `retriesExhausted`: the state already says it is
+            // blocked, and resolving the disagreement toward the reason that
+            // promises no automatic recovery is what stops an old build
+            // replaying a row forever over a reason it cannot read.
+            blockedReason: state == .blocked
+                ? (blockedReason.flatMap(PendingMutationBlockReason.init(rawValue:)) ?? .retriesExhausted)
+                : nil
         )
     }
 }
@@ -717,14 +714,15 @@ public actor MutationQueue {
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else { return }
         model.attemptCount += 1
-        model.lastError = BlockedErrorEncoding.encode(reason: reason, message: error)
+        model.lastError = error
+        model.blockedReason = reason.rawValue
         model.state = .blocked
         try modelContext.save()
     }
 
     /// Returns a blocked row to the queue: the block goes, the attempt count
-    /// starts again, and the message keeps its text without the reason prefix
-    /// so a consumer can still read what went wrong last time.
+    /// starts again, and the message is left alone so a consumer can still
+    /// read what went wrong last time.
     ///
     /// Emits a drain request, as every other write to this queue does. A
     /// `retry` that only changed a column would sit untouched until something
@@ -744,7 +742,7 @@ public actor MutationQueue {
         descriptor.fetchLimit = 1
         guard let model = try modelContext.fetch(descriptor).first else { return }
         if model.state == .blocked {
-            model.lastError = model.decodedError.message
+            model.blockedReason = nil
             model.state = .pending
         }
         model.attemptCount = 0

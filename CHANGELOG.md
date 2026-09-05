@@ -9,6 +9,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **A blocked mutation now says why in its own column**, where the reason used to ride inside `lastError` as a `[blocked:<reason>]` string prefix, stamped in one place and parsed back out in another. Nothing public changes: `PendingMutationRecord.blockedReason` reads the same, and the message it reports no longer needs a prefix stripped off it first.
+
+  The reasoning written at the time was sound — a property on a `@Model` needs a schema version, and one added for this alone would have cost every device a migration to carry a string. It stopped being true: V3 was added after `v16.0.0` and has never shipped, so no device holds a store in that shape.
+
+  **The smuggling had a failure the column does not.** An unrecognized token decoded as `retriesExhausted`, so a build meeting a reason written by a newer one was told the row would never recover on its own — a reason that clears itself, like a missing conflict resolver, read as one that does not. The column keeps that fallback deliberately, because an old build must not replay a row forever over a reason it cannot read, but it now applies to a genuinely unknown value rather than to every value the parser mishandled.
+
 - **A local query naming a parent type now finds the rows stored under its subtypes, as the server has always done.** `?type=core.entity` returns `core.entity.person` on the server and returned only `core.entity` on a device — no error, just a short answer, on a filter the caller had every reason to think was understood. Listing and offline search both take the rule, because those are the two places the server applies it and the only two a local store should.
 
   **A subtree has two roots, not one, and resolving either alone is wrong.** The dotted identifier is a namespace and a type's `parent` is a declared lineage; registration has never required a child's id to start with its parent's, so `user.annotated_note` may declare `core.note` as its parent and sit outside `core.note.*` entirely. Resolving names alone missed it. Resolving declarations alone would break the other half, since nothing declares a parent of `google` yet `google.*` plainly means the Google types. Both halves are now resolved and each is pinned by its own test.
