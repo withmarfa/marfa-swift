@@ -26,12 +26,28 @@ extension LocalStore {
     }
 
     func cacheBlob(hash: String, data: Data, mimeType: String, limit: Int?) throws {
+        let bound = limit ?? Self.defaultBlobCacheBytes
+        // **A blob that cannot fit is not cached, rather than cached and then
+        // evicting everything to make room it will not get.** Without this the
+        // loop deletes every row including the one just written and keeps
+        // nothing, so one large video flushes a person's whole cache for no
+        // gain. The write is refused silently because a blob too big to keep
+        // is not an error — the server still has it.
+        guard data.count <= bound else { return }
         let stamped = now()
         let predicate = #Predicate<CachedBlobModel> { $0.contentHash == hash }
         var descriptor = FetchDescriptor<CachedBlobModel>(predicate: predicate)
         descriptor.fetchLimit = 1
 
         if let existing = try modelContext.fetch(descriptor).first {
+            // **The bytes are content-addressed; the MIME type is not.** It
+            // comes from three authorities — the caller who uploaded, the
+            // outbound row, and the server's `Content-Type` on a download —
+            // and only the hash is guaranteed to agree between them. A first
+            // version refreshed the stamp alone, so the first writer won for
+            // ever and a later download could not correct it: one hash, two
+            // answers, depending on whether this device's cache was warm.
+            existing.mimeType = mimeType
             existing.lastUsedAt = stamped
         } else {
             let row = CachedBlobModel()
@@ -43,7 +59,7 @@ extension LocalStore {
             modelContext.insert(row)
         }
         try modelContext.save()
-        try evictBlobs(over: limit ?? Self.defaultBlobCacheBytes)
+        try evictBlobs(over: bound)
     }
 
     /// The bytes and MIME type this device holds for a hash, or `nil`.

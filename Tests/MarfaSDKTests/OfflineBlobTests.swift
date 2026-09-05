@@ -129,6 +129,83 @@ struct OfflineBlobTests {
         }
         let held = try await store.cachedBlobBytes()
         #expect(held <= 1_000, "held \(held) bytes against a 1000-byte bound")
-        #expect(held > 0, "evicting everything is not the rule either")
+        // Not an idle assertion: a bound is satisfied by an empty cache, so
+        // without this the rule "stay under the bound" is met by a cache that
+        // keeps nothing. A blob that cannot fit is refused separately —
+        // `anOversizedBlobDoesNotFlushTheCache` covers that.
+        #expect(held > 0, "evicting everything satisfies the bound and defeats the cache")
+    }
+
+    // MARK: - What the review found the comments claiming
+
+    /// The hash covers the bytes. It does not cover the MIME type, which
+    /// reaches this cache from three authorities and only agrees by luck.
+    ///
+    /// A first version refreshed the use stamp alone on a re-cache, so the
+    /// first writer won for ever: one hash gave two answers depending on
+    /// whether this device's cache happened to be warm.
+    @Test("a later writer corrects a MIME type the hash cannot vouch for")
+    func aLaterWriteCorrectsTheMimeType() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let store = try #require(client.localStore)
+        let hash = "sha256:" + String(repeating: "d", count: 64)
+
+        try await store.cacheBlob(hash: hash, data: bytes, mimeType: "application/octet-stream")
+        try await store.cacheBlob(hash: hash, data: bytes, mimeType: "image/png")
+
+        #expect(try await store.cachedBlob(hash: hash)?.mimeType == "image/png")
+    }
+
+    /// A blob too large to keep is not cached, rather than cached and then
+    /// evicting everything to make room it will not get. Without the guard
+    /// one large video flushes a person's whole cache for no gain.
+    @Test("a blob larger than the bound does not empty the cache")
+    func anOversizedBlobDoesNotFlushTheCache() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let store = try #require(client.localStore)
+        let small = Data(repeating: 1, count: 400)
+
+        for i in 0..<3 {
+            try await store.cacheBlob(
+                hash: "sha256:" + String(format: "%064d", i),
+                data: small, mimeType: "application/octet-stream", limit: 2_000
+            )
+        }
+        #expect(try await store.cachedBlobBytes() == 1_200)
+
+        try await store.cacheBlob(
+            hash: "sha256:" + String(repeating: "e", count: 64),
+            data: Data(repeating: 2, count: 5_000),
+            mimeType: "video/mp4", limit: 2_000
+        )
+
+        #expect(try await store.cachedBlobBytes() == 1_200, "the cache was flushed for nothing")
+    }
+
+    /// A hash mismatch means the local hash was wrong and every reference to
+    /// it will 404 elsewhere. Caching under it would make this one device the
+    /// only place those bytes resolve, silently masking the diagnostic the
+    /// mismatch log exists to raise.
+    @Test("bytes the server addressed differently are not cached under the local hash")
+    func aHashMismatchIsNotCached() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        transport.enqueueEvents([])
+        await engine.start()
+
+        let localHash = "sha256:" + String(repeating: "f", count: 64)
+        let serverHash = "sha256:" + String(repeating: "9", count: 64)
+        try await queue.enqueueBlobUpload(hash: localHash, data: bytes, mimeType: "image/png")
+
+        transport.enqueueRaw(
+            data: Data(#"{"hash":"\#(serverHash)","mime_type":"image/png","size":18}"#.utf8),
+            statusCode: 200
+        )
+        await engine.replayMutationsForTesting()
+        try await SyncEngineTestKit.awaitCondition(description: "the upload drained") {
+            try await queue.fetchPendingBlob(hash: localHash) == nil
+        }
+
+        #expect(try await store.cachedBlob(hash: localHash) == nil)
+        await engine.stop()
     }
 }

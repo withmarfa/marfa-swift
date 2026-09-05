@@ -2583,8 +2583,35 @@ public actor SyncEngine {
             //
             // Cached before the row is removed, so a failure between the two
             // leaves the outbound copy rather than no copy.
-            try? await localStore.cacheBlob(hash: p.hash, data: blobData, mimeType: p.mimeType)
-            try? await mutationQueue.deletePendingBlob(hash: p.hash)
+            // **Cached under the address the SERVER acknowledged**, and only
+            // when the two agree. The mismatch above is a diagnostic saying
+            // every reference to the local hash will 404; caching under it
+            // would make this one device the only place those bytes resolve,
+            // silently masking the thing the log exists to raise.
+            //
+            // **The delete is guarded on the cache write succeeding.** A first
+            // version ordered the two correctly and then swallowed a failure
+            // with `try?`, so a cache write that threw still dropped the
+            // outbound row and left neither copy — the ordering protects
+            // against a crash between the lines and nothing else.
+            let acknowledged = (try? JSONDecoder().decode(BlobUploadResponse.self, from: responseData))?.hash
+            if acknowledged == nil || acknowledged == p.hash {
+                do {
+                    try await localStore.cacheBlob(
+                        hash: p.hash, data: blobData, mimeType: p.mimeType
+                    )
+                    try? await mutationQueue.deletePendingBlob(hash: p.hash)
+                } catch {
+                    // The outbound row stays, so the bytes are still on this
+                    // device and the next drain tries again. The blob is on
+                    // the server either way, so nothing is lost by waiting.
+                    logger.log.error(
+                        "sync.uploadBlob.cache_failed hash=\(p.hash, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
+                    )
+                }
+            } else {
+                try? await mutationQueue.deletePendingBlob(hash: p.hash)
+            }
             emit(.blobUploadCompleted(hash: p.hash))
 
         case .bulk:

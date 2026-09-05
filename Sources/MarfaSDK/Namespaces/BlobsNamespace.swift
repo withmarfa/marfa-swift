@@ -116,9 +116,17 @@ public struct BlobsNamespace: Sendable {
     /// about. That is what makes a read-through cache correct here rather than
     /// merely fast, and it is why this works with no server at all.
     ///
+    /// **That holds for the bytes and not for the MIME type**, which the hash
+    /// does not cover and which reaches this cache from three authorities: the
+    /// caller who uploaded, the outbound row, and the server's `Content-Type`.
+    /// A later write refreshes it, so the answer converges on whatever spoke
+    /// last rather than on whoever got there first.
+    ///
     /// A client with a store keeps what it uploads and what it fetches, under
     /// a least-recently-used bound. Without a store, every call is a fetch, as
-    /// before.
+    /// before. In pure-local mode the cache can only hold what an earlier
+    /// synced session put there — this client cannot fill it, since `upload`
+    /// refuses before it writes anything.
     public func download(hash: String) async throws -> (Data, String) {
         let cleanHash = hash.hasPrefix("sha256:") ? hash : "sha256:\(hash)"
 
