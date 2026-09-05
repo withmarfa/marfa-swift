@@ -9,6 +9,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **A request body now encodes to stable bytes, without which an idempotency key made things worse rather than better.** The server fingerprints method, path, credential and **body**, and refuses a key replayed with a different request. Swift's synthesized `Codable` fills a keyed container backed by a dictionary, so the same value could encode as `{"version":1,"properties":{…}}` one time and `{"properties":{…},"version":1}` the next — two different requests as far as the fingerprint is concerned.
+
+  **So a replay of an unchanged write was refused as `idempotency_key_reused`.** That is worse than sending no key at all: unkeyed, a replay after a lost response merely conflicted, and the conflict machinery could settle it. Refused, it cannot succeed however often it is retried. Every keyed door was affected, which is every write door the server keys.
+
+  The transport's encoder now sorts its keys. **Nothing is required of a consumer, and a queue built by an earlier version is fine**: a queued mutation stores a typed payload and the body is encoded fresh at send, so rows already waiting go out under the new ordering. There is no need to drain or discard anything.
+
+  **A custom `Transport` gets none of this.** The protocol is a documented injection point, and a conformer that encodes its own bodies has to sort its own keys or it keeps the defect.
+
+  **Found by a live scenario** that sent one body twice under one key and was told the key had been used for a different request — the server was right and the bytes really had changed. It reproduced roughly one run in three, which is why it survived a suite that had already run green many times.
+
+  `.sortedKeys` is Apple's, documented as locale-sensitive and "subject to change", so it fixes an ordering within a build and a system rather than for all time. That covers a retry of one call and a replay on the same device; it would not cover a row whose first attempt and replay straddled an operating-system update that changed the comparator. Named at the site rather than implied.
+
 - **Every write the server keys now carries an idempotency key, including the two doors that carried none.** A key exists so a write whose response was lost can be replayed without landing twice, and these two bypassed the mechanism rather than declining it. Blob upload is the deliberate exception: `POST /blobs` does not declare the parameter, and the replay tells "already there" from "lost" with a `HEAD` probe instead.
 
   **A client with no local store sent no key at all.** That door has no queue behind it, but it does have the transport's retry loop, which retries `.timedOut` and `.networkConnectionLost` on any method. The reason recorded for that was that such a request cannot have completed on the server — **which is not true of a timeout**: it means this side stopped waiting, and the server may have committed and lost only the response. Unkeyed, that retry was a second create. A key is now minted per call, so the retries of one call share it and two calls never do.
