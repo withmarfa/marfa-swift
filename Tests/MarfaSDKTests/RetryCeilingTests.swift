@@ -45,9 +45,10 @@ struct RetryCeilingTests {
         }
 
         let row = try #require(await queue.fetchAll().first)
-        #expect(row.attemptCount >= 8, "a person asking how many times sees the truth")
+        // Only this one. `attemptCount >= 8` restated the condition just
+        // awaited, on a quantity nothing decrements, and `state != .blocked`
+        // cannot fail — every path that blocks starves the wait above first.
         #expect(row.refusalCount == 0, "nothing refused it; nothing was ever asked")
-        #expect(row.state != .blocked)
         await engine.stop()
     }
 
@@ -91,7 +92,11 @@ struct RetryCeilingTests {
 
         let row = try #require(await queue.fetchAll().first)
         #expect(row.blockedReason == .retriesExhausted)
-        #expect(row.refusalCount > 0)
+        // Exact, not `> 0`. The ceiling is five and `classify` counts the
+        // refusal in hand alongside the four recorded, so a blocked row has
+        // recorded exactly one fewer than the ceiling. `> 0` survived four
+        // separate mutations.
+        #expect(row.refusalCount == 4)
         await engine.stop()
     }
 
@@ -157,5 +162,91 @@ struct RetryCeilingTests {
     func anUndecodableResponseIsARefusal() {
         struct Boom: Error {}
         #expect(PendingMutationBlockReason.isServerRefusal(ResponseDecodingError(Boom())))
+    }
+
+    // MARK: - The sequence the rest of this suite could not see
+
+    /// **The defect this whole change exists to fix, and nothing else here
+    /// catches it.**
+    ///
+    /// A review found that reverting the call site to the pre-change wiring —
+    /// handing `classify` the attempt count instead of the refusal count —
+    /// left every other test in this suite green. The reason is that
+    /// `classify` returns `nil` for an environmental failure *before* it
+    /// reaches the ceiling, so during a pure outage the ceiling is never
+    /// consulted and both versions behave identically. The difference only
+    /// appears when an outage is followed by a real refusal, and no test ran
+    /// that sequence through the engine.
+    ///
+    /// So this is the regression guard the suite claimed to be and was not.
+    @Test("an outage does not spend the allowance a later refusal needs")
+    func anOutageDoesNotSpendTheAllowance() async throws {
+        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+
+        let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+        let item = try await store.createItem(input)
+        try await queue.enqueueCreateItem(input, localId: item.id)
+        let id = try #require(await queue.fetchAll().first?.id)
+
+        // **The engine is started after the outage, not before it.** Enqueuing
+        // emits a drain request, so a started engine begins draining while the
+        // sequence below is still being written — and a drain that finds no
+        // queued response gets an error that counts as a refusal, which is
+        // the one number this test is about. Nothing drains until there is an
+        // engine, so writing the history first makes it exact.
+        //
+        // A week offline, recorded directly so the sequence is the test's
+        // rather than at the mercy of how often a started engine chose to try.
+        for _ in 0..<20 {
+            try await queue.recordFailure(
+                id: id, error: "offline", wasRefusedByTheServer: false
+            )
+        }
+        let afterTheOutage = try #require(await queue.fetchAll().first)
+        #expect(afterTheOutage.attemptCount == 20)
+        #expect(afterTheOutage.refusalCount == 0)
+
+        // Now the first real answers the device has ever received. Four
+        // refusals is one short of the ceiling, so the row must still be
+        // replayable — and would not be if the outage had counted.
+        for _ in 0..<60 { transport.enqueueError(refusal()) }
+        transport.enqueueEvents([])
+        await engine.start()
+        for _ in 0..<4 { await engine.replayMutationsForTesting() }
+        // **Waits for EITHER outcome, not just the healthy one.** A wait that
+        // only admits success turns a real failure into a sixty-second
+        // timeout naming a condition rather than a property — the row blocks
+        // immediately under the defect, so the count it is waiting for never
+        // arrives. Admitting the blocked state too means the assertion below
+        // is what reports, in milliseconds, with the reason.
+        try await SyncEngineTestKit.awaitCondition(description: "the refusals settled") {
+            let row = try await queue.fetchAll().first
+            return row?.state == .blocked || (row?.refusalCount ?? 0) >= 4
+        }
+
+        let row = try #require(await queue.fetchAll().first)
+        #expect(row.state != .blocked, "an outage must not spend the refusal budget")
+        #expect(row.attemptCount > 20, "and the displayed count kept counting")
+        await engine.stop()
+    }
+
+    /// A second queue over the same container reads the same numbers, so both
+    /// are in the row rather than in the actor that wrote them — the property
+    /// the block-reason column has its own test for.
+    @Test("both counters are in the store, not in the writer's memory")
+    func bothCountersArePersisted() async throws {
+        let (store, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
+        let item = try await store.createItem(input)
+        try await queue.enqueueCreateItem(input, localId: item.id)
+        let id = try #require(await queue.fetchAll().first?.id)
+
+        try await queue.recordFailure(id: id, error: "offline", wasRefusedByTheServer: false)
+        try await queue.recordFailure(id: id, error: "refused", wasRefusedByTheServer: true)
+
+        let reopened = MutationQueue(modelContainer: container)
+        let row = try #require(await reopened.fetchAll().first)
+        #expect(row.attemptCount == 2)
+        #expect(row.refusalCount == 1)
     }
 }

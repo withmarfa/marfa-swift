@@ -792,6 +792,11 @@ public actor MutationQueue {
         model.attemptCount += 1
         model.lastError = error
         model.blockedReason = reason.rawValue
+        // **`refusalCount` is deliberately not raised here.** `classify` counts
+        // the refusal in hand alongside the recorded ones — `refusalCount + 1
+        // >= ceiling` — so the attempt that triggers the block is already
+        // accounted for. Adding it would double-count it, and a blocked row
+        // therefore records exactly one fewer refusal than the ceiling.
         model.state = .blocked
         try modelContext.save()
     }

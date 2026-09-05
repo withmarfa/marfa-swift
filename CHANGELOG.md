@@ -22,6 +22,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   **A store failure during replay is not a refusal either**, and that is a class the transport-shaped test cannot see. The replay writes to the store *after* a `2xx` — it adopts the row the server returned — so a store that refuses there is a write the server accepted. A store failing for its own environmental reason, a locked device or a full disk, would otherwise spend the entire budget and leave the row blocked as "ran out of retries" for a write the server already holds.
 
+  **`PendingMutationRecord` is `Codable` and gains a non-optional field, so JSON written by an earlier build no longer decodes** — it throws `keyNotFound` for `refusalCount`. Nothing in the SDK persists that type; the salvage sidecar writes its own shape. An app that archived one itself needs a migration or a default.
+
   **`PendingMutationRecord` gains `refusalCount`, and its initializer changes shape** to take it after `attemptCount`. The two are different quantities that coincided until a device could stay offline that long: `attemptCount` still means attempts *made*, which is what a person means by it and what a consumer displays — showing "5 attempts" for a week offline is telling the truth, and a ceiling firing on it is not.
 
 - **A blocked mutation now says why in its own column**, where the reason used to ride inside `lastError` as a `[blocked:<reason>]` string prefix, stamped in one place and parsed back out in another. Nothing public changes: `PendingMutationRecord.blockedReason` reads the same, and the message it reports no longer needs a prefix stripped off it first.
