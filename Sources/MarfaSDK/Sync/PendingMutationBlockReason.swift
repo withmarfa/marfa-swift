@@ -44,9 +44,9 @@ extension PendingMutationBlockReason {
     /// attempt that has just happened.
     ///
     /// **The network class never blocks, however often it fails.** A
-    /// connectivity failure, a `5xx`, a `429` and a `401` are statements about
-    /// the environment rather than about the write, and each clears without the
-    /// app doing anything. Counting them would strand a valid write behind an
+    /// connectivity failure, a `5xx`, a `429`, a `401` and a suspended space
+    /// are statements about the environment rather than about the write, and
+    /// each clears without the app doing anything. Counting them would strand a valid write behind an
     /// outage and then need a person to release it — a worse defect than the one
     /// this mechanism exists to fix.
     ///
@@ -70,6 +70,14 @@ extension PendingMutationBlockReason {
 
         if let marfaError = error as? MarfaError {
             if marfaError is NetworkError { return nil }
+            // A suspended space belongs to the network class above rather than
+            // to the ceiling below, by that class's own definition: it is a
+            // statement about the environment, it clears with nothing the app
+            // or the person can do, and counting it would strand valid work
+            // behind a suspension and then need somebody to release it by
+            // hand. It arrives as a 403, so it has to be named rather than
+            // caught by a status band.
+            if marfaError.code == MarfaError.spaceSuspendedCode { return nil }
             switch marfaError.status {
             case 401, 429, 500...599:
                 return nil
