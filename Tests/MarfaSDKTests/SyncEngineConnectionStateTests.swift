@@ -117,4 +117,39 @@ struct SyncEngineConnectionStateTests {
         #expect(await oldIterator.next() == nil)
         await manager.stop()
     }
+
+    /// **A stream taken after `stop()` must end rather than hang.** `stop()`
+    /// finishes the subscribers it is holding, so one arriving afterwards
+    /// registered into a table nothing would read again: it received the
+    /// current state and then waited on a manager that had already said its
+    /// last word.
+    ///
+    /// The documentation on `stateUpdates` promised this property for the
+    /// other ordering — take a stream, then stop — which does work, and is why
+    /// the gap sat one line from a comment about it. It matters more now that
+    /// a client forwards this stream as the documented way to observe the
+    /// connection, so a view outliving a teardown is the ordinary shape.
+    @Test("a stream taken after stop ends rather than hanging")
+    func aStreamTakenAfterStopEnds() async {
+        let manager = ConnectionStateManager()
+        await manager.applyStateForTesting(.online)
+        await manager.stop()
+
+        var yielded: [ConnectionState] = []
+        for await state in manager.stateUpdates { yielded.append(state) }
+        #expect(yielded.isEmpty, "a stopped manager has nothing left to say")
+    }
+
+    /// And a manager started again is observable again — the flag says
+    /// "stopped", not "has ever been stopped".
+    @Test("a manager restarted after stop can be observed again")
+    func aRestartedManagerCanBeObservedAgain() async {
+        let manager = ConnectionStateManager()
+        await manager.stop()
+        await manager.start()
+        defer { Task { await manager.stop() } }
+
+        var iterator = manager.stateUpdates.makeAsyncIterator()
+        #expect(await iterator.next() != nil, "a restarted manager publishes again")
+    }
 }

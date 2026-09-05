@@ -7,6 +7,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Fixed
+
+- **A connection stream taken after the engine stopped waited forever.** `SyncEngine.stop()` stops the connection manager, which finishes every subscriber it is holding at the time. A subscriber arriving afterwards registered into a table nothing would read again: it was handed the current state and then waited on a manager that had already published its last value. `for await` never returned.
+
+  It surfaces as a view that stays alive across a teardown — a status line still iterating while the app tears its client down and rebuilds it. Taking the stream *before* `stop()` always worked, which is the property the code's own documentation described, and is why a gap one line away went unread.
+
+  A stopped manager now hands back a stream that is already finished, and a manager started again publishes again.
+
 ### Changed
 
 - **A request body now encodes to stable bytes, without which an idempotency key made things worse rather than better.** The server fingerprints method, path, credential and **body**, and refuses a key replayed with a different request. Swift's synthesized `Codable` fills a keyed container backed by a dictionary, so the same value could encode as `{"version":1,"properties":{…}}` one time and `{"properties":{…},"version":1}` the next — two different requests as far as the fingerprint is concerned.
