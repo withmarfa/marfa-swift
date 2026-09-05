@@ -79,6 +79,13 @@ public enum SyncEvent: Sendable {
     /// Watch ``SyncEvent/mutationBlocked(kind:itemId:reason:)`` and
     /// ``PendingMutationStatus/blocked(reason:attemptCount:lastError:)`` for
     /// those.
+    ///
+    /// **One reason is excepted, because it stops the queue rather than a
+    /// row.** A refused credential parks every unsent write, so "the only
+    /// outstanding rows are blocked" becomes true for the worst reason there
+    /// is. That reports neither this nor `synced`: it reports
+    /// ``SyncEvent/queueParked(reason:count:)``, and
+    /// ``FullSyncState/parked(reason:count:)`` while it stands.
     case failed(error: Error)
 
     /// The mutation-queue replay auto-merged a server conflict using

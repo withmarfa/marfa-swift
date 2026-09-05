@@ -57,19 +57,28 @@ public final class FullSyncStateQuery {
     init(engine: SyncEngine) {
         let events = engine.events
 
-        // Seed the initial state from the persisted timestamp. The
-        // listener task below runs concurrently; if a `.synced` /
-        // `.syncing` / `.failed` event lands before the seed
-        // completes the event takes precedence (it's fresher), so
-        // the race is benign.
+        // Seed the initial state from the engine, which reads the park as well
+        // as the persisted timestamp. The listener task below runs
+        // concurrently; if a `.synced` / `.syncing` / `.failed` /
+        // `.queueParked` event lands before the seed completes the event takes
+        // precedence (it's fresher), so the race is benign.
+        //
+        // **Through `fullSyncState` rather than the timestamp alone**, because
+        // a store that synced cleanly before its credential was refused still
+        // holds that stamp — so seeding from it directly opens an app on "last
+        // synced an hour ago" over a queue that has stopped, and nothing
+        // afterwards corrects it until an event happens to arrive.
         self.initialLoadTask = Task { @MainActor [weak self] in
-            let stamped = await engine.lastCleanDrainAt
+            let seeded = await engine.fullSyncState
             guard !Task.isCancelled, let self else { return }
             // Only seed if we haven't already moved off `.notYetSynced`
             // — a concurrent event-listener update would otherwise be
             // overwritten by stale persisted state.
-            if case .notYetSynced = self.state, let stamped {
-                self.state = .synced(at: stamped)
+            if case .notYetSynced = self.state, case .notYetSynced = seeded {
+                return
+            }
+            if case .notYetSynced = self.state {
+                self.state = seeded
             }
         }
 
@@ -89,6 +98,13 @@ public final class FullSyncStateQuery {
             state = .synced(at: at)
         case let .failed(error):
             state = .failed(at: Date(), error: error)
+        case let .queueParked(reason, count):
+            // **Without this the shipped SwiftUI surface never moves.** This
+            // query is event-driven after its initial load, so a view already
+            // sitting at `.synced` from a healthy session goes on rendering
+            // "last synced" over a queue that has stopped — the engine's own
+            // `fullSyncState` reads the park, and nothing was telling this.
+            state = .parked(reason: reason, count: count)
         default:
             // Other events (item.*, edge.*, blob.*, conflict, dropped)
             // don't move the full-sync state machine — they're either

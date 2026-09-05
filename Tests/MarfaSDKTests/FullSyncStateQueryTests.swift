@@ -204,4 +204,69 @@ struct FullSyncStateQueryTests {
         let store = MarfaStore(container: container, localStore: localStore)
         #expect(store.queryFullSyncState() == nil)
     }
+
+    /// **The shipped SwiftUI surface is event-driven after its seed**, so a
+    /// view already sitting at `.synced` from a healthy session had nothing
+    /// that would ever move it once the credential died. The engine reading
+    /// the park does not reach a query that is not listening for it.
+    @Test("a queue parking moves the query off a synced state")
+    func parkingMovesTheQueryOffSynced() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        try await queue.saveSyncState(key: "last_clean_drain_at", value: stamp)
+
+        let query = try #require(store.queryFullSyncState())
+        try await awaitCondition(description: "query.state becomes .synced") {
+            if case .synced = query.state { return true }
+            return false
+        }
+
+        for label in ["one", "two"] {
+            var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
+            input.id = UUIDv7.generateString()
+            try await queue.enqueueCreateItem(input, localId: input.id!)
+        }
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+
+        try await awaitCondition(description: "query.state becomes .parked") {
+            if case .parked = query.state { return true }
+            return false
+        }
+        guard case .parked(let reason, let count) = query.state else {
+            Issue.record("expected .parked; got \(query.state)")
+            query.stop()
+            return
+        }
+        #expect(reason == .credentialRefused)
+        #expect(count == 2)
+        query.stop()
+    }
+
+    /// **And a query opened over an already-parked store seeds parked**, which
+    /// is the app-restart case. Seeding from the persisted timestamp alone
+    /// opened it on "last synced an hour ago" over a queue that had stopped,
+    /// with no event coming to correct it.
+    @Test("a query opened over a parked store seeds parked, not synced")
+    func aQueryOpenedOverAParkedStoreSeedsParked() async throws {
+        let (store, queue, transport, connManager, engine) = try await makeFixture()
+        let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
+        try await queue.saveSyncState(key: "last_clean_drain_at", value: stamp)
+
+        var input = CreateItemInput(type: "core.note", properties: ["body": .string("one")])
+        input.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(input, localId: input.id!)
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await connManager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+
+        // Opened only now, so nothing it could have heard is in flight.
+        let query = try #require(store.queryFullSyncState())
+        try await awaitCondition(description: "query.state seeds to .parked") {
+            if case .parked = query.state { return true }
+            return false
+        }
+        query.stop()
+    }
 }

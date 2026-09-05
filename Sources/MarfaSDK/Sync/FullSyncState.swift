@@ -43,4 +43,22 @@ public enum FullSyncState: Sendable {
     /// mid-failure returns to ``notYetSynced`` (or ``synced(at:)`` if a
     /// prior clean drain stamped the store).
     case failed(at: Date, error: Error)
+
+    /// Every unsent write has stopped together, for a reason no retry can
+    /// clear. Today that means a credential the server refused and the
+    /// transport could not refresh.
+    ///
+    /// **It outranks both ``synced(at:)`` and ``failed(at:error:)``, and each
+    /// for its own reason.** A store that synced cleanly an hour ago still
+    /// holds that timestamp, and nothing about a refused credential erases it,
+    /// so without this the app renders "Last synced an hour ago" over a queue
+    /// that has stopped — the answer is true and it is not the answer to the
+    /// question being asked. A transient failure recorded before the parking
+    /// is worse: only a clean drain clears one, a parked queue cannot produce
+    /// a clean drain, and so an app would show "the Internet connection
+    /// appears to be offline" for ever when the remedy is to sign in again.
+    ///
+    /// `count` is how many writes are waiting on it. Clear it with
+    /// ``SyncEngine/retryAll(reason:)`` once a working credential is in place.
+    case parked(reason: PendingMutationBlockReason, count: Int)
 }

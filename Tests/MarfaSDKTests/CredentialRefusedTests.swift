@@ -242,6 +242,71 @@ struct CredentialRefusedTests {
         }
     }
 
+    /// **The hole both earlier fixes left, and the one the tests could not
+    /// see.** Suppressing the clean drain stops a *new* stamp and does nothing
+    /// about the one already there — and every fixture here started from a
+    /// store that had never synced, which is the single condition under which
+    /// that is enough. An app that synced successfully at any point before the
+    /// credential died goes on rendering "last synced" over a queue that has
+    /// stopped.
+    @Test("a store that had synced does not go on saying so once the queue parks")
+    func aPriorCleanDrainDoesNotSurviveTheParking() async throws {
+        let (_, queue, transport, manager, engine) = try await SyncEngineTestKit.makeFixture()
+        await manager.applyStateForTesting(.online)
+
+        // A healthy session first, so there is a stamp to be stale.
+        var healthy = CreateItemInput(type: "core.note", properties: ["body": .string("fine")])
+        healthy.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(healthy, localId: healthy.id!)
+        transport.enqueue(ItemResponse(item: Self.item(healthy.id!)))
+        await engine.triggerProactiveDrainForTesting()
+        let stamped = try #require(await engine.lastCleanDrainAt, "the healthy drain should stamp")
+
+        // Then the credential dies.
+        try await queueThree(queue)
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await engine.triggerProactiveDrainForTesting()
+        #expect(try await queue.counts.blocked[.credentialRefused] == 3)
+
+        // The stamp is still there and is still true. It is not the answer.
+        #expect(await engine.lastCleanDrainAt == stamped, "the historical fact stands")
+        guard case .parked(let reason, let count) = await engine.fullSyncState else {
+            Issue.record("reported \(await engine.fullSyncState) over a parked queue")
+            return
+        }
+        #expect(reason == .credentialRefused)
+        #expect(count == 3)
+    }
+
+    /// **And a failure recorded before the parking must not stand for ever.** A
+    /// clean drain is the only thing that clears one, and a parked queue
+    /// cannot produce a clean drain — so suppressing it strands whatever the
+    /// last transient error was, and an app renders "the Internet connection
+    /// appears to be offline" when the remedy is to sign in again.
+    @Test("a transient failure before the parking does not outlive it")
+    func aPriorFailureIsNotStrandedByTheParking() async throws {
+        let (_, queue, transport, manager, engine) = try await SyncEngineTestKit.makeFixture()
+        await manager.applyStateForTesting(.online)
+
+        var flaky = CreateItemInput(type: "core.note", properties: ["body": .string("flaky")])
+        flaky.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(flaky, localId: flaky.id!)
+        transport.enqueueError(NetworkError(URLError(.notConnectedToInternet)))
+        await engine.triggerProactiveDrainForTesting()
+        guard case .failed = await engine.fullSyncState else {
+            Issue.record("expected the transient failure to be recorded first")
+            return
+        }
+
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await engine.triggerProactiveDrainForTesting()
+
+        guard case .parked = await engine.fullSyncState else {
+            Issue.record("the offline error outlived the parking: \(await engine.fullSyncState)")
+            return
+        }
+    }
+
     /// **The engine's own lifecycle is what reaches this on a device**, and it
     /// is what the per-pass version of the suppression did not survive. A
     /// fully parked queue has no replayable rows, so a later drain takes an
@@ -350,6 +415,23 @@ struct CredentialRefusedTests {
         let counts = try await queue.counts
         #expect(counts.inFlight == 0, "a row left in flight was not parked")
         #expect(counts.blocked[.credentialRefused] == 3)
+    }
+}
+
+extension CredentialRefusedTests {
+    fileprivate static func item(_ id: String) -> Item {
+        Item(
+            createdAt: "2026-01-01T00:00:00.000Z",
+            id: id,
+            properties: [:],
+            schemaVersion: 1,
+            source: "test",
+            state: .active, tier: .library,
+            timestamp: "2026-01-01T00:00:00.000Z",
+            type: "core.note",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            version: 1
+        )
     }
 }
 

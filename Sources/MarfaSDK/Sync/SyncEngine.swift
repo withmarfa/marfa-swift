@@ -396,11 +396,21 @@ public actor SyncEngine {
     ///
     /// Order of precedence:
     /// 1. ``FullSyncState/syncing`` if a drain cycle is currently in flight.
-    /// 2. ``FullSyncState/failed(at:error:)`` if the most recent cycle
+    /// 2. ``FullSyncState/parked(reason:count:)`` if the queue has stopped on
+    ///    a refused credential.
+    /// 3. ``FullSyncState/failed(at:error:)`` if the most recent cycle
     ///    bailed and no later clean drain has cleared it.
-    /// 3. ``FullSyncState/synced(at:)`` if a clean drain timestamp is
+    /// 4. ``FullSyncState/synced(at:)`` if a clean drain timestamp is
     ///    persisted.
-    /// 4. ``FullSyncState/notYetSynced`` otherwise.
+    /// 5. ``FullSyncState/notYetSynced`` otherwise.
+    ///
+    /// **The park is read here and not only written.** Suppressing the clean
+    /// drain stops a *new* timestamp being stamped and does nothing about the
+    /// one already there, so a store that synced before the credential died
+    /// went on answering `.synced(at:)` from it — and a transient failure
+    /// recorded before the parking would otherwise stand for ever, because a
+    /// clean drain is the only thing that clears one and a parked queue cannot
+    /// produce a clean drain.
     ///
     /// ``MarfaStore/queryFullSyncState()`` returns a reactive
     /// `@Observable` view backed by the same signals; prefer that for
@@ -408,6 +418,11 @@ public actor SyncEngine {
     public var fullSyncState: FullSyncState {
         get async {
             if draining { return .syncing }
+            if let parked = try? await mutationQueue.counts.blocked[.credentialRefused],
+                parked > 0
+            {
+                return .parked(reason: .credentialRefused, count: parked)
+            }
             if let err = lastFailedError, let at = lastFailedAt {
                 return .failed(at: at, error: err)
             }
