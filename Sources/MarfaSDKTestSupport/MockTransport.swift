@@ -174,7 +174,6 @@ public final class MockTransport: Transport, @unchecked Sendable {
         let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
         let outcome: Dequeue<Data> = lock.withLock {
             _calls.append(Call(method: method, path: path, body: bodyData, query: query))
-            if !errors.isEmpty { return .error(errors.removeFirst()) }
             if let staged = staged[path] { return .value(staged) }
             if Self.incidentalRoutes.contains(path) {
                 // **Refused rather than answered `{}` when a test has staged
@@ -187,6 +186,13 @@ public final class MockTransport: Transport, @unchecked Sendable {
                 if responses.isEmpty { return .value(Data("{}".utf8)) }
                 return .error(IncidentalRouteNeedsStagingError(path: path))
             }
+            // **Positional, so it belongs with the positional queue.** Checked
+            // first, an enqueued error was taken by whatever asked next —
+            // including a route the engine reads for itself, which then
+            // swallowed it, and the request the test meant to fail got a real
+            // answer instead. That is the desynchronization the staged slot
+            // above exists to prevent, on the queue beside it.
+            if !errors.isEmpty { return .error(errors.removeFirst()) }
             if responses.isEmpty { return .missing }
             return .value(responses.removeFirst())
         }
@@ -216,7 +222,6 @@ public final class MockTransport: Transport, @unchecked Sendable {
                 method: method, path: path, body: bodyData, query: query,
                 idempotencyKey: idempotencyKey
             ))
-            if !errors.isEmpty { return .error(errors.removeFirst()) }
             // **An incidental read does not eat somebody else's response.**
             // The queue is positional, so any request the engine makes that a
             // test did not stage consumes the answer meant for the next one it
@@ -235,6 +240,13 @@ public final class MockTransport: Transport, @unchecked Sendable {
                 if responses.isEmpty { return .value(Data("{}".utf8)) }
                 return .error(IncidentalRouteNeedsStagingError(path: path))
             }
+            // **Positional, so it belongs with the positional queue.** Checked
+            // first, an enqueued error was taken by whatever asked next —
+            // including a route the engine reads for itself, which then
+            // swallowed it, and the request the test meant to fail got a real
+            // answer instead. That is the desynchronization the staged slot
+            // above exists to prevent, on the queue beside it.
+            if !errors.isEmpty { return .error(errors.removeFirst()) }
             if responses.isEmpty { return .missing }
             return .value(responses.removeFirst())
         }

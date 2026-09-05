@@ -916,6 +916,18 @@ public actor MutationQueue {
         }
     }
 
+    /// The counts and one sync-state value, read in a single hop.
+    ///
+    /// **Because a status assembled from two awaits can describe a state that
+    /// never held.** Composing `counts` and the clean-drain stamp separately
+    /// leaves a suspension between them, and a drain completing inside it
+    /// produces "five writes waiting" beside "the queue drained cleanly a
+    /// moment ago". Both values are this actor's, so one call removes the
+    /// window rather than narrowing it.
+    func countsAndSyncState(key: String) throws -> (MutationQueueCounts, String?) {
+        (try counts, try loadSyncState(key: key))
+    }
+
     // MARK: - Sync state (Last-Event-ID cursor)
 
     func loadSyncState(key: String) throws -> String? {

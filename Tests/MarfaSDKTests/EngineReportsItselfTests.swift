@@ -49,27 +49,43 @@ struct EngineReportsItselfTests {
     func queueCountsSeparateTheDispositions() async throws {
         let (_, queue, _, _, engine) = try await SyncEngineTestKit.makeFixture()
 
-        // **Two waiting and one stuck, not one of each.** With equal counts a
-        // reader that had the two predicates the wrong way round would report
-        // the same numbers, and this test would pass against it — which it did
-        // until a mutation said so.
-        for label in ["waiting one", "waiting two", "stuck"] {
+        // **Four different counts, no two alike.** With equal counts a reader
+        // that had two of the predicates the wrong way round reports the same
+        // numbers, and this test passes against it — which it did, on a
+        // fixture of one pending and one blocked, until a mutation said so.
+        // Two of each is not enough either: any pair sharing a value can be
+        // swapped invisibly, and `outstanding` only catches a swap across the
+        // line it draws. So 2 waiting, 3 in flight, 1 stuck, 4 refused.
+        for label in (1...10).map({ "row \($0)" }) {
             var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
             input.id = UUIDv7.generateString()
             try await queue.enqueueCreateItem(input, localId: input.id!)
         }
         let rows = try await queue.fetchAll()
+        #expect(rows.count == 10)
+
+        for row in rows[2..<5] {
+            try await queue.markInFlight(id: row.id)
+        }
         try await queue.recordBlocked(
-            id: try #require(rows.last).id,
+            id: rows[5].id,
             reason: PendingMutationBlockReason.conflictUnresolved,
             error: "held"
         )
+        for row in rows[6..<10] {
+            try await queue.recordDropped(
+                record: row,
+                droppedAt: Date(),
+                error: MarfaError(code: "validation_error", message: "refused", status: 400)
+            )
+        }
 
         let counts = try await queue.counts
         #expect(counts.pending == 2)
+        #expect(counts.inFlight == 3)
         #expect(counts.blocked == 1)
-        #expect(counts.deadLettered == 0)
-        #expect(counts.outstanding == 3)
+        #expect(counts.deadLettered == 4)
+        #expect(counts.outstanding == 6, "a dead letter is finished business, not outstanding work")
         #expect(!counts.isSettled)
 
         // And the engine reports the same numbers, so the forwarding is not
@@ -152,7 +168,7 @@ struct EngineReportsItselfTests {
     /// response.** `MockTransport`'s queue is positional, so answering the
     /// engine from it hands the engine the answer meant for the next request
     /// — and leaving the response in place for later is the same
-    /// desynchronisation with the sign reversed. Both are silent.
+    /// desynchronization with the sign reversed. Both are silent.
     ///
     /// So a test with responses queued gets a refusal naming the fix. The
     /// engine's own progress read is best-effort and swallows it, which is
@@ -299,10 +315,16 @@ struct EngineReportsItselfTests {
         #expect(status.hydration == nil, "an empty answer is not a total of zero")
     }
 
-    /// `0 of 0` is complete rather than undefined — a space with nothing in it
-    /// has finished filling.
-    @Test("progress against an empty total reads as finished, not as a divide by zero")
-    func emptyTotalIsComplete() {
+    /// **`0 of 0` reads as unstarted, not as finished.** Nothing is known and
+    /// nothing has arrived, and of the two answers a fraction can give, the
+    /// start is the honest one — a full bar over a space nobody has counted
+    /// claims a completion that was never measured.
+    ///
+    /// The name and doc here said the opposite of the assertion below them,
+    /// which is worse than either reading on its own: the next person to
+    /// notice would have "fixed" the implementation to match the prose.
+    @Test("progress against an empty total reads as unstarted, not as a divide by zero")
+    func emptyTotalReadsAsUnstarted() {
         #expect(HydrationProgress(imported: 0, total: 0).fraction == 0)
         // Rows against a total of zero saturate rather than divide: the count
         // is the truth and the fraction cannot express it.
@@ -320,5 +342,147 @@ struct EngineReportsItselfTests {
         let overrun = HydrationProgress(imported: 12, total: 10)
         #expect(overrun.fraction == 1)
         #expect(overrun.imported == 12, "the count stays honest even where the fraction cannot")
+    }
+
+    // MARK: - What a report must not survive
+
+    /// **An import that dies partway must not leave a bar standing.** A
+    /// fraction frozen at three tenths with nothing running is the one thing a
+    /// progress indicator must never say, and it is indistinguishable from an
+    /// import still going.
+    ///
+    /// Clearing at the top of the *next* import does not cover this: there may
+    /// be no next import, and the stalled figures stand for the life of the
+    /// process. The comment claiming otherwise was wrong about its own
+    /// mechanism.
+    @Test("an import that fails partway leaves no progress standing")
+    func aFailedImportClearsItsProgress() async throws {
+        let (_, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        transport.stage(["active": 10], for: "/items/stats")
+
+        // Page one only. The second page finds nothing queued and throws,
+        // which is the shape wanted: page one imported and reported, page two
+        // died. `enqueueError` cannot express it — the double checks its error
+        // queue before anything else, so the error lands on page one and the
+        // import never reports at all, which is a test that passes without
+        // reaching the defect.
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i1"), pair("i2")], cursor: "c1", hasMore: true
+        ))
+
+        await #expect(throws: (any Error).self) {
+            _ = try await engine.performInitialSync()
+        }
+
+        #expect(
+            try await engine.status.hydration == nil,
+            "2 of 10 with nothing running reads as an import still in flight"
+        )
+    }
+
+    /// **A route that answers nothing is not a route to keep asking.** The
+    /// denominator is bought once; when the answer is unusable the engine
+    /// carries on without one rather than paying for the same silence on every
+    /// page.
+    ///
+    /// Three pages, because two give the retry only one opportunity and it
+    /// takes two to tell "asked once" from "asked per page".
+    @Test("an unanswerable count is asked for once, not once a page")
+    func anUnanswerableCountIsAskedForOnce() async throws {
+        let (_, _, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
+        transport.stage([String: Int](), for: "/items/stats")
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i1")], cursor: "c1", hasMore: true
+        ))
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i2")], cursor: "c2", hasMore: true
+        ))
+        transport.enqueue(PaginatedResult<ItemWithMetadata>(
+            data: [pair("i3")], cursor: nil, hasMore: false
+        ))
+        transport.enqueue(PaginatedResult<Edge>(data: [], cursor: nil, hasMore: false))
+
+        _ = try await engine.performInitialSync()
+
+        let asks = transport.calls.filter { $0.path == "/items/stats" }.count
+        #expect(asks == 1, "asked \(asks) times across three pages")
+    }
+
+    /// **The client's three forwards, driven through an engine.** Every other
+    /// assertion on them lands on the no-engine fallback, which holds against
+    /// a client that returns a constant and forwards nothing — so replacing
+    /// each of the three with its default left the suite green.
+    @Test("the client forwards the engine's own answers rather than a default")
+    func theClientForwardsTheEnginesAnswers() async throws {
+        let (store, queue, transport, manager, engine) = try await SyncEngineTestKit.makeFixture()
+        let client = MarfaClient(
+            configuration: ClientConfiguration(url: URL(string: "http://test")!, apiKey: "k"),
+            transport: transport,
+            localStore: store,
+            mutationQueue: queue,
+            syncEngine: engine
+        )
+
+        await manager.applyStateForTesting(.online)
+        #expect(client.connectionState == .online, "the client answered with a default, not the engine")
+
+        var iterator = client.connectionStateUpdates.makeAsyncIterator()
+        #expect(await iterator.next() == .online, "the client's stream is not the engine's")
+        await manager.applyStateForTesting(.syncing)
+        #expect(await iterator.next() == .syncing)
+
+        var input = CreateItemInput(type: "core.note", properties: ["body": .string("queued")])
+        input.id = UUIDv7.generateString()
+        try await queue.enqueueCreateItem(input, localId: input.id!)
+
+        let status = try #require(try await client.syncStatus, "a client with an engine has a status")
+        #expect(status.connection == .syncing, "the status carried a stale or defaulted connection")
+        #expect(status.queue.pending == 1, "the status is not reading this client's queue")
+    }
+
+    /// **The two fields nothing asserted.** `connection` and
+    /// `lastCleanDrainAt` were carried through `status` untested, so either
+    /// could have been replaced by a constant without a red.
+    @Test("the status carries the live connection and the recorded drain")
+    func statusCarriesConnectionAndDrain() async throws {
+        let (_, queue, _, manager, engine) = try await SyncEngineTestKit.makeFixture()
+
+        #expect(try await engine.status.lastCleanDrainAt == nil, "nothing has drained yet")
+
+        await manager.applyStateForTesting(.online)
+        #expect(try await engine.status.connection == .online)
+
+        let stamp = Date(timeIntervalSince1970: 1_757_000_000)
+        try await queue.saveSyncState(
+            key: "last_clean_drain_at",
+            value: stamp.ISO8601Format(.init(includingFractionalSeconds: true))
+        )
+        let recorded = try #require(try await engine.status.lastCleanDrainAt)
+        #expect(abs(recorded.timeIntervalSince(stamp)) < 0.01)
+
+        await manager.applyStateForTesting(.offline)
+        #expect(try await engine.status.connection == .offline, "the status cached a state it should read")
+    }
+
+    /// **A queued error belongs to the request the test staged it for.** The
+    /// double checks its error queue before it recognizes an incidental route,
+    /// so a bookkeeping read the engine makes for itself consumes the head of
+    /// that queue — the same desynchronization the path-keyed slot exists to
+    /// prevent, left open on the adjacent queue.
+    @Test("an incidental route does not consume a queued error")
+    func anIncidentalRouteLeavesTheErrorQueueAlone() async throws {
+        let mock = MockTransport()
+        let client = MarfaClient(
+            configuration: ClientConfiguration(url: URL(string: "http://test")!, apiKey: "k"),
+            transport: mock
+        )
+        mock.stage(["active": 7], for: "/items/stats")
+        mock.enqueueError(MarfaError(code: "server_error", message: "meant for the list", status: 500))
+
+        #expect(try await client.items.stats()["active"] == 7, "the staged answer, not the error")
+
+        await #expect(throws: MarfaError.self) {
+            _ = try await client.items.list()
+        }
     }
 }

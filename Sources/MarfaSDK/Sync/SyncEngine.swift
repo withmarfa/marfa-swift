@@ -330,9 +330,16 @@ public actor SyncEngine {
     /// and hydration progress.
     ///
     /// **Assembled on demand rather than cached**, so it cannot drift from the
-    /// store it describes. The cost is three counts against the database,
-    /// which is cheaper than the arrays a caller would otherwise fetch and
-    /// measure.
+    /// store it describes. The cost is four counts and one lookup against the
+    /// database, which is cheaper than the arrays a caller would otherwise
+    /// fetch and measure.
+    ///
+    /// **The queue's four counts and its last clean drain come off the queue
+    /// actor together**, because reading them separately leaves a suspension
+    /// between them and a drain landing inside it reports work outstanding
+    /// beside a timestamp saying the queue had just emptied — a pair the
+    /// system was never in. Connection and hydration are this actor's own and
+    /// are read after that call, so they are the freshest of the four.
     /// **Throws rather than defaulting when the queue cannot be read.** A
     /// store that will not answer is not a store with nothing in it, and
     /// returning zeroes would report `isSettled` — a green tick from a
@@ -342,13 +349,24 @@ public actor SyncEngine {
     /// rather than absent.
     public var status: SyncStatus {
         get async throws {
-            SyncStatus(
+            let (queue, drainStamp) = try await mutationQueue.countsAndSyncState(
+                key: cleanDrainKey
+            )
+            return SyncStatus(
                 connection: connectionManager.state,
-                queue: try await mutationQueue.counts,
-                lastCleanDrainAt: await lastCleanDrainAt,
+                queue: queue,
+                lastCleanDrainAt: Self.parseDrainStamp(drainStamp),
                 hydration: hydrationProgress
             )
         }
+    }
+
+    /// ISO 8601 with fractional seconds, or `nil` for absent or unparseable.
+    /// Shared by ``status`` and ``lastCleanDrainAt`` so the two cannot come to
+    /// different conclusions about the same stored string.
+    private static func parseDrainStamp(_ raw: String?) -> Date? {
+        guard let raw else { return nil }
+        return try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
     }
 
     /// Timestamp of the most recent clean drain cycle — both the SSE
@@ -368,13 +386,7 @@ public actor SyncEngine {
     /// when absent or unparseable.
     public var lastCleanDrainAt: Date? {
         get async {
-            guard
-                let raw = try? await mutationQueue.loadSyncState(key: cleanDrainKey),
-                let parsed = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))
-            else {
-                return nil
-            }
-            return parsed
+            Self.parseDrainStamp(try? await mutationQueue.loadSyncState(key: cleanDrainKey))
         }
     }
 
@@ -839,10 +851,27 @@ public actor SyncEngine {
         // than as a wrong number.
         // **Cleared at the top, so a later import never reports an earlier
         // one's numbers.** Without this a re-import that fits in one page
-        // leaves the previous fill's figures standing, and one that throws
-        // partway leaves a stalled fraction that reads exactly like an import
-        // still running.
+        // leaves the previous fill's figures standing.
         hydrationProgress = nil
+
+        // **And cleared again on the way out if this import did not finish.**
+        // The reset above was written as though it covered that too, and it
+        // does not: it only protects the *next* import, and an import that
+        // throws on page four may have no next one. What stands until the
+        // process ends is a fraction frozen partway, which is the one thing a
+        // progress bar must never show — indistinguishable from a fill still
+        // running. A cancellation lands here as well, which is right: a
+        // stopped engine is not a hydrating one.
+        var finished = false
+        defer { if !finished { hydrationProgress = nil } }
+
+        // **Asked at most once, whatever the answer.** `total == nil` looks
+        // like it says that and does not: a route that answers `{}` or fails
+        // leaves `total` nil, so the condition is true again on the next page,
+        // and a twenty-page import against a space whose stats route is down
+        // asks nineteen times. The flag records that the question was put,
+        // which is the thing being paid for.
+        var askedForTotal = false
         var total: Int?
         // Every id the answer mentioned. What the prune below is for: a row the
         // server purged while this device was away is absent from the answer
@@ -895,7 +924,8 @@ public actor SyncEngine {
             }
 
             // Asked for once, on learning the import will not fit in a page.
-            if total == nil, page.hasMore {
+            if !askedForTotal, page.hasMore {
+                askedForTotal = true
                 total = try? await statsTotal()
             }
 
@@ -1012,6 +1042,9 @@ public actor SyncEngine {
         let stamp = Date().ISO8601Format(.init(includingFractionalSeconds: true))
         try? await mutationQueue.saveSyncState(key: fullSyncKey, value: stamp)
 
+        // Everything that could throw is behind us, so the figures this import
+        // reported are a finished account rather than a stalled one.
+        finished = true
         return imported
     }
 
