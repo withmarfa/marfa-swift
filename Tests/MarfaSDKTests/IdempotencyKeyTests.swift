@@ -92,11 +92,17 @@ struct IdempotencyKeyTests {
         #expect(Set(keys).count == 2)
     }
 
-    /// A key is minted by the one private door every kind funnels through, so
-    /// this holds for a write that is not a create — which is the half the
-    /// client-minted item id never covered.
-    @Test("a write that is not a create carries a key too")
-    func nonCreateWritesCarryAKey() async throws {
+    /// The write the key actually protects, and the reason this is not a
+    /// create.
+    ///
+    /// Both create doors already answered a repeat carrying a caller-minted
+    /// id, and the kit stamps one. `PATCH /items/:id` had nothing: it applies
+    /// the edit **and bumps `version`** each time it runs, so a lost response
+    /// costs one edit two version steps and leaves the device behind the
+    /// server — which turns the next ordinary edit into a conflict nobody
+    /// caused.
+    @Test("an update carries a key, and a retry repeats it")
+    func updatesCarryAStableKey() async throws {
         let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
         transport.enqueueEvents([])
         await engine.start()
@@ -104,16 +110,21 @@ struct IdempotencyKeyTests {
 
         let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
         let item = try await store.createItem(input)
-        try await queue.enqueueSetMetadata(itemId: item.id, input: MetadataInput(tags: ["a"]))
+        try await queue.enqueueUpdateItem(
+            id: item.id, properties: ["body": .string("edited")]
+        )
 
-        transport.enqueue(MetadataResponse(metadata: Metadata(extensions: [:], itemId: item.id, tags: ["a"])))
+        transport.enqueueError(NetworkError(URLError(.timedOut)))
+        transport.enqueue(echo(item.id))
         await engine.replayMutationsForTesting()
-        try await SyncEngineTestKit.awaitCondition(description: "the metadata write was attempted") {
-            transport.calls.contains { $0.method == .put || $0.method == .post }
+        try await SyncEngineTestKit.awaitCondition(description: "two patch attempts") {
+            transport.calls.filter { $0.method == .patch }.count >= 2
         }
 
-        let write = transport.calls.first { $0.method == .put || $0.method == .post }
-        #expect(write?.idempotencyKey != nil)
+        let patches = transport.calls.filter { $0.method == .patch }
+        try #require(patches.count == 2)
+        #expect(patches[0].idempotencyKey != nil)
+        #expect(patches[0].idempotencyKey == patches[1].idempotencyKey)
     }
 
     /// A row enqueued before keys existed replays **without** one rather than

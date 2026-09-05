@@ -110,9 +110,15 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
-- **Every queued write now carries an `Idempotency-Key`, and a retry carries the same one.** A replay whose response was lost is indistinguishable from one the server never saw — the write happened, the acknowledgement did not, and the next drain sends it again. A create was protected because the device stamps its own id, so the server recognizes the row. **Nothing protected the other write routes**, where a lost response meant a second edge, a second tag, a second metadata write, with no error anywhere and nothing to say it had happened.
+- **Every queued write now carries an `Idempotency-Key`, and a retry carries the same one.** A replay whose response was lost is indistinguishable from one the server never saw: the write happened, the acknowledgement did not, and the next drain sends it again.
 
-  **The property is sameness, not presence.** A key minted at replay time would differ on every attempt, which is worse than none: it tells the server each retry is a new request while looking, from here, exactly like protection working. The key is minted once when the row is enqueued, stored beside it, and never changed.
+  **Creates were already safe and are not what this fixes.** The kit stamps its own id on an item and an edge, and both routes answer a repeat carrying a caller-minted id. What had nothing was every other write door. The sharpest is `PATCH /items/:id`, which applies the edit **and bumps `version`** each time it runs: a lost response there costs one edit two version steps, leaves the device's idea of the version behind the server's, and turns the next ordinary edit into a conflict nobody caused. Transitions, restores, promotes and the edge patch and delete are the same shape.
+
+  **A refused write benefits too, and this is the case the server's own middleware says it exists for.** A `409` is recorded like any other outcome, so a client asking a second time is told what its *first* attempt met. Without that, "somebody else holds this" and "my own earlier write holds this" are the same answer.
+
+  **The property is sameness, not presence.** A key minted at replay time would differ on every attempt, which is worse than none: it tells the server each retry is a new request while looking, from the client, exactly like protection working. The key is minted once when the row is enqueued, stored beside it, and never changed.
+
+  The kit sends a key on **every** queued write, including the metadata, tag and extension doors the server deliberately leaves out because a replace, a merge, a set-add and a delete already repeat harmlessly. Sending one there costs nothing and covers a door that stops being naturally idempotent later.
 
   **`Transport` gains `request(method:path:body:query:idempotencyKey:)` and the matching `requestWithConflict`, both with default implementations that drop the key** and forward to the existing four-argument calls. An existing conformer keeps compiling and keeps behaving exactly as it did — and gets no protection against a repeated write, because the server cannot recognize a retry it was never told about. The SDK's `URLSessionTransport` and the bundled `MockTransport` both override; a custom transport should too. `MockTransport.Call` gains `idempotencyKey`, so a test can assert that a retry really is the same request.
 
