@@ -108,6 +108,15 @@ public actor SyncEngine {
     /// ``PendingMutationBlockReason/classify(error:kind:attemptCount:ceiling:)``.
     private let maxReplayAttempts: Int
 
+    /// Whether this engine's client holds its store's writer lock.
+    ///
+    /// **A second engine over one store is what this refuses**, and refusing
+    /// it here rather than at the queue is deliberate: the damage is not one
+    /// bad write, it is two engines each holding an event cursor and each
+    /// believing it is the one draining. Half the writes replay twice and the
+    /// cursors diverge, which no per-statement guard can see.
+    private let isStoreWriter: Bool
+
     // MARK: - Internals
 
     private var streamTask: Task<Void, Never>?
@@ -359,7 +368,12 @@ public actor SyncEngine {
         drainDebounceInterval: Duration = .milliseconds(150),
         conflictResolvers: ConflictResolverRegistry? = nil,
         maxReplayAttempts: Int = 5,
-        storeRecovery: StoreRecovery? = nil
+        storeRecovery: StoreRecovery? = nil,
+        /// Defaults to `true`, so an engine built directly — every test
+        /// fixture, and any consumer assembling one itself — keeps writing.
+        /// `MarfaClient.synced` is the door that takes a real lock and passes
+        /// what it got; nothing else can know.
+        isStoreWriter: Bool = true
     ) {
         self.transport = transport
         self.localStore = localStore
@@ -373,6 +387,7 @@ public actor SyncEngine {
         // an offline device would park every write it made.
         precondition(maxReplayAttempts >= 1, "maxReplayAttempts must be at least 1")
         self.maxReplayAttempts = maxReplayAttempts
+        self.isStoreWriter = isStoreWriter
     }
 
     // MARK: - Blocked mutations
@@ -420,6 +435,19 @@ public actor SyncEngine {
     /// ``fullSyncState`` or ``MarfaStore/queryFullSyncState()`` to render
     /// progress while a first import runs.
     public func start() async {
+        // **A client that does not hold its store's writer lock does not
+        // sync.** Somebody else's engine is draining this queue and holding
+        // this cursor; a second one would replay half the writes twice and
+        // leave the two cursors disagreeing about what has been seen. Logged
+        // at error rather than thrown, because this is a supported
+        // arrangement — an app and its share extension both open the store,
+        // and only one of them should be the engine.
+        guard isStoreWriter else {
+            logger.log.error(
+                "sync.start.refused reason=not_store_writer — another client holds this store's writer lock, so this one reads and does not drain"
+            )
+            return
+        }
         while let stoppingTask {
             await stoppingTask.value
             // The stop owner clears `stoppingTask` after observing the same
@@ -610,6 +638,21 @@ public actor SyncEngine {
 
     @discardableResult
     public func performInitialSync(pageSize: Int = 200) async throws -> Int {
+        // **Gated for the same reason `start()` is, and the gate on `start()`
+        // alone was not enough.** An import is not only reads: it upserts
+        // items, edges and metadata, and it *prunes* — it takes the ids the
+        // server returned as the whole answer and removes the rest. A client
+        // that does not hold the store's writer lock running that can delete
+        // rows the real writer created locally and has not yet pushed.
+        //
+        // Thrown rather than logged, because this one has a caller who asked
+        // for it and is waiting on a count. `start()` is the engine's own
+        // lifecycle and has nobody to tell.
+        guard isStoreWriter else {
+            throw LocalStoreError.storeQuarantineFailed(
+                "this client does not hold the store's writer lock, so it cannot import — another client is the writer for this store"
+            )
+        }
         importCallerCount += 1
         defer { importCallerCount -= 1 }
 

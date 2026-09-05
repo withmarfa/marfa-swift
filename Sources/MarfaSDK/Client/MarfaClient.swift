@@ -70,6 +70,44 @@ public final class MarfaClient: Sendable {
     /// rather ask than subscribe.
     public let storeRecovery: StoreRecovery?
 
+    /// The writer lock this client holds over its store, if any.
+    ///
+    /// Held for the client's lifetime rather than per write: the thing being
+    /// excluded is a second *engine*, not a second statement.
+    let storeWriterLock: StoreWriterLock?
+
+    /// Whether this client may write to its store.
+    ///
+    /// `false` when another process — or another client in this one — already
+    /// holds it. A read-only client answers reads from the store and does not
+    /// drain, so its queue is somebody else's to send. ``storeHeldBy`` says
+    /// whose.
+    ///
+    /// **`true` for a client that never took a lock**, which is a client with
+    /// no store or a pure-local one. There is nothing to exclude there and
+    /// nothing to contend with, so answering `false` would report a
+    /// restriction that does not exist.
+    public var holdsStoreWriteLock: Bool { storeWriterLock?.writer ?? true }
+
+    /// Who holds the store's writer lock, when this client does not.
+    public var storeHeldBy: StoreLockHolder? { storeWriterLock?.heldBy }
+
+    /// Gives the store's writer lock back when the client goes away.
+    ///
+    /// **Without this the lock was taken and never released.** A client that
+    /// is discarded held its store's path for the life of the process, so a
+    /// replacement built over the same path — an app rebuilding its client
+    /// after a sign-out, a test making two in a row — was refused with nothing
+    /// to release. Cross-process that heals on its own through the staleness
+    /// check, because the holder is gone; in-process it does not, because the
+    /// holder is still running.
+    ///
+    /// Releasing compares this hold's own token, so a client that lost its
+    /// lock to a takeover cannot delete whoever holds it now.
+    deinit {
+        storeWriterLock?.release()
+    }
+
     /// The active sync engine, present only in synced mode (``MarfaClient/synced(url:apiKey:storePath:)``).
     ///
     /// Call ``SyncEngine/start()`` to begin synchronization and
@@ -140,11 +178,13 @@ public final class MarfaClient: Sendable {
         syncEngine: SyncEngine? = nil,
         container: ModelContainer? = nil,
         conflictResolvers: ConflictResolverRegistry? = nil,
-        storeRecovery: StoreRecovery? = nil
+        storeRecovery: StoreRecovery? = nil,
+        storeWriterLock: StoreWriterLock? = nil
     ) {
         self.configuration = configuration
         self.transport = transport
         self.storeRecovery = storeRecovery
+        self.storeWriterLock = storeWriterLock
         self.syncEngine = syncEngine
         self.container = container
         self.mutationQueue = mutationQueue
@@ -387,7 +427,34 @@ public final class MarfaClient: Sendable {
         maxReplayAttempts: Int
     ) async throws -> MarfaClient {
         let transport = URLSessionTransport(configuration: config)
-        let opened = try MarfaModelContainer.open(path: storePath)
+
+        // **Taken before the store is opened**, because a store this build
+        // cannot read must not be moved aside by a caller that does not hold
+        // the write — the quarantine inside `open` is exactly that move.
+        //
+        // A second opener is told it cannot write rather than being queued:
+        // a caller can do something useful with a read-only store and nothing
+        // at all with a promise that has not settled. Two engines over one
+        // store is the failure this prevents, and it had nothing stopping it
+        // — an app and a share extension over an App Group container got two
+        // drains and two cursors with nothing anywhere saying so.
+        let writerLock = try StoreWriterLock.acquire(storePath: storePath)
+
+        // **The lock is consulted here, and taking it before the open was
+        // pointless until it was.** The stated reason for that ordering is
+        // that a store this build cannot read must not be moved aside by a
+        // caller without the write — and moving it aside is exactly what
+        // `open`'s fail-safe does. A reader reaching that path quarantines the
+        // writer's store out from under it.
+        //
+        // So a reader opens without the fail-safe. If the store will not open
+        // for it, that is the writer's problem to discover and repair, and a
+        // second client must not decide it on the writer's behalf.
+        let opened = writerLock.writer
+            ? try MarfaModelContainer.open(path: storePath)
+            : StoreOpenResult(
+                container: try MarfaModelContainer.make(path: storePath), recovery: nil
+            )
         let container = opened.container
         let store = await Task.detached { LocalStore(modelContainer: container) }.value
         let queue = await Task.detached { MutationQueue(modelContainer: container) }.value
@@ -402,7 +469,8 @@ public final class MarfaClient: Sendable {
             connectionManager: connectionManager,
             conflictResolvers: resolvers,
             maxReplayAttempts: maxReplayAttempts,
-            storeRecovery: opened.recovery
+            storeRecovery: opened.recovery,
+            isStoreWriter: writerLock.writer
         )
         return MarfaClient(
             configuration: config,
@@ -412,7 +480,8 @@ public final class MarfaClient: Sendable {
             syncEngine: engine,
             container: container,
             conflictResolvers: resolvers,
-            storeRecovery: opened.recovery
+            storeRecovery: opened.recovery,
+            storeWriterLock: writerLock
         )
     }
 
