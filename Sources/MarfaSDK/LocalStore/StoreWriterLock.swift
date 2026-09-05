@@ -144,23 +144,10 @@ extension StoreWriterLock {
                     inProcess.give(path)
                     return StoreWriterLock(writer: false, heldBy: holder, release: {})
                 }
-                // **Cleared by rename, not by unlink, and that is the whole
-                // difference between one writer and two.**
-                //
-                // An unlink removes whatever is at the path *now*, not the
-                // dead holder just read — so two openers meeting one stale
-                // lock both find it dead, both clear, and the second clears
-                // the first's fresh claim. Both come away as writer, and the
-                // first's release is then a no-op because the token no longer
-                // matches, so it never cleans up either. The trigger is
-                // ordinary: an app and its share extension starting together
-                // after a crash left a lockfile behind.
-                //
-                // A rename is atomic and names the file it is moving, so
-                // exactly one caller can succeed. The loser's rename fails
-                // because what it named is gone, and it re-reads rather than
-                // clearing a claim somebody else has just made.
-                guard tookOverStaleLock(at: path, token: token) else {
+                // Taking over a stale lock is one critical section — see
+                // `tookOverStaleLock`, which carries the three versions that
+                // raced before this one held.
+                guard try tookOverStaleLock(at: path, token: token) else {
                     inProcess.give(path)
                     return StoreWriterLock(
                         writer: false, heldBy: readHolder(path: path) ?? unknownHolder(),
@@ -215,9 +202,13 @@ extension StoreWriterLock {
     /// So the right covers the whole takeover. Clear and claim are one
     /// critical section, and a caller who does not hold it never touches the
     /// file.
-    private static func tookOverStaleLock(at path: String, token: String) -> Bool {
+    private static func tookOverStaleLock(at path: String, token: String) throws -> Bool {
         let right = path + ".clearing"
-        guard (try? takeClearingRight(at: right, token: token)) == true else { return false }
+        // Throws rather than reporting contention. Reporting a machine that
+        // cannot take a lock nobody holds as somebody else holding it is what
+        // produces a holder nobody can find, which this file's own contract
+        // names as the thing to avoid — and a `try?` here quietly undid it.
+        guard try takeClearingRight(at: right, token: token) else { return false }
         defer { try? FileManager.default.removeItem(atPath: right) }
 
         if let holder = readHolder(path: path) {
@@ -234,25 +225,98 @@ extension StoreWriterLock {
             try? FileManager.default.removeItem(atPath: path)
         }
 
-        return ((try? claim(path: path, token: token)) == true)
+        return try claim(path: path, token: token)
     }
 
     /// The exclusive right to clear one store's lock.
     ///
     /// Taken through the same link-into-place claim the lock itself uses, so
     /// a reader of the right never meets a file that exists and is empty.
+    ///
+    /// **Reclaiming an abandoned right is where this went wrong**, and the
+    /// mistake was the one the lock above documents as the whole difference
+    /// between one writer and two, reintroduced a level down. Reading the
+    /// dead right and then unlinking removes whatever is at that path *now*,
+    /// not the thing that was read — so a caller holding an older read
+    /// unlinks a right somebody legitimately holds. A review measured two
+    /// callers holding it at unmodified timing in two runs of three, and four
+    /// under widening; my own comment had called it a window needing a crash
+    /// and a race.
+    ///
+    /// The claim is atomic, so the fix is to ask afterwards whether the file
+    /// is the one this caller put there. If somebody unlinked it in between,
+    /// back off rather than act on a right that is now theirs.
     private static func takeClearingRight(at right: String, token: String) throws -> Bool {
         if try claim(path: right, token: token) { return true }
-        // A right nobody is holding was left by a crash. Without this, one
-        // crashed clearer makes every stale lock on that store permanently
-        // unclearable — the store read-only for good, which is the outcome
-        // the whole file is written to avoid.
-        if let holder = readHolder(path: right), !stillHolding(holder) {
+        guard isAbandoned(right: right) else { return false }
+
+        try? FileManager.default.removeItem(atPath: right)
+        guard try claim(path: right, token: token) else { return false }
+
+        // Somebody may have removed this claim between the link and here and
+        // claimed it themselves. The token says which.
+        if readHolder(path: right)?.token == token { return true }
+
+        // **This call no longer holds the right, so it must not act.** Another
+        // caller that also judged the old right abandoned can remove and claim
+        // between this call's remove and its own, and the token is what says
+        // so. Returning false here is correct rather than defensive.
+        //
+        // It does not leak. Chunk B shipped a version that won the right,
+        // found the file changed, and returned without giving it back — a
+        // store nothing could open, permanently — and asked me to check mine.
+        // The caller's `defer` is registered on acquisition and covers every
+        // exit including that one, and reaching this line means this call's
+        // own file is already gone. **Nothing removes a *fresh* right**, since
+        // the age rule judges one taken a moment ago as held, so the case
+        // where this call still holds the file here is not reachable.
+        //
+        // The `nil` branch below is therefore defence against a read that
+        // fails for its own reasons rather than against a race. It is kept
+        // because it costs nothing and the alternative is a store held out
+        // until an age bound expires, but no test covers it and none can.
+        if readHolder(path: right) == nil {
             try? FileManager.default.removeItem(atPath: right)
-            return try claim(path: right, token: token)
         }
         return false
     }
+
+    /// Whether a right can be taken over.
+    ///
+    /// **Process liveness is the wrong question for this file**, and asking it
+    /// produced a store that was permanently read-only with nothing raised.
+    /// The lock names a process that holds it for as long as the client lives;
+    /// the right names one inside a critical section measured in microseconds.
+    /// So a `.clearing` left behind by a failed unlink — the `try?` on the
+    /// release is silent — named a process that was still running, was judged
+    /// held for ever, and refused every later open.
+    ///
+    /// An age bound is the honest rule here and is not the tolerance window
+    /// this file argues against elsewhere. That argument was about a *derived*
+    /// value where two correct readings disagree; this is a real duration with
+    /// four orders of magnitude of headroom over the section it bounds.
+    private static func isAbandoned(right: String) -> Bool {
+        guard let holder = readHolder(path: right) else {
+            // Unparseable, so nothing valid wrote it — the same condition the
+            // main lock handles explicitly a few lines below, using the same
+            // helper. Leaving it makes the store unopenable for ever.
+            return true
+        }
+        if !stillHolding(holder) { return true }
+        guard let taken = ISO8601DateFormatter().date(from: holder.since) else {
+            // A holder with no readable timestamp is one this build cannot
+            // judge by age, and process liveness has already said it is alive.
+            return false
+        }
+        return Date().timeIntervalSince(taken) > maxClearingRightAge
+    }
+
+    /// How long a right may be held before it is treated as abandoned.
+    ///
+    /// The section it covers is a handful of filesystem calls. Ten seconds is
+    /// not a tuned number; it is "so far past plausible that anything beyond
+    /// it is a process that stopped".
+    static let maxClearingRightAge: TimeInterval = 10
 
     /// A holder for the case where the lock is held and the file has already
     /// moved on — contended, by somebody this caller cannot name.
@@ -274,8 +338,8 @@ extension StoreWriterLock {
 
     /// The atomic clear, reachable from a test so the race it exists to
     /// settle can actually be run. Nothing else calls it.
-    static func tookOverStaleLockForTesting(at path: String) -> Bool {
-        tookOverStaleLock(at: path, token: UUID().uuidString)
+    static func tookOverStaleLockForTesting(at path: String) throws -> Bool {
+        try tookOverStaleLock(at: path, token: UUID().uuidString)
     }
 
     private static func heldHere() -> StoreLockHolder {
