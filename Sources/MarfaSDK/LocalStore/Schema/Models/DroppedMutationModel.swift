@@ -88,10 +88,12 @@ final class DroppedMutationModel {
 
     /// Number of failed replay attempts before the row left the queue.
     ///
-    /// **A discarded row is the exception**: nothing was attempted to produce
-    /// its error, so the count is the row's own rather than one more than it.
-    /// For every other producer the last attempt is the one that made
-    /// ``errorStatus`` / ``errorCode`` / ``errorMessage``.
+    /// **A discard is the exception**: nothing was attempted to produce its
+    /// error, so the count is not incremented. A row cascaded away by a
+    /// discarded `createItem` carries the *root's* count for the same reason —
+    /// one operation, one number, rather than each orphan reporting a deferral
+    /// it never got to attempt. For every other producer the last attempt is
+    /// the one that made ``errorStatus`` / ``errorCode`` / ``errorMessage``.
     var attemptCount: Int = 0
 
     /// HTTP status code from the dropping error (typically 400, 403, 404,

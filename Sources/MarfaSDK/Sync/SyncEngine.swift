@@ -628,19 +628,13 @@ public actor SyncEngine {
         }
     }
 
-    /// What a discarded row owes the rest of the store.
-    ///
-    /// Mirrors the drain's permanent-drop path, and for the same reasons: a
-    /// row that will never reach the server leaves behind a local item nothing
-    /// can sync, downstream writes that would each 404 in turn, and — for an
-    /// upload — staged bytes with no remaining owner.
+    /// The local-store half of a discard, after the queue has done its own.
     ///
     /// **`credentialRefused` is why every kind has to be handled rather than
     /// just `updateItem`.** One refused credential parks *every* live row
     /// through `parkAllLive`, with no filter on kind, so a `createItem`, a
     /// `createEdge` and an `uploadBlob` can all be sitting in front of this
     /// door at once.
-    /// The local-store half of a discard, after the queue has done its own.
     ///
     /// **Everything that has to be atomic with the drop now happens inside
     /// `MutationQueue.discardIfBlocked`** — the cascade, because removing the
@@ -673,7 +667,12 @@ public actor SyncEngine {
             emit(.mutationDropped(
                 kind: ghost.kind.rawValue,
                 itemId: ghost.localId,
-                attempt: ghost.attemptCount,
+                // The root's count, matching what the orphan's dead-letter row
+                // is written with. An orphan is deferred behind the root, so
+                // its own count is usually zero — reporting that beside a
+                // persisted row carrying the root's would be one drop
+                // described two ways.
+                attempt: record.attemptCount,
                 error: marfaError
             ))
         }
