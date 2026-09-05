@@ -479,7 +479,8 @@ struct SyncEngineReplayTests {
             sourceId: edge.sourceId,
             spaceId: EdgeMintingTransport.spaceId,
             targetId: edge.targetId,
-            updatedAt: EdgeMintingTransport.stampedAt
+            updatedAt: EdgeMintingTransport.stampedAt,
+            version: 1
         )
     }
 
@@ -564,7 +565,7 @@ struct SyncEngineReplayTests {
 
         // One edge the caller names itself and one it leaves to the store.
         // Both have local rows before anything reaches the network, and both
-        // have to reach the server under those ids. `emitEvents` is on
+        // have to reach the server under those ids. `enableFanout` is on
         // because the echo is the half that duplicates the row, and the bulk
         // route publishes nothing unless the caller asks.
         let callerId = "01a06000-0000-7000-8000-00000000000a"
@@ -578,7 +579,7 @@ struct SyncEngineReplayTests {
                         sourceId: "src", targetId: "tgt-2", edgeType: "about"
                     ),
                 ],
-                emitEvents: true
+                enableFanout: true
             )
         )
         let named = try #require(result.results.first { $0.index == 0 })
@@ -638,7 +639,7 @@ struct SyncEngineReplayTests {
 
         // One entry the caller names itself and one it leaves to the store.
         // Both have local rows before anything reaches the network, and both
-        // have to reach the server under those ids. `emitEvents` is on because
+        // have to reach the server under those ids. `enableFanout` is on because
         // the echo is the half that duplicates the row, and the bulk route
         // publishes nothing unless the caller asks.
         let callerId = "01b06000-0000-7000-8000-00000000000a"
@@ -648,7 +649,7 @@ struct SyncEngineReplayTests {
                     BulkItemInput(id: callerId, type: "core.note"),
                     BulkItemInput(type: "core.note"),
                 ],
-                emitEvents: true
+                enableFanout: true
             )
         )
         let named = try #require(result.results.first { $0.index == 0 })
@@ -796,7 +797,8 @@ struct SyncEngineReplayTests {
             sourceId: "A",
             spaceId: nil,
             targetId: "X",
-            updatedAt: now
+            updatedAt: now,
+            version: 1
         ))
 
         let createInput = CreateItemInput(

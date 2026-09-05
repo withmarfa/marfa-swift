@@ -8,7 +8,7 @@ public extension EdgesNamespace {
     /// batches. Aggregates per-edge results across batches into a single
     /// ``BulkEdgeResult`` with absolute indices preserved.
     ///
-    /// Same batching shape as ``ItemsNamespace/bulkAll(_:batchSize:mode:atomic:emitEvents:progressHandler:)`` —
+    /// Same batching shape as ``ItemsNamespace/bulkAll(_:batchSize:mode:atomic:enableFanout:progressHandler:)`` —
     /// the server caps `/edges/bulk` at 5000 edges per call; `bulkAll`
     /// exists so mode-transition flows on larger spaces don't need to
     /// reinvent batch iteration.
@@ -24,7 +24,7 @@ public extension EdgesNamespace {
     ///     `500`, clamped to the server's 5000 cap.
     ///   - mode: ``BulkMode`` passed to every batch. Default ``BulkMode/upsert``.
     ///   - atomic: Per-batch atomicity flag. Default `false`.
-    ///   - emitEvents: Per-batch opt-in for `edge_created` webhook fanout.
+    ///   - enableFanout: Per-batch opt-in for `edge_created` webhook fanout.
     ///     Default `false`.
     ///   - progressHandler: Fires after each batch with
     ///     `(edgesCompleted, edgesTotal)`.
@@ -34,7 +34,7 @@ public extension EdgesNamespace {
         batchSize: Int = 500,
         mode: BulkMode = .upsert,
         atomic: Bool = false,
-        emitEvents: Bool = false,
+        enableFanout: Bool = false,
         progressHandler: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> BulkEdgeResult {
         let total = edges.count
@@ -64,7 +64,7 @@ public extension EdgesNamespace {
                 edges: slice,
                 mode: mode,
                 atomic: atomic,
-                emitEvents: emitEvents
+                enableFanout: enableFanout
             )
 
             do {

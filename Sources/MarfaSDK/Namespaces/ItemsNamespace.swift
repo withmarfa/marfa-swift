@@ -678,8 +678,8 @@ public struct ItemsNamespace: Sendable {
         list.source = filter.source
         list.tier = filter.tier
         list.tags = filter.tags
-        list.since = filter.since
-        list.until = filter.until
+        list.timestampAfter = filter.timestampAfter
+        list.timestampBefore = filter.timestampBefore
 
         // `maxItems` is deliberately *not* `list.limit`. The server's
         // `max_items` caps the match set before a `bulk_cap_exceeded` error —

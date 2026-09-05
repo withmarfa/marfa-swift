@@ -28,7 +28,8 @@ struct EdgesTests {
             sourceId: sourceId,
             spaceId: nil,
             targetId: targetId,
-            updatedAt: "2026-04-15T00:00:00Z"
+            updatedAt: "2026-04-15T00:00:00Z",
+            version: 1
         )
     }
 

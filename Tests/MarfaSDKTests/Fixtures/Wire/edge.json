@@ -2,9 +2,13 @@
   "created_at": "2026-04-14T10:00:00Z",
   "edge_type": "parent",
   "id": "edg_01JABCXYZ",
-  "properties": { "note": "first child", "weight": 1 },
+  "properties": {
+    "note": "first child",
+    "weight": 1
+  },
   "source_id": "itm_01CHILD",
   "target_id": "itm_01PARENT",
   "space_id": "tnt_01",
-  "updated_at": "2026-04-14T10:05:00Z"
+  "updated_at": "2026-04-14T10:05:00Z",
+  "version": 1
 }

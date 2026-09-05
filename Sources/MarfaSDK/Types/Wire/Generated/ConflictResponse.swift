@@ -37,13 +37,16 @@ public struct ConflictResponse: Codable, Sendable {
 
 public struct ConflictResponseError: Codable, Sendable, Hashable {
     public let code: ConflictResponseErrorCode
+    public let message: String
     public let status: Int
 
     public init(
         code: ConflictResponseErrorCode,
+        message: String,
         status: Int
     ) {
         self.code = code
+        self.message = message
         self.status = status
     }
 }

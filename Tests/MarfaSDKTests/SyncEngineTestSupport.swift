@@ -644,11 +644,11 @@ private struct SentEdgeCreate: Decodable {
 /// The bulk-edge body, read for the same reason.
 private struct SentBulkEdges: Decodable {
     let edges: [SentEdgeCreate]
-    let emitEvents: Bool?
+    let enableFanout: Bool?
 
     enum CodingKeys: String, CodingKey {
         case edges
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 }
 
@@ -665,7 +665,7 @@ private struct SentBulkEdges: Decodable {
 /// defect looks like from the device.
 ///
 /// Both edge-create doors are modeled, because both had the defect.
-/// `POST /edges/bulk` echoes only when the call set `emit_events`, as the
+/// `POST /edges/bulk` echoes only when the call set `enable_fanout`, as the
 /// route does — a double that echoed regardless would be asserting against
 /// events a real server never sends.
 ///
@@ -718,7 +718,8 @@ actor EdgeMintingTransport: Transport {
             sourceId: sent.sourceId,
             spaceId: Self.spaceId,
             targetId: sent.targetId,
-            updatedAt: Self.stampedAt
+            updatedAt: Self.stampedAt,
+            version: 1
         )
         if echo { echoes.append(edge) }
         return edge
@@ -748,7 +749,7 @@ actor EdgeMintingTransport: Transport {
 
         case "/edges/bulk":
             let sent = try JSONDecoder().decode(SentBulkEdges.self, from: bodyData)
-            let emit = sent.emitEvents ?? false
+            let emit = sent.enableFanout ?? false
             var entries: [BulkEdgeResultEntry] = []
             var created = 0, errored = 0
             for (index, raw) in sent.edges.enumerated() {
@@ -840,13 +841,13 @@ private struct SentBulkItem: Decodable {
 
 private struct SentBulkItems: Decodable {
     let items: [SentBulkItem]
-    let emitEvents: Bool?
+    let enableFanout: Bool?
     let mode: String?
     let atomic: Bool?
 
     enum CodingKeys: String, CodingKey {
         case items, mode, atomic
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 }
 
@@ -860,7 +861,7 @@ private struct SentBulkItems: Decodable {
 /// canned answers passes whether or not the request carried an id. This double
 /// derives its answer from the request the way the route does.
 ///
-/// `POST /items/bulk` echoes only when the call set `emit_events`, as the
+/// `POST /items/bulk` echoes only when the call set `enable_fanout`, as the
 /// route does: it defaults off so a bulk page does not fan out per-item
 /// webhooks. Echoes are delivered when the stream opens rather than
 /// concurrently, which is the real order — coming online drains the queue
@@ -979,7 +980,7 @@ actor ItemMintingTransport: Transport {
         }
 
         let sent = try JSONDecoder().decode(SentBulkItems.self, from: bodyData)
-        let emit = sent.emitEvents ?? false
+        let emit = sent.enableFanout ?? false
         let createOnly = sent.mode == "create_only"
         // `atomic` defaults to true on the route, so a page that says nothing
         // is atomic and one refused entry rolls the whole thing back.

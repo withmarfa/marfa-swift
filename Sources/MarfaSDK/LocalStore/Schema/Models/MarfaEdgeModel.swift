@@ -34,6 +34,13 @@ final class MarfaEdgeModel {
     var createdAt: String = ""
     var updatedAt: String = ""
 
+    /// The server's version for this edge. Edges gained one when the contract
+    /// required a client to tell a stale frame from a fresh one — the question
+    /// `MarfaItemModel.version` answers for an item. A locally created edge
+    /// starts at 1, matching the item path, and the server's value replaces it
+    /// on the first echo back.
+    var version: Int = 1
+
     init() {}
 
     // MARK: - Indexes

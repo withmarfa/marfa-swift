@@ -81,23 +81,23 @@ public struct BulkInput: Codable, Sendable {
     public var atomic: Bool?
     /// Per-item `created`/`updated` events default to OFF to avoid
     /// webhook fanout on bulk calls.
-    public var emitEvents: Bool?
+    public var enableFanout: Bool?
 
     public init(
         items: [BulkItemInput],
         mode: BulkMode? = nil,
         atomic: Bool? = nil,
-        emitEvents: Bool? = nil
+        enableFanout: Bool? = nil
     ) {
         self.items = items
         self.mode = mode
         self.atomic = atomic
-        self.emitEvents = emitEvents
+        self.enableFanout = enableFanout
     }
 
     enum CodingKeys: String, CodingKey {
         case items, mode, atomic
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 }
 
@@ -149,12 +149,27 @@ public struct BulkActionFilter: Codable, Sendable {
     public var source: String?
     public var tier: TierFilter?
     public var tags: [String]?
-    public var since: String?
-    public var until: String?
+    /// Lower bound on the item's user-meaningful time, inclusive. See
+    /// ``ListFilters/timestampAfter`` for why the name changed.
+    public var timestampAfter: String?
+    /// Upper bound on the item's user-meaningful time, inclusive.
+    public var timestampBefore: String?
     /// Full filter-SQL DSL expression, identical grammar to
     /// `GET /items?filter=`. `edge[type]=id` and `backref[type]=id`
     /// URL shorthand translates to `edge[type] eq "id"` here.
     public var filter: String?
+
+    /// Spelled out because this type had none, and relied on its Swift names
+    /// happening to match the wire. That held only while the two agreed: the
+    /// moment the time bounds were renamed to what the server takes, the
+    /// synthesized keys became `timestampAfter` and `timestampBefore`, which
+    /// no server has ever accepted. A type whose encoding depends on a
+    /// coincidence between two vocabularies is one rename from silence.
+    enum CodingKeys: String, CodingKey {
+        case type, state, source, tier, tags, filter
+        case timestampAfter = "timestamp_after"
+        case timestampBefore = "timestamp_before"
+    }
 
     public init(
         type: String? = nil,
@@ -162,8 +177,8 @@ public struct BulkActionFilter: Codable, Sendable {
         source: String? = nil,
         tier: TierFilter? = nil,
         tags: [String]? = nil,
-        since: String? = nil,
-        until: String? = nil,
+        timestampAfter: String? = nil,
+        timestampBefore: String? = nil,
         filter: String? = nil
     ) {
         self.type = type
@@ -171,8 +186,8 @@ public struct BulkActionFilter: Codable, Sendable {
         self.state = state
         self.tier = tier
         self.tags = tags
-        self.since = since
-        self.until = until
+        self.timestampAfter = timestampAfter
+        self.timestampBefore = timestampBefore
         self.filter = filter
     }
 }
@@ -184,18 +199,18 @@ public struct BulkActionOptions: Sendable {
     /// ``BulkActionInput/purge(filter:options:)`` refuses to encode without it.
     public var confirm: String?
     public var maxItems: Int?
-    public var emitEvents: Bool?
+    public var enableFanout: Bool?
 
     public init(
         dryRun: Bool? = nil,
         confirm: String? = nil,
         maxItems: Int? = nil,
-        emitEvents: Bool? = nil
+        enableFanout: Bool? = nil
     ) {
         self.dryRun = dryRun
         self.confirm = confirm
         self.maxItems = maxItems
-        self.emitEvents = emitEvents
+        self.enableFanout = enableFanout
     }
 }
 
@@ -222,7 +237,7 @@ public enum BulkActionInput: Codable, Sendable {
         case timestamp
         case dryRun = "dry_run"
         case maxItems = "max_items"
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -287,7 +302,7 @@ public enum BulkActionInput: Codable, Sendable {
         var options = BulkActionOptions()
         options.dryRun = try c.decodeIfPresent(Bool.self, forKey: .dryRun)
         options.maxItems = try c.decodeIfPresent(Int.self, forKey: .maxItems)
-        options.emitEvents = try c.decodeIfPresent(Bool.self, forKey: .emitEvents)
+        options.enableFanout = try c.decodeIfPresent(Bool.self, forKey: .enableFanout)
 
         switch action {
         case "transition":
@@ -325,7 +340,7 @@ public enum BulkActionInput: Codable, Sendable {
     ) throws {
         try container.encodeIfPresent(options.dryRun, forKey: .dryRun)
         try container.encodeIfPresent(options.maxItems, forKey: .maxItems)
-        try container.encodeIfPresent(options.emitEvents, forKey: .emitEvents)
+        try container.encodeIfPresent(options.enableFanout, forKey: .enableFanout)
         if includeConfirm {
             try container.encodeIfPresent(options.confirm, forKey: .confirm)
         }

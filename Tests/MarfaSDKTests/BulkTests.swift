@@ -122,12 +122,12 @@ struct BulkTests {
             items: [
                 BulkItemInput(type: "core.note", sourceId: "abc")
             ],
-            emitEvents: true
+            enableFanout: true
         )
         let data = try JSONEncoder().encode(input)
         let json = String(data: data, encoding: .utf8) ?? ""
         #expect(json.contains("\"source_id\":\"abc\""))
-        #expect(json.contains("\"emit_events\":true"))
+        #expect(json.contains("\"enable_fanout\":true"))
     }
 
     // MARK: - bulkAction
@@ -368,13 +368,13 @@ struct BulkTests {
         let input = BulkActionInput.transition(
             filter: BulkActionFilter(),
             state: .archived,
-            options: BulkActionOptions(dryRun: true, maxItems: 100, emitEvents: true)
+            options: BulkActionOptions(dryRun: true, maxItems: 100, enableFanout: true)
         )
         let data = try JSONEncoder().encode(input)
         let json = String(data: data, encoding: .utf8)!
         #expect(json.contains("\"dry_run\":true"))
         #expect(json.contains("\"max_items\":100"))
-        #expect(json.contains("\"emit_events\":true"))
+        #expect(json.contains("\"enable_fanout\":true"))
     }
 
     @Test("bulkAction round-trips through JSON (replay-queue shape)")

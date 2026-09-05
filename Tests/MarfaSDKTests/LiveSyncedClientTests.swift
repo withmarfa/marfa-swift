@@ -277,6 +277,52 @@ struct LiveSyncedClientTests {
         }
     }
 
+    // MARK: - Time bounds
+
+    /// The one thing that would have caught the rename, and did not exist.
+    ///
+    /// The kit sent `since` and `until` long after the server renamed them and
+    /// began refusing both with a 400 naming the replacement. Every SDK test
+    /// passed throughout, because the fixtures never look at a query string
+    /// and no live test ever sent a time bound. A refusal nobody's tests reach
+    /// is indistinguishable from a feature nobody uses.
+    @Test("a date-bounded read reaches the server rather than being refused")
+    func timeBoundedReadIsAccepted() async throws {
+        let credentials = try credentials()
+        let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
+
+        try await withFixture(cleaningUpThrough: other) { fixture in
+            let run = runMarker()
+            let created = try await other.items.create(note("time bound", run: run))
+            fixture.track(item: created.id)
+
+            // A window wide enough to hold what this run just made. Asserting
+            // the row is *present* rather than that the page is non-empty:
+            // this space holds other notes, so a non-empty page says nothing
+            // about whether the bound admitted the item under test.
+            var wide = recentNotes()
+            wide.timestampAfter = "2000-01-01T00:00:00.000Z"
+            wide.timestampBefore = "2100-01-01T00:00:00.000Z"
+            let page = try await other.items.list(filters: wide)
+            #expect(page.data.map(\.id).contains(created.id), "a bounded read lost the row it should hold")
+
+            // Two impossible windows, one per bound, and both are needed.
+            // A single upper-bound window leaves the lower bound uncovered —
+            // it would pass against a server that took `timestamp_after` and
+            // ignored it, or against an SDK that stopped sending it, which is
+            // the exact defect this whole change is about.
+            var beforeAnything = recentNotes()
+            beforeAnything.timestampBefore = "2000-01-01T00:00:00.000Z"
+            let noneBefore = try await other.items.list(filters: beforeAnything)
+            #expect(noneBefore.data.isEmpty, "the upper bound was accepted and then ignored")
+
+            var afterEverything = recentNotes()
+            afterEverything.timestampAfter = "2100-01-01T00:00:00.000Z"
+            let noneAfter = try await other.items.list(filters: afterEverything)
+            #expect(noneAfter.data.isEmpty, "the lower bound was accepted and then ignored")
+        }
+    }
+
     // MARK: - Hydration
 
     @Test("a fresh store fills itself from the server after start()")

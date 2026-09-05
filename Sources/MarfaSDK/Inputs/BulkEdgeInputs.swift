@@ -53,23 +53,23 @@ public struct BulkEdgeInput: Codable, Sendable {
     /// and `edge.updated` for each upsert that replaced an existing edge's
     /// properties, so a subscriber cannot tell a bulk edit from one made
     /// through `PATCH /edges/{id}`. Outcomes that wrote nothing emit nothing.
-    public var emitEvents: Bool?
+    public var enableFanout: Bool?
 
     public init(
         edges: [BulkEdgeInputItem],
         mode: BulkMode? = nil,
         atomic: Bool? = nil,
-        emitEvents: Bool? = nil
+        enableFanout: Bool? = nil
     ) {
         self.edges = edges
         self.mode = mode
         self.atomic = atomic
-        self.emitEvents = emitEvents
+        self.enableFanout = enableFanout
     }
 
     enum CodingKeys: String, CodingKey {
         case edges, mode, atomic
-        case emitEvents = "emit_events"
+        case enableFanout = "enable_fanout"
     }
 }
 

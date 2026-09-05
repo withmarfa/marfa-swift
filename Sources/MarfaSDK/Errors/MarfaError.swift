@@ -219,8 +219,9 @@ public final class LocalModeUnsupportedError: MarfaError {
 ///
 /// **A remote client never sees this.** It has no store, so its bulk action
 /// goes to the server, which evaluates its own grammar. Narrow with the
-/// structured fields — `type`, `state`, `source`, `tier`, `tags`, `since`,
-/// `until` — or perform the action through a remote client.
+/// structured fields — `type`, `state`, `source`, `tier`, `tags`,
+/// `timestampAfter`, `timestampBefore` — or perform the action through a
+/// remote client.
 public final class LocalFilterUnsupportedError: MarfaError {
     /// Refusing a narrowing this path cannot apply is final by construction:
     /// the same call on the same client resolves the same way every time. See
