@@ -69,7 +69,15 @@ open class MarfaError: Error, @unchecked Sendable {
         // on the first drain after a suspension, so the space came back and
         // the work did not. The same reasoning already exempts a 401, a 429
         // and a 5xx from the blocked-state ceiling.
-        if code == Self.spaceSuspendedCode { return false }
+        // **The status guard is not redundant, and it stopped being implicit
+        // in this same change.** Until every status kept the code the server
+        // sent, this string could only ever arrive on a 403 — the parser
+        // enforced it by discarding codes everywhere else. Now any status can
+        // carry it, and a `404` or a `500` reading `space_suspended` would be
+        // neither permanent nor blockable, which is the one combination that
+        // retries for ever. The server maps this code to 403 and nothing else;
+        // this says so rather than relying on it.
+        if status == 403, code == Self.spaceSuspendedCode { return false }
         switch status {
         case 400, 403, 404: return true
         default: return false
@@ -93,8 +101,11 @@ extension MarfaError: LocalizedError {
 
 /// 404 — resource does not exist.
 public final class NotFoundError: MarfaError {
-    public init(message: String, details: [String: JSONValue]? = nil) {
-        super.init(code: "not_found", message: message, status: 404, details: details)
+    /// Keeps the code the server sent, for the reason a `400`, a `403` and a
+    /// `409` do: the status says a request was refused and the code says what
+    /// about it was refused.
+    public init(code: String = "not_found", message: String, details: [String: JSONValue]? = nil) {
+        super.init(code: code, message: message, status: 404, details: details)
     }
 }
 
@@ -119,8 +130,11 @@ public final class ValidationError: MarfaError {
 
 /// 401 — invalid or expired credentials.
 public final class UnauthorizedError: MarfaError {
-    public init(message: String, details: [String: JSONValue]? = nil) {
-        super.init(code: "unauthorized", message: message, status: 401, details: details)
+    /// Keeps the code the server sent, for the reason a `400`, a `403` and a
+    /// `409` do: the status says a request was refused and the code says what
+    /// about it was refused.
+    public init(code: String = "unauthorized", message: String, details: [String: JSONValue]? = nil) {
+        super.init(code: code, message: message, status: 401, details: details)
     }
 }
 

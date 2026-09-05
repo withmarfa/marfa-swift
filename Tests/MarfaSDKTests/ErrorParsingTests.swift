@@ -86,15 +86,43 @@ struct ErrorParsingTests {
         #expect(error.isPermanent)
     }
 
-    @Test("5xx → base MarfaError with correct status")
+    @Test("5xx → base MarfaError keeping the code the server sent")
     func serverError() {
         let body = #"{"error":{"code":"internal","message":"Database down"}}"#
         let error = parseMarfaError(data: Data(body.utf8), statusCode: 503)
 
         #expect(type(of: error) == MarfaError.self)
         #expect(error.status == 503)
-        #expect(error.code == "server_error")
+        // This asserted `server_error` and pinned a collapse rather than a
+        // behavior. Stamping one code over every status outside 400, 403 and
+        // 409 is what left the kit unable to tell `quota_exceeded` from
+        // `rate_limited` at 429, or `blob_too_large` from
+        // `idempotency_key_reused`, and made the dropped-mutation log the docs
+        // promise carries the server's code unable to carry one.
+        #expect(error.code == "internal")
         #expect(error.message == "Database down")
+    }
+
+    /// The fallback the old constant described honestly: a body that named
+    /// nothing still gets `server_error`, so the change is about not
+    /// discarding a code rather than about inventing one.
+    @Test("a body with no code still falls back to server_error")
+    func serverErrorWithoutACode() {
+        let error = parseMarfaError(data: Data("upstream is unwell".utf8), statusCode: 503)
+        #expect(error.code == "server_error")
+    }
+
+    /// Every status the kit parses keeps what the server called the refusal.
+    /// Asserted together because the rule is one rule, and three of these
+    /// doors reached it at three different times.
+    @Test(
+        "every parsed status keeps the server's code",
+        arguments: [400, 401, 403, 404, 409, 410, 413, 422, 429, 503]
+    )
+    func everyStatusKeepsItsCode(_ status: Int) {
+        let body = #"{"error":{"code":"a_specific_reason","message":"why"}}"#
+        let error = parseMarfaError(data: Data(body.utf8), statusCode: status)
+        #expect(error.code == "a_specific_reason", "status \(status) discarded the code")
     }
 
     @Test("Malformed JSON body falls back to raw UTF-8 message")
