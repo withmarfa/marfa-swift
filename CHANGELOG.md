@@ -149,6 +149,15 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
   **`LocalStore.defaultBlobCacheBytes`** is the bound, public so an app can read what it is. It is not yet settable — an app that wants a different one has nowhere to say so, which is a gap rather than a decision.
 
   **`LocalStoreWriting` gains `cacheBlob(hash:data:mimeType:)` with no default implementation.** A default was tried and it shadowed the real one: `LocalStore`'s method stopped being chosen as the witness, every call landed on the empty default, and the cache silently held nothing while everything compiled. A conformer that wants no cache writes an empty body and says so.
+- **One writer per store.** Nothing enforced this: `MarfaModelContainer`'s creation lock is an in-process `NSLock` around building a container, and `SyncEngine.running` is a per-instance flag. So two clients over one store path — two `MarfaClient.synced(...)` in a process, or an app and a share extension over an App Group container — got two engines, two drains and two event cursors, with nothing anywhere saying so. Half the writes replay twice and the cursors diverge, which no per-statement guard can see.
+
+  `MarfaClient.synced(...)` now takes a writer lock beside the store before opening it, and an engine that does not hold one **does not start**. `MarfaClient.holdsStoreWriteLock` says whether this client may write and `MarfaClient.storeHeldBy` says who has it otherwise — a read-only client still answers reads from the store; its queue is somebody else's to send. Taken before the store is opened, because a store this build cannot read must not be moved aside by a caller that does not hold the write, and the quarantine inside `open` is exactly that move.
+
+  **A second opener is refused rather than queued**, because a caller can do something useful with a read-only store and nothing at all with a promise that has not settled. A holder that is no longer running is taken over: a crashed engine must not make its own store permanently read-only.
+
+  **The staleness check reads the machine's boot instant, not a process uptime**, and the distinction is the whole mechanism. A process id is not an identity across a restart — the machine reboots, the number is handed out again, and a liveness check answers yes for something unrelated. `KERN_BOOTTIME` is the instant itself rather than `now - uptime`, so every process reads the same number and no tolerance window is needed. `KERN_PROC_PID` closes what a boot instant cannot see, a process id recycled *within* one boot, which a portable interface cannot ask about at all.
+
+  New public types: `StoreWriterLock` and `StoreLockHolder`.
 
 - **Every queued write now carries an `Idempotency-Key`, and a retry carries the same one.** A replay whose response was lost is indistinguishable from one the server never saw: the write happened, the acknowledgement did not, and the next drain sends it again.
 
