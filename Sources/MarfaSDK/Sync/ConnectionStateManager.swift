@@ -35,10 +35,11 @@ public actor ConnectionStateManager {
         /// has to read it on the same synchronous path that registers.
         ///
         /// **Distinct from `started`, which this cannot be folded into.** A
-        /// manager that has never been started is not a stopped one: the
-        /// fixtures throughout this kit build a manager, drive it through the
-        /// test seam and never call ``start()``, and finishing their streams
-        /// would leave every one of them observing nothing.
+        /// manager that has never been started is not a stopped one, and that
+        /// is a documented public contract rather than a test convenience:
+        /// the usage example on this type takes a stream from a manager it
+        /// never starts, and `stateUpdatesYieldsCurrentStateImmediately`
+        /// pins it. Gating on `started` would finish both.
         var stopped = false
     }
 
