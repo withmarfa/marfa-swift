@@ -122,7 +122,7 @@ struct SchemaMigrationTests {
         #expect(v1.isSubset(of: v2))
         #expect(v2.subtracting(v1) == ["DroppedMutationModel"])
         #expect(v2.isSubset(of: v3))
-        #expect(v3.subtracting(v2) == ["CachedTypeModel"])
+        #expect(v3.subtracting(v2) == ["CachedTypeModel", "CachedBlobModel"])
     }
 
     /// The frozen copies are the whole mechanism, and nothing about them looks

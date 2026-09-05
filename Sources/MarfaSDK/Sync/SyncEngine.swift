@@ -2600,18 +2600,55 @@ public actor SyncEngine {
                 throw err
             }
 
-            // Upload succeeded — clean up the stored bytes. The response
-            // hash should match the locally-computed hash (same data, same
-            // SHA-256); if it doesn't, the local hash was wrong and any
-            // items/edges created against it will 404 on blob fetch. Log
-            // but don't fail — the blob IS on the server.
+            // Upload succeeded. The response hash should match the
+            // locally-computed one (same data, same SHA-256); if it does not,
+            // the local hash was wrong and any items or edges created against
+            // it will 404 on blob fetch. Log but do not fail — the blob IS on
+            // the server.
             if let uploaded = try? JSONDecoder().decode(BlobUploadResponse.self, from: responseData),
                uploaded.hash != p.hash {
                 logger.log.error(
                     "sync.uploadBlob.hash_mismatch local=\(p.hash, privacy: .public) server=\(uploaded.hash, privacy: .public)"
                 )
             }
-            try? await mutationQueue.deletePendingBlob(hash: p.hash)
+            // The bytes MOVE to the read cache rather than being dropped,
+            // and this line is the defect the cache exists to close. The
+            // outbound row was the only copy the device held, so deleting it
+            // on success meant a person could save a picture, watch it sync,
+            // and then not open it on a train — every read went back to the
+            // network for a file the device had held minutes earlier.
+            //
+            // Cached before the row is removed, so a failure between the two
+            // leaves the outbound copy rather than no copy.
+            // **Cached under the address the SERVER acknowledged**, and only
+            // when the two agree. The mismatch above is a diagnostic saying
+            // every reference to the local hash will 404; caching under it
+            // would make this one device the only place those bytes resolve,
+            // silently masking the thing the log exists to raise.
+            //
+            // **The delete is guarded on the cache write succeeding.** A first
+            // version ordered the two correctly and then swallowed a failure
+            // with `try?`, so a cache write that threw still dropped the
+            // outbound row and left neither copy — the ordering protects
+            // against a crash between the lines and nothing else.
+            let acknowledged = (try? JSONDecoder().decode(BlobUploadResponse.self, from: responseData))?.hash
+            if acknowledged == nil || acknowledged == p.hash {
+                do {
+                    try await localStore.cacheBlob(
+                        hash: p.hash, data: blobData, mimeType: p.mimeType
+                    )
+                    try? await mutationQueue.deletePendingBlob(hash: p.hash)
+                } catch {
+                    // The outbound row stays, so the bytes are still on this
+                    // device and the next drain tries again. The blob is on
+                    // the server either way, so nothing is lost by waiting.
+                    logger.log.error(
+                        "sync.uploadBlob.cache_failed hash=\(p.hash, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"
+                    )
+                }
+            } else {
+                try? await mutationQueue.deletePendingBlob(hash: p.hash)
+            }
             emit(.blobUploadCompleted(hash: p.hash))
 
         case .bulk:

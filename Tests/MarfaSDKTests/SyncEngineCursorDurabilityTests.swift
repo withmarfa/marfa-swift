@@ -54,6 +54,11 @@ actor FailingLocalStore: LocalStoreWriting {
 
     func upsertMetadata(_ metadata: Metadata) throws {}
 
+    /// Holds no blob cache, and says so rather than inheriting an empty
+    /// default — a default was tried and it shadowed the real implementation
+    /// everywhere, silently.
+    func cacheBlob(hash: String, data: Data, mimeType: String) async throws {}
+
     func purgeItem(id: String) throws {}
 }
 
