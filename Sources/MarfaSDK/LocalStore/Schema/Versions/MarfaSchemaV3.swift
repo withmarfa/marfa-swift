@@ -34,11 +34,14 @@ import SwiftData
 ///   server wrote. Eviction skips those rows and the size bound does not
 ///   refuse them, because there is nowhere for them to be fetched back from.
 ///
-/// **V3 has never been released**, which is why all of these are here
-/// rather than a fourth version. `v16.0.0` ships V2; V3 exists only on
-/// `main`, so no device holds a store in this shape and adding to it costs
-/// nobody a migration. The moment V3 ships that stops being true and the next
-/// column needs V4 — `isOwned` above went in on the last day that was free.
+/// **V3 is closed. It ships in `17.0.0`.** Everything above is here rather
+/// than in a fourth version because V3 was unreleased while each of them was
+/// added: `v16.0.0` ships V2, so no device held a store in this shape and
+/// adding to it cost nobody a migration. `isOwned` went in on the last day
+/// that was free.
+///
+/// **That day has passed.** Devices hold V3 stores from `17.0.0` onward, so
+/// the next column needs a V4 and a V3-to-V4 stage. Do not add one here.
 ///
 /// Version `3.0.0` per Apple's `Schema.Version` semantics.
 @_spi(MarfaSDKTestSupport) public enum MarfaSchemaV3: VersionedSchema {

@@ -62,6 +62,31 @@ AdminSpacesNamespace.list()	method	func list() async throws -> [SpaceSummary]
 AdminSpacesNamespace.metrics(id:)	method	func metrics(id: String) async throws -> SpaceMetrics
 AdminSpacesNamespace.suspend(id:)	method	func suspend(id: String) async throws -> SpaceSummary
 AdminSpacesNamespace.unsuspend(id:)	method	func unsuspend(id: String) async throws -> SpaceSummary
+AncestorUnavailableError	class	final class AncestorUnavailableError
+AncestorUnavailableError.current	property	let current: ConflictSnapshot
+AncestorUnavailableError.init(current:requestedVersion:message:)	init	init(current: ConflictSnapshot, requestedVersion: Int, message: String)
+AncestorUnavailableError.requestedVersion	property	let requestedVersion: Int
+AncestorUnavailableResponse	struct	struct AncestorUnavailableResponse
+AncestorUnavailableResponse.current	property	let current: ConflictSnapshot
+AncestorUnavailableResponse.error	property	let error: AncestorUnavailableResponseError
+AncestorUnavailableResponse.init(current:error:requestedVersion:)	init	init(current: ConflictSnapshot, error: AncestorUnavailableResponseError, requestedVersion: Int)
+AncestorUnavailableResponse.init(from:)	init	init(from decoder: any Decoder) throws
+AncestorUnavailableResponse.requestedVersion	property	let requestedVersion: Int
+AncestorUnavailableResponseError	struct	struct AncestorUnavailableResponseError
+AncestorUnavailableResponseError.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+AncestorUnavailableResponseError.code	property	let code: AncestorUnavailableResponseErrorCode
+AncestorUnavailableResponseError.init(code:message:status:)	init	init(code: AncestorUnavailableResponseErrorCode, message: String, status: Int)
+AncestorUnavailableResponseError.init(from:)	init	init(from decoder: any Decoder) throws
+AncestorUnavailableResponseError.message	property	let message: String
+AncestorUnavailableResponseError.status	property	let status: Int
+AncestorUnavailableResponseErrorCode	enum	enum AncestorUnavailableResponseErrorCode
+AncestorUnavailableResponseErrorCode.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+AncestorUnavailableResponseErrorCode.ancestorUnavailable	enum.case	case ancestorUnavailable
+AncestorUnavailableResponseErrorCode.encode(to:)	method	func encode(to encoder: any Encoder) throws
+AncestorUnavailableResponseErrorCode.hash(into:)	method	func hash(into hasher: inout Hasher)
+AncestorUnavailableResponseErrorCode.hashValue	property	var hashValue: Int { get }
+AncestorUnavailableResponseErrorCode.init(from:)	init	init(from decoder: any Decoder) throws
+AncestorUnavailableResponseErrorCode.init(rawValue:)	init	init?(rawValue: String)
 ApiKey	struct	struct ApiKey
 ApiKey.createdAt	property	let createdAt: String
 ApiKey.defaultTier	property	let defaultTier: Tier
@@ -184,14 +209,14 @@ BulkActionErrorEntry.message	property	let message: String
 BulkActionFilter	struct	struct BulkActionFilter
 BulkActionFilter.filter	property	var filter: String?
 BulkActionFilter.init(from:)	init	init(from decoder: any Decoder) throws
-BulkActionFilter.init(type:state:source:tier:tags:since:until:filter:)	init	init(type: String? = nil, state: ItemState? = nil, source: String? = nil, tier: TierFilter? = nil, tags: [String]? = nil, since: String? = nil, until: String? = nil, filter: String? = nil)
-BulkActionFilter.since	property	var since: String?
+BulkActionFilter.init(type:state:source:tier:tags:timestampAfter:timestampBefore:filter:)	init	init(type: String? = nil, state: ItemState? = nil, source: String? = nil, tier: TierFilter? = nil, tags: [String]? = nil, timestampAfter: String? = nil, timestampBefore: String? = nil, filter: String? = nil)
 BulkActionFilter.source	property	var source: String?
 BulkActionFilter.state	property	var state: ItemState?
 BulkActionFilter.tags	property	var tags: [String]?
 BulkActionFilter.tier	property	var tier: TierFilter?
+BulkActionFilter.timestampAfter	property	var timestampAfter: String?
+BulkActionFilter.timestampBefore	property	var timestampBefore: String?
 BulkActionFilter.type	property	var type: String?
-BulkActionFilter.until	property	var until: String?
 BulkActionInput	enum	enum BulkActionInput
 BulkActionInput.encode(to:)	method	func encode(to encoder: any Encoder) throws
 BulkActionInput.init(from:)	init	init(from decoder: any Decoder) throws
@@ -229,8 +254,8 @@ BulkActionJobStatus.queued	enum.case	case queued
 BulkActionOptions	struct	struct BulkActionOptions
 BulkActionOptions.confirm	property	var confirm: String?
 BulkActionOptions.dryRun	property	var dryRun: Bool?
-BulkActionOptions.emitEvents	property	var emitEvents: Bool?
-BulkActionOptions.init(dryRun:confirm:maxItems:emitEvents:)	init	init(dryRun: Bool? = nil, confirm: String? = nil, maxItems: Int? = nil, emitEvents: Bool? = nil)
+BulkActionOptions.enableFanout	property	var enableFanout: Bool?
+BulkActionOptions.init(dryRun:confirm:maxItems:enableFanout:)	init	init(dryRun: Bool? = nil, confirm: String? = nil, maxItems: Int? = nil, enableFanout: Bool? = nil)
 BulkActionOptions.maxItems	property	var maxItems: Int?
 BulkActionPollOptions	struct	struct BulkActionPollOptions
 BulkActionPollOptions.default	type.property	static let `default`: BulkActionPollOptions
@@ -250,11 +275,17 @@ BulkActionResult.init(action:matched:succeeded:errored:dryRun:ids:errors:blobHas
 BulkActionResult.init(from:)	init	init(from decoder: any Decoder) throws
 BulkActionResult.matched	property	let matched: Int
 BulkActionResult.succeeded	property	let succeeded: Int
+BulkCapExceededError	class	final class BulkCapExceededError
+BulkCapExceededError.cap	property	let cap: Int
+BulkCapExceededError.init(matched:cap:)	init	init(matched: Int, cap: Int)
+BulkCapExceededError.matched	property	let matched: Int
+BulkConfirmationRequiredError	class	final class BulkConfirmationRequiredError
+BulkConfirmationRequiredError.init()	init	init()
 BulkEdgeInput	struct	struct BulkEdgeInput
 BulkEdgeInput.atomic	property	var atomic: Bool?
 BulkEdgeInput.edges	property	var edges: [BulkEdgeInputItem]
-BulkEdgeInput.emitEvents	property	var emitEvents: Bool?
-BulkEdgeInput.init(edges:mode:atomic:emitEvents:)	init	init(edges: [BulkEdgeInputItem], mode: BulkMode? = nil, atomic: Bool? = nil, emitEvents: Bool? = nil)
+BulkEdgeInput.enableFanout	property	var enableFanout: Bool?
+BulkEdgeInput.init(edges:mode:atomic:enableFanout:)	init	init(edges: [BulkEdgeInputItem], mode: BulkMode? = nil, atomic: Bool? = nil, enableFanout: Bool? = nil)
 BulkEdgeInput.init(from:)	init	init(from decoder: any Decoder) throws
 BulkEdgeInput.mode	property	var mode: BulkMode?
 BulkEdgeInputItem	struct	struct BulkEdgeInputItem
@@ -280,9 +311,9 @@ BulkEdgeResultEntry.outcome	property	let outcome: BulkOutcome
 BulkEdgeResultEntry.reason	property	let reason: String?
 BulkInput	struct	struct BulkInput
 BulkInput.atomic	property	var atomic: Bool?
-BulkInput.emitEvents	property	var emitEvents: Bool?
+BulkInput.enableFanout	property	var enableFanout: Bool?
 BulkInput.init(from:)	init	init(from decoder: any Decoder) throws
-BulkInput.init(items:mode:atomic:emitEvents:)	init	init(items: [BulkItemInput], mode: BulkMode? = nil, atomic: Bool? = nil, emitEvents: Bool? = nil)
+BulkInput.init(items:mode:atomic:enableFanout:)	init	init(items: [BulkItemInput], mode: BulkMode? = nil, atomic: Bool? = nil, enableFanout: Bool? = nil)
 BulkInput.items	property	var items: [BulkItemInput]
 BulkInput.mode	property	var mode: BulkMode?
 BulkItemInput	struct	struct BulkItemInput
@@ -387,6 +418,12 @@ ConflictError.conflictingFields	property	let conflictingFields: [String]
 ConflictError.current	property	let current: ConflictSnapshot
 ConflictError.init(current:ancestor:conflictingFields:clientPatch:)	init	init(current: ConflictSnapshot, ancestor: ConflictSnapshot, conflictingFields: [String], clientPatch: [String : JSONValue])
 ConflictError.init(message:details:)	init	init(message: String, details: [String : JSONValue]? = nil)
+ConflictResolution	struct	struct ConflictResolution
+ConflictResolution.conflictedCopyId	property	let conflictedCopyId: String?
+ConflictResolution.fields	property	let fields: [String]
+ConflictResolution.init(conflictedCopyId:fields:strategy:)	init	init(conflictedCopyId: String? = nil, fields: [String], strategy: [String : MergePolicyStrategy])
+ConflictResolution.init(from:)	init	init(from decoder: any Decoder) throws
+ConflictResolution.strategy	property	let strategy: [String : MergePolicyStrategy]
 ConflictResolver	typealias	typealias ConflictResolver = nonisolated(nonsending) @Sendable (ConflictData) async throws -> [String : JSONValue]
 ConflictResolverMissingError	class	final class ConflictResolverMissingError
 ConflictResolverMissingError.init(message:)	init	init(message: String)
@@ -413,8 +450,9 @@ ConflictResponse.mergePolicy	property	let mergePolicy: MergePolicy
 ConflictResponseError	struct	struct ConflictResponseError
 ConflictResponseError.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 ConflictResponseError.code	property	let code: ConflictResponseErrorCode
-ConflictResponseError.init(code:status:)	init	init(code: ConflictResponseErrorCode, status: Int)
+ConflictResponseError.init(code:message:status:)	init	init(code: ConflictResponseErrorCode, message: String, status: Int)
 ConflictResponseError.init(from:)	init	init(from decoder: any Decoder) throws
+ConflictResponseError.message	property	let message: String
 ConflictResponseError.status	property	let status: Int
 ConflictResponseErrorCode	enum	enum ConflictResponseErrorCode
 ConflictResponseErrorCode.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
@@ -464,6 +502,7 @@ Connection.lastErrorAt	property	var lastErrorAt: String? { get }
 Connection.lastSyncAt	property	var lastSyncAt: String? { get }
 Connection.lastUsedAt	property	var lastUsedAt: String? { get }
 Connection.mapping	property	var mapping: [String : JSONValue]? { get }
+Connection.mappingReapplyUntil	property	var mappingReapplyUntil: String? { get }
 Connection.nextRunAt	property	var nextRunAt: String? { get }
 Connection.revokedAt	property	var revokedAt: String? { get }
 Connection.runtimeStatus	property	var runtimeStatus: String? { get }
@@ -1301,10 +1340,9 @@ CreatedKey	struct	struct CreatedKey
 CreatedKey.createdAt	property	let createdAt: String
 CreatedKey.defaultTier	property	let defaultTier: Tier
 CreatedKey.edgePermissions	property	let edgePermissions: [String : EdgePermission]?
-CreatedKey.expiresAt	property	let expiresAt: String?
 CreatedKey.extensionPermissions	property	let extensionPermissions: [String : ExtensionPermission]?
 CreatedKey.id	property	let id: String
-CreatedKey.init(createdAt:defaultTier:edgePermissions:expiresAt:extensionPermissions:id:isPlatform:key:label:lastUsedAt:metadataPermissions:role:source:typePermissions:)	init	init(createdAt: String, defaultTier: Tier, edgePermissions: [String : EdgePermission]? = nil, expiresAt: String? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, id: String, isPlatform: Bool, key: String, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : MetadataPermission]? = nil, role: KeyRole, source: String, typePermissions: [String : TypePermission])
+CreatedKey.init(createdAt:defaultTier:edgePermissions:extensionPermissions:id:isPlatform:key:label:lastUsedAt:metadataPermissions:role:source:typePermissions:)	init	init(createdAt: String, defaultTier: Tier, edgePermissions: [String : EdgePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, id: String, isPlatform: Bool, key: String, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : MetadataPermission]? = nil, role: KeyRole, source: String, typePermissions: [String : TypePermission])
 CreatedKey.init(from:)	init	init(from decoder: any Decoder) throws
 CreatedKey.isPlatform	property	let isPlatform: Bool
 CreatedKey.key	property	let key: String
@@ -1406,13 +1444,14 @@ Edge.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 Edge.createdAt	property	let createdAt: String
 Edge.edgeType	property	let edgeType: String
 Edge.id	property	let id: String
-Edge.init(createdAt:edgeType:id:properties:sourceId:spaceId:targetId:updatedAt:)	init	init(createdAt: String, edgeType: String, id: String, properties: [String : JSONValue], sourceId: String, spaceId: String? = nil, targetId: String, updatedAt: String)
+Edge.init(createdAt:edgeType:id:properties:sourceId:spaceId:targetId:updatedAt:version:)	init	init(createdAt: String, edgeType: String, id: String, properties: [String : JSONValue], sourceId: String, spaceId: String? = nil, targetId: String, updatedAt: String, version: Int)
 Edge.init(from:)	init	init(from decoder: any Decoder) throws
 Edge.properties	property	let properties: [String : JSONValue]
 Edge.sourceId	property	let sourceId: String
 Edge.spaceId	property	let spaceId: String?
 Edge.targetId	property	let targetId: String
 Edge.updatedAt	property	let updatedAt: String
+Edge.version	property	let version: Int
 EdgePermission	enum	enum EdgePermission
 EdgePermission.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 EdgePermission.encode(to:)	method	func encode(to encoder: any Encoder) throws
@@ -1463,10 +1502,11 @@ EdgesNamespace	struct	struct EdgesNamespace
 EdgesNamespace.allFromSource(sourceId:edgeType:pageSize:)	method	func allFromSource(sourceId: String, edgeType: String? = nil, pageSize: Int? = nil) -> PaginatedSequence<Edge>
 EdgesNamespace.allToTarget(targetId:edgeType:pageSize:)	method	func allToTarget(targetId: String, edgeType: String? = nil, pageSize: Int? = nil) -> PaginatedSequence<Edge>
 EdgesNamespace.bulk(_:)	method	func bulk(_ input: BulkEdgeInput) async throws -> BulkEdgeResult
-EdgesNamespace.bulkAll(_:batchSize:mode:atomic:emitEvents:progressHandler:)	method	func bulkAll(_ edges: [BulkEdgeInputItem], batchSize: Int = 500, mode: BulkMode = .upsert, atomic: Bool = false, emitEvents: Bool = false, progressHandler: (@Sendable (Int, Int) -> Void)? = nil) async throws -> BulkEdgeResult
+EdgesNamespace.bulkAll(_:batchSize:mode:atomic:enableFanout:progressHandler:)	method	func bulkAll(_ edges: [BulkEdgeInputItem], batchSize: Int = 500, mode: BulkMode = .upsert, atomic: Bool = false, enableFanout: Bool = false, progressHandler: (@Sendable (Int, Int) -> Void)? = nil) async throws -> BulkEdgeResult
 EdgesNamespace.create(source:target:edgeType:properties:)	method	func create(source: String, target: String, edgeType: String, properties: [String : JSONValue]? = nil) async throws -> Edge
 EdgesNamespace.delete(id:)	method	func delete(id: String) async throws
 EdgesNamespace.edgeTypes	property	var edgeTypes: EdgeTypesAPI { get }
+EdgesNamespace.get(id:)	method	func get(id: String) async throws -> Edge
 EdgesNamespace.list(edgeType:cursor:limit:)	method	func list(edgeType: String? = nil, cursor: String? = nil, limit: Int? = nil) async throws -> PaginatedResult<Edge>
 EdgesNamespace.listFromSource(sourceId:edgeType:cursor:limit:)	method	func listFromSource(sourceId: String, edgeType: String? = nil, cursor: String? = nil, limit: Int? = nil) async throws -> PaginatedResult<Edge>
 EdgesNamespace.listToTarget(targetId:edgeType:cursor:limit:)	method	func listToTarget(targetId: String, edgeType: String? = nil, cursor: String? = nil, limit: Int? = nil) async throws -> PaginatedResult<Edge>
@@ -1518,10 +1558,11 @@ FieldType.object	enum.case	case object
 FieldType.string	enum.case	case string
 FieldType.url	enum.case	case url
 ForbiddenError	class	final class ForbiddenError
-ForbiddenError.init(message:details:)	init	init(message: String, details: [String : JSONValue]? = nil)
+ForbiddenError.init(code:message:details:)	init	init(code: String = "forbidden", message: String, details: [String : JSONValue]? = nil)
 FullSyncState	enum	enum FullSyncState
 FullSyncState.failed(at:error:)	enum.case	case failed(at: Date, error: any Error)
 FullSyncState.notYetSynced	enum.case	case notYetSynced
+FullSyncState.parked(reason:count:)	enum.case	case parked(reason: PendingMutationBlockReason, count: Int)
 FullSyncState.synced(at:)	enum.case	case synced(at: Date)
 FullSyncState.syncing	enum.case	case syncing
 FullSyncStateQuery	class	@MainActor final class FullSyncStateQuery
@@ -1538,6 +1579,12 @@ HTTPMethod.init(rawValue:)	init	init?(rawValue: String)
 HTTPMethod.patch	enum.case	case patch
 HTTPMethod.post	enum.case	case post
 HTTPMethod.put	enum.case	case put
+HydrationProgress	struct	struct HydrationProgress
+HydrationProgress.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+HydrationProgress.fraction	property	var fraction: Double { get }
+HydrationProgress.imported	property	let imported: Int
+HydrationProgress.init(imported:total:)	init	init(imported: Int, total: Int)
+HydrationProgress.total	property	let total: Int
 InboundWebhookDelivery	struct	struct InboundWebhookDelivery
 InboundWebhookDelivery.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 InboundWebhookDelivery.externalDeliveryId	property	let externalDeliveryId: String
@@ -1590,6 +1637,7 @@ InitialSyncError.helpAnchor	property	var helpAnchor: String? { get }
 InitialSyncError.localizedDescription	property	var localizedDescription: String { get }
 InitialSyncError.pendingMutations(count:)	enum.case	case pendingMutations(count: Int)
 InitialSyncError.recoverySuggestion	property	var recoverySuggestion: String? { get }
+InitialSyncError.unresumablePage(route:imported:)	enum.case	case unresumablePage(route: String, imported: Int)
 Integration	struct	struct Integration
 Integration.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 Integration.direction	property	let direction: IntegrationDirection
@@ -1679,7 +1727,7 @@ ItemsNamespace.bulkAction(_:options:)	method	func bulkAction(_ input: BulkAction
 ItemsNamespace.bulkActionAsync(_:)	method	func bulkActionAsync(_ input: BulkActionInput) async throws -> BulkActionJob
 ItemsNamespace.bulkActionCancel(jobId:)	method	func bulkActionCancel(jobId: String) async throws -> BulkActionJob
 ItemsNamespace.bulkActionStatus(jobId:)	method	func bulkActionStatus(jobId: String) async throws -> BulkActionJob
-ItemsNamespace.bulkAll(_:batchSize:mode:atomic:emitEvents:progressHandler:)	method	func bulkAll(_ items: [BulkItemInput], batchSize: Int = 500, mode: BulkMode = .upsert, atomic: Bool = false, emitEvents: Bool = false, progressHandler: (@Sendable (Int, Int) -> Void)? = nil) async throws -> BulkResult
+ItemsNamespace.bulkAll(_:batchSize:mode:atomic:enableFanout:progressHandler:)	method	func bulkAll(_ items: [BulkItemInput], batchSize: Int = 500, mode: BulkMode = .upsert, atomic: Bool = false, enableFanout: Bool = false, progressHandler: (@Sendable (Int, Int) -> Void)? = nil) async throws -> BulkResult
 ItemsNamespace.create(_:)	method	func create(_ input: CreateItemInput) async throws -> Item
 ItemsNamespace.createWithAttachments(_:)	method	func createWithAttachments(_ input: CreateWithAttachmentsInput) async throws -> CreateWithAttachmentsResult
 ItemsNamespace.delete(id:)	method	func delete(id: String) async throws
@@ -1797,28 +1845,40 @@ ListFilters.cursor	property	var cursor: String?
 ListFilters.direction	property	var direction: SortDirection?
 ListFilters.edge	property	var edge: [String : String]?
 ListFilters.filter	property	var filter: String?
-ListFilters.init(type:state:source:tier:tags:filter:sort:direction:since:until:limit:cursor:edge:backref:)	init	init(type: String? = nil, state: ItemState? = nil, source: String? = nil, tier: TierFilter? = nil, tags: [String]? = nil, filter: String? = nil, sort: SortField? = nil, direction: SortDirection? = nil, since: String? = nil, until: String? = nil, limit: Int? = nil, cursor: String? = nil, edge: [String : String]? = nil, backref: [String : String]? = nil)
+ListFilters.includeTrashed	property	var includeTrashed: Bool?
+ListFilters.init(type:state:includeTrashed:source:tier:tags:filter:sort:direction:timestampAfter:timestampBefore:limit:cursor:edge:backref:)	init	init(type: String? = nil, state: ItemState? = nil, includeTrashed: Bool? = nil, source: String? = nil, tier: TierFilter? = nil, tags: [String]? = nil, filter: String? = nil, sort: SortField? = nil, direction: SortDirection? = nil, timestampAfter: String? = nil, timestampBefore: String? = nil, limit: Int? = nil, cursor: String? = nil, edge: [String : String]? = nil, backref: [String : String]? = nil)
 ListFilters.limit	property	var limit: Int?
-ListFilters.since	property	var since: String?
 ListFilters.sort	property	var sort: SortField?
 ListFilters.source	property	var source: String?
 ListFilters.state	property	var state: ItemState?
 ListFilters.tags	property	var tags: [String]?
 ListFilters.tier	property	var tier: TierFilter?
+ListFilters.timestampAfter	property	var timestampAfter: String?
+ListFilters.timestampBefore	property	var timestampBefore: String?
 ListFilters.type	property	var type: String?
-ListFilters.until	property	var until: String?
+LocalFilterUnsupportedError	class	final class LocalFilterUnsupportedError
+LocalFilterUnsupportedError.field	property	let field: String
+LocalFilterUnsupportedError.init(operation:field:)	init	init(operation: String, field: String)
+LocalFilterUnsupportedError.isPermanent	property	override var isPermanent: Bool { get }
+LocalFilterUnsupportedError.operation	property	let operation: String
 LocalModeUnsupportedError	class	final class LocalModeUnsupportedError
 LocalModeUnsupportedError.init(operation:)	init	init(operation: String)
+LocalModeUnsupportedError.isPermanent	property	override var isPermanent: Bool { get }
 LocalModeUnsupportedError.operation	property	let operation: String
 LocalStore	class	actor LocalStore
+LocalStore.applyServerItem(_:rebasing:)	method	@discardableResult func applyServerItem(_ item: Item, rebasing edits: [PendingItemEdit]) throws -> Bool
 LocalStore.assertIsolated(_:file:line:)	method	@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0) nonisolated func assertIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)
 LocalStore.assumeIsolated(_:file:line:)	method	nonisolated func assumeIsolated<T>(_ operation: (isolated Self) throws -> T, file: StaticString = #fileID, line: UInt = #line) rethrows -> T where T : Sendable
+LocalStore.cacheBlob(hash:data:mimeType:)	method	func cacheBlob(hash: String, data: Data, mimeType: String) throws
+LocalStore.defaultBlobCacheBytes	type.property	static let defaultBlobCacheBytes: Int
 LocalStore.deleteEdge(id:)	method	func deleteEdge(id: String) throws
 LocalStore.init(modelContainer:)	init	init(modelContainer: ModelContainer)
 LocalStore.modelContainer	property	nonisolated let modelContainer: ModelContainer
 LocalStore.modelContext	property	var modelContext: ModelContext { get }
 LocalStore.modelExecutor	property	nonisolated let modelExecutor: any ModelExecutor
+LocalStore.ownBlob(hash:data:mimeType:)	method	func ownBlob(hash: String, data: Data, mimeType: String) throws
 LocalStore.preconditionIsolated(_:file:line:)	method	@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0) nonisolated func preconditionIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)
+LocalStore.pruneItems(keeping:protecting:)	method	@discardableResult func pruneItems(keeping keptIds: Set<String>, protecting protectedIds: Set<String>) throws -> [String]
 LocalStore.purgeItem(id:)	method	func purgeItem(id: String) throws
 LocalStore.setMetadata(itemId:input:)	method	@discardableResult func setMetadata(itemId: String, input: MetadataInput) throws -> Metadata
 LocalStore.subscript(_:as:)	subscript	subscript<T>(id: PersistentIdentifier, as as: T.Type) -> T? where T : PersistentModel { get }
@@ -1833,8 +1893,13 @@ LocalStoreError.databaseSetupFailed(_:)	enum.case	case databaseSetupFailed(Strin
 LocalStoreError.encodingFailure(_:)	enum.case	case encodingFailure(String)
 LocalStoreError.localizedDescription	property	var localizedDescription: String { get }
 LocalStoreError.modelMissing(id:)	enum.case	case modelMissing(id: String)
+LocalStoreError.storeQuarantineFailed(_:)	enum.case	case storeQuarantineFailed(String)
+LocalStoreError.storeRebuildFailed(quarantineDirectory:reason:)	enum.case	case storeRebuildFailed(quarantineDirectory: URL, reason: String)
 LocalStoreWriting	protocol	protocol LocalStoreWriting : Sendable
+LocalStoreWriting.applyServerItem(_:rebasing:)	method	@discardableResult func applyServerItem(_ item: Item, rebasing edits: [PendingItemEdit]) async throws -> Bool
+LocalStoreWriting.cacheBlob(hash:data:mimeType:)	method	func cacheBlob(hash: String, data: Data, mimeType: String) async throws
 LocalStoreWriting.deleteEdge(id:)	method	func deleteEdge(id: String) async throws
+LocalStoreWriting.pruneItems(keeping:protecting:)	method	@discardableResult func pruneItems(keeping: Set<String>, protecting: Set<String>) async throws -> [String]
 LocalStoreWriting.purgeItem(id:)	method	func purgeItem(id: String) async throws
 LocalStoreWriting.upsertEdge(_:)	method	func upsertEdge(_ edge: Edge) async throws
 LocalStoreWriting.upsertItem(_:)	method	func upsertItem(_ item: Item) async throws
@@ -1864,6 +1929,8 @@ MarfaClient.auth	property	let auth: AuthNamespace
 MarfaClient.blobs	property	let blobs: BlobsNamespace
 MarfaClient.claimStore(for:)	method	func claimStore(for identity: MarfaAccountIdentity) async throws
 MarfaClient.configuration	property	let configuration: ClientConfiguration
+MarfaClient.connectionState	property	var connectionState: ConnectionState { get }
+MarfaClient.connectionStateUpdates	property	var connectionStateUpdates: AsyncStream<ConnectionState> { get }
 MarfaClient.connections	property	let connections: ConnectionsNamespace
 MarfaClient.credentials	property	let credentials: CredentialsNamespace
 MarfaClient.edges	property	let edges: EdgesNamespace
@@ -1872,6 +1939,7 @@ MarfaClient.fromEnvironment()	type.method	static func fromEnvironment() -> Marfa
 MarfaClient.fromKeychain(service:account:url:accessGroup:)	type.method	static func fromKeychain(service: String = "marfa.sdk", account: String, url: URL, accessGroup: String? = nil) async throws -> MarfaClient
 MarfaClient.fromSecureStorage(service:account:url:storage:)	type.method	static func fromSecureStorage(service: String = "marfa.sdk", account: String, url: URL, storage: any SecureStorage) async throws -> MarfaClient
 MarfaClient.health()	method	func health() async throws -> Bool
+MarfaClient.holdsStoreWriteLock	property	var holdsStoreWriteLock: Bool { get }
 MarfaClient.init(configuration:)	init	convenience init(configuration: ClientConfiguration)
 MarfaClient.init(url:apiKey:)	init	convenience init(url: URL, apiKey: String)
 MarfaClient.init(url:tokenProvider:)	init	convenience init(url: URL, tokenProvider: any TokenProvider)
@@ -1883,17 +1951,22 @@ MarfaClient.local(path:)	type.method	static func local(path: String) async throw
 MarfaClient.makeStore()	method	@MainActor func makeStore() -> MarfaStore?
 MarfaClient.metadata	property	let metadata: MetadataNamespace
 MarfaClient.profile	property	let profile: ProfileNamespace
+MarfaClient.refreshCachedTypes()	method	@discardableResult func refreshCachedTypes() async throws -> Int
 MarfaClient.registerConflictResolver(_:)	method	func registerConflictResolver(_ resolver: @escaping ConflictResolver) async
 MarfaClient.releaseStoreClaim()	method	func releaseStoreClaim() async throws
 MarfaClient.saveToKeychain(service:account:accessGroup:)	method	func saveToKeychain(service: String = "marfa.sdk", account: String, accessGroup: String? = nil) async throws
 MarfaClient.search(query:filters:)	method	func search(query: String, filters: SearchFilters? = nil) async throws -> [SearchResult]
 MarfaClient.searchRemote(query:filters:)	method	func searchRemote(query: String, filters: SearchFilters? = nil) async throws -> [SearchResult]
 MarfaClient.spaces	property	let spaces: SpacesNamespace
+MarfaClient.storeHeldBy	property	var storeHeldBy: StoreLockHolder? { get }
 MarfaClient.storeOwnership(for:)	method	func storeOwnership(for identity: MarfaAccountIdentity) async throws -> StoreOwnership
 MarfaClient.storeOwnership(resolvedWith:)	method	func storeOwnership(resolvedWith credentialClient: MarfaClient) async throws -> StoreOwnership
+MarfaClient.storeRecovery	property	let storeRecovery: StoreRecovery?
 MarfaClient.syncEngine	property	let syncEngine: SyncEngine?
+MarfaClient.syncStatus	property	var syncStatus: SyncStatus? { get async throws }
 MarfaClient.synced(url:apiKey:storePath:connectionManager:maxReplayAttempts:)	type.method	static func synced(url: URL, apiKey: String, storePath: String, connectionManager: ConnectionStateManager = ConnectionStateManager(), maxReplayAttempts: Int = 5) async throws -> MarfaClient
 MarfaClient.synced(url:tokenProvider:storePath:connectionManager:maxReplayAttempts:)	type.method	static func synced(url: URL, tokenProvider: any TokenProvider, storePath: String, connectionManager: ConnectionStateManager = ConnectionStateManager(), maxReplayAttempts: Int = 5) async throws -> MarfaClient
+MarfaClient.typeRegistry()	method	func typeRegistry() async throws -> MarfaTypeRegistry
 MarfaClient.types	property	let types: TypesNamespace
 MarfaClient.webhooks	property	let webhooks: WebhooksNamespace
 MarfaError	class	class MarfaError
@@ -1902,12 +1975,41 @@ MarfaError.details	property	let details: [String : JSONValue]?
 MarfaError.errorDescription	property	var errorDescription: String? { get }
 MarfaError.failureReason	property	var failureReason: String? { get }
 MarfaError.helpAnchor	property	var helpAnchor: String? { get }
+MarfaError.idempotencyKeyReusedCode	type.property	static let idempotencyKeyReusedCode: String
 MarfaError.init(code:message:status:details:)	init	init(code: String, message: String, status: Int, details: [String : JSONValue]? = nil)
 MarfaError.isPermanent	property	var isPermanent: Bool { get }
 MarfaError.localizedDescription	property	var localizedDescription: String { get }
 MarfaError.message	property	let message: String
 MarfaError.recoverySuggestion	property	var recoverySuggestion: String? { get }
+MarfaError.spaceSuspendedCode	type.property	static let spaceSuspendedCode: String
 MarfaError.status	property	let status: Int
+MarfaFieldDefinition	struct	struct MarfaFieldDefinition
+MarfaFieldDefinition.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+MarfaFieldDefinition.enumValues	property	let enumValues: [String]?
+MarfaFieldDefinition.init(from:)	init	init(from decoder: any Decoder) throws
+MarfaFieldDefinition.init(type:enumValues:maxItems:maxLength:isRequired:)	init	init(type: MarfaFieldType, enumValues: [String]? = nil, maxItems: Int? = nil, maxLength: Int? = nil, isRequired: Bool = false)
+MarfaFieldDefinition.isRequired	property	let isRequired: Bool
+MarfaFieldDefinition.maxItems	property	let maxItems: Int?
+MarfaFieldDefinition.maxLength	property	let maxLength: Int?
+MarfaFieldDefinition.type	property	let type: MarfaFieldType
+MarfaFieldType	enum	enum MarfaFieldType
+MarfaFieldType.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+MarfaFieldType.array	enum.case	case array
+MarfaFieldType.boolean	enum.case	case boolean
+MarfaFieldType.date	enum.case	case date
+MarfaFieldType.datetime	enum.case	case datetime
+MarfaFieldType.email	enum.case	case email
+MarfaFieldType.encode(to:)	method	func encode(to encoder: any Encoder) throws
+MarfaFieldType.explicitEnum	enum.case	case explicitEnum
+MarfaFieldType.hash(into:)	method	func hash(into hasher: inout Hasher)
+MarfaFieldType.hashValue	property	var hashValue: Int { get }
+MarfaFieldType.init(from:)	init	init(from decoder: any Decoder) throws
+MarfaFieldType.init(rawValue:)	init	init?(rawValue: String)
+MarfaFieldType.integer	enum.case	case integer
+MarfaFieldType.number	enum.case	case number
+MarfaFieldType.object	enum.case	case object
+MarfaFieldType.string	enum.case	case string
+MarfaFieldType.url	enum.case	case url
 MarfaItem	protocol	protocol MarfaItem : Sendable
 MarfaItem.createdAt	property	var createdAt: String { get }
 MarfaItem.id	property	var id: String { get }
@@ -1935,6 +2037,7 @@ MarfaLogger.signposter	property	let signposter: OSSignposter
 MarfaLogger.subsystem	type.property	static let subsystem: String
 MarfaModelContainer	enum	enum MarfaModelContainer
 MarfaModelContainer.make(path:cloudKitDatabase:)	type.method	static func make(path: String, cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none) throws -> ModelContainer
+MarfaModelContainer.open(path:cloudKitDatabase:)	type.method	static func open(path: String, cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none) throws -> StoreOpenResult
 MarfaSession	enum	enum MarfaSession
 MarfaSession.EndResult	enum	enum EndResult
 MarfaSession.EndResult.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
@@ -1962,6 +2065,27 @@ MarfaStore.querySearch(text:filters:)	method	@MainActor func querySearch(text: S
 MarfaStore.queryTags()	method	@MainActor func queryTags() -> TagsQuery
 MarfaStore.queryTypesInData()	method	@MainActor func queryTypesInData() -> TypesInDataQuery
 MarfaStore.typedQuery(_:filters:)	method	@MainActor func typedQuery<T>(_ type: T.Type, filters: ListFilters? = nil) -> TypedItemQuery<T> where T : MarfaItem
+MarfaTypeDefinition	struct	struct MarfaTypeDefinition
+MarfaTypeDefinition.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+MarfaTypeDefinition.bodyField	property	let bodyField: String?
+MarfaTypeDefinition.fields	property	let fields: [String : MarfaFieldDefinition]
+MarfaTypeDefinition.id	property	let id: String
+MarfaTypeDefinition.init(id:parent:fields:titleField:bodyField:schemaVersion:)	init	init(id: String, parent: String? = nil, fields: [String : MarfaFieldDefinition] = [:], titleField: String? = nil, bodyField: String? = nil, schemaVersion: Int = 1)
+MarfaTypeDefinition.parent	property	let parent: String?
+MarfaTypeDefinition.schemaVersion	property	let schemaVersion: Int
+MarfaTypeDefinition.titleField	property	let titleField: String?
+MarfaTypeRegistry	struct	struct MarfaTypeRegistry
+MarfaTypeRegistry.declaredDescendantsOutsideNamespace(of:)	method	func declaredDescendantsOutsideNamespace(of rootId: String) -> Set<String>
+MarfaTypeRegistry.definition(for:)	method	func definition(for typeId: String) -> MarfaTypeDefinition?
+MarfaTypeRegistry.init(definitions:)	init	init(definitions: [String : MarfaTypeDefinition])
+MarfaTypeRegistry.isDescendant(_:of:)	method	func isDescendant(_ typeId: String, of ancestorId: String) -> Bool
+MarfaTypeRegistry.merging(_:)	method	func merging(_ overlay: [String : MarfaTypeDefinition]) -> MarfaTypeRegistry
+MarfaTypeRegistry.platform	type.property	static let platform: MarfaTypeRegistry
+MarfaTypeRegistry.resolved()	method	func resolved() -> MarfaTypeRegistry
+MarfaTypeRegistry.searchableFields(of:)	method	func searchableFields(of typeId: String) -> [String]
+MarfaTypeRegistry.typeIds	property	var typeIds: [String] { get }
+MarfaTypeRegistry.typesAssignable(to:)	method	func typesAssignable(to ancestorId: String) -> [String]
+MarfaTypeRegistry.validate(properties:against:)	method	func validate(properties: [String : JSONValue], against typeId: String) throws
 MergePolicy	struct	struct MergePolicy
 MergePolicy.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 MergePolicy.default	property	let `default`: MergePolicyStrategy?
@@ -2048,6 +2172,16 @@ MutationQueue.subscript(_:as:)	subscript	subscript<T>(id: PersistentIdentifier, 
 MutationQueue.unownedExecutor	property	nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 MutationQueue.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T where E : Error, T : ~Copyable
 MutationQueue.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T where E : Error, T : ~Copyable
+MutationQueueCounts	struct	struct MutationQueueCounts
+MutationQueueCounts.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+MutationQueueCounts.blocked	property	let blocked: [PendingMutationBlockReason : Int]
+MutationQueueCounts.blockedTotal	property	var blockedTotal: Int { get }
+MutationQueueCounts.deadLettered	property	let deadLettered: Int
+MutationQueueCounts.inFlight	property	let inFlight: Int
+MutationQueueCounts.init(pending:inFlight:blocked:deadLettered:)	init	init(pending: Int, inFlight: Int, blocked: [PendingMutationBlockReason : Int], deadLettered: Int)
+MutationQueueCounts.isSettled	property	var isSettled: Bool { get }
+MutationQueueCounts.outstanding	property	var outstanding: Int { get }
+MutationQueueCounts.pending	property	let pending: Int
 NetworkError	class	final class NetworkError
 NetworkError.init(_:)	init	init(_ error: any Error)
 NetworkError.underlyingError	property	let underlyingError: any Error
@@ -2060,7 +2194,7 @@ NoLocalStoreError.localizedDescription	property	var localizedDescription: String
 NoLocalStoreError.operation	property	let operation: String
 NoLocalStoreError.recoverySuggestion	property	var recoverySuggestion: String? { get }
 NotFoundError	class	final class NotFoundError
-NotFoundError.init(message:details:)	init	init(message: String, details: [String : JSONValue]? = nil)
+NotFoundError.init(code:message:details:)	init	init(code: String = "not_found", message: String, details: [String : JSONValue]? = nil)
 OAuthDiscovery	class	actor OAuthDiscovery
 OAuthDiscovery.Endpoints	struct	struct Endpoints
 OAuthDiscovery.Endpoints.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
@@ -2203,12 +2337,18 @@ PasskeyError.Code.userCancelled	enum.case	case userCancelled
 PasskeyError.Code.verificationFailed	enum.case	case verificationFailed
 PasskeyError.init(rawCode:message:details:)	init	init(rawCode: String, message: String, details: [String : JSONValue]? = nil)
 PasskeyError.passkeyCode	property	let passkeyCode: PasskeyError.Code
+PendingItemEdit	enum	enum PendingItemEdit
+PendingItemEdit.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+PendingItemEdit.properties(delta:tier:)	enum.case	case properties(delta: [String : JSONValue], tier: Tier?)
+PendingItemEdit.state(_:)	enum.case	case state(ItemState)
 PendingMutationBlockReason	enum	enum PendingMutationBlockReason
 PendingMutationBlockReason.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 PendingMutationBlockReason.conflictUnresolved	enum.case	case conflictUnresolved
+PendingMutationBlockReason.credentialRefused	enum.case	case credentialRefused
 PendingMutationBlockReason.encode(to:)	method	func encode(to encoder: any Encoder) throws
 PendingMutationBlockReason.hash(into:)	method	func hash(into hasher: inout Hasher)
 PendingMutationBlockReason.hashValue	property	var hashValue: Int { get }
+PendingMutationBlockReason.idempotencyKeyReused	enum.case	case idempotencyKeyReused
 PendingMutationBlockReason.init(from:)	init	init(from decoder: any Decoder) throws
 PendingMutationBlockReason.init(rawValue:)	init	init?(rawValue: String)
 PendingMutationBlockReason.resolverMissing	enum.case	case resolverMissing
@@ -2219,12 +2359,14 @@ PendingMutationRecord.attemptCount	property	var attemptCount: Int
 PendingMutationRecord.blockedReason	property	var blockedReason: PendingMutationBlockReason?
 PendingMutationRecord.createdAt	property	var createdAt: String
 PendingMutationRecord.id	property	var id: String
+PendingMutationRecord.idempotencyKey	property	var idempotencyKey: String?
 PendingMutationRecord.init(from:)	init	init(from decoder: any Decoder) throws
-PendingMutationRecord.init(id:kind:payloadJson:sourceId:localId:createdAt:attemptCount:lastError:state:blockedReason:)	init	init(id: String, kind: MutationKind, payloadJson: String, sourceId: String? = nil, localId: String? = nil, createdAt: String, attemptCount: Int = 0, lastError: String? = nil, state: PendingMutationState = .pending, blockedReason: PendingMutationBlockReason? = nil)
+PendingMutationRecord.init(id:kind:payloadJson:sourceId:localId:createdAt:attemptCount:refusalCount:lastError:state:blockedReason:idempotencyKey:)	init	init(id: String, kind: MutationKind, payloadJson: String, sourceId: String? = nil, localId: String? = nil, createdAt: String, attemptCount: Int = 0, refusalCount: Int = 0, lastError: String? = nil, state: PendingMutationState = .pending, blockedReason: PendingMutationBlockReason? = nil, idempotencyKey: String? = nil)
 PendingMutationRecord.kind	property	var kind: MutationKind
 PendingMutationRecord.lastError	property	var lastError: String?
 PendingMutationRecord.localId	property	var localId: String?
 PendingMutationRecord.payloadJson	property	var payloadJson: String
+PendingMutationRecord.refusalCount	property	var refusalCount: Int
 PendingMutationRecord.sourceId	property	var sourceId: String?
 PendingMutationRecord.state	property	var state: PendingMutationState
 PendingMutationState	enum	enum PendingMutationState
@@ -2630,12 +2772,62 @@ StaticTokenProvider.currentToken()	method	func currentToken() async throws -> To
 StaticTokenProvider.init(apiKey:)	init	init(apiKey: String)
 StaticTokenProvider.invalidate()	method	func invalidate() async
 StaticTokenProvider.invalidate(_:)	method	func invalidate(_ rejected: Token) async
+StoreIdentityAxis	enum	enum StoreIdentityAxis
+StoreIdentityAxis.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+StoreIdentityAxis.hash(into:)	method	func hash(into hasher: inout Hasher)
+StoreIdentityAxis.hashValue	property	var hashValue: Int { get }
+StoreIdentityAxis.init(rawValue:)	init	init?(rawValue: String)
+StoreIdentityAxis.origin	enum.case	case origin
+StoreIdentityMismatchError	class	final class StoreIdentityMismatchError
+StoreIdentityMismatchError.axis	property	let axis: StoreIdentityAxis
+StoreIdentityMismatchError.found	property	let found: String
+StoreIdentityMismatchError.init(axis:recorded:found:)	init	init(axis: StoreIdentityAxis, recorded: String, found: String)
+StoreIdentityMismatchError.isPermanent	property	override var isPermanent: Bool { get }
+StoreIdentityMismatchError.recorded	property	let recorded: String
+StoreLockHolder	struct	struct StoreLockHolder
+StoreLockHolder.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+StoreLockHolder.bootedAt	property	let bootedAt: Int64
+StoreLockHolder.init(from:)	init	init(from decoder: any Decoder) throws
+StoreLockHolder.pid	property	let pid: Int32
+StoreLockHolder.since	property	let since: String
+StoreLockHolder.startedAt	property	let startedAt: Int64?
+StoreLockHolder.token	property	let token: String
+StoreOpenResult	struct	struct StoreOpenResult
+StoreOpenResult.container	property	let container: ModelContainer
+StoreOpenResult.recovery	property	let recovery: StoreRecovery?
 StoreOwnership	enum	enum StoreOwnership
 StoreOwnership.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 StoreOwnership.differentAccount	enum.case	case differentAccount
 StoreOwnership.sameAccount	enum.case	case sameAccount
 StoreOwnership.unclaimed	enum.case	case unclaimed
 StoreOwnership.unresolved	enum.case	case unresolved
+StoreRecovery	struct	struct StoreRecovery
+StoreRecovery.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+StoreRecovery.Cause	enum	enum Cause
+StoreRecovery.Cause.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+StoreRecovery.Cause.encode(to:)	method	func encode(to encoder: any Encoder) throws
+StoreRecovery.Cause.hash(into:)	method	func hash(into hasher: inout Hasher)
+StoreRecovery.Cause.hashValue	property	var hashValue: Int { get }
+StoreRecovery.Cause.init(from:)	init	init(from decoder: any Decoder) throws
+StoreRecovery.Cause.init(rawValue:)	init	init?(rawValue: String)
+StoreRecovery.Cause.newerThanCode	enum.case	case newerThanCode
+StoreRecovery.Cause.unreadable	enum.case	case unreadable
+StoreRecovery.cause	property	let cause: StoreRecovery.Cause
+StoreRecovery.cursor	property	let cursor: String?
+StoreRecovery.droppedMutationCount	property	let droppedMutationCount: Int
+StoreRecovery.init(cause:reason:quarantineDirectory:sidecar:sidecarError:truncatedTables:pendingMutationCount:droppedMutationCount:pendingBlobCount:cursor:)	init	init(cause: StoreRecovery.Cause, reason: String, quarantineDirectory: URL, sidecar: URL?, sidecarError: String?, truncatedTables: [String], pendingMutationCount: Int, droppedMutationCount: Int, pendingBlobCount: Int, cursor: String?)
+StoreRecovery.pendingBlobCount	property	let pendingBlobCount: Int
+StoreRecovery.pendingMutationCount	property	let pendingMutationCount: Int
+StoreRecovery.quarantineDirectory	property	let quarantineDirectory: URL
+StoreRecovery.reason	property	let reason: String
+StoreRecovery.sidecar	property	let sidecar: URL?
+StoreRecovery.sidecarError	property	let sidecarError: String?
+StoreRecovery.truncatedTables	property	let truncatedTables: [String]
+StoreWriterLock	struct	struct StoreWriterLock
+StoreWriterLock.acquire(storePath:)	type.method	static func acquire(storePath: String) throws -> StoreWriterLock
+StoreWriterLock.heldBy	property	let heldBy: StoreLockHolder?
+StoreWriterLock.release()	method	func release()
+StoreWriterLock.writer	property	let writer: Bool
 StoredTokenProvider	class	actor StoredTokenProvider
 StoredTokenProvider.assertIsolated(_:file:line:)	method	@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0) nonisolated func assertIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)
 StoredTokenProvider.assumeIsolated(_:file:line:)	method	nonisolated func assumeIsolated<T>(_ operation: (isolated Self) throws -> T, file: StaticString = #fileID, line: UInt = #line) rethrows -> T where T : Sendable
@@ -2652,16 +2844,20 @@ StoredTokenProvider.withSerialExecutor(_:)	method	nonisolated func withSerialExe
 SyncEngine	class	actor SyncEngine
 SyncEngine.assertIsolated(_:file:line:)	method	@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0) nonisolated func assertIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)
 SyncEngine.assumeIsolated(_:file:line:)	method	nonisolated func assumeIsolated<T>(_ operation: (isolated Self) throws -> T, file: StaticString = #fileID, line: UInt = #line) rethrows -> T where T : Sendable
+SyncEngine.connectionState	property	nonisolated var connectionState: ConnectionState { get }
+SyncEngine.connectionStateUpdates	property	nonisolated var connectionStateUpdates: AsyncStream<ConnectionState> { get }
 SyncEngine.events	property	nonisolated var events: AsyncStream<SyncEvent> { get }
 SyncEngine.fullSyncState	property	var fullSyncState: FullSyncState { get async }
 SyncEngine.hasPendingMutations	property	var hasPendingMutations: Bool { get async throws }
-SyncEngine.init(transport:localStore:mutationQueue:connectionManager:drainDebounceInterval:conflictResolvers:maxReplayAttempts:)	init	init(transport: any Transport, localStore: any LocalStoreWriting, mutationQueue: MutationQueue, connectionManager: ConnectionStateManager, drainDebounceInterval: Duration = .milliseconds(150), conflictResolvers: ConflictResolverRegistry? = nil, maxReplayAttempts: Int = 5)
+SyncEngine.init(transport:localStore:mutationQueue:connectionManager:drainDebounceInterval:conflictResolvers:maxReplayAttempts:storeRecovery:isStoreWriter:)	init	init(transport: any Transport, localStore: any LocalStoreWriting, mutationQueue: MutationQueue, connectionManager: ConnectionStateManager, drainDebounceInterval: Duration = .milliseconds(150), conflictResolvers: ConflictResolverRegistry? = nil, maxReplayAttempts: Int = 5, storeRecovery: StoreRecovery? = nil, isStoreWriter: Bool = true)
 SyncEngine.lastCleanDrainAt	property	var lastCleanDrainAt: Date? { get async }
 SyncEngine.lastFullSyncAt	property	var lastFullSyncAt: Date? { get async }
 SyncEngine.performInitialSync(pageSize:)	method	@discardableResult func performInitialSync(pageSize: Int = 200) async throws -> Int
 SyncEngine.preconditionIsolated(_:file:line:)	method	@backDeployed(before: macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0) nonisolated func preconditionIsolated(_ message: @autoclosure () -> String = String(), file: StaticString = #fileID, line: UInt = #line)
 SyncEngine.retry(id:)	method	func retry(id: String) async throws
+SyncEngine.retryAll(reason:)	method	@discardableResult func retryAll(reason: PendingMutationBlockReason) async throws -> Int
 SyncEngine.start()	method	func start() async
+SyncEngine.status	property	var status: SyncStatus { get async throws }
 SyncEngine.stop()	method	func stop() async
 SyncEngine.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T where E : Error, T : ~Copyable
 SyncEngine.withSerialExecutor(_:)	method	nonisolated func withSerialExecutor<T, E>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T where E : Error, T : ~Copyable
@@ -2675,13 +2871,25 @@ SyncEvent.edgeCreated(id:)	enum.case	case edgeCreated(id: String)
 SyncEvent.edgeDeleted(id:)	enum.case	case edgeDeleted(id: String)
 SyncEvent.edgeUpdated(id:)	enum.case	case edgeUpdated(id: String)
 SyncEvent.failed(error:)	enum.case	case failed(error: any Error)
+SyncEvent.hydrationEnded(imported:completed:)	enum.case	case hydrationEnded(imported: Int, completed: Bool)
+SyncEvent.hydrationProgress(imported:total:)	enum.case	case hydrationProgress(imported: Int, total: Int)
 SyncEvent.itemCreated(id:)	enum.case	case itemCreated(id: String)
 SyncEvent.itemDeleted(id:)	enum.case	case itemDeleted(id: String)
+SyncEvent.itemPurged(id:)	enum.case	case itemPurged(id: String)
 SyncEvent.itemUpdated(id:)	enum.case	case itemUpdated(id: String)
 SyncEvent.mutationBlocked(kind:itemId:reason:)	enum.case	case mutationBlocked(kind: String, itemId: String?, reason: PendingMutationBlockReason)
 SyncEvent.mutationDropped(kind:itemId:attempt:error:)	enum.case	case mutationDropped(kind: String, itemId: String?, attempt: Int, error: MarfaError)
+SyncEvent.queueParked(reason:count:)	enum.case	case queueParked(reason: PendingMutationBlockReason, count: Int)
+SyncEvent.storeRecovered(_:)	enum.case	case storeRecovered(StoreRecovery)
 SyncEvent.synced(at:)	enum.case	case synced(at: Date)
 SyncEvent.syncing	enum.case	case syncing
+SyncStatus	struct	struct SyncStatus
+SyncStatus.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+SyncStatus.connection	property	let connection: ConnectionState
+SyncStatus.hydration	property	let hydration: HydrationProgress?
+SyncStatus.init(connection:queue:lastCleanDrainAt:hydration:)	init	init(connection: ConnectionState, queue: MutationQueueCounts, lastCleanDrainAt: Date?, hydration: HydrationProgress?)
+SyncStatus.lastCleanDrainAt	property	let lastCleanDrainAt: Date?
+SyncStatus.queue	property	let queue: MutationQueueCounts
 SystemDeviceFlowClock	struct	struct SystemDeviceFlowClock
 SystemDeviceFlowClock.init()	init	init()
 SystemDeviceFlowClock.now()	method	func now() -> Date
@@ -2740,7 +2948,9 @@ Transport.rawRequest(method:path:body:contentType:query:)	method	func rawRequest
 Transport.rawUpload(method:path:body:contentType:query:onBytesSent:)	method	func rawUpload(method: HTTPMethod, path: String, body: Data, contentType: String?, query: [(String, String)]?, onBytesSent: @escaping @Sendable (Int64, Int64) -> Void) async throws -> (Data, HTTPURLResponse)
 Transport.rawUpload(method:path:body:contentType:query:onBytesSent:)	method	func rawUpload(method: HTTPMethod, path: String, body: Data, contentType: String?, query: [(String, String)]?, onBytesSent: @escaping @Sendable (Int64, Int64) -> Void) async throws -> (Data, HTTPURLResponse)
 Transport.request(method:path:body:query:)	method	func request<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?) async throws -> T where T : Decodable, T : Sendable
-Transport.requestWithConflict(method:path:body:query:)	method	func requestWithConflict<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?) async throws -> ConflictResult<T> where T : Decodable, T : Sendable
+Transport.request(method:path:body:query:idempotencyKey:)	method	func request<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?, idempotencyKey: String?) async throws -> T where T : Decodable, T : Sendable
+Transport.request(method:path:body:query:idempotencyKey:)	method	func request<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?, idempotencyKey: String?) async throws -> T where T : Decodable, T : Sendable
+Transport.requestWithConflict(method:path:body:query:idempotencyKey:)	method	func requestWithConflict<T>(method: HTTPMethod, path: String, body: (any Encodable & Sendable)?, query: [(String, String)]?, idempotencyKey: String?) async throws -> ConflictResult<T> where T : Decodable, T : Sendable
 Transport.uploadMultipart(method:path:fieldName:filename:data:mimeType:query:)	method	func uploadMultipart(method: HTTPMethod, path: String, fieldName: String, filename: String, data: Data, mimeType: String, query: [(String, String)]? = nil) async throws -> (Data, HTTPURLResponse)
 TypePermission	enum	enum TypePermission
 TypePermission.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
@@ -2788,6 +2998,18 @@ TypeSchemaVersionPolicy.init(from:)	init	init(from decoder: any Decoder) throws
 TypeSchemaVersionPolicy.maxVersions	property	let maxVersions: Int?
 TypeSchemaVersionPolicy.recentDays	property	let recentDays: Int?
 TypeSchemaVersionPolicy.weeklySnapshotDays	property	let weeklySnapshotDays: Int?
+TypeValidationError	struct	struct TypeValidationError
+TypeValidationError.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+TypeValidationError.Failure	struct	struct Failure
+TypeValidationError.Failure.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+TypeValidationError.Failure.field	property	let field: String
+TypeValidationError.Failure.init(field:message:)	init	init(field: String, message: String)
+TypeValidationError.Failure.message	property	let message: String
+TypeValidationError.description	property	var description: String { get }
+TypeValidationError.failures	property	let failures: [TypeValidationError.Failure]
+TypeValidationError.init(typeId:failures:)	init	init(typeId: String, failures: [TypeValidationError.Failure])
+TypeValidationError.localizedDescription	property	var localizedDescription: String { get }
+TypeValidationError.typeId	property	let typeId: String
 TypedItemQuery	class	@MainActor final class TypedItemQuery<T> where T : MarfaItem
 TypedItemQuery.error	property	@MainActor var error: (any Error)? { get set }
 TypedItemQuery.isLoading	property	@MainActor var isLoading: Bool { get set }
@@ -2808,7 +3030,7 @@ UUIDv7	enum	enum UUIDv7
 UUIDv7.generateBytes()	type.method	static func generateBytes() -> [UInt8]
 UUIDv7.generateString()	type.method	static func generateString() -> String
 UnauthorizedError	class	final class UnauthorizedError
-UnauthorizedError.init(message:details:)	init	init(message: String, details: [String : JSONValue]? = nil)
+UnauthorizedError.init(code:message:details:)	init	init(code: String = "unauthorized", message: String, details: [String : JSONValue]? = nil)
 UpdateOptions	struct	struct UpdateOptions
 UpdateOptions.conflict	property	var conflict: ConflictStrategy?
 UpdateOptions.init(version:conflict:resolve:tier:sourceId:)	init	init(version: Int? = nil, conflict: ConflictStrategy? = nil, resolve: ConflictResolver? = nil, tier: Tier? = nil, sourceId: String? = nil)
