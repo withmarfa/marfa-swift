@@ -126,7 +126,10 @@ extension LocalStore {
         guard requestedLimit > 0 else { return [] }
 
         try Task.checkCancellation()
-        let models = try modelContext.fetch(Self.makeSearchDescriptor(filters: filters))
+        let subtree = try filters?.type.map { try Self.subtree(in: modelContext, for: $0) }
+        let models = try modelContext.fetch(
+            Self.makeSearchDescriptor(filters: filters, subtree: subtree)
+        )
 
         // Rank before touching metadata so the second read only covers
         // rows that actually matched the text.
@@ -221,29 +224,48 @@ extension LocalStore {
     /// *results*, and capping the fetch instead would silently drop rows
     /// before they were ever ranked.
     nonisolated static func makeSearchDescriptor(
-        filters: SearchFilters?
+        filters: SearchFilters?,
+        subtree: TypeSubtree? = nil
     ) -> FetchDescriptor<MarfaItemModel> {
-        let typeFilter = filters?.type ?? ""
-        let hasTypeFilter = filters?.type != nil
+        // Same subtree rule as a listing, because the server applies it in
+        // both places and nowhere else. See `TypeSubtree`.
+        // An EMPTY type string is no filter at all, matching the server's own
+        // falsy check on the parameter. Anything else narrows — including a
+        // spelling the server would refuse, which resolves to a subtree
+        // nothing is in rather than to an unnarrowed read. See `TypeSubtree`.
+        let resolved = filters?.type.flatMap {
+            $0.isEmpty ? nil : (subtree ?? TypeSubtree(filter: $0))
+        }
+        let hasTypeFilter = resolved != nil
+        let typeSet = resolved?.matchedIds ?? []
+        let typeNamespace = resolved?.namespace ?? ""
+        let systemPrefix = TypeSubtree.systemPrefix
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
         let tierFilter = filters?.tier?.rawValue ?? ""
         let hasTierFilter = filters?.tier != nil
         let trashedRaw = ItemState.trashed.rawValue
 
-        // `system.*` records are operational, not user data, and the
-        // server drops them from search unless the caller asks for a
-        // system type by name. Mirror that rather than leaking device
-        // and connection rows into an app's search field.
-        let systemPrefix = "system."
-        let excludeSystemTypes = !(filters?.type?.hasPrefix(systemPrefix) ?? false)
-
-        let predicate = #Predicate<MarfaItemModel> { item in
-            (!hasTypeFilter || item.type == typeFilter) &&
-            ((hasStateFilter && item.stateRaw == stateFilter) ||
-             (!hasStateFilter && item.stateRaw != trashedRaw)) &&
-            (!hasTierFilter || item.tierRaw == tierFilter) &&
-            (!excludeSystemTypes || !item.type.starts(with: systemPrefix))
+        // Two predicates for the reason `makeItemsDescriptor` has two: a
+        // subtree needs a term more than an identifier did, and the combined
+        // expression will not type-check. The `system.` exclusion mirrors the
+        // server, which drops those rows from a search unless the caller asks
+        // for a system type by name.
+        let predicate: Predicate<MarfaItemModel>
+        if hasTypeFilter {
+            predicate = #Predicate<MarfaItemModel> { item in
+                (typeSet.contains(item.type) || item.type.starts(with: typeNamespace)) &&
+                ((hasStateFilter && item.stateRaw == stateFilter) ||
+                 (!hasStateFilter && item.stateRaw != trashedRaw)) &&
+                (!hasTierFilter || item.tierRaw == tierFilter)
+            }
+        } else {
+            predicate = #Predicate<MarfaItemModel> { item in
+                ((hasStateFilter && item.stateRaw == stateFilter) ||
+                 (!hasStateFilter && item.stateRaw != trashedRaw)) &&
+                (!hasTierFilter || item.tierRaw == tierFilter) &&
+                !item.type.starts(with: systemPrefix)
+            }
         }
 
         return FetchDescriptor<MarfaItemModel>(

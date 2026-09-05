@@ -78,3 +78,51 @@ extension LocalStore {
         return definitions
     }
 }
+
+extension LocalStore {
+    /// The subtree a read filter's `type=` selects, resolved against this
+    /// store's graph.
+    ///
+    /// Answered from two indexed columns rather than by decoding the cached
+    /// definitions: descent needs a child and its parent and nothing else, and
+    /// a listing is a hot enough path that decoding every type's field map to
+    /// answer it would be a poor trade.
+    ///
+    /// A cached row **shadows** its platform namesake, matching how
+    /// ``MarfaTypeRegistry/merging(_:)`` resolves the same collision. A cached
+    /// row whose `parent` is absent therefore un-declares a platform parent
+    /// rather than leaving it in place.
+    func subtree(for filter: String) throws -> TypeSubtree {
+        try Self.subtree(in: modelContext, for: filter)
+    }
+
+    /// `nonisolated` and context-taking for the reason `itemModels` is: the
+    /// reactive queries own their own `ModelContext` and cannot reach the
+    /// actor, and a second copy of this would drift from the first.
+    nonisolated static func subtree(in context: ModelContext, for filter: String) throws -> TypeSubtree {
+        let bare = TypeSubtree(filter: filter)
+
+        let platform = MarfaTypeRegistry.platform
+        var parents: [String: String] = [:]
+        for id in platform.typeIds {
+            if let parent = platform.definition(for: id)?.parent { parents[id] = parent }
+        }
+        for row in try context.fetch(FetchDescriptor<CachedTypeModel>()) {
+            if let parent = row.parent, !parent.isEmpty {
+                parents[row.id] = parent
+            } else {
+                parents.removeValue(forKey: row.id)
+            }
+        }
+
+        return TypeSubtree(
+            root: bare.root,
+            declaredExtras: MarfaTypeRegistry.declaredDescendantsOutsideNamespace(
+                of: bare.root, parents: parents
+            ),
+            // Asked of the raw filter, not of `bare.root`, which has already
+            // discarded the distinction between `system` and `system.*`.
+            namesASystemType: filter.hasPrefix(TypeSubtree.systemPrefix)
+        )
+    }
+}
