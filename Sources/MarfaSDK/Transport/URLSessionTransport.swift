@@ -69,7 +69,31 @@ final class URLSessionTransport: Transport {
         self.session = URLSession(configuration: requestConfig)
         self.streamSession = URLSession(configuration: streamConfig)
         self.decoder = JSONDecoder()
-        self.encoder = JSONEncoder()
+        // **Sorted keys, because an idempotency key names a body.** Swift's
+        // synthesized `Codable` fills a keyed container backed by a
+        // dictionary, so encoding the same value twice can emit its keys in
+        // different orders — `{"version":1,"properties":{…}}` one time and
+        // `{"properties":{…},"version":1}` the next.
+        //
+        // The server fingerprints method, path, credential and **body**, and
+        // refuses a key replayed with a different request. So without this a
+        // replay of an unchanged write is refused as `idempotency_key_reused`
+        // — the key turns a retry that would merely have conflicted into one
+        // that cannot succeed at all, which is worse than sending no key.
+        // Found by a live scenario sending one body twice under one key and
+        // getting a 422; the server does the right thing, the bytes differed.
+        //
+        // **What this cannot promise, since the guarantee is Apple's.**
+        // `.sortedKeys` is documented as sorting with the system locale and as
+        // "subject to change", so it fixes the ordering *within a build and a
+        // system* rather than for all time. That covers the case this is for —
+        // a retry of one call, and a replay of a queued row on the same
+        // device — and would not cover a row whose first attempt and replay
+        // straddled an operating-system update that changed the comparator.
+        // Nothing here can close that; naming it is the honest half.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        self.encoder = encoder
         self.logger = MarfaLogger(category: "transport")
         self.debugLogging = configuration.debugLogging
         self.retryPolicy = configuration.retryPolicy

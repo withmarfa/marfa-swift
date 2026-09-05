@@ -55,7 +55,15 @@ enum BulkActionRunner {
         transport: Transport,
         input: BulkActionInput
     ) async throws -> InitialResponse {
-        let bodyData = try JSONEncoder().encode(input)
+        // **Sorted, like the transport's own encoder**, because this body goes
+        // out as `Data` through `rawRequest` and so bypasses that encoder
+        // entirely. The route carries no key today, so nothing is refused for
+        // an unstable ordering — but keying it is the obvious next step for a
+        // write with a queue behind it, and the defect would arrive with the
+        // key rather than with this line.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let bodyData = try encoder.encode(input)
         let (data, response) = try await transport.rawRequest(
             method: .post,
             path: "/items/bulk-actions",

@@ -7,8 +7,18 @@ import Foundation
 /// mutation kinds, and a seventeenth kind added later would compile, ship and
 /// silently send no key — the failure would be invisible until a lost response
 /// duplicated somebody's data. Wrapping the transport once, at the top of the
-/// replay, means every call inside it carries the key by construction and a
-/// new kind inherits that without anyone noticing it needed to.
+/// replay, means every JSON call inside it carries the key by construction and
+/// a new kind inherits that without anyone noticing it needed to.
+///
+/// **Two doors are exceptions and neither is guarded by anything but this
+/// sentence.** ``rawRequest(method:path:body:contentType:query:)`` and
+/// ``rawUpload(...)`` forward without a key, because the protocol has no keyed
+/// form of either. A blob upload wants that — `POST /blobs` takes no key and
+/// the replay tells "already there" from "lost" with a `HEAD` probe instead.
+/// A bulk action does not: it reaches the server through `rawRequest`, so the
+/// `.bulkAction` replay arm is exactly the "seventeenth kind that compiles,
+/// ships and sends no key" this wrapper was built to prevent. Keying it means
+/// giving the protocol a keyed `rawRequest`, not adding a call here.
 ///
 /// `nil` forwards unchanged, which is what a row enqueued before keys existed
 /// gets. Such a row replays exactly as it always did.
