@@ -229,6 +229,69 @@ struct OfflineBlobTests {
         #expect(mime == "image/png")
     }
 
+    /// **The namespace has to own what it writes, and nothing said so.**
+    /// Swapping `ownBlob` for `cacheBlob` at the upload site compiles and left
+    /// the whole suite green: every ownership case drove `LocalStore`
+    /// directly, and the two that went through the namespace used fixtures far
+    /// under the 256 MB default, so nothing evicted and nothing was refused.
+    /// The change proved the store can own bytes and that the door writes
+    /// bytes, and never that the door owns them.
+    @Test("bytes written through a local client survive eviction pressure")
+    func theUploadDoorOwnsWhatItWrites() async throws {
+        let container = try MarfaModelContainer.make(path: ":memory:")
+        let client = try await MarfaClient.local(container: container)
+        let store = await Task.detached { LocalStore(modelContainer: container) }.value
+
+        let response = try await client.blobs.upload(
+            data: Data(repeating: 9, count: 60), mimeType: "image/png"
+        )
+        try await store.cacheBlob(
+            hash: "sha256:merely-cached", data: Data(repeating: 1, count: 60),
+            mimeType: "image/png", limit: 1_000
+        )
+        // The uploaded row is the older of the two, so a rule that ignored
+        // ownership would take it first.
+        try await store.stampBlobUseForTesting(hash: response.hash, at: "2020-01-01T00:00:00.000Z")
+        try await store.stampBlobUseForTesting(hash: "sha256:merely-cached", at: "2020-01-02T00:00:00.000Z")
+
+        #expect(try await store.evictBlobs(over: 100) == 1)
+        #expect(
+            try await store.cachedBlob(hash: response.hash) != nil,
+            "the door wrote a cached row, so the only copy was evictable"
+        )
+    }
+
+    /// **Ownership has to promote an existing row, and only the demote
+    /// direction was covered.** The case below writes `ownBlob` first, so the
+    /// row is created owned and the later `cacheBlob` only has to leave the
+    /// flag alone — deleting the promote branch left the suite green.
+    ///
+    /// The order this covers is the one the model's own documentation names: a
+    /// store synced once downloaded the blob, the same store is later opened
+    /// with no server, and the app writes the same bytes. Without the promote
+    /// the only copy on the device stays evictable.
+    @Test("a cached row becomes owned when the same bytes are written locally")
+    func aCachedRowIsPromotedByALocalWrite() async throws {
+        let (store, _, _) = try await MarfaSDKTest.makeInMemoryStorePair()
+        let bytes = Data(repeating: 5, count: 60)
+
+        // Downloaded first, so the row exists and is merely cached.
+        try await store.cacheBlob(hash: "sha256:p", data: bytes, mimeType: "image/png")
+        try await store.ownBlob(hash: "sha256:p", data: bytes, mimeType: "image/png")
+
+        try await store.stampBlobUseForTesting(hash: "sha256:p", at: "2020-01-01T00:00:00.000Z")
+        try await store.cacheBlob(
+            hash: "sha256:filler", data: Data(repeating: 6, count: 60),
+            mimeType: "application/octet-stream", limit: 1_000
+        )
+
+        _ = try await store.evictBlobs(over: 100)
+        #expect(
+            try await store.cachedBlob(hash: "sha256:p") != nil,
+            "the local write did not take ownership of the row already there"
+        )
+    }
+
     /// **The hash is the one the server would compute**, so a store that later
     /// gains a server addresses the same blob rather than a private name.
     @Test("a local upload addresses the blob the way the server does")

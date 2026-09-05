@@ -14,9 +14,11 @@ import CryptoKit
 /// In **network-only mode** (`MarfaClient(url:apiKey:)`) `upload` hits the
 /// transport directly, identical to the previous behavior.
 ///
-/// A client created via ``MarfaClient/local(path:)`` has no live server;
-/// calling `upload`, `download`, `exists`, or `presignedURL` throws
-/// ``LocalModeUnsupportedError``.
+/// A client created via ``MarfaClient/local(path:)`` has no live server.
+/// `upload` writes into that client's own store and `download` answers from
+/// it; `exists` and `presignedURL` throw ``LocalModeUnsupportedError``, and so
+/// does `download` for a hash the store does not hold — each of those is a
+/// question only a server can answer.
 public struct BlobsNamespace: Sendable {
 
     let transport: any Transport
@@ -25,9 +27,13 @@ public struct BlobsNamespace: Sendable {
     let mutationQueue: MutationQueue?
     let localStore: LocalStore?
 
-    /// `true` when this namespace is attached to a pure-local client. When
-    /// set, every method except ``url(hash:)`` throws before touching the
-    /// transport.
+    /// `true` when this namespace is attached to a pure-local client.
+    ///
+    /// When set, every method that needs an answer only a server has throws
+    /// before touching the transport. ``url(hash:)`` is pure string work and
+    /// always answers; ``upload(data:mimeType:onProgress:)`` writes to the
+    /// local store; ``download(hash:)`` serves the store first and throws only
+    /// for a hash it does not hold.
     let isLocalMode: Bool
 
     private func ensureRemote(_ operation: String) throws {

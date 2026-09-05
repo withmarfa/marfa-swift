@@ -5,7 +5,7 @@ import SwiftData
 /// under. Its models are the live classes in `Schema/Models/`, so the current
 /// shape is always readable in one place.
 ///
-/// Six changes over V2, all additive:
+/// Seven changes over V2, all additive:
 ///
 /// - ``MarfaItemModel/spaceId`` — the wire has carried `space_id` on an item
 ///   since before this store existed and the store dropped it on the way in,

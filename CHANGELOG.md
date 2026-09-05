@@ -80,7 +80,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   It writes to the same store, as **owned** rather than cached. `CachedBlobModel` gains `isOwned`, `LocalStore.ownBlob(hash:data:mimeType:)` is the door, eviction skips those rows and the size bound does not refuse one — both of those rules are right for a copy of something the server holds and wrong for the only copy there is. Ownership promotes and never demotes, so a later download of the same bytes does not turn the only copy back into a cached one. Owned bytes still count toward the total, so a store holding more of them than the bound evicts every cached row and stays over it.
 
-  The hash comes from the same function the synced path uses, so a store that later gains a server addresses the same blob the server would.
+  The hash comes from the same function the synced path uses, so a store that later gains a server addresses the same blob the server would. **That is a statement about the address and not a promise of an upload** — nothing enqueues one for owned bytes, so until a local store can carry an outbox those blobs are held on the device and nowhere else.
 
   **`createWithAttachments` is still refused in pure-local mode.** It needs a bulk create as well as the bytes, and that is separate work.
 
