@@ -76,6 +76,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **A client with no server can hold blob bytes of its own.** `blobs.upload` refused in pure-local mode, so the read-through cache could only ever hold what an earlier synced session had left there — an app with no server could open a file and never make one, and no `core.file.*` item on such a device could point at anything.
+
+  It writes to the same store, as **owned** rather than cached. `CachedBlobModel` gains `isOwned`, `LocalStore.ownBlob(hash:data:mimeType:)` is the door, eviction skips those rows and the size bound does not refuse one — both of those rules are right for a copy of something the server holds and wrong for the only copy there is. Ownership promotes and never demotes, so a later download of the same bytes does not turn the only copy back into a cached one. Owned bytes still count toward the total, so a store holding more of them than the bound evicts every cached row and stays over it.
+
+  The hash comes from the same function the synced path uses, so a store that later gains a server addresses the same blob the server would.
+
+  **`createWithAttachments` is still refused in pure-local mode.** It needs a bulk create as well as the bytes, and that is separate work.
+
 - **`SyncStatus`, `MutationQueueCounts` and `HydrationProgress`**, reachable as `MarfaClient.syncStatus` and `SyncEngine.status`.
 - **`MarfaClient.connectionState` and `.connectionStateUpdates`**, forwarded from the engine. A client with no engine reports `.offline` and a stream that finishes rather than one that hangs a view awaiting it. **`syncStatus` is `nil` there rather than a zeroed status**, because reporting "0 pending, 0 blocked" claims a state of health nobody measured — an app showing a green tick because it forgot to build a synced client is the failure this prevents. **Both `status` and `syncStatus` throw rather than defaulting when the queue cannot be read**, for the same reason: a store that will not answer is not a store with nothing in it.
 - **`SyncEngine.connectionState` and `.connectionStateUpdates`.**

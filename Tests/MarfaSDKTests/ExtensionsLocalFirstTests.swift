@@ -159,13 +159,33 @@ struct ExtensionsLocalFirstTests {
 
     // MARK: - Pure-local blobs guard
 
-    @Test("Blobs upload throws LocalModeUnsupportedError on local client") func blobsUploadThrowsOnLocalClient() async throws {
+    /// **`upload` used to be in this guard and is not any more.** It refused
+    /// because there was no door into the store's blob table, not because a
+    /// client with no server has no business holding bytes — and the refusal
+    /// left the cache able to hold only what an earlier synced session had put
+    /// there. It writes now, as owned rather than cached; see `OfflineBlobTests`.
+    ///
+    /// The rest of the namespace still refuses, and for a reason that has not
+    /// changed: `exists`, `presignedURL` and a `download` of a hash this device
+    /// does not hold are all questions only a server can answer.
+    @Test("Blobs upload writes to the store rather than refusing on a local client")
+    func blobsUploadWritesOnLocalClient() async throws {
+        let client = try await MarfaClient.local(path: ":memory:")
+        let response = try await client.blobs.upload(
+            data: Data("hello".utf8), mimeType: "text/plain"
+        )
+        #expect(response.hash.hasPrefix("sha256:"))
+        #expect(response.size == 5)
+    }
+
+    @Test("Blobs exists throws LocalModeUnsupportedError on local client")
+    func blobsExistsThrowsOnLocalClient() async throws {
         let client = try await MarfaClient.local(path: ":memory:")
         do {
-            _ = try await client.blobs.upload(data: Data("hello".utf8), mimeType: "text/plain")
+            _ = try await client.blobs.exists(hash: "sha256:nothing")
             Issue.record("expected LocalModeUnsupportedError")
         } catch let e as LocalModeUnsupportedError {
-            #expect(e.operation == "blobs.upload")
+            #expect(e.operation == "blobs.exists")
             #expect(e.status == 501)
         }
     }

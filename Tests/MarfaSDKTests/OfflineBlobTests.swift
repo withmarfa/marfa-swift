@@ -281,6 +281,12 @@ struct OfflineBlobTests {
     /// A blob larger than the whole bound is declined for the cache, because
     /// the server still has it. **Owned bytes have no server**, so declining
     /// one returns a hash addressing nothing.
+    ///
+    /// **Driven through the bounded entry point rather than through
+    /// `ownBlob`**, and the difference is the whole test: `ownBlob` uses the
+    /// 256 MB default, so a fixture-sized blob never approaches it and the
+    /// exemption is never reached. Written that way first, it passed with the
+    /// exemption deleted.
     @Test("a blob over the bound is kept when it is owned and declined when it is not")
     func theBoundDoesNotRefuseOwnedBytes() async throws {
         let (store, _, _) = try await MarfaSDKTest.makeInMemoryStorePair()
@@ -289,7 +295,9 @@ struct OfflineBlobTests {
         try await store.cacheBlob(hash: "sha256:toobig", data: big, mimeType: "video/mp4", limit: 100)
         #expect(try await store.cachedBlob(hash: "sha256:toobig") == nil, "the server still has it")
 
-        try await store.ownBlob(hash: "sha256:onlycopy", data: big, mimeType: "video/mp4")
+        try await store.cacheBlob(
+            hash: "sha256:onlycopy", data: big, mimeType: "video/mp4", limit: 100, owned: true
+        )
         let held = try await store.cachedBlob(hash: "sha256:onlycopy")
         #expect(held?.data == big, "nothing else holds these")
     }
