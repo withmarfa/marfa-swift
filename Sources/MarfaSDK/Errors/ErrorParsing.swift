@@ -42,12 +42,12 @@ func parseMarfaError(
     // beneath it, and reporting it as `validation_error` left the engine
     // unable to tell a rolled-back page from any other bad request.
     case 400: return ValidationError(code: code ?? "validation_error", message: message, details: details)
-    case 401: return UnauthorizedError(message: message, details: details)
+    case 401: return UnauthorizedError(code: code ?? "unauthorized", message: message, details: details)
     // A 403 keeps its code for the same reason a 400 and a 409 do. It is not
     // decoration: `space_suspended` is the one 403 a queued write must survive,
     // and collapsing every 403 to `forbidden` made it unrecognizable.
     case 403: return ForbiddenError(code: code ?? "forbidden", message: message, details: details)
-    case 404: return NotFoundError(message: message, details: details)
+    case 404: return NotFoundError(code: code ?? "not_found", message: message, details: details)
     // A 409 reaching here is one the caller could not read as a version
     // conflict: `URLSessionTransport` decodes `ConflictResponse` first and
     // only falls through when the body carries none. What is left is a
@@ -57,6 +57,17 @@ func parseMarfaError(
     // a generic code here loses the only thing the response said, and the
     // dropped-mutation log stores this code for an app to show.
     case 409: return MarfaError(code: code ?? "conflict", message: message, status: 409, details: details)
-    default: return MarfaError(code: "server_error", message: message, status: statusCode, details: details)
+    // **Every other status keeps its code too, and stamping `server_error`
+    // over them was the constraint underneath several other defects rather
+    // than a cosmetic loss.** A `429` is `quota_exceeded` or `rate_limited`
+    // and those want opposite handling; a `413` is `blob_too_large`; a `422`
+    // is `idempotency_key_reused` or `compatible_with_violation`. Collapsing
+    // them meant the kit could not classify by code even where it needed to,
+    // and the dropped-mutation log the docs promise carries the server's code
+    // could not carry one.
+    //
+    // `server_error` remains the fallback for a body that named nothing,
+    // which is what it always described honestly.
+    default: return MarfaError(code: code ?? "server_error", message: message, status: statusCode, details: details)
     }
 }

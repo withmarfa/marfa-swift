@@ -93,8 +93,11 @@ extension MarfaError: LocalizedError {
 
 /// 404 — resource does not exist.
 public final class NotFoundError: MarfaError {
-    public init(message: String, details: [String: JSONValue]? = nil) {
-        super.init(code: "not_found", message: message, status: 404, details: details)
+    /// Keeps the code the server sent, for the reason a `400`, a `403` and a
+    /// `409` do: the status says a request was refused and the code says what
+    /// about it was refused.
+    public init(code: String = "not_found", message: String, details: [String: JSONValue]? = nil) {
+        super.init(code: code, message: message, status: 404, details: details)
     }
 }
 
@@ -119,8 +122,11 @@ public final class ValidationError: MarfaError {
 
 /// 401 — invalid or expired credentials.
 public final class UnauthorizedError: MarfaError {
-    public init(message: String, details: [String: JSONValue]? = nil) {
-        super.init(code: "unauthorized", message: message, status: 401, details: details)
+    /// Keeps the code the server sent, for the reason a `400`, a `403` and a
+    /// `409` do: the status says a request was refused and the code says what
+    /// about it was refused.
+    public init(code: String = "unauthorized", message: String, details: [String: JSONValue]? = nil) {
+        super.init(code: code, message: message, status: 401, details: details)
     }
 }
 
