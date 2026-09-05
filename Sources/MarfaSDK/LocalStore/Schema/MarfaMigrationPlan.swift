@@ -30,11 +30,16 @@ import SwiftData
 /// ## The current version is open until it ships, and that is worth checking
 ///
 /// **A version only has to be frozen once a store exists that records it.**
-/// V3 is unreleased — the newest tag is `v16.0.0` and the V3 change sits under
-/// `## [Unreleased]` — so no device holds a V3 store, and an additive column
-/// added to a live model today joins V3 rather than forcing a V4. The cost to
-/// a device is unchanged either way: it takes the V2 to V3 stage it was going
-/// to take, carrying whatever shape V3 has when it ships.
+/// While a version is unreleased no device holds a store in its shape, so an
+/// additive column added to a live model joins it rather than forcing a new
+/// one. The cost to a device is unchanged either way: it takes the stage it
+/// was going to take, carrying whatever shape that version has when it ships.
+///
+/// **V3 is closed. It ships in `17.0.0`.** Devices hold V3 stores from that
+/// release onward, so the next column needs a V4 and a V3-to-V4 stage. This
+/// paragraph named V3 as the open one until the day it was cut; if you are
+/// reading it and the newest tag is later than `v17.0.0`, check the tag rather
+/// than this sentence.
 ///
 /// So before adding a version, **check whether the current one has shipped**.
 /// Reaching for a new one out of habit buys nothing and costs every device an
