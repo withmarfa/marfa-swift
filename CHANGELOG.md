@@ -9,13 +9,45 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **Every write the server keys now carries an idempotency key, including the two doors that carried none.** A key exists so a write whose response was lost can be replayed without landing twice, and these two bypassed the mechanism rather than declining it. Blob upload is the deliberate exception: `POST /blobs` does not declare the parameter, and the replay tells "already there" from "lost" with a `HEAD` probe instead.
+
+  **A client with no local store sent no key at all.** That door has no queue behind it, but it does have the transport's retry loop, which retries `.timedOut` and `.networkConnectionLost` on any method. The reason recorded for that was that such a request cannot have completed on the server — **which is not true of a timeout**: it means this side stopped waiting, and the server may have committed and lost only the response. Unkeyed, that retry was a second create. A key is now minted per call, so the retries of one call share it and two calls never do.
+
+  **The versioned update sent no key either, and its symptom was worse than a duplicate.** A versioned `items.update` takes the conflict door, which had no key parameter at all. The first attempt moves the version, so a replay after a lost response is refused as a conflict *over the edit that landed* — the caller is told it collided when it succeeded, which teaches it the opposite of what happened. The first attempt is now keyed under the row's own key, and the later ones under keys of their own — see below, because a retry carries a different body by design and a keyed repeat carrying a different body is refused.
+
+  **A rebased retry is keyed by the version it rebases onto**, because its body is a function of the row and that version, so the same situation always produces the same key — which is what the server needs, since it refuses a key replayed with a different request. **A resolver-driven retry is keyed too, but with a freshly minted key rather than a derived one**: a resolver returns whatever it likes, so no derivation could reliably name one request, while a fresh key names this one exactly. That covers the transport's own retry of the attempt and not a later drain, which is more than an unkeyed request gave and is stated rather than implied.
+
+  **`Transport.requestWithConflict` gains an `idempotencyKey` parameter**, so a custom transport conforming to the protocol must add it. There is no default implementation on purpose: one would let a conformer silently drop the key, which is the failure this entry is about.
+
+- **Resolving a conflict is the server's job now, and the on-device three-way merge is gone.** The kit sends `conflict=auto` and the server resolves inside the write's own transaction by the type's merge policy. Two implementations of one rule is what this ends, and they did not agree: the kit's `last_writer_wins` kept the *earlier* write where the server keeps the later one, so two devices editing one field reached different answers depending only on which kit resolved it. The kit also spawned its own `keep_both_copies` sibling through an unkeyed `POST /items`, so a lost response made two siblings.
+
+  **`manual` and `callback` deliberately send nothing.** Both mean the caller resolves, and the route's default for an omitted parameter is already `manual`.
+
+  **A `409` that comes back under `conflict=auto` is one the server could not resolve, not one it declined**, and it now surfaces as `ConflictError` rather than being merged locally. **`.auto` therefore no longer retries a conflict at all**, where it previously retried up to three times with a locally merged body.
+
+  **This release requires a server that implements the `conflict` parameter.** A server ignores a query parameter it does not know, so against an older deployment `conflict=auto` is silently dropped, the `409` envelope comes back, and every conflicted `.auto` write becomes a blocked mutation instead of a merged one. There is no client-side fallback and deliberately so: the fallback was the second implementation this change exists to remove.
+
+- **A write that resolved a conflict now reports what the server did.** `ConflictAutoMergedPayload` is filled from the response's `conflict_resolution` rather than inferred on the device, which matters most for the sibling: **no route says what a write created**, so `conflicted_copy_id` there is the only place a conflicted copy is ever named.
+
+  It reaches an app as `SyncEvent.conflictAutoMerged`, so **synced mode only** — a client with no local store has no engine to emit it, and `items.update` still discards the report. That gap is pre-existing and needs a public-API decision; it is filed rather than changed here. A `.callback` resolution carries no report at all, because the caller resolved and the server merely accepted an ordinary write.
+
+- **A write refused against a version history no longer retains now rebases and goes again.** The server answers `ancestor_unavailable` with the two fields a rebase needs, and the kit threw them away by decoding every `409` as a merge conflict — which fails, because that shape requires an ancestor this one has none of.
+
+  **The visible symptom was not a dead letter; it was a queue row that could never clear.** The row parked as an unresolved conflict, and the remedy that state names — resolve it, then `retry(id:)` — re-sends the same stale version and is refused identically, for as long as anyone retries. Under `.auto` the write now rebases onto the version the server says it holds and retries within the same call, which is what `last_writer_wins` already means. `manual` and `callback` are handed `AncestorUnavailableError` instead, because rebasing under them would apply an edit onto a base the caller never saw.
+
+  `AncestorUnavailableError` carries `current` and `requestedVersion`, and a direct-mode caller gets it as a typed error where it previously got a bare `MarfaError`.
+
 - **The OpenAPI snapshot catches up with the server**, which moves several generated names. Most were already named here by earlier entries; one is a removal that is not the kit's choice.
 
 ### Added
 
+- `AncestorUnavailableError`, plus the `AncestorUnavailableResponse` wire type it decodes from and its nested `AncestorUnavailableResponseError` and `AncestorUnavailableResponseErrorCode`.
+- `ConflictResolution`, the server's report of a resolution it performed, reachable through `ConflictAutoMergedPayload`.
 - `EdgesNamespace.get(id:)`, wrapping `GET /edges/{id}` — a route the server declares and the kit had no way to reach. It reads the local store when there is one, so an edge already on the device is readable offline.
 
 ### Removed
+
+- **The client-side merge and its primitives**: `autoMergeWithPolicy`, `keepBothFlow`, `strategyForField` and `autoMergeLastWriterWins`, together with `ConflictResolutionOutcome`, which described their result. All were internal; no public type changes shape. `conflictedCopyTag` stays — the server still applies that tag, and an app filtering for siblings still wants it.
 
 - **`CreatedKey.expiresAt` is gone, and its initializer loses the parameter**, because `POST /keys` stopped declaring `expires_at` in its `201`. This is a server contract change the kit is reporting, not one it chose: `GET /keys` and `PATCH /keys/{id}` still declare the field, so a key can still carry an expiry — the create response no longer tells you what it is. Read it back with `GET /keys` until the create response declares it again.
 

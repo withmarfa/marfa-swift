@@ -932,6 +932,18 @@ public actor MutationQueue {
     public func rewriteLocalId(from oldId: String, to newId: String) throws {
         guard oldId != newId else { return }
 
+        // **Every row rewritten here must be one that has never been sent**,
+        // and that is a real constraint rather than a tidiness preference. A
+        // row's idempotency key names its body; rewrite the body after the key
+        // has been on the wire and the same key names two different requests,
+        // which the server refuses with `idempotency_key_reused` — turning a
+        // write that would have succeeded into a failure.
+        //
+        // It holds because the only caller runs immediately after a
+        // `createItem` succeeds, and the drain is ordered, so a row depending
+        // on that create is rewritten before it is ever attempted. A future
+        // caller that does not have that property has to re-mint the key.
+
         // Pass 1 — every row whose `localId` matches.
         let directPredicate = #Predicate<PendingMutationModel> { $0.localId == oldId }
         let directDescriptor = FetchDescriptor<PendingMutationModel>(predicate: directPredicate)

@@ -63,10 +63,12 @@ private final class StreamCountingTransport: Transport, @unchecked Sendable {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         try await inner.requestWithConflict(
-            method: method, path: path, body: body, query: query
+            method: method, path: path, body: body, query: query,
+            idempotencyKey: idempotencyKey
         )
     }
 

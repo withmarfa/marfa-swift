@@ -368,3 +368,31 @@ struct ErrorInfo: Codable, Sendable {
     let message: String?
     let details: [String: JSONValue]?
 }
+
+/// 409 — the base version's snapshot has been thinned, so the write cannot be
+/// merged and the server will never auto-resolve it.
+///
+/// **The recoverable 409, and the kit used to throw away exactly the two
+/// fields that make it recoverable.** The server answers this branch with the
+/// item as it stands and the version the write asked for, and deliberately
+/// without the ancestor, the conflicting fields or the merge policy — there is
+/// no ancestor left to diff against, which is the whole point. `ConflictError`
+/// requires all three, so the branch failed to decode, fell through to the
+/// generic path, and the mutation dead-lettered where a rebase would have
+/// worked.
+///
+/// A caller rebases on ``current`` and writes again at its version.
+public final class AncestorUnavailableError: MarfaError {
+    /// The item as the server holds it now.
+    public let current: ConflictSnapshot
+
+    /// The version the refused write was written against.
+    public let requestedVersion: Int
+
+    public init(current: ConflictSnapshot, requestedVersion: Int, message: String) {
+        self.current = current
+        self.requestedVersion = requestedVersion
+        super.init(code: "ancestor_unavailable", message: message, status: 409)
+    }
+
+}

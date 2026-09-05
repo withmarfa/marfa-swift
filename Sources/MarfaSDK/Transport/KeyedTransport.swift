@@ -27,10 +27,7 @@ struct KeyedTransport: Transport {
     /// route is not one the server keys, which is not a property this file
     /// should depend on.
     private func keyFor(_ method: HTTPMethod) -> String? {
-        switch method {
-        case .post, .put, .patch, .delete: return key
-        default: return nil
-        }
+        HTTPMethod.isWrite(method) ? key : nil
     }
 
     func request<T: Decodable & Sendable>(
@@ -61,21 +58,22 @@ struct KeyedTransport: Transport {
         )
     }
 
-    /// **Forwarded WITHOUT the key, deliberately.** A key identifies one
-    /// request and the server fingerprints the body; the conflict loop sends a
-    /// different body on every attempt, so a stable key would turn a merge
-    /// into a `422`. Nothing routes a conflict-aware write through this
-    /// wrapper today — the replay hands that path the unwrapped transport —
-    /// and this is here so that if something ever does, it does not silently
-    /// acquire a key.
+    /// **Forwards the caller's key rather than substituting the row's.** The
+    /// conflict loop decides per attempt whether a key is safe — the first
+    /// attempt is the one whose lost response matters, and a resolver-driven
+    /// retry carries a different body that a keyed repeat would meet with a
+    /// `422`. Stamping the row's key on every attempt here would take that
+    /// decision away from the only code that can make it.
     func requestWithConflict<T: Decodable & Sendable>(
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String?
     ) async throws -> ConflictResult<T> {
         try await base.requestWithConflict(
-            method: method, path: path, body: body, query: query
+            method: method, path: path, body: body, query: query,
+            idempotencyKey: idempotencyKey
         )
     }
 

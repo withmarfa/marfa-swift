@@ -420,7 +420,8 @@ actor BlockingTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         fatalError("BlockingTransport: requestWithConflict not supported")
     }
@@ -536,7 +537,8 @@ actor BlockingReplayTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         fatalError("BlockingReplayTransport: requestWithConflict not supported")
     }
@@ -626,7 +628,8 @@ actor BlockingSuccessfulReplayTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         fatalError("BlockingSuccessfulReplayTransport: requestWithConflict not supported")
     }
@@ -784,7 +787,8 @@ actor HeldOpenStreamTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         .success(try await request(method: method, path: path, body: body, query: query))
     }
@@ -1001,7 +1005,8 @@ actor EdgeMintingTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         .success(try await request(method: method, path: path, body: body, query: query))
     }
@@ -1272,7 +1277,8 @@ actor ItemMintingTransport: Transport {
         method: HTTPMethod,
         path: String,
         body: (any Encodable & Sendable)?,
-        query: [(String, String)]?
+        query: [(String, String)]?,
+        idempotencyKey: String? = nil
     ) async throws -> ConflictResult<T> {
         .success(try await request(method: method, path: path, body: body, query: query))
     }

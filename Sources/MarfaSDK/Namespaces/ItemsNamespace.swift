@@ -148,13 +148,13 @@ public struct ItemsNamespace: Sendable {
     /// captured with the queued mutation so replay applies the strategy the
     /// caller chose.
     ///
-    /// **Passing `version:` changes what a replay guarantees.** A versioned
-    /// update takes the conflict door, and that door carries no
-    /// `Idempotency-Key`: the server fingerprints the request body, and the
-    /// conflict loop deliberately sends a different one on every attempt, so a
-    /// stable key would turn a merge into a refusal. An unversioned update is
-    /// keyed. Both are correct; the versioned one relies on the conflict loop
-    /// rather than on the key to recover from a lost response.
+    /// **A versioned update takes the conflict door, and that door is keyed on
+    /// its first attempt.** That attempt is the only one whose lost response
+    /// matters: without a key the write replays against a version its own
+    /// first attempt already moved, and comes back as a conflict over the edit
+    /// that landed. Only the resolver-driven retries go unkeyed, because those
+    /// carry a different body by design and a keyed repeat carrying a
+    /// different body is answered with a `422`.
     ///
     /// A `.callback` strategy in synced mode resolves through the resolver
     /// registered on the client rather than the per-call closure, because a
@@ -240,7 +240,12 @@ public struct ItemsNamespace: Sendable {
             strategy: strategy,
             resolver: options?.resolve,
             tier: options?.tier,
-            sourceId: options?.sourceId
+            sourceId: options?.sourceId,
+            // Minted here rather than left to the transport, because the
+            // conflict door bypasses the overload that mints one. There is no
+            // queue on this path, so the key spans this call's own retries and
+            // nothing longer.
+            idempotencyKey: UUIDv7.generateString()
         )
     }
 

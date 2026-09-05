@@ -69,8 +69,8 @@ public struct RetryPolicy: Sendable, Equatable {
     /// - 429 and 503 are always retryable regardless of method (server
     ///   requested back-off).
     /// - 500, 502, 504 are retryable only on idempotent methods.
-    /// - Known-transient `URLError` codes are always retryable (connection
-    ///   didn't complete, so idempotence doesn't apply).
+    /// - Known-transient `URLError` codes are always retryable. Idempotence
+    ///   very much does apply — see ``transientURLErrorCodes``.
     /// - Everything else is non-retryable.
     public func shouldRetry(
         method: HTTPMethod,
@@ -90,9 +90,17 @@ public struct RetryPolicy: Sendable, Equatable {
         return false
     }
 
-    /// `URLError.Code`s the transport treats as transient connection
-    /// failures. Retrying them is safe on any method because the request
-    /// didn't complete on the server.
+    /// `URLError.Code`s the transport treats as transient connection failures.
+    ///
+    /// **Retrying these on any method is a trade, not a safety property.** A
+    /// `.timedOut` or a `.networkConnectionLost` says this side stopped
+    /// waiting; it does not say the server did nothing, and it may have
+    /// committed the write and lost only the response. Retrying anyway is
+    /// right because failing a write that probably did not land is worse far
+    /// more often — and because every write the server keys now carries an
+    /// `Idempotency-Key`, which is what actually makes the repeat safe. Blob
+    /// upload is the exception and settles it a different way, with a `HEAD`
+    /// probe that tells "already there" from "lost".
     static let transientURLErrorCodes: Set<URLError.Code> = [
         .timedOut,
         .networkConnectionLost,

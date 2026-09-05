@@ -8,6 +8,15 @@ import Foundation
 struct ItemResponse: Codable, Sendable {
     var item: Item
     var metadata: Metadata?
+    /// Present only when this write resolved a version conflict, which the
+    /// server does in the write's own transaction under `conflict=auto`.
+    var conflictResolution: ConflictResolution?
+
+    enum CodingKeys: String, CodingKey {
+        case item
+        case metadata
+        case conflictResolution = "conflict_resolution"
+    }
 }
 
 /// Response from GET /items/:id/versions.
