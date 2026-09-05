@@ -8,7 +8,27 @@ import Foundation
 /// `backref: ["in-thread": threadId]` to list members of the thread.
 public struct ListFilters: Sendable {
     public var type: String?
+
+    /// Select exactly one lifecycle state.
+    ///
+    /// **Leaving it `nil` is not "every state".** It matches the server's
+    /// default, which excludes trashed rows and keeps archived ones — so a
+    /// list with no state named is the ordinary view of a space, bin
+    /// excluded. Name a state and exactly that state is selected, the bin
+    /// included. For every state at once, set ``includeTrashed``.
     public var state: ItemState?
+
+    /// Return every state, including trashed.
+    ///
+    /// **The local equivalent of the server's `state=any`**, which a single
+    /// `ItemState` cannot express. Without it, narrowing the default to
+    /// exclude trashed rows would have removed a capability rather than
+    /// corrected one: "everything in one read" was reachable before and is
+    /// what a resuming client and a bin view both need.
+    ///
+    /// Ignored when ``state`` names a state, because that is a narrower
+    /// request and answering it with everything would be surprising.
+    public var includeTrashed: Bool?
     public var source: String?
     public var tier: TierFilter?
     public var tags: [String]?
@@ -41,6 +61,7 @@ public struct ListFilters: Sendable {
     public init(
         type: String? = nil,
         state: ItemState? = nil,
+        includeTrashed: Bool? = nil,
         source: String? = nil,
         tier: TierFilter? = nil,
         tags: [String]? = nil,
@@ -56,6 +77,7 @@ public struct ListFilters: Sendable {
     ) {
         self.type = type
         self.state = state
+        self.includeTrashed = includeTrashed
         self.source = source
         self.tier = tier
         self.tags = tags
@@ -74,7 +96,13 @@ public struct ListFilters: Sendable {
     func toQueryParams() -> [(String, String)] {
         var params: [(String, String)] = []
         if let type { params.append(("type", type)) }
-        if let state { params.append(("state", state.rawValue)) }
+        // A named state wins: it is the narrower request, and answering it
+        // with `any` would return rows the caller excluded.
+        if let state {
+            params.append(("state", state.rawValue))
+        } else if includeTrashed == true {
+            params.append(("state", "any"))
+        }
         if let source { params.append(("source", source)) }
         if let tier { params.append(("tier", tier.rawValue)) }
         if let tags, !tags.isEmpty { params.append(("tags", tags.joined(separator: ","))) }

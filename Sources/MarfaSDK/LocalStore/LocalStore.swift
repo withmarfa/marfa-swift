@@ -1041,6 +1041,31 @@ public actor LocalStore {
 
         let stateFilter = filters?.state?.rawValue ?? ""
         let hasStateFilter = filters?.state != nil
+        // **Omitting `state` excludes trashed rows and keeps archived ones**,
+        // which is what the server does — its own parameter description says
+        // so and a live read confirms it. Without this the same `ListFilters`
+        // selected different rows here than at the server, so an app's offline
+        // list showed rows from the bin that its online list never had.
+        //
+        // `ListFilters.state` is a single `ItemState` and cannot express the
+        // server's `any`, so ``ListFilters/includeTrashed`` does. Without it
+        // this change would have removed a capability rather than corrected a
+        // default: "every state in one read" was reachable before — by
+        // passing no filters at all — and a bin view and a resuming client
+        // both need it.
+        // **`includeTrashed` disarms the exclusion rather than adding a fifth
+        // literal.** Comparing against a value no row can hold makes
+        // `stateRaw != excluded` true for every row, which is what `state=any`
+        // means remotely — and it costs no term, where a third state mode
+        // would have taken the literals below from four to six. The sentinel
+        // is the one `TypeSubtree` already uses to make a prefix match
+        // nothing, for the same reason.
+        //
+        // A named state wins over it, matching what `toQueryParams` sends:
+        // that is the narrower request, and answering it with everything
+        // returns rows the caller excluded.
+        let everyState = !hasStateFilter && filters?.includeTrashed == true
+        let excludedState = everyState ? "\u{0}" : ItemState.trashed.rawValue
         let lowerBound = filters?.timestampAfter ?? ""
         let hasLowerBound = filters?.timestampAfter != nil
         let upperBound = filters?.timestampBefore ?? ""
@@ -1064,34 +1089,55 @@ public actor LocalStore {
         // `createdAt` afterwards. Permissive rather than strict on purpose: a
         // row wrongly excluded here cannot be recovered later, whereas one
         // wrongly included is dropped a moment later at no cost.
-        // TWO predicates, chosen here rather than one predicate with a
-        // `hasTypeFilter` short-circuit, and this is a compiler constraint
-        // rather than a preference. Narrowing to a subtree needs two terms —
-        // the set, and the namespace — where matching one identifier needed
-        // one, and `#Predicate` will not type-check the combined expression:
-        // it is already six conjuncts deep and the macro gives up. Splitting
-        // is what the compiler asks for when it does, and each branch reads
-        // more simply than the merged one did.
+        // **Four literals, chosen here rather than one predicate that decides
+        // at evaluation time, and that is a compiler constraint rather than a
+        // preference.** `#Predicate` will not type-check the combined
+        // expression: narrowing to a subtree needs two terms where matching
+        // one identifier needed one, and adding the state exclusion needed
+        // another. The macro gives up — measured twice, once per axis, not
+        // guessed. So each axis that can be settled while building the
+        // descriptor is settled here, and each of the four literals is
+        // *simpler* than what it replaced, because by this point it is known
+        // whether a type was named and which state comparison is wanted.
         //
-        // The `system.` exclusion lives only in the untyped branch. With a
+        // The `system.` exclusion lives only in the untyped branches. With a
         // type filter present it is redundant: the filter narrows to its own
         // subtree, so it either names `system.` outright or cannot reach a
         // system row, and `typeSet` is scrubbed above for the one case that
         // could — a declared child of an ordinary type that happens to be
         // named under `system.`.
         let predicate: Predicate<MarfaItemModel>
-        if hasTypeFilter {
+        switch (hasTypeFilter, hasStateFilter) {
+        case (true, true):
             predicate = #Predicate<MarfaItemModel> { item in
                 (typeSet.contains(item.type) || item.type.starts(with: typeNamespace)) &&
-                (!hasStateFilter || item.stateRaw == stateFilter) &&
+                item.stateRaw == stateFilter &&
                 (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
                 (!hasUpperBound || item.timestamp <= upperBound) &&
                 (!hasTierFilter || item.tierRaw == tierFilter) &&
                 (!hasSourceFilter || item.source == sourceFilter)
             }
-        } else {
+        case (true, false):
             predicate = #Predicate<MarfaItemModel> { item in
-                (!hasStateFilter || item.stateRaw == stateFilter) &&
+                (typeSet.contains(item.type) || item.type.starts(with: typeNamespace)) &&
+                item.stateRaw != excludedState &&
+                (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
+                (!hasUpperBound || item.timestamp <= upperBound) &&
+                (!hasTierFilter || item.tierRaw == tierFilter) &&
+                (!hasSourceFilter || item.source == sourceFilter)
+            }
+        case (false, true):
+            predicate = #Predicate<MarfaItemModel> { item in
+                item.stateRaw == stateFilter &&
+                (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
+                (!hasUpperBound || item.timestamp <= upperBound) &&
+                (!hasTierFilter || item.tierRaw == tierFilter) &&
+                (!hasSourceFilter || item.source == sourceFilter) &&
+                !item.type.starts(with: systemPrefix)
+            }
+        case (false, false):
+            predicate = #Predicate<MarfaItemModel> { item in
+                item.stateRaw != excludedState &&
                 (!hasLowerBound || item.timestamp >= lowerBound || item.timestamp == "") &&
                 (!hasUpperBound || item.timestamp <= upperBound) &&
                 (!hasTierFilter || item.tierRaw == tierFilter) &&

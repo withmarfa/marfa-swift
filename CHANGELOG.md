@@ -20,6 +20,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
   **Found by a live scenario** that sent one body twice under one key and was told the key had been used for a different request — the server was right and the bytes really had changed. It reproduced roughly one run in three, which is why it survived a suite that had already run green many times.
 
   `.sortedKeys` is Apple's, documented as locale-sensitive and "subject to change", so it fixes an ordering within a build and a system rather than for all time. That covers a retry of one call and a replay on the same device; it would not cover a row whose first attempt and replay straddled an operating-system update that changed the comparator. Named at the site rather than implied.
+- **An offline list no longer shows rows the online one hides.** Omitting `state` at the server excludes trashed rows and keeps archived ones — the parameter's own description says so, and a live read confirms it. The local store applied no state filter at all when none was given, so the same `ListFilters` selected different rows depending on whether the client had a store. An app listing notes offline saw items from the bin that its online view had never shown it, and nothing in the kit disagreed with itself loudly enough to notice.
+
+  **What a consumer may have to change.** If you built a bin view on an unfiltered list plus a client-side "is it trashed" check, it is now empty — pass `state: .trashed`. If you relied on an unfiltered list meaning *every* state, pass the new `ListFilters.includeTrashed`. This reaches the **reactive queries** as well as one-shot reads, which is the likeliest place an app meets it: `ItemQuery`, `TypedItemQuery` and `ItemsWithMetadataQuery` all narrow through the same descriptor, so a live view of a space stops showing rows the moment they are binned. That is the intended behavior and it is also a visible change.
+
+  Naming a state still selects exactly that state, the bin included. A queued bulk action resolves against the same set, which is what its own comment already asked for.
+
+  Found by a live scenario that trashed a row on one device and compared what each side then listed. The behavior was previously described in a test comment as a deliberate asymmetry with search; that was a description of the code rather than a reason, and the two now agree.
 
 - **Every write the server keys now carries an idempotency key, including the two doors that carried none.** A key exists so a write whose response was lost can be replayed without landing twice, and these two bypassed the mechanism rather than declining it. Blob upload is the deliberate exception: `POST /blobs` does not declare the parameter, and the replay tells "already there" from "lost" with a `HEAD` probe instead.
 
@@ -52,6 +59,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - **The OpenAPI snapshot catches up with the server**, which moves several generated names. Most were already named here by earlier entries; one is a removal that is not the kit's choice.
 
 ### Added
+
+- **`ListFilters.includeTrashed`**, the local equivalent of the server's `state=any`, which a single `ItemState` cannot express. Without it, narrowing the unfiltered default above would have removed a capability rather than corrected one — "every state in one read" was reachable before by passing no filters at all, and a bin view and a resuming client both need it. A named `state` wins over it, because that is the narrower request.
 
 - `AncestorUnavailableError`, plus the `AncestorUnavailableResponse` wire type it decodes from and its nested `AncestorUnavailableResponseError` and `AncestorUnavailableResponseErrorCode`.
 - `ConflictResolution`, the server's report of a resolution it performed, reachable through `ConflictAutoMergedPayload`.

@@ -175,6 +175,31 @@ struct PredicateSafetyTests {
         #expect(everything.isEmpty)
     }
 
+    /// **The literal a plain `list()` reaches**, on a seed that can tell the
+    /// two candidate rules apart. The shared fixture holds no archived row, so
+    /// "not trashed" and "active only" agree there; they do not agree here,
+    /// and the server keeps archived rows in an unfiltered read.
+    @Test("the unfiltered items descriptor keeps archived rows and drops trashed")
+    func unfilteredKeepsArchived() async throws {
+        let container = try MarfaSDKTest.makeInMemoryContainer()
+        let context = ModelContext(container)
+        for (id, state) in [("keep", ItemState.archived), ("live", .active), ("bin", .trashed)] {
+            let model = MarfaItemModel()
+            model.id = id
+            model.type = "core.note"
+            model.stateRaw = state.rawValue
+            model.createdAt = "2026-01-01T00:00:00.000Z"
+            model.updatedAt = model.createdAt
+            model.timestamp = model.createdAt
+            model.source = "test"
+            context.insert(model)
+        }
+        try context.save()
+
+        let rows = try context.fetch(LocalStore.makeItemsDescriptor(filters: nil))
+        #expect(Set(rows.map(\.id)) == ["keep", "live"])
+    }
+
     /// The items descriptor's sibling witness. It composes more branches than
     /// the search one — seven now that `source` narrows — and the file it
     /// lives in warns twice that clause count is what pushes the `#Predicate`
@@ -184,11 +209,19 @@ struct PredicateSafetyTests {
     @Test("Items descriptor composes every filter without crashing") func itemsDescriptorShapes() async throws {
         let (context, _) = try await seededContext()
 
-        // Unfiltered: `system.*` rows drop out, trashed ones do not — the
-        // items descriptor has no default state exclusion where search does,
-        // and that asymmetry is deliberate.
+        // Unfiltered: `system.*` rows drop out and so do trashed ones, which
+        // is what the server does for the same absent parameter — its own
+        // description says omitting `state` excludes trashed rows, and a live
+        // read confirms archived rows survive it. This comment previously
+        // called the asymmetry with search deliberate; it was a description of
+        // the code rather than a reason, and the two are now the same.
+        //
+        // **This seed has no archived row**, so this assertion alone cannot
+        // tell "not trashed" from "active only" — different rules with the
+        // same answer here. `unfilteredKeepsArchived` below pins that on a
+        // seed that can.
         let unfiltered = try context.fetch(LocalStore.makeItemsDescriptor(filters: nil))
-        #expect(Set(unfiltered.map(\.id)) == ["a", "b", "c"])
+        #expect(Set(unfiltered.map(\.id)) == ["a", "c"])
 
         // Each captured branch alone, so a clause that stopped narrowing is
         // distinguishable from one that never matched.
@@ -197,10 +230,12 @@ struct PredicateSafetyTests {
         )
         #expect(byState.map(\.id) == ["b"])
 
+        // `b` is in the bin, so it drops out here too — a source filter does
+        // not opt back into trashed rows.
         let bySource = try context.fetch(
             LocalStore.makeItemsDescriptor(filters: ListFilters(source: "test"))
         )
-        #expect(Set(bySource.map(\.id)) == ["a", "b", "c"])
+        #expect(Set(bySource.map(\.id)) == ["a", "c"])
 
         let byMissingSource = try context.fetch(
             LocalStore.makeItemsDescriptor(filters: ListFilters(source: "no-such-source"))

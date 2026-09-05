@@ -246,9 +246,11 @@ extension LocalStore {
         let hasTierFilter = filters?.tier != nil
         let trashedRaw = ItemState.trashed.rawValue
 
-        // Two predicates for the reason `makeItemsDescriptor` has two: a
+        // Two predicates for the reason `makeItemsDescriptor` has four: a
         // subtree needs a term more than an identifier did, and the combined
-        // expression will not type-check. The `system.` exclusion mirrors the
+        // expression will not type-check. Search splits on one axis rather
+        // than two because its state clause stayed a disjunct — it has a term
+        // in hand that the items descriptor spent on the type subtree. The `system.` exclusion mirrors the
         // server, which drops those rows from a search unless the caller asks
         // for a system type by name.
         let predicate: Predicate<MarfaItemModel>
