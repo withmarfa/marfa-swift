@@ -110,6 +110,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **Every queued write now carries an `Idempotency-Key`, and a retry carries the same one.** A replay whose response was lost is indistinguishable from one the server never saw — the write happened, the acknowledgement did not, and the next drain sends it again. A create was protected because the device stamps its own id, so the server recognizes the row. **Nothing protected the other write routes**, where a lost response meant a second edge, a second tag, a second metadata write, with no error anywhere and nothing to say it had happened.
+
+  **The property is sameness, not presence.** A key minted at replay time would differ on every attempt, which is worse than none: it tells the server each retry is a new request while looking, from here, exactly like protection working. The key is minted once when the row is enqueued, stored beside it, and never changed.
+
+  **`Transport` gains `request(method:path:body:query:idempotencyKey:)` and the matching `requestWithConflict`, both with default implementations that drop the key** and forward to the existing four-argument calls. An existing conformer keeps compiling and keeps behaving exactly as it did — and gets no protection against a repeated write, because the server cannot recognize a retry it was never told about. The SDK's `URLSessionTransport` and the bundled `MockTransport` both override; a custom transport should too. `MockTransport.Call` gains `idempotencyKey`, so a test can assert that a retry really is the same request.
+
+  **`PendingMutationRecord` gains `idempotencyKey` and its initializer changes shape**, from `init(id:kind:payloadJson:sourceId:localId:createdAt:attemptCount:lastError:state:blockedReason:)` to the same with `idempotencyKey:` appended. Anything constructing one — a test double, a queue inspector — takes the extra argument, which defaults to `nil`.
+
+  Blob uploads carry no key deliberately: a blob is addressed by the hash of its own bytes, so sending one twice is already the same write.
+
 - **A client with a local store now refuses a write its type forbids, before the write reaches the store or the queue.** The server has always refused these; what it could not do is refuse them at the moment the person made one. A write queued offline and rejected on reconnect fails hours later, to nobody, in a log — and whoever could have fixed it in two seconds has long since moved on.
 
   **`MarfaClient.typeRegistry()`** is the graph it checks against: the platform types the SDK ships with, merged with this space's own types as `GET /types` last described them, the space winning a collision because its rows were written against its shape. **`MarfaClient.refreshCachedTypes()`** fills that cache and returns how many types it stored. A refresh **replaces** rather than merges, because the route answers with the whole space and a type deleted upstream is absent rather than marked — merging would keep it for ever, and a validator holding a type the space no longer has refuses writes the server would accept.

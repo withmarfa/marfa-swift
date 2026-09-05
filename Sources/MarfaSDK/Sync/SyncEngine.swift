@@ -2224,6 +2224,15 @@ public actor SyncEngine {
     private func replayRecord(_ record: PendingMutationRecord, decoder: JSONDecoder) async throws -> Bool {
         let data = record.payloadJson.data(using: .utf8) ?? Data()
 
+        // Every write below goes out under this row's key, and it is applied
+        // by SHADOWING the engine's transport rather than by passing it to
+        // sixteen call sites. That is deliberate: the switch has one arm per
+        // mutation kind, and a seventeenth kind added later would compile,
+        // ship, and silently send no key — a defect invisible until a lost
+        // response duplicated somebody's data. A wrapper cannot be forgotten
+        // by a case that has not been written yet.
+        let transport = KeyedTransport(base: self.transport, key: record.idempotencyKey)
+
         switch record.kind {
 
         case .createItem:

@@ -23,9 +23,30 @@ final class PendingMutationModel {
     /// inspectable in CloudKit's dashboard.
     var payloadJson: String = "{}"
 
-    /// For `createItem` mutations, the stable client id used for server-side
-    /// idempotency. Optional because most mutation kinds don't carry one.
+    /// The `source_id` a caller supplied on a `createItem`, carried so the
+    /// replay sends back what the caller asked for.
+    ///
+    /// **Not the idempotency mechanism, despite reading like one.** It is a
+    /// caller's own identifier for the thing being created and only some
+    /// callers set it; see ``idempotencyKey`` for what actually makes a
+    /// replay safe to repeat.
     var sourceId: String?
+
+    /// The value sent as `Idempotency-Key` on every attempt at this mutation,
+    /// minted once when the row is enqueued and never changed.
+    ///
+    /// **A retry is only safe if it is the same request.** Without a key, a
+    /// replay whose response was lost is indistinguishable from one the server
+    /// never saw: the write happened, the acknowledgement did not, and the
+    /// next drain sends it again. For a create the device is protected by
+    /// stamping its own id, so the server recognizes the row — but nothing
+    /// protected the other nine write routes, where a lost response meant a
+    /// second edge, a second tag, a second metadata write.
+    ///
+    /// Optional because a store written by an earlier build has rows without
+    /// one. Those replay as they always did; see `MutationQueue` for how a
+    /// missing key is handled rather than invented.
+    var idempotencyKey: String?
 
     /// The local item/edge id this mutation operates on. Used by the cascade
     /// scan when a `createItem` is dropped permanently and dependent

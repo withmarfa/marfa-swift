@@ -22,6 +22,16 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
     public var lastError: String?
     public var state: PendingMutationState
 
+    /// The `Idempotency-Key` every attempt at this mutation carries, so the
+    /// server can recognize a retry whose first response was lost.
+    ///
+    /// `nil` for a row enqueued by a build that did not mint one. Such a row
+    /// replays without a key rather than being given a fresh one: a key
+    /// invented at replay time is a *different* key on every attempt, which
+    /// is worse than none — it would tell the server each retry was a new
+    /// request while looking, from here, like the protection was working.
+    public var idempotencyKey: String?
+
     /// Why this row is blocked, or `nil` when it is not.
     ///
     /// Read from the row's own column, or — for a row a `16.x` build left
@@ -39,7 +49,8 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         attemptCount: Int = 0,
         lastError: String? = nil,
         state: PendingMutationState = .pending,
-        blockedReason: PendingMutationBlockReason? = nil
+        blockedReason: PendingMutationBlockReason? = nil,
+        idempotencyKey: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -51,6 +62,7 @@ public struct PendingMutationRecord: Sendable, Codable, Equatable {
         self.lastError = lastError
         self.state = state
         self.blockedReason = blockedReason
+        self.idempotencyKey = idempotencyKey
     }
 }
 
@@ -92,7 +104,8 @@ extension PendingMutationModel {
             attemptCount: attemptCount,
             lastError: LegacyBlockedPrefix.strip(lastError),
             state: state,
-            blockedReason: state == .blocked ? resolvedBlockReason : nil
+            blockedReason: state == .blocked ? resolvedBlockReason : nil,
+            idempotencyKey: idempotencyKey
         )
     }
 }
@@ -357,11 +370,26 @@ public actor MutationQueue {
         model.sourceId = sourceId
         model.localId = localId
         model.createdAt = now
+        // Minted once, here, for every kind — this is the only door into the
+        // queue, which is what makes "the same key on every attempt" a
+        // property of the row rather than a discipline at ten call sites.
+        model.idempotencyKey = UUIDv7.generateString()
         model.attemptCount = 0
         model.lastError = nil
         modelContext.insert(model)
         try modelContext.save()
         emitDrainRequest()
+    }
+
+    /// Strips the key from a queued row, so a test can exercise the shape a
+    /// store written by an earlier build has. Nothing in production removes a
+    /// key: it is minted at enqueue and never changes.
+    func clearIdempotencyKeyForTesting(localId: String) throws {
+        let predicate = #Predicate<PendingMutationModel> { $0.localId == localId }
+        for model in try modelContext.fetch(FetchDescriptor(predicate: predicate)) {
+            model.idempotencyKey = nil
+        }
+        try modelContext.save()
     }
 
     // MARK: - Enqueue public API

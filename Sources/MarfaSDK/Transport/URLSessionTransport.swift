@@ -96,10 +96,23 @@ final class URLSessionTransport: Transport {
         body: (any Encodable & Sendable)?,
         query: [(String, String)]?
     ) async throws -> T {
+        try await request(
+            method: method, path: path, body: body, query: query, idempotencyKey: nil
+        )
+    }
+
+    func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?,
+        idempotencyKey: String?
+    ) async throws -> T {
         let bodyData = try encodeBody(body)
         let (data, response) = try await rawRequest(
             method: method, path: path, body: bodyData,
-            contentType: body != nil ? "application/json" : nil, query: query
+            contentType: body != nil ? "application/json" : nil, query: query,
+            idempotencyKey: idempotencyKey
         )
 
         if response.statusCode == 409 {
@@ -336,6 +349,22 @@ final class URLSessionTransport: Transport {
         body: Data?,
         contentType: String?,
         query: [(String, String)]?
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await rawRequest(
+            method: method, path: path, body: body,
+            contentType: contentType, query: query, idempotencyKey: nil
+        )
+    }
+
+    /// The one place a request is actually built, so the key cannot be
+    /// stamped on some paths and forgotten on others.
+    func rawRequest(
+        method: HTTPMethod,
+        path: String,
+        body: Data?,
+        contentType: String?,
+        query: [(String, String)]?,
+        idempotencyKey: String?
     ) async throws -> (Data, HTTPURLResponse) {
         let url = try buildURL(path: path, query: query)
         var request = URLRequest(url: url)

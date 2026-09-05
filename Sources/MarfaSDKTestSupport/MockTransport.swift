@@ -42,19 +42,25 @@ public final class MockTransport: Transport, @unchecked Sendable {
         /// the SDK passed when opening the SSE stream. Lets tests assert
         /// cursor-resume behavior.
         public let lastEventID: String?
+        /// The `Idempotency-Key` the SDK sent, if any. A queued write carries
+        /// the same value on every attempt, so a test can assert that a retry
+        /// really is the same request rather than a second one.
+        public let idempotencyKey: String?
 
         public init(
             method: HTTPMethod,
             path: String,
             body: Data?,
             query: [(String, String)]?,
-            lastEventID: String? = nil
+            lastEventID: String? = nil,
+            idempotencyKey: String? = nil
         ) {
             self.method = method
             self.path = path
             self.body = body
             self.query = query
             self.lastEventID = lastEventID
+            self.idempotencyKey = idempotencyKey
         }
     }
 
@@ -119,6 +125,36 @@ public final class MockTransport: Transport, @unchecked Sendable {
         let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
         let outcome: Dequeue<Data> = lock.withLock {
             _calls.append(Call(method: method, path: path, body: bodyData, query: query))
+            if !errors.isEmpty { return .error(errors.removeFirst()) }
+            if responses.isEmpty { return .missing }
+            return .value(responses.removeFirst())
+        }
+        switch outcome {
+        case .error(let e):
+            if let e { throw e }
+            fatalError("MockTransport: nil error enqueued")
+        case .missing:
+            let err = MissingMockResponseError(method: method.rawValue, path: path)
+            mockTransportLogger.error("\(err.description, privacy: .public)")
+            throw err
+        case .value(let data):
+            return try JSONDecoder().decode(T.self, from: data)
+        }
+    }
+
+    public func request<T: Decodable & Sendable>(
+        method: HTTPMethod,
+        path: String,
+        body: (any Encodable & Sendable)?,
+        query: [(String, String)]?,
+        idempotencyKey: String?
+    ) async throws -> T {
+        let bodyData = body.flatMap { try? JSONEncoder().encode(AnyEncodable($0)) }
+        let outcome: Dequeue<Data> = lock.withLock {
+            _calls.append(Call(
+                method: method, path: path, body: bodyData, query: query,
+                idempotencyKey: idempotencyKey
+            ))
             if !errors.isEmpty { return .error(errors.removeFirst()) }
             if responses.isEmpty { return .missing }
             return .value(responses.removeFirst())
