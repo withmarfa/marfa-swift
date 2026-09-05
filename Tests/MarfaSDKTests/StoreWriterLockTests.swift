@@ -280,45 +280,15 @@ struct StoreWriterLockTests {
 
     // MARK: - The window a review found
 
-    /// **Two openers meeting one stale lock must not both come away as
-    /// writer**, and an earlier version let them.
+    /// Two openers meeting one stale lock used to be the whole race test, and
+    /// it is now `StoreLockRaceTests` — which needs twelve openers rather than
+    /// two, because the residual window needs a *third* party to fall into it.
     ///
-    /// Clearing by unlink removes whatever is at the path *now*, not the dead
-    /// holder just read — so both find it dead, both clear, and the second
-    /// clears the first's fresh claim. Both hold, and the first's release is
-    /// then a no-op because its token no longer matches, so it never cleans up
-    /// either. Clearing by rename is atomic: exactly one caller can succeed,
-    /// and the loser re-reads rather than removing a claim somebody has just
-    /// made.
-    @Test("two openers meeting one stale lock produce exactly one writer")
-    func onlyOneOpenerTakesOverAStaleLock() async throws {
-        let path = tempStorePath()
-        let lockPath = try #require(StoreWriterLock.lockPath(for: path))
-        try FileManager.default.createDirectory(
-            atPath: (lockPath as NSString).deletingLastPathComponent,
-            withIntermediateDirectories: true
-        )
-        let dead = StoreLockHolder(
-            pid: 999_999, token: "gone", since: "then",
-            bootedAt: StoreWriterLock.machineBootedAt(), startedAt: nil
-        )
-        try JSONEncoder().encode(dead).write(to: URL(fileURLWithPath: lockPath))
-
-        // The in-process guard would settle this on its own, so it is stood
-        // down for the length of the race: what is under test is the
-        // filesystem claim, which is what two *processes* would contend over.
-        let winners = await withTaskGroup(of: Bool.self) { group in
-            for _ in 0..<2 {
-                group.addTask {
-                    StoreWriterLock.clearedStaleLockForTesting(at: lockPath)
-                }
-            }
-            var won = 0
-            for await didClear in group where didClear { won += 1 }
-            return won
-        }
-        #expect(winners == 1, "both openers cleared the same stale lock")
-    }
+    /// What was here asserted that exactly one caller could clear. That is no
+    /// longer the property: with the holder re-read under an exclusive right,
+    /// a second caller arriving after the file is already gone truthfully
+    /// reports the path as clear. The property that survives is exactly one
+    /// *writer*, which is what the race suite measures.
 
     // MARK: - What the readings actually say
 
