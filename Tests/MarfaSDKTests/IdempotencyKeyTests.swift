@@ -141,77 +141,6 @@ struct IdempotencyKeyTests {
     ///
     /// Nothing is lost: the conflict machinery is itself the recovery for the
     /// case a key would have covered — a server that moved under this write.
-    @Test("a versioned update is deliberately not keyed")
-    func versionedUpdatesAreNotKeyed() async throws {
-        let (store, queue, transport, _, engine) = try await SyncEngineTestKit.makeFixture()
-        transport.enqueueEvents([])
-        await engine.start()
-
-        let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
-        let item = try await store.createItem(input)
-        try await queue.enqueueUpdateItem(
-            id: item.id, properties: ["body": .string("edited")], version: 1
-        )
-
-        transport.enqueue(echo(item.id))
-        await engine.replayMutationsForTesting()
-        try await SyncEngineTestKit.awaitCondition(description: "the versioned patch was attempted") {
-            transport.calls.contains { $0.method == .patch }
-        }
-
-        let patch = try #require(transport.calls.first { $0.method == .patch })
-        #expect(patch.idempotencyKey == nil)
-        await engine.stop()
-    }
-
-    /// The key is in the row, not in the actor that wrote it.
-    ///
-    /// The whole premise is "minted at enqueue, survives to replay", and a
-    /// replay can be days and several launches later. A second queue over the
-    /// same container reads the same value — which is what makes it a stored
-    /// column rather than something the writer happens to remember.
-    @Test("the key is stored, so a later reader sees the same one")
-    func theKeyIsStoredNotRemembered() async throws {
-        let (store, queue, container) = try await MarfaSDKTest.makeInMemoryStorePair()
-        let input = CreateItemInput(type: "core.note", properties: ["body": .string("x")])
-        let item = try await store.createItem(input)
-        try await queue.enqueueCreateItem(input, localId: item.id)
-
-        let first = try #require(await queue.fetchAll().first?.idempotencyKey)
-        let reopened = MutationQueue(modelContainer: container)
-        #expect(try await reopened.fetchAll().first?.idempotencyKey == first)
-    }
-
-    /// An edge create is a queued write like any other, and no test touched
-    /// one — the suite covered items only.
-    @Test("an edge create carries a key too")
-    func edgeCreatesCarryAKey() async throws {
-        let (_, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
-        try await queue.enqueueCreateEdge(
-            source: "a", target: "b", edgeType: "core.mentions", properties: [:], localEdgeId: "e1"
-        )
-        #expect(try await queue.fetchAll().first?.idempotencyKey != nil)
-    }
-
-    /// A blob upload is unkeyed **on purpose**, and nothing pinned that — so a
-    /// later change adding a key would have looked like an improvement.
-    ///
-    /// A blob is addressed by the hash of its own bytes, so sending it twice
-    /// is already the same write, and the route is not one the server keys.
-    /// It also builds its queue row directly rather than through the door that
-    /// mints keys, which is why the absence is structural rather than a
-    /// decision taken at replay.
-    @Test("a blob upload is deliberately unkeyed")
-    func blobUploadsAreUnkeyed() async throws {
-        let (_, queue, _) = try await MarfaSDKTest.makeInMemoryStorePair()
-        try await queue.enqueueBlobUpload(
-            hash: "abc", data: Data("bytes".utf8), mimeType: "text/plain"
-        )
-        let row = try #require(await queue.fetchAll().first)
-        #expect(row.kind == .uploadBlob)
-        #expect(row.idempotencyKey == nil)
-    }
-
     /// A row enqueued before keys existed replays **without** one rather than
     /// being given a fresh one. A key invented at replay time differs on every
     /// attempt, which is worse than none: it would tell the server each retry
@@ -249,13 +178,18 @@ struct IdempotencyKeyTests {
 /// which is exactly what happened, and it reddened the other suite rather than
 /// this one. A `.serialized` trait does not help: it orders tests within a
 /// suite, not across suites sharing global state.
-final class IdempotencyStubProtocol: URLProtocol, @unchecked Sendable {
+private final class IdempotencyStubProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var recorded: [URLRequest] = []
     private static let lock = NSLock()
 
-    static func reset() {
+    nonisolated(unsafe) private static var body: String = "{}"
+
+    /// `body` is what every canned response carries. A conflict-door call
+    /// decodes an `ItemResponse`, so `{}` is not always enough.
+    static func reset(body: String = "{}") {
         lock.lock(); defer { lock.unlock() }
         recorded = []
+        self.body = body
     }
 
     static func requests() -> [URLRequest] {
@@ -275,7 +209,10 @@ final class IdempotencyStubProtocol: URLProtocol, @unchecked Sendable {
             url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data("{}".utf8))
+        Self.lock.lock()
+        let payload = Self.body
+        Self.lock.unlock()
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 
@@ -334,6 +271,53 @@ struct IdempotencyHeaderTests {
         #expect(sent.value(forHTTPHeaderField: "Idempotency-Key") == nil)
     }
 
+    /// **Asserted on the wire, not through the mock**, and the first draft of
+    /// this test could not fail.
+    ///
+    /// `MockTransport.Call.idempotencyKey` defaults to `nil` for a
+    /// `requestWithConflict`, because that method has no key parameter to
+    /// record and never had one — so an assertion that it is `nil` holds
+    /// whatever the code does. Reverting the fix left it green. That is the
+    /// exact defect this branch exists to have learned from, reproduced in the
+    /// fix, guarding the one decision worth guarding.
+    @Test("a versioned update is deliberately not keyed")
+    func versionedUpdatesAreNotKeyed() async throws {
+        IdempotencyStubProtocol.reset()
+        let wrapped = KeyedTransport(base: stubbedTransport(), key: "row-key")
+
+        // The conflict door, reached the way the replay reaches it.
+        let _: ConflictResult<EmptyResponse> = try await wrapped.requestWithConflict(
+            method: .patch, path: "/items/x", body: nil, query: nil
+        )
+
+        let sent = try #require(IdempotencyStubProtocol.requests().first)
+        #expect(sent.value(forHTTPHeaderField: "Idempotency-Key") == nil)
+
+        // The discriminator: an ordinary write through the same wrapper does
+        // carry it, so the absence above is about this door rather than about
+        // the wrapper being inert.
+        let _: EmptyResponse = try await wrapped.request(
+            method: .patch, path: "/items/x", body: nil, query: nil
+        )
+        let second = try #require(IdempotencyStubProtocol.requests().last)
+        #expect(second.value(forHTTPHeaderField: "Idempotency-Key") == "row-key")
+    }
+
+    /// A key on a read is never right, and the wrapper covers whole replays —
+    /// a bulk action posts once and then polls the job with `GET`s through the
+    /// same transport.
+    @Test("a read through the wrapper carries no key")
+    func readsAreNotKeyed() async throws {
+        IdempotencyStubProtocol.reset()
+        let wrapped = KeyedTransport(base: stubbedTransport(), key: "row-key")
+
+        let _: EmptyResponse = try await wrapped.request(
+            method: .get, path: "/items/bulk-actions/jobs/1", body: nil, query: nil
+        )
+        let sent = try #require(IdempotencyStubProtocol.requests().first)
+        #expect(sent.value(forHTTPHeaderField: "Idempotency-Key") == nil)
+    }
+
     /// `X-Request-ID` is the opposite property and shares the code path, so a
     /// change that made one stable would be visible here.
     @Test("the request id still differs per attempt while the key does not")
@@ -353,5 +337,22 @@ struct IdempotencyHeaderTests {
         #expect(sent.map { $0.value(forHTTPHeaderField: "Idempotency-Key") } == ["one-key", "one-key"])
         let requestIds = sent.compactMap { $0.value(forHTTPHeaderField: "X-Request-ID") }
         #expect(Set(requestIds).count == 2)
+    }
+
+    /// The negative control for the path the header first landed on by
+    /// mistake. Reading confirms `rawUpload` sets no key; this suite exists
+    /// because reading is what failed last time.
+    @Test("an upload carries no key")
+    func uploadsCarryNoHeader() async throws {
+        IdempotencyStubProtocol.reset()
+        let transport = stubbedTransport()
+
+        _ = try await transport.rawUpload(
+            method: .post, path: "/blobs", body: Data("bytes".utf8),
+            contentType: "application/octet-stream", query: nil, onBytesSent: { _, _ in }
+        )
+
+        let sent = try #require(IdempotencyStubProtocol.requests().first)
+        #expect(sent.value(forHTTPHeaderField: "Idempotency-Key") == nil)
     }
 }

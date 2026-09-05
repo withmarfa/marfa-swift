@@ -16,6 +16,23 @@ struct KeyedTransport: Transport {
     let base: any Transport
     let key: String?
 
+    /// A key is only ever stamped on a **write**.
+    ///
+    /// The wrapper covers a whole replay, and a replay is not only writes: a
+    /// bulk action posts once and then polls the job with `GET`s through the
+    /// same transport. Keying a read is never right, and here it would be
+    /// silently total — the server would answer every poll with the first
+    /// poll's stored body, so the job would never be observed finishing and
+    /// the runner would spin to its timeout. Harmless today only because that
+    /// route is not one the server keys, which is not a property this file
+    /// should depend on.
+    private func keyFor(_ method: HTTPMethod) -> String? {
+        switch method {
+        case .post, .put, .patch, .delete: return key
+        default: return nil
+        }
+    }
+
     func request<T: Decodable & Sendable>(
         method: HTTPMethod,
         path: String,
@@ -23,7 +40,8 @@ struct KeyedTransport: Transport {
         query: [(String, String)]?
     ) async throws -> T {
         try await base.request(
-            method: method, path: path, body: body, query: query, idempotencyKey: key
+            method: method, path: path, body: body, query: query,
+            idempotencyKey: keyFor(method)
         )
     }
 
@@ -39,7 +57,7 @@ struct KeyedTransport: Transport {
         // is a wrapper that quietly ignores its caller.
         try await base.request(
             method: method, path: path, body: body, query: query,
-            idempotencyKey: idempotencyKey ?? key
+            idempotencyKey: idempotencyKey ?? keyFor(method)
         )
     }
 
