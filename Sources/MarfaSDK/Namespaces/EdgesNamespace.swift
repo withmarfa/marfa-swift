@@ -181,6 +181,18 @@ public struct EdgesNamespace: Sendable {
 
     // MARK: - Reads
 
+    /// Fetches a single edge by id. Reads the local store when there is one,
+    /// so an edge already on the device is readable offline.
+    public func get(id: String) async throws -> Edge {
+        if let store = localStore {
+            return try await store.fetchEdge(id: id)
+        }
+        let response: EdgeResponse = try await transport.request(
+            method: .get, path: "/edges/\(id)", body: nil, query: nil
+        )
+        return response.edge
+    }
+
     /// Global space-scoped edge listing, optionally filtered by type.
     /// Use this when you need "all edges of type X" (thread-root counting,
     /// taxonomy traversal) — replaces the walk-every-item N+1 pattern.

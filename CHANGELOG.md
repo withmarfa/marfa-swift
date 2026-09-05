@@ -9,6 +9,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
+- **The OpenAPI snapshot catches up with the server**, which moves several generated names. Most were already named here by earlier entries; one is a removal that is not the kit's choice.
+
+### Added
+
+- `EdgesNamespace.get(id:)`, wrapping `GET /edges/{id}` — a route the server declares and the kit had no way to reach. It reads the local store when there is one, so an edge already on the device is readable offline.
+
+### Removed
+
+- **`CreatedKey.expiresAt` is gone, and its initializer loses the parameter**, because `POST /keys` stopped declaring `expires_at` in its `201`. This is a server contract change the kit is reporting, not one it chose: `GET /keys` and `PATCH /keys/{id}` still declare the field, so a key can still carry an expiry — the create response no longer tells you what it is. Read it back with `GET /keys` until the create response declares it again.
+
 - **A refused write now carries the code the server sent, whatever its status.** A `403` learned this when a suspended space needed telling apart from an ordinary refusal; `400` and `409` already knew it. Everything else stamped `server_error` over the answer, and `401` and `404` stamped their own — so `quota_exceeded` and `rate_limited` were the same thing at `429`, and `blob_too_large`, `compatible_with_violation` and `idempotency_key_reused` were the same thing across `413` and `422`.
 
   **This was the constraint underneath several other divergences rather than a cosmetic loss.** The dropped-mutation log the documentation promises carries the server's code could not carry one, and the classifier could not tell apart refusals that want opposite handling even where it needed to. `UnauthorizedError` and `NotFoundError` gain a `code` parameter defaulting to their old constants, matching `ForbiddenError`.
