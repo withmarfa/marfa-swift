@@ -160,16 +160,7 @@ extension StoreWriterLock {
                 // exactly one caller can succeed. The loser's rename fails
                 // because what it named is gone, and it re-reads rather than
                 // clearing a claim somebody else has just made.
-                guard clearedStaleLock(at: path, token: token) else {
-                    inProcess.give(path)
-                    return StoreWriterLock(
-                        writer: false, heldBy: readHolder(path: path) ?? unknownHolder(),
-                        release: {}
-                    )
-                }
-                guard try claim(path: path, token: token) else {
-                    // Somebody else claimed between the clear and here, which
-                    // is an ordinary outcome rather than an error.
+                guard tookOverStaleLock(at: path, token: token) else {
                     inProcess.give(path)
                     return StoreWriterLock(
                         writer: false, heldBy: readHolder(path: path) ?? unknownHolder(),
@@ -197,17 +188,70 @@ extension StoreWriterLock {
         })
     }
 
-    /// Takes a stale lock out of the way, atomically.
+    /// Takes over a stale lock: clears it **and** claims it, under one right.
     ///
-    /// Returns `false` when somebody else got there first — the rename fails
-    /// because the file it named no longer exists, which is exactly the answer
-    /// wanted: this caller did not clear it and must not claim as though it
-    /// had.
-    private static func clearedStaleLock(at path: String, token: String) -> Bool {
-        let aside = "\(path).\(token).stale"
-        guard rename(path, aside) == 0 else { return false }
-        try? FileManager.default.removeItem(atPath: aside)
-        return true
+    /// **Three versions of this raced and each failure taught the next one
+    /// something, so the reasoning is here rather than in a commit nobody
+    /// will find.**
+    ///
+    /// Renaming the file aside is atomic, so only one caller moves any given
+    /// file — but a loser still carrying an earlier read moves the *winner's
+    /// fresh lock* aside to inspect it, and the path is empty while it does.
+    /// A third opener claims in that gap. Twelve openers over thirty rounds
+    /// found it; two openers never will.
+    ///
+    /// Taking an exclusive right to clear does not close it either. The right
+    /// says nobody else is clearing; it says nothing about the file still
+    /// being the one you judged dead, so a straggler carrying an older read
+    /// can win the right afterwards and unlink a lock that is now live.
+    ///
+    /// Re-reading the holder under the right fixes that and still races,
+    /// because **the right ended at the clear and the claim happened outside
+    /// it.** Two callers could both come away with the path legitimately
+    /// clear — one removed the dead file, the other arrived to find it
+    /// already gone — and then both claim. The atomic link makes one of them
+    /// lose, which is why this took thirty rounds under load to see.
+    ///
+    /// So the right covers the whole takeover. Clear and claim are one
+    /// critical section, and a caller who does not hold it never touches the
+    /// file.
+    private static func tookOverStaleLock(at path: String, token: String) -> Bool {
+        let right = path + ".clearing"
+        guard (try? takeClearingRight(at: right, token: token)) == true else { return false }
+        defer { try? FileManager.default.removeItem(atPath: right) }
+
+        if let holder = readHolder(path: path) {
+            // Somebody live got here first. Refuse against them rather than
+            // clearing a lock that is no longer the one judged dead.
+            guard !stillHolding(holder) else { return false }
+            try? FileManager.default.removeItem(atPath: path)
+        } else {
+            // Either nothing is there or something unparseable is, and both
+            // want the same answer. A lockfile that will not parse is one
+            // nothing valid ever wrote — the claim puts its holder in place
+            // atomically and leaves no half-written state to meet — and
+            // leaving it would make the store unopenable for ever.
+            try? FileManager.default.removeItem(atPath: path)
+        }
+
+        return ((try? claim(path: path, token: token)) == true)
+    }
+
+    /// The exclusive right to clear one store's lock.
+    ///
+    /// Taken through the same link-into-place claim the lock itself uses, so
+    /// a reader of the right never meets a file that exists and is empty.
+    private static func takeClearingRight(at right: String, token: String) throws -> Bool {
+        if try claim(path: right, token: token) { return true }
+        // A right nobody is holding was left by a crash. Without this, one
+        // crashed clearer makes every stale lock on that store permanently
+        // unclearable — the store read-only for good, which is the outcome
+        // the whole file is written to avoid.
+        if let holder = readHolder(path: right), !stillHolding(holder) {
+            try? FileManager.default.removeItem(atPath: right)
+            return try claim(path: right, token: token)
+        }
+        return false
     }
 
     /// A holder for the case where the lock is held and the file has already
@@ -222,10 +266,16 @@ extension StoreWriterLock {
         )
     }
 
+    /// Drops this process's record of holding a path, so a test can contend
+    /// over the filesystem the way two processes would. Nothing else calls it.
+    static func forgetInProcessHoldForTesting(storePath: String) {
+        if let path = lockPath(for: storePath) { inProcess.give(path) }
+    }
+
     /// The atomic clear, reachable from a test so the race it exists to
     /// settle can actually be run. Nothing else calls it.
-    static func clearedStaleLockForTesting(at path: String) -> Bool {
-        clearedStaleLock(at: path, token: UUID().uuidString)
+    static func tookOverStaleLockForTesting(at path: String) -> Bool {
+        tookOverStaleLock(at: path, token: UUID().uuidString)
     }
 
     private static func heldHere() -> StoreLockHolder {
