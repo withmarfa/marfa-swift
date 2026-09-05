@@ -58,10 +58,10 @@ struct EngineReportsItselfTests {
         // **Four different counts, no two alike.** Any pair of counters sharing
         // a value can be swapped invisibly, and `outstanding` only catches a
         // swap across the line it draws. The fixture this replaces was two
-        // pending and one blocked, which did pin that pair — and left
-        // `inFlight` and `deadLettered` both at zero and both unasserted, so
-        // either could have been absent. So 2 waiting, 3 in flight, 1 stuck,
-        // 4 refused.
+        // pending and one blocked, which did pin that pair — and pinned
+        // `deadLettered` only at zero, which holds against a counter that
+        // always answers zero, while `inFlight` was not asserted at all. So 2
+        // waiting, 3 in flight, 1 stuck, 4 refused.
         for label in (1...10).map({ "row \($0)" }) {
             var input = CreateItemInput(type: "core.note", properties: ["body": .string(label)])
             input.id = UUIDv7.generateString()
@@ -518,6 +518,10 @@ struct EngineReportsItselfTests {
         }
 
         #expect(
+            transport.calls.contains { $0.path == "/edges" },
+            "the premise is that it died in the edge pass, so it has to have got there"
+        )
+        #expect(
             try await engine.status.hydration == nil,
             "the clear covers the item loop and stops there"
         )
@@ -590,6 +594,7 @@ struct EngineReportsItselfTests {
             await endings.seen.count >= 1
         }
         let seen = await endings.seen
+        #expect(seen.count == 1, "one ending per import, not one per exit path: \(seen)")
         #expect(seen.first?.completed == true)
         #expect(seen.first?.imported == 3)
     }

@@ -865,7 +865,6 @@ public actor SyncEngine {
         // running. A cancellation lands here as well, which is right: a
         // stopped engine is not a hydrating one.
         var finished = false
-        var importedSoFar = 0
         // **Both surfaces, or the push surface is left saying the opposite of
         // the pull surface.** Clearing `hydrationProgress` fixes what `status`
         // reports and nothing else: a consumer drawing a bar from
@@ -875,7 +874,7 @@ public actor SyncEngine {
         defer {
             if !finished {
                 hydrationProgress = nil
-                emit(.hydrationEnded(imported: importedSoFar, completed: false))
+                emit(.hydrationEnded(imported: imported, completed: false))
             }
         }
 
@@ -953,7 +952,6 @@ public actor SyncEngine {
             // Once per page, not once per row. A progress event per item on a
             // ten-thousand-row import is ten thousand main-actor hops to move
             // a bar by a pixel.
-            importedSoFar = imported
             if let total {
                 hydrationProgress = HydrationProgress(imported: imported, total: total)
                 emit(.hydrationProgress(imported: imported, total: total))

@@ -191,6 +191,10 @@ public enum SyncEvent: Sendable {
     /// being written to while a device fills can push `imported` past it.
     /// `imported` is the figure to trust; the pair is progress, not an
     /// invariant.
+    ///
+    /// **Terminated by ``hydrationEnded(imported:completed:)``**, which is what
+    /// says the fill stopped. Without handling that, a bar built on this sits
+    /// at the last fraction it was given.
     case hydrationProgress(imported: Int, total: Int)
 
     /// A first fill has stopped, either because it finished or because it did
@@ -209,7 +213,16 @@ public enum SyncEvent: Sendable {
     /// engine's own catch-up path and not for an app calling
     /// ``SyncEngine/performInitialSync()`` directly, where the throw goes to
     /// the caller, and it is skipped altogether when a `stop()` cancels the
-    /// import. This fires on every way out.
+    /// import. This fires on every way out **of the import itself**. The two
+    /// refusals ahead of it — a client that does not hold the store's writer
+    /// lock, and a queue with unsent work — emit nothing, and need nothing:
+    /// no progress was reported either, so there is no bar to take down.
+    ///
+    /// **A `stop()` mid-import arrives here as `completed: false`**, and is
+    /// deliberately not distinguished from a failure: for a progress bar the
+    /// two mean the same thing. An app that raises an error from this case
+    /// will raise one on an ordinary teardown, so `completed: false` is a
+    /// reason to stop drawing rather than a reason to complain.
     case hydrationEnded(imported: Int, completed: Bool)
 
     /// A blob upload has started. Fires once per upload attempt, before
