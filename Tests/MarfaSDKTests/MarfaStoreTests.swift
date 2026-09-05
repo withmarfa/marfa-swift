@@ -234,6 +234,37 @@ struct MarfaStoreTests {
         query.stop()
     }
 
+    // MARK: - edges.get
+
+    /// **The local branch, which the namespace test cannot reach.** That one
+    /// drives a `MockTransport` and so only ever proves the remote path; a
+    /// `get` wired to the network even when a store exists would pass it and
+    /// then fail offline, which is the one condition this method is for.
+    @Test("edges.get reads the local store rather than the network")
+    func edgesGetReadsTheLocalStore() async throws {
+        let client = try await makeClient()
+        let a = try await client.items.create(noteInput(body: "A"))
+        let b = try await client.items.create(noteInput(body: "B"))
+        let created = try await client.edges.create(source: a.id, target: b.id, edgeType: "about")
+
+        let read = try await client.edges.get(id: created.id)
+
+        #expect(read.id == created.id)
+        #expect(read.sourceId == a.id)
+        #expect(read.targetId == b.id)
+        #expect(read.edgeType == "about")
+    }
+
+    /// An edge the store does not hold is a miss, not an empty edge — and on
+    /// this path there is no server to fall through to.
+    @Test("edges.get on an unknown id reports it as missing")
+    func edgesGetOnUnknownIdThrows() async throws {
+        let client = try await makeClient()
+        await #expect(throws: NotFoundError.self) {
+            _ = try await client.edges.get(id: "edge-that-does-not-exist")
+        }
+    }
+
     // MARK: - EdgesQuery
 
     @Test("EdgesQuery returns outbound edges") func edgesQueryReturnsOutboundEdges() async throws {

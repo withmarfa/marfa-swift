@@ -112,6 +112,24 @@ struct EdgesTests {
         #expect(mock.calls[0].path == "/edges/edge-9")
     }
 
+    // MARK: - get
+
+    /// The route the server declares and the kit did not reach. Asserted on
+    /// the request, because a `get` that fetched the wrong path would still
+    /// return the mock's edge and read as correct.
+    @Test("get sends GET /edges/<id> and returns the edge")
+    func get() async throws {
+        let (client, mock) = makeClient()
+        mock.enqueue(["edge": sampleEdge(id: "edge-7")])
+
+        let edge = try await client.edges.get(id: "edge-7")
+
+        #expect(edge.id == "edge-7")
+        let call = try #require(mock.calls.first)
+        #expect(call.method == .get)
+        #expect(call.path == "/edges/edge-7")
+    }
+
     // MARK: - listFromSource / listToTarget
 
     @Test("listFromSource sends GET /items/:id/edges with optional edge_type")
