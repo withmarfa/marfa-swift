@@ -1909,16 +1909,7 @@ public actor SyncEngine {
         // cycle, where the queue holds writes on both sides of the block.
         var stoppedThisCycle = Set<String>()
 
-        // **Whether this pass parked the whole queue on one refusal**, which
-        // the clean-drain decision below has to know about. That decision
-        // excludes blocked rows on purpose — a row stopped for a stated reason
-        // is not work the cycle failed to do — and it was written when
-        // blocking was per-row and exceptional. Parking every row at once
-        // makes "nothing outstanding" true for the worst reason there is, so
-        // without this a refused credential stamps a clean drain and publishes
-        // `.synced`: a green tick and "synced just now" over a queue that
-        // cannot move until somebody signs in again.
-        var parkedTheQueue = false
+
 
         // Records this cycle chose not to attempt. The clean-drain decision
         // reads it: a row deferred behind a blocked one is not outstanding work
@@ -2101,7 +2092,6 @@ public actor SyncEngine {
                     // they have: a conflict awaiting review is not resolved by
                     // a new credential.
                     if reason == .credentialRefused {
-                        parkedTheQueue = true
                         let parked = (try? await mutationQueue.parkAllLive(
                             reason: .credentialRefused,
                             error: formatLastError(error)
@@ -2159,7 +2149,7 @@ public actor SyncEngine {
 
         if let transientError {
             recordSyncFailure(transientError)
-        } else if !parkedTheQueue {
+        } else {
             await recordCleanDrainIfQueueIsEmpty(skipped: deferredRecordIds)
         }
     }
@@ -2450,14 +2440,31 @@ public actor SyncEngine {
         // path, left the `.failed` from the attempt before the block standing in
         // `fullSyncState` for good, since a clean drain is the only thing that
         // clears it.
-        let outstanding: [PendingMutationRecord]
+        //
+        // **One reason is excepted, because it does not stop a row — it stops
+        // the queue.** Every other block is one write waiting on one decision,
+        // and the rest of the queue really did drain. A refused credential
+        // parks all of them, so "nothing outstanding" becomes true for the
+        // worst reason there is, and a status line built on this says "synced
+        // just now" over work that cannot move until a person signs in again.
+        //
+        // Read from the store rather than remembered from the pass that
+        // parked. That was the first shape of this fix and it covered one
+        // pass: a fully parked queue has no replayable rows, so the *next*
+        // drain takes an early return that never reaches here, and the
+        // engine's own catch-up and stream-close paths produce one within
+        // milliseconds. Per-pass state cannot answer a question about the
+        // queue's condition.
+        let rows: [PendingMutationRecord]
         do {
-            outstanding = try await mutationQueue.fetchAll().filter {
-                $0.state != .blocked && !skipped.contains($0.id)
-            }
+            rows = try await mutationQueue.fetchAll()
         } catch {
             recordSyncFailure(error)
             return
+        }
+        if rows.contains(where: { $0.blockedReason == .credentialRefused }) { return }
+        let outstanding = rows.filter {
+            $0.state != .blocked && !skipped.contains($0.id)
         }
         guard running, outstanding.isEmpty else { return }
         await recordCleanDrain()

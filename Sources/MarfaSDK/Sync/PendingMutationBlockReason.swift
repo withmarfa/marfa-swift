@@ -86,14 +86,15 @@ extension PendingMutationBlockReason {
     /// **The environmental class never blocks, however often it fails.** A
     /// connectivity failure, a `5xx`, a `429` and a suspended space are
     /// statements about the environment rather than about the write, and each
-    /// clears without the app doing anything.
+    /// clears without the app doing anything. Counting them would strand a
+    /// valid write behind an outage and then need a person to release it — a
+    /// worse defect than the one this mechanism exists to fix.
     ///
     /// **A `401` was in that list and is not any more.** It clears only when a
-    /// person replaces the credential, so retrying it for ever left an app
-    /// with nothing to say beyond an unsent count that did not move. It is
-    /// classified above this, as ``PendingMutationBlockReason/credentialRefused``. Counting them would strand a valid write behind an
-    /// outage and then need a person to release it — a worse defect than the one
-    /// this mechanism exists to fix.
+    /// person replaces the credential, so retrying it for ever left an app with
+    /// nothing to say beyond an unsent count that did not move. It is
+    /// classified above this, as
+    /// ``PendingMutationBlockReason/credentialRefused``.
     ///
     /// `CancellationError` is exempt for a less obvious reason.
     /// ``SyncEngine/stop()`` cancels an in-flight replay and the throw lands
@@ -101,7 +102,13 @@ extension PendingMutationBlockReason {
     /// accrue one failure per stop. Without this, a handful of ordinary app
     /// backgrounds would block a mutation nothing had ever refused.
     /// Whether a failure is about the environment rather than about the
-    /// write: connectivity, a `5xx`, a `429`, a `401`, a suspended space.
+    /// write: connectivity, a `5xx`, a `429`, a suspended space — and a `401`,
+    /// which is the one entry that is true of this function and no longer true
+    /// of the kit. `classify` returns `credentialRefused` before ever asking,
+    /// so this answer is never the one that decides a 401. It stays because it
+    /// remains a true statement about the transport class, and because a
+    /// reordering that put this first would otherwise start counting a dead
+    /// credential toward the ceiling in silence.
     ///
     /// The one definition of that class, so nothing that consults it can
     /// disagree about which failures it means. It is transport-shaped: see

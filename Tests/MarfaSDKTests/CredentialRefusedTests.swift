@@ -227,6 +227,52 @@ struct CredentialRefusedTests {
         if case .synced = await engine.fullSyncState {
             Issue.record("reported .synced over a queue parked on a dead credential")
         }
+
+        // **And it must still be true one pass later.** A fully parked queue
+        // has no replayable rows, so the next drain takes the early return
+        // rather than the tail this suppression was written on — and the
+        // engine's own lifecycle produces that pass within milliseconds.
+        await engine.triggerProactiveDrainForTesting()
+        #expect(
+            await engine.lastCleanDrainAt == nil,
+            "a later pass stamped a clean drain over the parked queue"
+        )
+        if case .synced = await engine.fullSyncState {
+            Issue.record("a later pass reported .synced over the parked queue")
+        }
+    }
+
+    /// **The engine's own lifecycle is what reaches this on a device**, and it
+    /// is what the per-pass version of the suppression did not survive. A
+    /// fully parked queue has no replayable rows, so a later drain takes an
+    /// early return that never reaches the tail the first fix was written on —
+    /// and `start()` produces exactly such a pass, through catch-up, within
+    /// milliseconds of the parking.
+    @Test("starting the engine over a parked queue does not report it as synced")
+    func startingOverAParkedQueueIsNotSynced() async throws {
+        let (_, queue, transport, manager, engine) = try await SyncEngineTestKit.makeFixture()
+        try await queueThree(queue)
+        transport.enqueueError(UnauthorizedError(message: "key revoked"))
+        await manager.applyStateForTesting(.online)
+        await engine.triggerProactiveDrainForTesting()
+        #expect(try await queue.counts.blocked[.credentialRefused] == 3)
+
+        transport.enqueueEvents([])
+        await engine.start()
+        await manager.applyStateForTesting(.connecting)
+        try await SyncEngineTestKit.awaitCondition(description: "the engine to settle online") {
+            manager.state == .online
+        }
+
+        #expect(
+            await engine.lastCleanDrainAt == nil,
+            "the lifecycle stamped a clean drain over a queue parked on a dead credential"
+        )
+        if case .synced = await engine.fullSyncState {
+            Issue.record("reported .synced after starting over a parked queue")
+        }
+        #expect(try await queue.counts.blocked[.credentialRefused] == 3, "still parked")
+        await engine.stop()
     }
 
     /// **Releasing is not sending.** `retryAll` returned a count and left the
