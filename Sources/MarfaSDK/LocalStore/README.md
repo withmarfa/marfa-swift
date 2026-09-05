@@ -21,7 +21,7 @@ Eight `@Model` classes, all under `Schema/Models/`:
 | `SyncStateModel` | Key/value table for sync cursor + bookkeeping. |
 | `PendingBlobModel` | Binary buffer for queued blob uploads. `data` field uses `@Attribute(.externalStorage)`. |
 | `DroppedMutationModel` | Permanently-failed mutations dropped from the replay queue, retained for inspection + dismissal. |
-| `CachedTypeModel` | The space's type graph as the server last described it. Ships empty; nothing writes it yet. |
+| `CachedTypeModel` | The space's type graph as the server last described it, written by `refreshCachedTypes()` and read to validate a write before it is queued. Schemas are stored **as declared** — `GET /types` does not flatten a parent chain — so a reader resolves them with `MarfaTypeRegistry.resolved()`. |
 
 CloudKit invariants (no `#Unique`, every property defaulted, every
 relationship optional, no `.deny` rules, Codable enums via rawValue,

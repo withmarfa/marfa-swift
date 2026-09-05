@@ -91,6 +91,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   **An unknown type is not refused**, and the reason matters more than the behavior: a space's types reach the device through a cache that may never have been filled, and refusing every custom type until it is would make the offline story worse than no validation at all. Such a write still meets the server on drain, where it was always decided.
 
+  **Both write doors are covered.** `create` validates what it was handed; `update` validates the **merge** its patch produces, which is what the server checks and what the row becomes. Validating a patch on its own would refuse almost every legitimate edit, since omitting a required field in a delta does not remove it.
+
+  **The cached graph is resolved before it is used, and `MarfaTypeRegistry.resolved()` is public because that matters to anyone else reading it.** `GET /types` answers with schemas **as declared** — a type carries its own fields and a `parent` id, with nothing inherited folded in, because resolving a whole vocabulary is work a caller who wants one type should pay per type. Two things follow. A custom type would enforce none of its parent's rules; and a cached copy of a *platform* type would overlay the generated, already-flattened one and quietly stop enforcing everything it inherits, universal fields included. Resolution seeds the universal fields, then merges the chain root-first, exactly as the server does.
+
   **Existing callers should expect this to surface writes that were already invalid.** Nine tests in this repository were building items the server would have refused — a `core.note` with no `body`, a `system.connection` with a `status` outside its enum — and passed only because the local store validated nothing.
 
 - **`Connection.mappingReapplyUntil`**, surfaced by refreshing the vendored type snapshot, which had `system.connection` at schema version 2 while the platform shipped version 3. The drift guard caught the missing accessor as soon as the snapshot moved — the snapshot being stale is what had kept it quiet.

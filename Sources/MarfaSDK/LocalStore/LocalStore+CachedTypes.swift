@@ -41,9 +41,21 @@ extension LocalStore {
             row.cachedAt = stamped
             // Stored whole rather than decomposed: a field this build does not
             // know about survives the round trip and reaches one that does.
-            if let data = try? encoder.encode(schema), let json = String(data: data, encoding: .utf8) {
-                row.definitionJson = json
+            //
+            // **The encode is not allowed to fail quietly.** Swallowing it
+            // would leave the row's `id`, `parent` and `cachedAt` updated
+            // while `definitionJson` kept the *previous* schema — a row
+            // claiming to be current while carrying a stale one, which is the
+            // single shape that can make this cache refuse a write the server
+            // would accept. Throwing abandons the whole save, so the previous
+            // graph stays whole and the caller is told.
+            let data = try encoder.encode(schema)
+            guard let json = String(data: data, encoding: .utf8) else {
+                throw LocalStoreError.encodingFailure(
+                    "cached type \(id) did not encode as UTF-8"
+                )
             }
+            row.definitionJson = json
         }
         try modelContext.save()
     }
@@ -64,18 +76,5 @@ extension LocalStore {
             definitions[row.id] = MarfaTypeDefinition(wire: schema)
         }
         return definitions
-    }
-
-    /// When the cache was last written, or `nil` if it never has been.
-    ///
-    /// What decides whether a schema refusal gets one refresh before it is
-    /// treated as permanent: a cache that has never been filled is not stale,
-    /// it is absent, and the two want different responses.
-    func cachedTypesLastWrittenAt() throws -> String? {
-        var descriptor = FetchDescriptor<CachedTypeModel>(
-            sortBy: [SortDescriptor(\.cachedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first?.cachedAt
     }
 }

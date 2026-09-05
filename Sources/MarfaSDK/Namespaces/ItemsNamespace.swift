@@ -60,7 +60,8 @@ public struct ItemsNamespace: Sendable {
     }
 
     /// Refuses a write the type forbids, before it reaches the store or the
-    /// queue.
+    /// queue. Both write doors run it: `create` on what it was handed, and
+    /// `update` on the merge its patch produces.
     ///
     /// **The point is when, not whether.** The server has always refused these
     /// writes; what it could not do is refuse them at the moment the person
@@ -83,7 +84,9 @@ public struct ItemsNamespace: Sendable {
         type: String,
         store: LocalStore
     ) async throws {
-        let registry = MarfaTypeRegistry.platform.merging(try await store.cachedTypeDefinitions())
+        let registry = MarfaTypeRegistry.platform
+            .merging(try await store.cachedTypeDefinitions())
+            .resolved()
         guard registry.definition(for: type) != nil else { return }
         try registry.validate(properties: properties, against: type)
     }
@@ -157,6 +160,17 @@ public struct ItemsNamespace: Sendable {
         options: UpdateOptions? = nil
     ) async throws -> Item {
         if let store = localStore {
+            // Validated against the MERGE, not the patch, because that is what
+            // the row becomes and what the server checks. A patch is a delta:
+            // omitting a required field does not remove it, so validating the
+            // delta alone would refuse almost every legitimate edit — and
+            // validating nothing lets an edit that empties a required field
+            // through, which is the case this catches.
+            let existing = try await store.fetchItem(id: id)
+            var merged = existing.properties
+            for (key, value) in properties { merged[key] = value }
+            try await refuseIfTheTypeForbidsIt(merged, type: existing.type, store: store)
+
             let queuedStrategy = options?.conflict ?? defaultConflictStrategy
             if queuedStrategy == .callback,
                 options?.resolve == nil,

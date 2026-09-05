@@ -15,11 +15,14 @@ struct TypeValidationOnWriteTests {
     func requiredFieldIsEnforcedOffline() async throws {
         let client = try await MarfaSDKTest.makeInMemoryClient()
 
-        await #expect(throws: TypeValidationError.self) {
+        let thrown = await #expect(throws: TypeValidationError.self) {
             _ = try await client.items.create(
                 CreateItemInput(type: "core.note", properties: ["title": .string("no body")])
             )
         }
+        // Which field, not just "something threw". Without this the test stays
+        // green against a build that refuses every write for its own reasons.
+        #expect(thrown?.failures.map(\.field) == ["body"])
 
         // Nothing was written. A refusal that leaves a ghost behind is worse
         // than no refusal, because the row then exists only on this device.
@@ -41,11 +44,12 @@ struct TypeValidationOnWriteTests {
     @Test("a declared field holding the wrong type is refused")
     func wrongTypeIsRefused() async throws {
         let client = try await MarfaSDKTest.makeInMemoryClient()
-        await #expect(throws: TypeValidationError.self) {
+        let thrown = await #expect(throws: TypeValidationError.self) {
             _ = try await client.items.create(
                 CreateItemInput(type: "core.note", properties: ["body": .int(3)])
             )
         }
+        #expect(thrown?.failures.map(\.field) == ["body"])
     }
 
     /// Deliberate, and the reason matters more than the behavior: a space's
@@ -131,5 +135,157 @@ struct TypeValidationOnWriteTests {
         let registry = try await client.typeRegistry()
         #expect(registry.isDescendant("myapp.invoice", of: "core.note"))
         #expect(registry.typesAssignable(to: "core.note").contains("myapp.invoice"))
+    }
+
+    // MARK: - Resolution
+
+    /// `GET /types` answers with schemas **as declared**, so a cached type
+    /// carries its own fields and a `parent` id and nothing inherited. A
+    /// validator that took that at face value would enforce none of the
+    /// parent's rules — the graph would look right and check almost nothing.
+    @Test("a custom type inherits its parent's required fields")
+    func cachedChildInheritsParentRequirements() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let store = try #require(client.localStore)
+        try await store.replaceCachedTypes(with: [
+            schema(id: "myapp.invoice", parent: "core.note", required: "total")
+        ])
+
+        // `total` is present and `body` — inherited from `core.note` — is not.
+        let thrown = await #expect(throws: TypeValidationError.self) {
+            _ = try await client.items.create(
+                CreateItemInput(type: "myapp.invoice", properties: ["total": .string("10")])
+            )
+        }
+        #expect(thrown?.failures.map(\.field) == ["body"])
+
+        _ = try await client.items.create(
+            CreateItemInput(
+                type: "myapp.invoice",
+                properties: ["total": .string("10"), "body": .string("for services")]
+            )
+        )
+    }
+
+    /// The regression a cache can cause rather than fix. A refresh caches
+    /// every type the space can see, core ones included, and the cached copy
+    /// wins the merge — so an unresolved `core.note` would replace the
+    /// generated, already-flattened one and take the universal fields with it.
+    @Test("caching a platform type does not un-resolve it")
+    func cachingAPlatformTypeKeepsItsUniversalFields() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let store = try #require(client.localStore)
+
+        let before = try await client.typeRegistry()
+        #expect(before.definition(for: "core.note")?.fields["attachments"] != nil)
+
+        // What `GET /types` sends for `core.note`: its own fields, nothing
+        // universal, nothing inherited.
+        try await store.replaceCachedTypes(with: [
+            TypeSchema(
+                compatibleWith: nil, description: nil, displayHints: nil,
+                fields: ["body": .dictionary([
+                    "type": .string("string"), "required": .bool(true),
+                ])],
+                id: "core.note", label: nil, mergePolicy: nil, parent: nil,
+                roles: nil, version: 1, versionPolicy: nil
+            )
+        ])
+
+        let after = try await client.typeRegistry()
+        #expect(after.definition(for: "core.note")?.fields["attachments"] != nil)
+    }
+
+    // MARK: - The other write door
+
+    /// `update` is a patch and the server validates the **merge**, so this
+    /// asserts on both directions: a patch that empties a required field is
+    /// refused, and a patch that simply omits one is not.
+    @Test("an update that empties a required field is refused")
+    func updateIsValidatedAgainstTheMerge() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let created = try await client.items.create(
+            CreateItemInput(type: "core.note", properties: [
+                "body": .string("here"), "title": .string("a note"),
+            ])
+        )
+
+        let thrown = await #expect(throws: TypeValidationError.self) {
+            _ = try await client.items.update(id: created.id, properties: ["body": .int(3)])
+        }
+        #expect(thrown?.failures.map(\.field) == ["body"])
+
+        // A patch touching something else must still go through: validating
+        // the patch rather than the merge would refuse this, and refusing it
+        // would make almost every edit fail.
+        let edited = try await client.items.update(
+            id: created.id, properties: ["title": .string("renamed")]
+        )
+        #expect(edited.properties["title"]?.stringValue == "renamed")
+    }
+
+    // MARK: - The wire
+
+    /// Three field constraints the decoder reads, and nothing else reaches.
+    ///
+    /// **The spelling is the point.** `enum_values` is snake_case while
+    /// `maxLength` and `maxItems` are camelCase, on the same object — which
+    /// reads like a defect and is not: the server's own `FieldDefinition`
+    /// declares them exactly that way. A test that only ever sends `type` and
+    /// `required`, as the rest of this suite does, cannot tell a right
+    /// spelling from a wrong one.
+    @Test("the decoder reads enum values and both bounds, at the server's spelling")
+    func wireConstraintsAreDecoded() async throws {
+        let client = try await MarfaSDKTest.makeInMemoryClient()
+        let store = try #require(client.localStore)
+        try await store.replaceCachedTypes(with: [
+            TypeSchema(
+                compatibleWith: nil, description: nil, displayHints: nil,
+                fields: [
+                    // `enum`, not `string`. The server applies `enum_values`
+                    // only under a declared `enum` type — a string field
+                    // carrying them gets a plain bounded string and the values
+                    // are not enforced. Writing this test the obvious way
+                    // asserted a rule the server does not have.
+                    "status": .dictionary([
+                        "type": .string("enum"),
+                        "enum_values": .array([.string("open"), .string("closed")]),
+                    ]),
+                    "code": .dictionary([
+                        "type": .string("string"), "maxLength": .int(3),
+                    ]),
+                    "labels": .dictionary([
+                        "type": .string("array"), "maxItems": .int(2),
+                    ]),
+                ],
+                id: "myapp.ticket", label: nil, mergePolicy: nil, parent: nil,
+                roles: nil, version: 1, versionPolicy: nil
+            )
+        ])
+
+        let field = try await client.typeRegistry().definition(for: "myapp.ticket")?.fields
+        #expect(field?["status"]?.enumValues == ["open", "closed"])
+        #expect(field?["code"]?.maxLength == 3)
+        #expect(field?["labels"]?.maxItems == 2)
+
+        // And each one refuses through the validator, so the decode is wired
+        // rather than merely parsed.
+        await #expect(throws: TypeValidationError.self) {
+            _ = try await client.items.create(
+                CreateItemInput(type: "myapp.ticket", properties: ["status": .string("wontfix")])
+            )
+        }
+        await #expect(throws: TypeValidationError.self) {
+            _ = try await client.items.create(
+                CreateItemInput(type: "myapp.ticket", properties: ["code": .string("toolong")])
+            )
+        }
+        await #expect(throws: TypeValidationError.self) {
+            _ = try await client.items.create(
+                CreateItemInput(type: "myapp.ticket", properties: [
+                    "labels": .array([.string("a"), .string("b"), .string("c")]),
+                ])
+            )
+        }
     }
 }

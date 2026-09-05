@@ -415,7 +415,11 @@ struct LocalSearchTests {
         _ = try await client.items.create(
             CreateItemInput(
                 type: "core.note",
-                properties: ["title": .string("Local invoice"), "body": .string("an invoice")]
+                // The body deliberately does NOT contain the needle. This is
+                // the only test that proves search reaches `title` at all, and
+                // a body echoing the search term would let it pass against a
+                // build where title matching is gone entirely.
+                properties: ["title": .string("Local invoice"), "body": .string("filed last week")]
             )
         )
 
@@ -454,9 +458,14 @@ struct SearchQueryTests {
     private func note(_ title: String) -> CreateItemInput {
         // `core.note` requires a body, and the store enforces that now — these
         // fixtures used to build items the server would have refused.
+        //
+        // The body is fixed text rather than anything derived from `title`,
+        // and that is not tidiness. Every caller searches for a word from the
+        // title, so a body interpolating the title would match the needle too
+        // and no test here could tell title matching from body matching.
         CreateItemInput(
             type: "core.note",
-            properties: ["title": .string(title), "body": .string("body of \(title)")]
+            properties: ["title": .string(title), "body": .string("filed for review")]
         )
     }
 

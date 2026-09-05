@@ -13,16 +13,24 @@ extension MarfaClient {
     /// the authority, and a local check there would only duplicate it.
     public func typeRegistry() async throws -> MarfaTypeRegistry {
         guard let localStore else { return .platform }
-        return .platform.merging(try await localStore.cachedTypeDefinitions())
+        // `.resolved()` is not optional decoration. `GET /types` answers with
+        // schemas as declared, so a cached type carries only its own fields —
+        // and a cached copy of a *platform* type would otherwise overlay the
+        // generated, already-flattened one and quietly stop enforcing
+        // everything it inherits.
+        return .platform.merging(try await localStore.cachedTypeDefinitions()).resolved()
     }
 
     /// Caches this space's type graph, so a write can be validated with no
     /// network.
     ///
-    /// Called on the engine's own schedule for a synced client. It is public
-    /// because a pure-local client that is handed a server later has no engine
-    /// to do it, and because an app that knows it has just registered a type
-    /// should not have to wait for a sync cycle to see it.
+    /// **Nothing calls this on a schedule yet**, so a client's cache is
+    /// whatever its app last asked for. That is the honest state rather than
+    /// the intended one: the graph changes when a type is registered, which
+    /// an app knows about and a timer does not, and wiring it into the sync
+    /// cycle is tracked separately. Until then an app that registers a type,
+    /// or that wants offline validation to know about the space's types at
+    /// all, calls this itself.
     ///
     /// **Throws rather than failing quietly.** A refresh that cannot reach the
     /// server leaves the previous cache in place, which is the right outcome —
