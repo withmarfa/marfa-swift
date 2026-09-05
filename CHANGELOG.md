@@ -16,6 +16,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
   **A `404` is the door most apps will notice, and the changelog argued the case on `429` and `413` without mentioning it.** `DroppedMutationRecord.errorCode` used to read `not_found` for every missing thing and now reads what the server called it — `item_not_found`, `type_not_found`, `edge_not_found`, `blob_not_found` and others. Rows dead-lettered before the upgrade keep the old value, so an app grouping or filtering on that column sees both spellings for one failure. Nothing in the SDK reads it; this is app-facing only.
 
   `server_error` stays as the fallback for a body that named nothing, which is what it always described honestly. A test now asserts the rule across every status the kit parses, rather than one door at a time — three of these reached it separately and the fourth is only visible when you ask all of them at once.
+- **The retry ceiling counts refusals, not attempts nobody could make.** A ceiling exists to stop retrying something that will never succeed, and an attempt that failed because there was no network says nothing about whether the write will succeed — it says the question was never asked. Counting it conflated *we could not ask* with *we asked and were refused*.
+
+  **The consequence was not an edge case.** A device offline for a week exhausted its budget having learned nothing, then blocked on the first real answer it ever received. That is what a commute looks like.
+
+  **`PendingMutationRecord` gains `refusalCount`, and its initializer changes shape** to take it after `attemptCount`. The two are different quantities that coincided until a device could stay offline that long: `attemptCount` still means attempts *made*, which is what a person means by it and what a consumer displays — showing "5 attempts" for a week offline is telling the truth, and a ceiling firing on it is not.
 
 - **A blocked mutation now says why in its own column**, where the reason used to ride inside `lastError` as a `[blocked:<reason>]` string prefix, stamped in one place and parsed back out in another. Nothing public changes: `PendingMutationRecord.blockedReason` reads the same, and the message it reports no longer needs a prefix stripped off it first.
 

@@ -39,9 +39,9 @@ extension PendingMutationBlockReason {
 
     /// The single place that decides whether a replay failure can be retried.
     ///
-    /// `nil` means the next drain should try again. `attemptCount` is the count
-    /// *before* this failure, so the ceiling below is compared against the
-    /// attempt that has just happened.
+    /// `nil` means the next drain should try again. `refusalCount` is the
+    /// count *before* this failure, so the ceiling below is compared against
+    /// the refusal that has just happened.
     ///
     /// **The network class never blocks, however often it fails.** A
     /// connectivity failure, a `5xx`, a `429`, a `401` and a suspended space
@@ -79,7 +79,7 @@ extension PendingMutationBlockReason {
     static func classify(
         error: Error,
         kind: MutationKind,
-        attemptCount: Int,
+        refusalCount: Int,
         ceiling: Int
     ) -> PendingMutationBlockReason? {
         // Keyed by type before status, because status cannot separate these:
@@ -119,7 +119,10 @@ extension PendingMutationBlockReason {
         // that nothing has proven final: a 4xx outside the permanent set, a
         // response the SDK could not decode, a store that refused the write.
         // Try a bounded number of times, then stop.
-        return attemptCount + 1 >= ceiling ? .retriesExhausted : nil
+        // **Refusals, not attempts.** The two coincided until a device could
+        // stay offline for a week; counting an attempt nobody could make
+        // conflates "we could not ask" with "we asked and were refused".
+        return refusalCount + 1 >= ceiling ? .retriesExhausted : nil
     }
 }
 

@@ -1842,7 +1842,7 @@ public actor SyncEngine {
                 if let reason = PendingMutationBlockReason.classify(
                     error: error,
                     kind: record.kind,
-                    attemptCount: record.attemptCount,
+                    refusalCount: record.refusalCount,
                     ceiling: maxReplayAttempts
                 ) {
                     try? await mutationQueue.recordBlocked(
@@ -1865,8 +1865,12 @@ public actor SyncEngine {
                     }
                 } else {
                     transientError = error
+                    // A failure the environment caused was never an answer,
+                    // so it raises the displayed attempt count and not the
+                    // refusal count the ceiling reads.
                     try? await mutationQueue.recordFailure(
-                        id: record.id, error: formatLastError(error)
+                        id: record.id, error: formatLastError(error),
+                        reachedTheServer: !PendingMutationBlockReason.isEnvironmental(error)
                     )
                     logger.log.info(
                         "sync.mutation.failed kind=\(record.kind.rawValue, privacy: .public) item_id=\(record.localId ?? "-", privacy: .public) attempt=\(record.attemptCount + 1, privacy: .public) reason=\(String(describing: type(of: error)), privacy: .public)"

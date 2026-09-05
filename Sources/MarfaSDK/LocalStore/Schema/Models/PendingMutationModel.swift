@@ -59,6 +59,26 @@ final class PendingMutationModel {
     /// Number of failed replay attempts. Incremented by `recordFailure`.
     var attemptCount: Int = 0
 
+    /// Attempts that **reached the server and were refused**, which is the
+    /// number the retry ceiling is about.
+    ///
+    /// **A different quantity from ``attemptCount``, which they coincided with
+    /// until a device could stay offline for a week.** A retry ceiling exists
+    /// to stop retrying something that will never succeed, and an attempt that
+    /// failed because there was no network says nothing about whether the
+    /// write will succeed — it says the question was never asked. Counting it
+    /// conflates *we could not ask* with *we asked and were refused*, which
+    /// are the two things the whole failure classification exists to separate.
+    ///
+    /// The consequence is not an edge case: a device offline for a week
+    /// exhausts its budget having learned nothing, then blocks on the first
+    /// real answer it ever receives. That is what a commute looks like.
+    ///
+    /// ``attemptCount`` keeps meaning attempts *made*, because that is what a
+    /// person means by it and what a consumer displays. Showing "5 attempts"
+    /// for a week offline is telling the truth; a ceiling firing on it is not.
+    var refusalCount: Int = 0
+
     /// Most recent error message from `recordFailure`. Optional.
     var lastError: String?
 
