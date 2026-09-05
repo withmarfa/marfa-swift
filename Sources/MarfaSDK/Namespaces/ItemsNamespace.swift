@@ -44,6 +44,7 @@ public struct ItemsNamespace: Sendable {
     /// a phantom. Callers that already supply `input.id` are unaffected.
     public func create(_ input: CreateItemInput) async throws -> Item {
         if let store = localStore {
+            try await refuseIfTheTypeForbidsIt(input.properties, type: input.type, store: store)
             var stamped = input
             if stamped.id == nil {
                 stamped.id = UUIDv7.generateString()
@@ -56,6 +57,35 @@ public struct ItemsNamespace: Sendable {
             method: .post, path: "/items", body: input, query: nil
         )
         return response.item
+    }
+
+    /// Refuses a write the type forbids, before it reaches the store or the
+    /// queue.
+    ///
+    /// **The point is when, not whether.** The server has always refused these
+    /// writes; what it could not do is refuse them at the moment the person
+    /// made one. A write queued offline and refused on reconnect fails hours
+    /// later, to nobody, in a log — and the person who could have fixed it in
+    /// two seconds has long since moved on.
+    ///
+    /// Checked against the platform graph plus whatever this space's own types
+    /// were last cached, so a custom type is as enforceable as a shipped one
+    /// once the cache has been filled.
+    ///
+    /// **An unknown type is not refused here**, and that is deliberate rather
+    /// than an omission. A space's types reach the device through a cache that
+    /// may never have been filled — a fresh install, a client that has not yet
+    /// synced — and refusing every custom type until then would make the
+    /// offline story worse than no validation at all. An unknown type still
+    /// meets the server on drain, which is where it was always decided.
+    private func refuseIfTheTypeForbidsIt(
+        _ properties: [String: JSONValue],
+        type: String,
+        store: LocalStore
+    ) async throws {
+        let registry = MarfaTypeRegistry.platform.merging(try await store.cachedTypeDefinitions())
+        guard registry.definition(for: type) != nil else { return }
+        try registry.validate(properties: properties, against: type)
     }
 
     /// Fetches a single item by ID.

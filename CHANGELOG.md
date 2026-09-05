@@ -85,6 +85,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **A client with a local store now refuses a write its type forbids, before the write reaches the store or the queue.** The server has always refused these; what it could not do is refuse them at the moment the person made one. A write queued offline and rejected on reconnect fails hours later, to nobody, in a log — and whoever could have fixed it in two seconds has long since moved on.
+
+  **`MarfaClient.typeRegistry()`** is the graph it checks against: the platform types the SDK ships with, merged with this space's own types as `GET /types` last described them, the space winning a collision because its rows were written against its shape. **`MarfaClient.refreshCachedTypes()`** fills that cache and returns how many types it stored. A refresh **replaces** rather than merges, because the route answers with the whole space and a type deleted upstream is absent rather than marked — merging would keep it for ever, and a validator holding a type the space no longer has refuses writes the server would accept.
+
+  **An unknown type is not refused**, and the reason matters more than the behavior: a space's types reach the device through a cache that may never have been filled, and refusing every custom type until it is would make the offline story worse than no validation at all. Such a write still meets the server on drain, where it was always decided.
+
+  **Existing callers should expect this to surface writes that were already invalid.** Nine tests in this repository were building items the server would have refused — a `core.note` with no `body`, a `system.connection` with a `status` outside its enum — and passed only because the local store validated nothing.
+
 - **`Connection.mappingReapplyUntil`**, surfaced by refreshing the vendored type snapshot, which had `system.connection` at schema version 2 while the platform shipped version 3. The drift guard caught the missing accessor as soon as the snapshot moved — the snapshot being stale is what had kept it quiet.
 
 - **The type graph now reaches the device.** A client with a local store accepted any type string and validated nothing, so a write the type forbids was queued, sent, and refused by the server — possibly hours later on a reconnect, long after the person who could have fixed it moved on.

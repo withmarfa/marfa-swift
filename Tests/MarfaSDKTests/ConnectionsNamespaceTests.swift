@@ -282,6 +282,8 @@ struct ConnectionsNamespaceTests {
                     "kind": .string("integration"),
                     "name": .string("Calendar"),
                     "granted_at": .string("2026-09-03T09:00:00Z"),
+                    // Required by the type, and the store enforces that now.
+                    "status": .string("active"),
                 ]
             )
         )

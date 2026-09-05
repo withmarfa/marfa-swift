@@ -413,7 +413,10 @@ struct LocalSearchTests {
     @Test("A pure-local client serves search from the store") func localClientSearch() async throws {
         let client = try await MarfaSDKTest.makeInMemoryClient()
         _ = try await client.items.create(
-            CreateItemInput(type: "core.note", properties: ["title": .string("Local invoice")])
+            CreateItemInput(
+                type: "core.note",
+                properties: ["title": .string("Local invoice"), "body": .string("an invoice")]
+            )
         )
 
         let results = try await client.search(query: "invoice")
@@ -449,7 +452,12 @@ struct SearchQueryTests {
     }
 
     private func note(_ title: String) -> CreateItemInput {
-        CreateItemInput(type: "core.note", properties: ["title": .string(title)])
+        // `core.note` requires a body, and the store enforces that now — these
+        // fixtures used to build items the server would have refused.
+        CreateItemInput(
+            type: "core.note",
+            properties: ["title": .string(title), "body": .string("body of \(title)")]
+        )
     }
 
     @Test("Delivers matching results") func deliversResults() async throws {
