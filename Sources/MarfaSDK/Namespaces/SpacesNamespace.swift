@@ -99,7 +99,7 @@ public struct SpaceQuotasNamespace: Sendable {
         try ensureRemote("spaces.quotas.getById")
         return try await transport.request(
             method: .get,
-            path: "/spaces/\(spaceId)/quotas",
+            path: "/spaces/\(spaceId.escapedPathSegment)/quotas",
             body: nil,
             query: nil
         )
@@ -114,7 +114,7 @@ public struct SpaceQuotasNamespace: Sendable {
         try ensureRemote("spaces.quotas.set")
         return try await transport.request(
             method: .put,
-            path: "/spaces/\(spaceId)/quotas",
+            path: "/spaces/\(spaceId.escapedPathSegment)/quotas",
             body: input,
             query: nil
         )

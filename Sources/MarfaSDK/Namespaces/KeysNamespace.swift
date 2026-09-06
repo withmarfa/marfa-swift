@@ -39,7 +39,7 @@ public struct KeysNamespace: Sendable {
     public func revoke(id: String) async throws {
         try ensureRemote("keys.revoke")
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/keys/\(id)", body: nil, query: nil
+            method: .delete, path: "/keys/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 }

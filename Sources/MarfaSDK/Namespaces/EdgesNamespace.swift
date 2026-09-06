@@ -68,7 +68,7 @@ public struct EdgesNamespace: Sendable {
         }
         let body = UpdateEdgeBody(properties: properties)
         let response: EdgeResponse = try await transport.request(
-            method: .patch, path: "/edges/\(id)", body: body, query: nil
+            method: .patch, path: "/edges/\(id.escapedPathSegment)", body: body, query: nil
         )
         return response.edge
     }
@@ -81,7 +81,7 @@ public struct EdgesNamespace: Sendable {
             return
         }
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/edges/\(id)", body: nil, query: nil
+            method: .delete, path: "/edges/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 
@@ -188,7 +188,7 @@ public struct EdgesNamespace: Sendable {
             return try await store.fetchEdge(id: id)
         }
         let response: EdgeResponse = try await transport.request(
-            method: .get, path: "/edges/\(id)", body: nil, query: nil
+            method: .get, path: "/edges/\(id.escapedPathSegment)", body: nil, query: nil
         )
         return response.edge
     }
@@ -238,7 +238,7 @@ public struct EdgesNamespace: Sendable {
         if let cursor { query.append(("cursor", cursor)) }
         if let limit { query.append(("limit", String(limit))) }
         return try await transport.request(
-            method: .get, path: "/items/\(sourceId)/edges", body: nil,
+            method: .get, path: "/items/\(sourceId.escapedPathSegment)/edges", body: nil,
             query: query.isEmpty ? nil : query
         )
     }
@@ -260,7 +260,7 @@ public struct EdgesNamespace: Sendable {
         if let cursor { query.append(("cursor", cursor)) }
         if let limit { query.append(("limit", String(limit))) }
         return try await transport.request(
-            method: .get, path: "/items/\(targetId)/backrefs", body: nil,
+            method: .get, path: "/items/\(targetId.escapedPathSegment)/backrefs", body: nil,
             query: query.isEmpty ? nil : query
         )
     }
@@ -404,7 +404,7 @@ public struct EdgeTypesAPI: Sendable {
     /// registered via ``create(_:)`` can be removed.
     public func delete(id: String) async throws {
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/edge-types/\(id)", body: nil, query: nil
+            method: .delete, path: "/edge-types/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 }

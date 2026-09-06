@@ -22,7 +22,7 @@ public struct ExtensionsNamespace: Sendable {
             return try await store.fetchExtensions(itemId: itemId)
         }
         let response: ExtensionsResponse = try await transport.request(
-            method: .get, path: "/items/\(itemId)/extensions", body: nil, query: nil
+            method: .get, path: "/items/\(itemId.escapedPathSegment)/extensions", body: nil, query: nil
         )
         return response.extensions
     }
@@ -32,9 +32,10 @@ public struct ExtensionsNamespace: Sendable {
         if let store = localStore {
             return try await store.fetchExtension(itemId: itemId, namespace: namespace)
         }
-        let encoded = namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? namespace
         let response: NamespaceResponse = try await transport.request(
-            method: .get, path: "/items/\(itemId)/extensions/\(encoded)", body: nil, query: nil
+            method: .get,
+            path: "/items/\(itemId.escapedPathSegment)/extensions/\(namespace.escapedPathSegment)",
+            body: nil, query: nil
         )
         return response.data
     }
@@ -50,9 +51,9 @@ public struct ExtensionsNamespace: Sendable {
             try await mutationQueue?.enqueueSetExtension(itemId: itemId, namespace: namespace, data: data)
             return result
         }
-        let encoded = namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? namespace
         let response: ExtensionsResponse = try await transport.request(
-            method: .put, path: "/items/\(itemId)/extensions/\(encoded)",
+            method: .put,
+            path: "/items/\(itemId.escapedPathSegment)/extensions/\(namespace.escapedPathSegment)",
             body: data, query: nil
         )
         return response.extensions
@@ -65,9 +66,10 @@ public struct ExtensionsNamespace: Sendable {
             try await mutationQueue?.enqueueDeleteExtension(itemId: itemId, namespace: namespace)
             return
         }
-        let encoded = namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? namespace
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/items/\(itemId)/extensions/\(encoded)", body: nil, query: nil
+            method: .delete,
+            path: "/items/\(itemId.escapedPathSegment)/extensions/\(namespace.escapedPathSegment)",
+            body: nil, query: nil
         )
     }
 }

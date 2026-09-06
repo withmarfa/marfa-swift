@@ -97,7 +97,7 @@ public struct ItemsNamespace: Sendable {
             return try await store.fetchItem(id: id)
         }
         let response: ItemResponse = try await transport.request(
-            method: .get, path: "/items/\(id)", body: nil, query: nil
+            method: .get, path: "/items/\(id.escapedPathSegment)", body: nil, query: nil
         )
         return response.item
     }
@@ -262,7 +262,7 @@ public struct ItemsNamespace: Sendable {
             return
         }
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/items/\(id)", body: nil, query: nil
+            method: .delete, path: "/items/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 
@@ -274,7 +274,7 @@ public struct ItemsNamespace: Sendable {
             return item
         }
         let response: ItemResponse = try await transport.request(
-            method: .post, path: "/items/\(id)/restore", body: nil, query: nil
+            method: .post, path: "/items/\(id.escapedPathSegment)/restore", body: nil, query: nil
         )
         return response.item
     }
@@ -287,7 +287,7 @@ public struct ItemsNamespace: Sendable {
             return item
         }
         let response: ItemResponse = try await transport.request(
-            method: .post, path: "/items/\(id)/transition",
+            method: .post, path: "/items/\(id.escapedPathSegment)/transition",
             body: TransitionBody(state: state), query: nil
         )
         return response.item
@@ -316,7 +316,7 @@ public struct ItemsNamespace: Sendable {
             )]
         }
         let response: VersionsResponse = try await transport.request(
-            method: .get, path: "/items/\(id)/versions", body: nil, query: nil
+            method: .get, path: "/items/\(id.escapedPathSegment)/versions", body: nil, query: nil
         )
         return response.versions
     }
@@ -345,7 +345,7 @@ public struct ItemsNamespace: Sendable {
             throw LocalModeUnsupportedError(operation: "items.promote")
         }
         let response: ItemResponse = try await transport.request(
-            method: .post, path: "/items/\(id)/promote", body: nil, query: nil
+            method: .post, path: "/items/\(id.escapedPathSegment)/promote", body: nil, query: nil
         )
         return response.item
     }
@@ -366,7 +366,7 @@ public struct ItemsNamespace: Sendable {
             throw LocalModeUnsupportedError(operation: "items.reconcile")
         }
         let response: ReconcileResponse = try await transport.request(
-            method: .get, path: "/items/\(id)/reconcile", body: nil, query: nil
+            method: .get, path: "/items/\(id.escapedPathSegment)/reconcile", body: nil, query: nil
         )
         return response.mirrors
     }
@@ -418,7 +418,7 @@ public struct ItemsNamespace: Sendable {
             return
         }
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/items/\(id)/purge", body: nil, query: nil
+            method: .delete, path: "/items/\(id.escapedPathSegment)/purge", body: nil, query: nil
         )
     }
 
@@ -441,7 +441,7 @@ public struct ItemsNamespace: Sendable {
         if let cursor { query.append(("cursor", cursor)) }
         if let limit { query.append(("limit", String(limit))) }
         return try await transport.request(
-            method: .get, path: "/items/\(id)/edges", body: nil,
+            method: .get, path: "/items/\(id.escapedPathSegment)/edges", body: nil,
             query: query.isEmpty ? nil : query
         )
     }
@@ -463,7 +463,7 @@ public struct ItemsNamespace: Sendable {
         if let cursor { query.append(("cursor", cursor)) }
         if let limit { query.append(("limit", String(limit))) }
         return try await transport.request(
-            method: .get, path: "/items/\(id)/backrefs", body: nil,
+            method: .get, path: "/items/\(id.escapedPathSegment)/backrefs", body: nil,
             query: query.isEmpty ? nil : query
         )
     }
@@ -630,7 +630,7 @@ public struct ItemsNamespace: Sendable {
     public func bulkActionStatus(jobId: String) async throws -> BulkActionJob {
         try await transport.request(
             method: .get,
-            path: "/items/bulk-actions/jobs/\(jobId)",
+            path: "/items/bulk-actions/jobs/\(jobId.escapedPathSegment)",
             body: nil,
             query: nil
         )
@@ -644,7 +644,7 @@ public struct ItemsNamespace: Sendable {
     public func bulkActionCancel(jobId: String) async throws -> BulkActionJob {
         try await transport.request(
             method: .delete,
-            path: "/items/bulk-actions/jobs/\(jobId)",
+            path: "/items/bulk-actions/jobs/\(jobId.escapedPathSegment)",
             body: nil,
             query: nil
         )

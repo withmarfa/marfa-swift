@@ -196,24 +196,19 @@ struct AdminNamespaceTests {
         #expect(mock.calls[0].body == nil)
     }
 
-    /// **A limitation, pinned rather than described.** The id is interpolated
-    /// into the path raw, so a character that means something in a URL is not
-    /// escaped and the request addresses a different route than the caller
-    /// asked for. The platform's TypeScript SDK percent-encodes this same
-    /// argument, so the two clients genuinely differ here.
+    /// This asserted the opposite until the segment encoder existed: the id
+    /// went into the path raw, so the slash opened a segment and the question
+    /// mark opened a query string, and neither the path nor the verb the
+    /// server saw was the one asked for.
     ///
-    /// Left as it is rather than fixed at this call site. Every namespace in
-    /// this SDK interpolates ids raw — items, spaces, edges, connections —
-    /// so encoding one wrapper would leave the inconsistency and hide it;
-    /// the fix belongs in `buildURL`, which is where the whole surface would
-    /// gain it at once. In the meantime the exposure is small: an id reaches
-    /// this method from ``drift()`` rather than from a caller's imagination,
-    /// and platform type identifiers are dotted.
-    ///
-    /// This test asserts the wrong behavior on purpose. Closing the gap
-    /// fails it, which is the point — it should be updated then, not deleted.
-    @Test("an id carrying a path character is not escaped, and the request goes elsewhere")
-    func platformTypeRemoveDoesNotEscapeTheId() async throws {
+    /// **The fix is not in `buildURL`, which is where the old note here sent
+    /// the reader.** By the time a path reaches it the separators are already
+    /// indistinguishable from the ones inside an id, so it can only encode a
+    /// *path* — and a path encoder keeps `/` by definition. Escaping happens
+    /// at the interpolation, where the segment boundary is still known.
+    /// ``PathSegmentEncodingTests`` holds the general form of this.
+    @Test("an id carrying a path character is escaped into one segment")
+    func platformTypeRemoveEscapesTheId() async throws {
         let (client, mock) = makeClient()
         mock.enqueue(JSONValue.dictionary([
             "removed": .bool(true),
@@ -222,11 +217,7 @@ struct AdminNamespaceTests {
 
         try await client.admin.platformTypes.remove("acme/deal?x=1")
 
-        // Percent-encoded this would be one segment,
-        // `acme%2Fdeal%3Fx%3D1`. Raw, the slash opens a segment and the
-        // question mark opens a query string, so neither the path nor the
-        // verb the server sees is the one intended.
-        #expect(mock.calls[0].path == "/admin/platform-types/acme/deal?x=1/remove")
+        #expect(mock.calls[0].path == "/admin/platform-types/acme%2Fdeal%3Fx%3D1/remove")
     }
 
     // MARK: - Pure-local rejection

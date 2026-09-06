@@ -5,7 +5,23 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [17.2.0] — 2026-09-06
+
+### Fixed
+
+- **An identifier carrying a reserved character now reaches the route it names.** Request paths were assembled by interpolating the identifier into a string literal, so a `/` in it opened a segment and a `#` took the rest of the path into a fragment that never left the process. **Nothing refused any of it.** `URLComponents(string:)` parses rather than encodes, and it repairs on the way through — a space and a bare percent are escaped for it — so the request was well-formed and went somewhere other than the caller asked. Every caller-supplied segment is percent-encoded as a segment now.
+
+  **Six call sites already encoded, with the wrong encoder, and a seventh did not encode at all.** Three extension-namespace sites, a tag, and two namespace sites in the queue's replay used `CharacterSet.urlPathAllowed`, which keeps `/` because a path is allowed to hold separators — so they escaped everything except the character that breaks routing. **The queue's replay of a tag interpolated it raw**, with no encoding of any kind. All seven go through the same segment encoder now.
+
+  **The escaping is `encodeURIComponent`'s, byte for byte**, which is what the platform's TypeScript client produces and what its routes already expect of an encoded segment. One consequence shows in a request log rather than in behavior: a blob hash goes out as `sha256%3A…` where it used to carry a literal colon. The route resolves unchanged, because a path parameter is decoded once on arrival.
+
+  **`blobs.url(hash:)` is fixed alongside them**, and it is the one URL here that no request builds — an app hands it to an image loader. It was composed with `appendingPathComponent`, which keeps `/` and re-escapes a `%`, so it needed its encoded path assigned directly instead.
+
+  **The bytes on the wire change, which matters if you worked around this.** An identifier that reaches the SDK is now escaped exactly once. If your app pre-encoded ids or tags to get past the old behavior, it must stop: `a%2Fb` handed in today becomes `a%252Fb` on the wire and the route answers `404`. Hand the SDK the raw identifier. Nothing else is affected, because every character of a UUIDv7 encodes to itself, so ordinary ids and any queued write already carrying one are byte-identical before and after.
+
+  **A blob URL carries `sha256%3A…` where it used to carry a literal colon.** Both spellings resolve — measured against the serving origin, `200` either way, with a control confirming the route reads the hash rather than answering `200` to anything. The escaping is kept for parity with the TypeScript client rather than because the colon required it.
+
+  No public API changes.
 
 ## [17.1.0] — 2026-09-05
 
@@ -44,7 +60,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
   Every live mutation parks together, because they all carry the credential that was refused — sending the rest one at a time spends a request per write to learn what the first already said. Rows already blocked keep the reason they have: a conflict awaiting review is not settled by a new credential. `SyncEngine.retryAll(reason:)` releases one class and leaves the others, for the same reason.
 
-  **A spent idempotency key parks on the first refusal too.** `idempotency_key_reused` means the key has already answered a different body, so repeating it is refused identically however often anyone tries. It was spending the retry ceiling on five guaranteed refusals and then parking under `retriesExhausted`, which names the wrong cause and sends an app to the wrong remedy: the key is spent, not the write, so what clears it is re-applying the edit rather than a retry. `MarfaError.idempotencyKeyReusedCode` is public so an app can recognize it without hardcoding the string.
+  **A spent idempotency key parks on the first refusal too.** `idempotency_key_reused` means the key has already answered a different body, so repeating it is refused identically however often anyone tries. It was spending the retry ceiling on five guaranteed refusals and then parking under `retriesExhausted`, which names the wrong cause and sends an app to the wrong remedy: the key is spent, not the write, so retrying cannot clear it. `MarfaError.idempotencyKeyReusedCode` is public so an app can recognize it without hardcoding the string.
+
+  **Corrected after publication.** The paragraph above closed, as published, by saying that what clears a spent key is re-applying the edit. It does not, and that half-sentence has been removed rather than the entry rewritten, because the release it describes has shipped. A re-applied edit is a new row under the same local id, queued after the blocked one, and the replay defers every later write to an item behind that item's blocked row — so the fresh mutation waits behind the row it was meant to route around, and the item takes no further writes until something removes it. **Nothing in 17.0.0 released it.** `SyncEngine.discard(id:)`, added in 17.1.0, is what does: it moves the blocked row into the dead-letter log under `MarfaError.discardedByAppCode` and, by removing it from the queue, lifts the deferral it was holding over its item. It acts on a blocked row only — a pending or in-flight one belongs to the drain and throws `DiscardNotBlockedError` — and a discarded `createItem` dead-letters the writes behind it rather than releasing them, since an item that will never exist cannot receive them. The same correction was made to `MarfaError.idempotencyKeyReusedCode` and `PendingMutationBlockReason.idempotencyKeyReused` in the kit.
 
   **`FullSyncState` gains `parked(reason:count:)`, and an exhaustive switch over it stops compiling.** It outranks both `synced(at:)` and `failed(at:error:)`, and each for its own reason. A store that synced cleanly an hour ago still holds that timestamp and a refused credential does not erase it, so without this an app renders "last synced an hour ago" over a queue that has stopped — true, and not the answer to the question. A transient failure recorded before the parking is worse: a clean drain is the only thing that clears one, a parked queue cannot produce a clean drain, and the app would show "the Internet connection appears to be offline" for ever when the remedy is to sign in again. `queryFullSyncState()` reports it too, both on its initial load and from the event.
 

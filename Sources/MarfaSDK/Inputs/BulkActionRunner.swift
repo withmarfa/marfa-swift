@@ -99,7 +99,7 @@ enum BulkActionRunner {
         while true {
             let job: BulkActionJob = try await transport.request(
                 method: .get,
-                path: "/items/bulk-actions/jobs/\(jobId)",
+                path: "/items/bulk-actions/jobs/\(jobId.escapedPathSegment)",
                 body: nil,
                 query: nil
             )

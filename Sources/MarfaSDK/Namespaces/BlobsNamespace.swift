@@ -167,7 +167,7 @@ public struct BlobsNamespace: Sendable {
         try ensureRemote("blobs.download")
 
         let (data, response) = try await transport.rawRequest(
-            method: .get, path: "/blobs/\(cleanHash)", body: nil,
+            method: .get, path: "/blobs/\(cleanHash.escapedPathSegment)", body: nil,
             contentType: nil, query: nil
         )
 
@@ -185,7 +185,7 @@ public struct BlobsNamespace: Sendable {
         try ensureRemote("blobs.exists")
         let cleanHash = hash.hasPrefix("sha256:") ? hash : "sha256:\(hash)"
         let (_, response) = try await transport.rawRequest(
-            method: .head, path: "/blobs/\(cleanHash)", body: nil,
+            method: .head, path: "/blobs/\(cleanHash.escapedPathSegment)", body: nil,
             contentType: nil, query: nil
         )
         return response.statusCode == 200
@@ -196,7 +196,21 @@ public struct BlobsNamespace: Sendable {
     public func url(hash: String) -> URL {
         let cleanHash = hash.hasPrefix("sha256:") ? hash : "sha256:\(hash)"
         let base = cdnBaseURL ?? apiBaseURL
-        return base.appendingPathComponent("blobs/\(cleanHash)")
+        // **`appendingPathComponent` cannot express this.** It escapes with
+        // the path set, which keeps `/` — so a hash carrying one silently
+        // becomes two segments — and it re-escapes a `%`, so handing it an
+        // already-escaped segment produces `%25` instead. Composing the
+        // percent-encoded path is what escapes the segment exactly once.
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
+            return base
+        }
+        let root = components.percentEncodedPath.hasSuffix("/")
+            ? String(components.percentEncodedPath.dropLast())
+            : components.percentEncodedPath
+        components.percentEncodedPath = "\(root)/blobs/\(cleanHash.escapedPathSegment)"
+        // Neither fallback is reachable from a URL that parsed: the base came
+        // from `ClientConfiguration`, and the path assigned above is escaped.
+        return components.url ?? base
     }
 
     /// Gets a presigned download URL for a blob (S3 backend only).
@@ -206,7 +220,7 @@ public struct BlobsNamespace: Sendable {
         var query: [(String, String)] = []
         if let ttl { query.append(("ttl", String(ttl))) }
         return try await transport.request(
-            method: .get, path: "/blobs/\(cleanHash)/url", body: nil,
+            method: .get, path: "/blobs/\(cleanHash.escapedPathSegment)/url", body: nil,
             query: query.isEmpty ? nil : query
         )
     }

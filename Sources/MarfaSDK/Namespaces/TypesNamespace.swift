@@ -30,7 +30,7 @@ public struct TypesNamespace: Sendable {
     public func get(id: String) async throws -> TypeSchema {
         try ensureRemote("types.get")
         return try await transport.request(
-            method: .get, path: "/types/\(id)", body: nil, query: nil
+            method: .get, path: "/types/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 
@@ -47,7 +47,7 @@ public struct TypesNamespace: Sendable {
     public func update(id: String, schema: TypeSchema) async throws -> TypeSchema {
         try ensureRemote("types.update")
         let response: TypeResponse = try await transport.request(
-            method: .put, path: "/types/\(id)", body: schema, query: nil
+            method: .put, path: "/types/\(id.escapedPathSegment)", body: schema, query: nil
         )
         return response.type
     }
@@ -58,7 +58,7 @@ public struct TypesNamespace: Sendable {
         var query: [(String, String)] = []
         if force { query.append(("force", "true")) }
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/types/\(id)", body: nil,
+            method: .delete, path: "/types/\(id.escapedPathSegment)", body: nil,
             query: query.isEmpty ? nil : query
         )
     }

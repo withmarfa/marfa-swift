@@ -13,7 +13,7 @@ public struct MetadataNamespace: Sendable {
             return try await store.fetchMetadata(itemId: itemId)
         }
         let response: MetadataResponse = try await transport.request(
-            method: .get, path: "/items/\(itemId)/metadata", body: nil, query: nil
+            method: .get, path: "/items/\(itemId.escapedPathSegment)/metadata", body: nil, query: nil
         )
         return response.metadata
     }
@@ -26,7 +26,7 @@ public struct MetadataNamespace: Sendable {
             return metadata
         }
         let response: MetadataResponse = try await transport.request(
-            method: .put, path: "/items/\(itemId)/metadata", body: input, query: nil
+            method: .put, path: "/items/\(itemId.escapedPathSegment)/metadata", body: input, query: nil
         )
         return response.metadata
     }
@@ -39,7 +39,7 @@ public struct MetadataNamespace: Sendable {
             return metadata
         }
         let response: MetadataResponse = try await transport.request(
-            method: .patch, path: "/items/\(itemId)/metadata", body: input, query: nil
+            method: .patch, path: "/items/\(itemId.escapedPathSegment)/metadata", body: input, query: nil
         )
         return response.metadata
     }
@@ -52,7 +52,7 @@ public struct MetadataNamespace: Sendable {
             return metadata
         }
         let response: MetadataResponse = try await transport.request(
-            method: .post, path: "/items/\(itemId)/tags",
+            method: .post, path: "/items/\(itemId.escapedPathSegment)/tags",
             body: AddTagsBody(tags: tags), query: nil
         )
         return response.metadata
@@ -88,9 +88,10 @@ public struct MetadataNamespace: Sendable {
             try await mutationQueue?.enqueueRemoveTag(itemId: itemId, tag: tag)
             return
         }
-        let encoded = tag.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? tag
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/items/\(itemId)/tags/\(encoded)", body: nil, query: nil
+            method: .delete,
+            path: "/items/\(itemId.escapedPathSegment)/tags/\(tag.escapedPathSegment)",
+            body: nil, query: nil
         )
     }
 }

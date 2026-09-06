@@ -165,7 +165,7 @@ public struct ConnectionsNamespace: Sendable {
         try ensureRemote("connections.uninstall")
         return try await transport.request(
             method: .post,
-            path: "/connections/\(id)/uninstall",
+            path: "/connections/\(id.escapedPathSegment)/uninstall",
             body: nil,
             query: nil
         )
@@ -226,7 +226,7 @@ public struct LeaseTokensNamespace: Sendable {
         )
         return try await transport.request(
             method: .post,
-            path: "/connections/\(connectionId)/lease-tokens",
+            path: "/connections/\(connectionId.escapedPathSegment)/lease-tokens",
             body: input,
             query: nil
         )
@@ -238,7 +238,7 @@ public struct LeaseTokensNamespace: Sendable {
         try ensureRemote("connections.leaseTokens.list")
         let response: LeaseTokensListResponse = try await transport.request(
             method: .get,
-            path: "/connections/\(connectionId)/lease-tokens",
+            path: "/connections/\(connectionId.escapedPathSegment)/lease-tokens",
             body: nil,
             query: nil
         )
@@ -251,7 +251,7 @@ public struct LeaseTokensNamespace: Sendable {
         try ensureRemote("connections.leaseTokens.revoke")
         let _: EmptyResponse = try await transport.request(
             method: .post,
-            path: "/connections/\(connectionId)/lease-tokens/\(leaseId)/revoke",
+            path: "/connections/\(connectionId.escapedPathSegment)/lease-tokens/\(leaseId.escapedPathSegment)/revoke",
             body: nil,
             query: nil
         )
@@ -275,7 +275,7 @@ public struct InboundWebhooksNamespace: Sendable {
         try ensureRemote("connections.inboundWebhooks.list")
         let response: InboundWebhooksListResponse = try await transport.request(
             method: .get,
-            path: "/connections/\(connectionId)/inbound-webhooks",
+            path: "/connections/\(connectionId.escapedPathSegment)/inbound-webhooks",
             body: nil,
             query: nil
         )
@@ -290,7 +290,7 @@ public struct InboundWebhooksNamespace: Sendable {
         try ensureRemote("connections.inboundWebhooks.listDeliveries")
         let response: InboundWebhookDeliveriesResponse = try await transport.request(
             method: .get,
-            path: "/connections/\(connectionId)/inbound-webhooks/\(webhookId)/deliveries",
+            path: "/connections/\(connectionId.escapedPathSegment)/inbound-webhooks/\(webhookId.escapedPathSegment)/deliveries",
             body: nil,
             query: nil
         )
@@ -307,7 +307,7 @@ public struct InboundWebhooksNamespace: Sendable {
         try ensureRemote("connections.inboundWebhooks.retryDelivery")
         let _: EmptyResponse = try await transport.request(
             method: .post,
-            path: "/connections/\(connectionId)/inbound-webhooks/\(webhookId)/deliveries/\(eventId)/retry",
+            path: "/connections/\(connectionId.escapedPathSegment)/inbound-webhooks/\(webhookId.escapedPathSegment)/deliveries/\(eventId.escapedPathSegment)/retry",
             body: nil,
             query: nil
         )
