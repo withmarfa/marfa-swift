@@ -37,6 +37,30 @@ private enum LiveServer {
     }()
 
     static var isConfigured: Bool { credentials != nil }
+
+    /// Hosts this suite may never provision against, whatever it was handed.
+    ///
+    /// **A doc comment is not a guard.** Provisioning writes a space, two
+    /// credentials and an irreversible delete onto whatever instance the
+    /// environment names, and the only thing standing between a stale shell
+    /// and production was a sentence asking people not to. A stale
+    /// `MARFA_API_URL` is exactly the input this cannot afford to trust.
+    ///
+    /// Deny rather than allow because the set of disposable hosts is open --
+    /// a laptop, a container, a self-host on any name -- while the set that
+    /// must never be touched is small, known, and the one that matters.
+    private static let neverProvision: Set<String> = ["api.marfa.so"]
+
+    /// True when this run may create and destroy a space.
+    ///
+    /// Three conditions, all positive: the suite is configured, an instance
+    /// admin credential was supplied deliberately, and the target is not a
+    /// host on the deny list.
+    static var mayProvision: Bool {
+        guard let c = credentials, c.adminApiKey != nil else { return false }
+        guard let host = c.url.host()?.lowercased() else { return false }
+        return !neverProvision.contains(host)
+    }
 }
 
 /// Thrown when a test body runs without credentials, which the suite's gate
@@ -155,7 +179,7 @@ private final class LiveFixture {
     ///
     /// **Deleting the space is what makes the keys and rows inside it
     /// somebody else's problem rather than a leak**, so it runs last and it
-    /// runs on every exit path. Only ever an id returned by this run's own
+    /// runs on every exit path, **including a cancelled one**. Only ever an id returned by this run's own
     /// `POST /admin/spaces`: the delete route takes any id on the instance,
     /// and the two real spaces on staging are the operator's.
     func track(scratchSpace id: String, removingThrough admin: MarfaClient) {
@@ -232,46 +256,66 @@ private final class LiveFixture {
         }
         itemIds.removeAll()
 
-        // Last, because the scenario that mints one revokes it as its subject
-        // and this is the path for a run that never got there. Revoking a key
-        // that is already revoked answers 404 and is swallowed with everything
-        // else here: the point is that no run leaves a live credential behind,
-        // not that this is the call that killed it.
-        for id in scratchKeyIds {
-            try? await client.keys.revoke(id: id)
-        }
+        // **No key revocation here, deliberately.** Every scratch key is
+        // minted inside the space below, and deleting a space takes its keys
+        // with it, so a second call could only ever be redundant. The loop
+        // that used to sit here was worse than redundant: it revoked through
+        // the operator's credential, which cannot reach a key in another
+        // space -- measured, `404` against `200` for the admin credential --
+        // and `try?` hid that. It read as a belt and was not one.
         scratchKeyIds.removeAll()
 
         // Last of all, and through the admin credential rather than `client`,
         // which is scoped to a space it does not own. Deleting the space takes
-        // its keys and its rows with it, so this is the step that makes the
-        // rest best-effort rather than load-bearing.
+        // its keys and its rows with it, so it is the one step here that has to
+        // work.
+        //
+        // **Detached, because teardown may be running cancelled.**
+        // swift-testing enforces `.timeLimit` by cancelling the task, so a run
+        // that exhausts it arrives here with cancellation already set and every
+        // request throws before it is sent -- space, keys and rows all survive.
+        // That is precisely the path the control wait hands to the runner on
+        // purpose, so it is the path cleanup has to survive. A detached task
+        // does not inherit cancellation; awaiting its value keeps the ordering.
         if let admin = adminClient {
-            for id in scratchSpaceIds {
-                // **Not `try?`.** The first version of this swallowed the
-                // result and three runs passed while leaving three spaces
-                // behind, because the route requires `confirm` and answered
-                // 400 every time. A cleanup that cannot fail reports success
-                // over work it never did, which is the shape this suite exists
-                // to catch elsewhere. It is recorded rather than thrown so a
-                // teardown on the failing path does not mask the failure that
-                // got it here.
-                do {
-                    let result: DeletedSpace = try await admin.transport.request(
-                        method: .post,
-                        path: "/admin/spaces/\(id)/delete",
-                        body: DeleteSpaceInput(confirm: id),
-                        query: nil
-                    )
-                    if !result.deleted {
-                        Issue.record("space \(id) was not deleted and is still on the server")
-                    }
-                } catch {
-                    Issue.record("space \(id) survived teardown: \(error)")
+            let ids = scratchSpaceIds
+            scratchSpaceIds.removeAll()
+            await Task.detached { await LiveFixture.deleteSpaces(ids, through: admin) }.value
+        } else if !scratchSpaceIds.isEmpty {
+            // Unreachable while `track(scratchSpace:removingThrough:)` sets both
+            // together, and recorded rather than dropped because the alternative
+            // is forgetting a space with no way to name it again.
+            Issue.record("spaces \(scratchSpaceIds) tracked with no admin client to remove them")
+            scratchSpaceIds.removeAll()
+        }
+    }
+
+    /// Deletes the spaces this run created, reporting any that survive.
+    ///
+    /// `nonisolated` so the detached task above runs it clear of the cancelled
+    /// context it was spawned from.
+    nonisolated static func deleteSpaces(_ ids: [String], through admin: MarfaClient) async {
+        for id in ids {
+            // **Not `try?`.** The first version swallowed the result and three
+            // runs passed while leaving three spaces behind, because the route
+            // requires `confirm` and answered 400 every time. A cleanup that
+            // cannot fail reports success over work it never did. Recorded
+            // rather than thrown, so teardown on the failing path does not mask
+            // the failure that got it here.
+            do {
+                let result: DeletedSpace = try await admin.transport.request(
+                    method: .post,
+                    path: "/admin/spaces/\(id)/delete",
+                    body: DeleteSpaceInput(confirm: id),
+                    query: nil
+                )
+                if !result.deleted {
+                    Issue.record("space \(id) was not deleted and is still on the server")
                 }
+            } catch {
+                Issue.record("space \(id) survived teardown: \(error)")
             }
         }
-        scratchSpaceIds.removeAll()
     }
 }
 
@@ -313,6 +357,11 @@ private struct ParkAnnouncement: Sendable {
 /// anything — and that is a decision with a public-surface baseline attached.
 /// The scenario below needs a key, so it sends the body the server documents
 /// and goes through the real transport to send it.
+/// The body `POST /admin/spaces/{id}/keys` requires.
+///
+/// Hand-rolled because the kit's own `keys.create` cannot express it: its input
+/// type carries no `source`, which the route requires, so that call cannot mint
+/// a key against any server. Filed as T-1407; remove this once it lands.
 private struct ScratchKeyInput: Codable, Sendable {
     let label: String
     let source: String
@@ -338,7 +387,9 @@ private struct DeletedSpace: Codable, Sendable { let deleted: Bool }
 /// space and never against production — the tests write, and they delete what
 /// they wrote through a second client on the way out.
 ///
-/// Gated on `MARFA_API_URL` and `MARFA_API_KEY`; skipped, not passed, when
+/// Gated on `MARFA_API_URL` and `MARFA_API_KEY`; the one scenario that
+/// provisions a space of its own additionally needs `MARFA_ADMIN_API_KEY` and
+/// a target that is not production, and skips without them. Skipped, not passed, when
 /// either is unset.
 ///
 /// **Not every rule belongs here, and the ones missing are missing on
@@ -1283,27 +1334,33 @@ struct LiveSyncedClientTests {
     /// wire never carries.
     ///
     /// **The control is the half that makes the park mean something.** A key
-    /// that never worked parks identically to one that was revoked — the
-    /// existing scenario above runs on exactly such a key — so this one mints a
-    /// scratch key, drives a write through it that the server accepts and that
-    /// is then read back under the operator's own credential, and only then
-    /// revokes it. Without that, the assertion below is satisfied by a typo.
+    /// that never worked parks identically to one that was revoked — which
+    /// ``aNeverValidCredentialParksTheQueue`` covers on its own — so this one
+    /// mints a scratch key, drives a write through it that the server accepts
+    /// and that is then read back through a second credential inside the same
+    /// space, and only then revokes it. Without that, the assertion below is
+    /// satisfied by a typo.
     ///
     /// **Only the key this run minted is ever revoked**, and it is named by the
     /// id `keys.create` returned rather than by its label. See
     /// `LiveFixture.track(scratchKey:)` for why that distinction is the whole
     /// safety property.
-    @Test("rule 5: a credential revoked mid-session parks the queue it was carrying")
+    @Test(
+        "rule 5: a credential revoked mid-session parks the queue it was carrying",
+        .enabled(
+            if: LiveServer.mayProvision,
+            "set MARFA_ADMIN_API_KEY, against a host that is not production: this scenario creates a space and deletes it"
+        )
+    )
     func aRevokedCredentialParksTheQueue() async throws {
         let credentials = try credentials()
         let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
         let path = storePath()
         defer { removeStore(at: path) }
 
-        let adminKey = try #require(
-            credentials.adminApiKey,
-            "set MARFA_ADMIN_API_KEY: this scenario provisions a space of its own"
-        )
+        // The trait above already refused every run without this, so the
+        // unwrap is a formality rather than the gate.
+        let adminKey = try #require(credentials.adminApiKey)
         let admin = MarfaClient(url: credentials.url, apiKey: adminKey)
 
         try await withFixture(cleaningUpThrough: other) { fixture in
@@ -1335,22 +1392,25 @@ struct LiveSyncedClientTests {
             // other. Two rather than one because the operator's credential
             // cannot see into this space at all, so the read-back that makes
             // the control mean something has to come from inside it.
-            func mintKey(_ suffix: String) async throws -> CreatedKey {
+            // The device writes two notes and nothing else; only the warden
+            // has to revoke. `space_admin` on both was reaching for the role
+            // that would certainly work rather than the one the job needs.
+            func mintKey(_ suffix: String, role: String) async throws -> CreatedKey {
                 try await admin.transport.request(
                     method: .post,
                     path: "/admin/spaces/\(space.id)/keys",
                     body: ScratchKeyInput(
                         label: "\(label)-\(suffix)",
                         source: "\(label)-\(suffix)",
-                        role: "space_admin",
+                        role: role,
                         type_permissions: ["*": "write"],
                         default_tier: "library"
                     ),
                     query: nil
                 )
             }
-            let scratch = try await mintKey("device")
-            let wardenKey = try await mintKey("warden")
+            let scratch = try await mintKey("device", role: "member")
+            let wardenKey = try await mintKey("warden", role: "space_admin")
             // Tracked before anything else can throw. Deleting the space would
             // take them anyway; this is the belt for a run that dies before the
             // space id is usable.
@@ -1388,15 +1448,19 @@ struct LiveSyncedClientTests {
             // condition can be starved rather than merely delayed -- a drain
             // waits on the import, and the import waits on however many rows
             // the space holds -- and D61 is explicit that where that is true a
-            // number in the test body reports on the machine instead of on the
+            // number in the test body reports on the machine rather than on the
             // code. The space is this run's own and holds nothing, so a wait
-            // that does not settle means the kit did not replay; the ceiling
-            // here is deliberately far above the suite's `.timeLimit`, so the
-            // failure surfaces as the runner's timeout, which is legible,
-            // rather than as a bound somebody picked and nobody revisits.
+            // that does not settle means the kit did not replay.
+            //
+            // **An hour, so that raising the suite's limit cannot quietly make
+            // this the operative bound.** A number merely "above the current
+            // limit" becomes load-bearing the moment somebody raises that limit
+            // for an unrelated reason, and nothing would say so. This one is
+            // not a bound anyone will cross; it exists because the helper's
+            // signature requires a `Duration`.
             try await waitForDrain(
                 engine,
-                timeout: .seconds(600),
+                timeout: .seconds(60 * 60),
                 description: "the control write to replay under the scratch key"
             )
 
@@ -1503,6 +1567,14 @@ struct LiveSyncedClientTests {
                 "a refused credential must not spend the retry ceiling, which is for refusals of the write"
             )
             #expect(dropped.isEmpty, "a refused credential must never dead-letter an edit")
+            // The recorded text, which the scenario this replaces was the only
+            // thing asserting. An app shows this, so a park carrying no reason
+            // or the wrong one is a park nobody can act on.
+            let recorded = try #require(row.lastError, "a parked row recorded no error at all")
+            #expect(
+                recorded.contains("401") || recorded.lowercased().contains("unauthor"),
+                "the recorded error does not name the refusal: \(recorded)"
+            )
 
             let park = try #require(announcement, "the parking was never announced, so an app cannot show it")
             #expect(park.reason == .credentialRefused)
@@ -1532,6 +1604,67 @@ struct LiveSyncedClientTests {
             )
         }
     }
+    /// **The other half of rule 5's auth arm: a credential that never worked.**
+    ///
+    /// The scenario above revokes a key that had just written successfully, so
+    /// what it proves is that a *live* credential going dead parks the queue.
+    /// This one starts with a key the server has never seen. The two look
+    /// identical from inside the queue, which is exactly why the control up
+    /// there matters — and why this case is worth keeping separately rather
+    /// than trusting one test to cover both.
+    ///
+    /// It needs no privileged credential and creates nothing on the server, so
+    /// it runs wherever the suite runs.
+    @Test("rule 5: a credential that never worked parks the queue too")
+    func aNeverValidCredentialParksTheQueue() async throws {
+        let credentials = try credentials()
+        let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
+        let path = storePath()
+        defer { removeStore(at: path) }
+
+        try await withFixture(cleaningUpThrough: other) { fixture in
+            let device = try await MarfaClient.synced(
+                url: credentials.url,
+                apiKey: "marfa_k1_this-key-is-not-valid-and-never-was",
+                storePath: path
+            )
+            fixture.stopOnExit(device)
+            let engine = try #require(device.syncEngine)
+            let queue = try #require(device.mutationQueue)
+            await engine.start()
+
+            // Never reaches the server, so there is nothing to clean up.
+            let stranded = try await device.items.create(note("never valid", run: runMarker()))
+            #expect(stranded.id.isEmpty == false)
+
+            try await waitUntil(
+                timeout: .seconds(60 * 60),
+                description: "the queue to stop, however it chooses to"
+            ) {
+                let counts = try await queue.counts
+                return counts.blockedTotal > 0 || counts.deadLettered > 0
+            }
+
+            let row = try #require(try await queue.fetchAll().first)
+            let dropped = try await queue.fetchDropped()
+
+            #expect(
+                row.blockedReason == .credentialRefused,
+                "parked under \(String(describing: row.blockedReason)) rather than the credential class"
+            )
+            #expect(
+                row.refusalCount == 0,
+                "a refused credential must not spend the retry ceiling"
+            )
+            #expect(dropped.isEmpty, "nothing is dropped: the write is kept for when a credential returns")
+            let recorded = try #require(row.lastError, "a parked row recorded no error at all")
+            #expect(
+                recorded.contains("401") || recorded.lowercased().contains("unauthor"),
+                "the recorded error does not name the refusal: \(recorded)"
+            )
+        }
+    }
+
 
     // MARK: - Rule 2, a key names one request
 
