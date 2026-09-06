@@ -340,28 +340,21 @@ private struct ParkAnnouncement: Sendable {
     let count: Int
 }
 
-/// The body `POST /keys` actually requires, which is not the body
-/// ``CreateKeyInput`` encodes.
-///
-/// **The kit cannot mint a key against a conforming server**, and this is where
-/// that was found. `scripts/openapi.json` lists `source` in the route's
-/// `required` array alongside `label`; `CreateKeyInput` has no such field and
-/// no way to set one, so every `keys.create` is answered
-/// `400 missing_required_field`. Nothing in the repository could have caught
-/// it: `RouteCoverageTests` compares the routes the SDK calls against the ones
-/// the spec declares and never reads a request body, and every unit test for
-/// this namespace asserts against a mock that accepts whatever it is handed.
-///
-/// Declared here rather than fixed here because the remedy is a change to a
-/// public wire type — a required field cannot be added as an optional and mean
-/// anything — and that is a decision with a public-surface baseline attached.
-/// The scenario below needs a key, so it sends the body the server documents
-/// and goes through the real transport to send it.
 /// The body `POST /admin/spaces/{id}/keys` requires.
 ///
-/// Hand-rolled because the kit's own `keys.create` cannot express it: its input
-/// type carries no `source`, which the route requires, so that call cannot mint
-/// a key against any server. Filed as T-1407; remove this once it lands.
+/// **Hand-rolled because the kit wraps no route that mints a key into another
+/// space.** `AdminSpacesNamespace` reads that path with a `GET` and has no
+/// `POST`, and `keys.create` is a different door: it mints into the caller's
+/// own space, which is not what a scenario provisioning a space of its own can
+/// use.
+///
+/// This comment used to say something else, and the correction is worth
+/// keeping. It said the struct existed because `CreateKeyInput` carried no
+/// `source` — true when written, and it made the struct look like a workaround
+/// that would go away once that was fixed. It has been fixed, and this struct
+/// is still needed, because the reason was never the input type. Two comments
+/// had also been merged into one, so the same block described two different
+/// routes.
 private struct ScratchKeyInput: Codable, Sendable {
     let label: String
     let source: String
@@ -1345,6 +1338,88 @@ struct LiveSyncedClientTests {
     /// id `keys.create` returned rather than by its label. See
     /// `LiveFixture.track(scratchKey:)` for why that distinction is the whole
     /// safety property.
+    /// A reproduction. `keys.create` could not succeed against any server:
+    /// `POST /keys` requires a `source` and ``CreateKeyInput`` carried no way
+    /// to spell one, so every call was refused. Green here means the door
+    /// works, and it is the only place that can say so — a mock transport
+    /// accepts whatever it is handed, and the route-coverage suite reads
+    /// verbs and paths rather than bodies.
+    @Test(
+        "keys.create mints a usable key against a real server",
+        .enabled(
+            if: LiveServer.mayProvision,
+            "set MARFA_ADMIN_API_KEY, against a host that is not production: this scenario creates a space and deletes it"
+        )
+    )
+    func keysCreateMintsAUsableKey() async throws {
+        let credentials = try credentials()
+        let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
+        let adminKey = try #require(credentials.adminApiKey)
+        let admin = MarfaClient(url: credentials.url, apiKey: adminKey)
+
+        try await withFixture(cleaningUpThrough: other) { fixture in
+            let run = runMarker()
+            let label = "keys-create-drive-\(Int(Date().timeIntervalSince1970))-\(run)"
+
+            // A space of this run's own, so the key this scenario mints has
+            // no reach into anything the operator holds and the teardown that
+            // removes the space takes it whatever happens here.
+            let space: CreatedSpace = try await admin.transport.request(
+                method: .post,
+                path: "/admin/spaces",
+                body: CreateSpaceInput(name: label),
+                query: nil
+            )
+            fixture.track(scratchSpace: space.id, removingThrough: admin)
+
+            // The minting credential, through the admin door, because
+            // `keys.create` mints into the caller's own space and the
+            // operator's credential is not in this one.
+            let minter: CreatedKey = try await admin.transport.request(
+                method: .post,
+                path: "/admin/spaces/\(space.id)/keys",
+                body: ScratchKeyInput(
+                    label: "\(label)-minter",
+                    source: "\(label)-minter",
+                    role: "space_admin",
+                    type_permissions: ["*": "write"],
+                    default_tier: "library"
+                ),
+                query: nil
+            )
+            fixture.track(scratchKey: minter.id)
+            let inSpace = MarfaClient(url: credentials.url, apiKey: minter.key)
+
+            // The subject.
+            let made = try await inSpace.keys.create(
+                CreateKeyInput(
+                    label: "\(label)-minted",
+                    source: "\(label)-minted",
+                    role: .member,
+                    typePermissions: ["core.note": .write]
+                )
+            )
+            fixture.track(scratchKey: made.id)
+            #expect(made.role == .member)
+            #expect(made.source == "\(label)-minted")
+            #expect(!made.key.isEmpty)
+
+            // Usable, not merely returned. A response body proves the route
+            // answered; only a request carrying the key proves it minted one.
+            let minted = MarfaClient(url: credentials.url, apiKey: made.key)
+            let item = try await minted.items.create(note("minted-key writes", run: run))
+            fixture.track(item: item.id)
+            #expect(!item.id.isEmpty)
+
+            // And revoked through the kit as well, so both ends of the
+            // namespace are driven rather than only the one under repair.
+            try await inSpace.keys.revoke(id: made.id)
+            await #expect(throws: (any Error).self) {
+                _ = try await minted.items.create(note("after revoke", run: run))
+            }
+        }
+    }
+
     @Test(
         "rule 5: a credential revoked mid-session parks the queue it was carrying",
         .enabled(

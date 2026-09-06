@@ -56,6 +56,7 @@ struct KeysNamespaceTests {
         let result = try await client.keys.create(
             CreateKeyInput(
                 label: "test-key",
+                source: "test-suite",
                 role: .member,
                 typePermissions: ["core.note": .write]
             )
@@ -70,9 +71,59 @@ struct KeysNamespaceTests {
         let body = mock.calls[0].body!
         let json = try JSONSerialization.jsonObject(with: body) as! [String: Any]
         #expect(json["label"] as? String == "test-key")
+        #expect(json["source"] as? String == "test-suite")
         #expect(json["role"] as? String == "member")
         let typePerms = json["type_permissions"] as? [String: String]
         #expect(typePerms?["core.note"] == "write")
+    }
+
+    /// The gap that let `keys.create` ship unable to succeed anywhere.
+    ///
+    /// `RouteCoverageTests` compares paths and methods, so it confirmed
+    /// this kit calls `POST /keys` and stopped. **A body is not a route.**
+    /// The server required `source`, `CreateKeyInput` could not express
+    /// one, and every call was refused — with nothing in this repository
+    /// able to see it, because the case above asserted only the fields the
+    /// input happened to carry.
+    ///
+    /// So this reads the requirement from the vendored spec rather than
+    /// restating it. A field the platform makes required later fails here
+    /// on the next snapshot sync instead of at a caller.
+    @Test("the encoded create body carries every field the spec makes required")
+    func createBodyCarriesRequiredFields() async throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let data = try Data(
+            contentsOf: packageRoot.appendingPathComponent("scripts/openapi.json"))
+        let spec = try #require(
+            try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let schema = try #require(
+            (((((spec["paths"] as? [String: Any])?["/keys"] as? [String: Any])?[
+                "post"] as? [String: Any])?["requestBody"] as? [String: Any])?[
+                    "content"] as? [String: Any])?["application/json"]
+                as? [String: Any],
+            "the snapshot declares no JSON body for POST /keys")
+        let required = try #require(
+            (schema["schema"] as? [String: Any])?["required"] as? [String],
+            "the snapshot names no required fields for POST /keys")
+        // The control. An empty list would make every assertion below
+        // vacuous, and this test's whole subject is a check that passed
+        // while measuring nothing.
+        #expect(!required.isEmpty)
+
+        let (client, mock) = makeClient()
+        mock.enqueue(makeCreatedKey())
+        _ = try await client.keys.create(
+            CreateKeyInput(label: "test-key", source: "test-suite"))
+
+        let body = try #require(mock.calls[0].body)
+        let json = try #require(
+            try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        for field in required {
+            #expect(json[field] != nil, "the create body omits `\(field)`, which the server requires")
+        }
     }
 
     @Test("list unwraps the keys envelope into [ApiKey]")

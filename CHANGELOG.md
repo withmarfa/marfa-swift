@@ -5,6 +5,28 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.0.0] — 2026-09-06
+
+### Breaking
+
+- **`CreateKeyInput` now requires `source`, and that is a source break on every existing call site.** It is also a break on code that could not work: `POST /keys` has always required a `source`, this type could not express one, and **every `keys.create` call was refused by every server**. Nothing here could see it — the route-coverage suite compares verbs and paths, and a required field missing from an input type is not a route, so the door read as covered while being unusable.
+
+  `source` is free text the operator surface shows beside the key, so it is provenance. **The kit does not default it**, because a value this kit chose would be a claim the caller never made and the server would display it as though they had. Pass what the key is for.
+
+  ```swift
+  // Before: compiled, and was refused by the server.
+  try await client.keys.create(CreateKeyInput(label: "importer"))
+
+  // Now:
+  try await client.keys.create(CreateKeyInput(label: "importer", source: "photo-importer"))
+  ```
+
+  A prefix that names a connection's own integration credential is reserved and refused by the server; those are issued by the runtime rather than through this door.
+
+### Fixed
+
+- **A create body is now checked against what the spec makes required.** The gap above existed because nothing compared the two: the namespace's own test asserted the fields the input happened to carry, and asserting the fields you already send proves nothing about the ones you do not. The check reads the `required` list for the door out of the vendored snapshot and asserts the encoded body against it, so a field the platform makes required later fails on the next snapshot sync rather than at a caller. `RouteCoverageTests` records that a body is outside what it can see, and where the check that covers it belongs.
+
 ## [17.2.0] — 2026-09-06
 
 ### Fixed

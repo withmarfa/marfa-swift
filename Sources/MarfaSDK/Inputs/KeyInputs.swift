@@ -3,6 +3,13 @@ import Foundation
 /// Input for creating an API key.
 public struct CreateKeyInput: Codable, Sendable {
     public var label: String
+    /// Where the key came from, as free text the operator surface shows
+    /// beside it. **Required by the server**, and it has no default here on
+    /// purpose: it is provenance, so a value this kit chose would be a
+    /// claim the caller never made and the server would show it as if they
+    /// had. Prefixes that name a connection's own integration credential
+    /// are reserved and refused.
+    public var source: String
     public var role: KeyRole?
     public var typePermissions: [String: TypePermission]?
     public var extensionPermissions: [String: ExtensionPermission]?
@@ -15,6 +22,7 @@ public struct CreateKeyInput: Codable, Sendable {
 
     public init(
         label: String,
+        source: String,
         role: KeyRole? = nil,
         typePermissions: [String: TypePermission]? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
@@ -22,6 +30,7 @@ public struct CreateKeyInput: Codable, Sendable {
         metadataPermissions: [String: MetadataPermission]? = nil
     ) {
         self.label = label
+        self.source = source
         self.role = role
         self.typePermissions = typePermissions
         self.extensionPermissions = extensionPermissions
@@ -30,7 +39,7 @@ public struct CreateKeyInput: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case label, role
+        case label, source, role
         case typePermissions = "type_permissions"
         case extensionPermissions = "extension_permissions"
         case edgePermissions = "edge_permissions"
