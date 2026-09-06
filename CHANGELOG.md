@@ -5,17 +5,21 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [17.2.0] — 2026-09-06
 
 ### Fixed
 
 - **An identifier carrying a reserved character now reaches the route it names.** Request paths were assembled by interpolating the identifier into a string literal, so a `/` in it opened a segment and a `#` took the rest of the path into a fragment that never left the process. **Nothing refused any of it.** `URLComponents(string:)` parses rather than encodes, and it repairs on the way through — a space and a bare percent are escaped for it — so the request was well-formed and went somewhere other than the caller asked. Every caller-supplied segment is percent-encoded as a segment now.
 
-  **Three call sites already encoded, with the wrong encoder.** A tag, an extension namespace, and the queue's replay of both used `CharacterSet.urlPathAllowed`, which keeps `/` because a path is allowed to hold separators — so they escaped everything except the character that breaks routing. They escape once now, through the same encoder as the rest.
+  **Six call sites already encoded, with the wrong encoder, and a seventh did not encode at all.** Three extension-namespace sites, a tag, and two namespace sites in the queue's replay used `CharacterSet.urlPathAllowed`, which keeps `/` because a path is allowed to hold separators — so they escaped everything except the character that breaks routing. **The queue's replay of a tag interpolated it raw**, with no encoding of any kind. All seven go through the same segment encoder now.
 
   **The escaping is `encodeURIComponent`'s, byte for byte**, which is what the platform's TypeScript client produces and what its routes already expect of an encoded segment. One consequence shows in a request log rather than in behavior: a blob hash goes out as `sha256%3A…` where it used to carry a literal colon. The route resolves unchanged, because a path parameter is decoded once on arrival.
 
   **`blobs.url(hash:)` is fixed alongside them**, and it is the one URL here that no request builds — an app hands it to an image loader. It was composed with `appendingPathComponent`, which keeps `/` and re-escapes a `%`, so it needed its encoded path assigned directly instead.
+
+  **The bytes on the wire change, which matters if you worked around this.** An identifier that reaches the SDK is now escaped exactly once. If your app pre-encoded ids or tags to get past the old behavior, it must stop: `a%2Fb` handed in today becomes `a%252Fb` on the wire and the route answers `404`. Hand the SDK the raw identifier. Nothing else is affected, because every character of a UUIDv7 encodes to itself, so ordinary ids and any queued write already carrying one are byte-identical before and after.
+
+  **A blob URL carries `sha256%3A…` where it used to carry a literal colon.** Both spellings resolve — measured against the serving origin, `200` either way, with a control confirming the route reads the hash rather than answering `200` to anything. The escaping is kept for parity with the TypeScript client rather than because the colon required it.
 
   No public API changes.
 

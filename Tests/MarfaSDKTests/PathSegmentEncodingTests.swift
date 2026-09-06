@@ -187,14 +187,21 @@ struct PathSegmentEncodingTests {
     /// week: a new call site written the old way fails here rather than
     /// waiting for somebody to hand it an id with a slash in it.
     ///
-    /// **What it reads, and what it therefore cannot see.** It scans line by
-    /// line, skips lines that begin a comment, and looks only at `path:`
-    /// arguments — so a path assembled into a local variable first, or one
-    /// spelled across two lines, is invisible to it, and so is a URL built
-    /// any other way. All three are worth naming rather than assuming: the
-    /// third is not hypothetical, and ``blobURLEscapesTheHash`` covers the one
-    /// place it happens. The check under-reports rather than inventing a
-    /// violation, so its silence is weaker evidence than its complaint.
+    /// **What it reads, and what it therefore cannot see.** It looks only at
+    /// `path:` arguments, so a path assembled into a local variable first is
+    /// invisible to it, and so is a URL built any other way — the latter is
+    /// not hypothetical, and ``blobURLEscapesTheHash`` covers the one place it
+    /// happens. The check under-reports rather than inventing a violation, so
+    /// its silence is weaker evidence than its complaint.
+    ///
+    /// **It is no longer defeated by a line wrap.** The first version scanned
+    /// one line at a time, so a `path:` argument split across two lines was
+    /// invisible — and `.swift-format` sets a 120-column limit, which two
+    /// lines this change wrote already exceed. The next person to wrap one
+    /// would have reopened the hole silently, which is the failure class this
+    /// package keeps finding: a guard defeated by ordinary formatting. It now
+    /// joins a `path:` argument with the lines that continue it before
+    /// scanning, and reports the line the argument starts on.
     @Test("no request path interpolates an unescaped segment")
     func everyPathLiteralEscapesItsSegments() throws {
         var offenders: [String] = []
@@ -202,10 +209,14 @@ struct PathSegmentEncodingTests {
 
         for file in try Self.sdkSourceFiles() {
             let source = try String(contentsOf: file, encoding: .utf8)
-            for (offset, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            for (offset, line) in lines.enumerated() {
                 let trimmed = line.drop { $0 == " " || $0 == "\t" }
                 if trimmed.hasPrefix("//") { continue }
-                for literal in Self.pathLiterals(in: String(line)) {
+                // Join the lines that continue this one before scanning, so a
+                // wrapped `path:` argument is read as the one expression it is.
+                let joined = Self.logicalLine(startingAt: offset, in: lines)
+                for literal in Self.pathLiterals(in: joined) {
                     scannedLiterals += 1
                     for expression in Self.interpolations(in: literal)
                     where !expression.hasSuffix(".escapedPathSegment") {
@@ -223,6 +234,54 @@ struct PathSegmentEncodingTests {
     }
 
     // MARK: - Scanning
+
+    /// The line at `index` joined with the lines that continue it.
+    ///
+    /// **Only where it matters.** A line carrying `path:` whose string literal
+    /// does not close on that line is joined with what follows, up to a small
+    /// bound, so a wrapped argument is scanned as the single expression it is.
+    /// Everything else is returned untouched, which keeps the reported line
+    /// number the line the argument starts on rather than wherever it ended.
+    ///
+    /// The bound exists so that an unterminated literal — which does not
+    /// compile, but this reads sources rather than an AST — cannot swallow a
+    /// whole file and turn one mistake into a scan of everything after it.
+    private static func logicalLine(startingAt index: Int, in lines: [String]) -> String {
+        guard let argument = lines[index].range(of: "path:") else { return lines[index] }
+        var joined = lines[index]
+        var tail = String(joined[argument.upperBound...])
+        var cursor = index
+        // Join forward until the argument holds a complete string literal.
+        //
+        // **Two quotes, not an odd count.** The first version joined only when
+        // a literal was left open on the line, which is one of the two ways an
+        // argument wraps and not the common one: `swift-format` breaks *before*
+        // the literal, leaving `path:` alone on its line with no quote on it at
+        // all. That version compiled, read plausibly, and caught nothing --
+        // proved by wrapping a real call site and watching it still pass.
+        while Self.quoteCount(in: tail) < 2, cursor + 1 < lines.count, cursor - index < 4 {
+            cursor += 1
+            let next = String(lines[cursor].drop { $0 == " " || $0 == "\t" })
+            joined += " " + next
+            tail += " " + next
+        }
+        return joined
+    }
+
+    /// Double quotes in `text`, ignoring escaped ones.
+    ///
+    /// An odd count means a string literal is still open at the end of the
+    /// line, which is the signal that the argument continues below.
+    private static func quoteCount(in text: String) -> Int {
+        var count = 0
+        var escaped = false
+        for character in text {
+            if escaped { escaped = false; continue }
+            if character == "\\" { escaped = true; continue }
+            if character == "\"" { count += 1 }
+        }
+        return count
+    }
 
     private static var packageRoot: URL {
         var root = URL(fileURLWithPath: #filePath)
