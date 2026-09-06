@@ -53,7 +53,7 @@ public struct WaitUntilTimeoutError: Error, CustomStringConvertible {
 /// so a bound in milliseconds measures the runner and reports it as logic.
 ///
 /// Every surviving caller of this function is in the live-server suite and
-/// passes a bound between fifteen and a hundred and twenty seconds, each
+/// passes a bound between fifteen seconds and an hour, each
 /// derived from what that call actually does against a real space. Nothing in
 /// the repository passes a sub-second bound here any more.
 ///

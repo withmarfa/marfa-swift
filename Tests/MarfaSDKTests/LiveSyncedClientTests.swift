@@ -13,6 +13,10 @@ private enum LiveServer {
     struct Credentials: Sendable {
         let url: URL
         let apiKey: String
+        /// Instance-admin credential, present only when `MARFA_ADMIN_API_KEY`
+        /// is set. Required by the one scenario that provisions its own space;
+        /// every other scenario runs without it.
+        let adminApiKey: String?
     }
 
     static let credentials: Credentials? = {
@@ -24,10 +28,39 @@ private enum LiveServer {
         else {
             return nil
         }
-        return Credentials(url: url, apiKey: apiKey)
+        let admin = environment["MARFA_ADMIN_API_KEY"]
+        return Credentials(
+            url: url,
+            apiKey: apiKey,
+            adminApiKey: (admin?.isEmpty == false) ? admin : nil
+        )
     }()
 
     static var isConfigured: Bool { credentials != nil }
+
+    /// Hosts this suite may never provision against, whatever it was handed.
+    ///
+    /// **A doc comment is not a guard.** Provisioning writes a space, two
+    /// credentials and an irreversible delete onto whatever instance the
+    /// environment names, and the only thing standing between a stale shell
+    /// and production was a sentence asking people not to. A stale
+    /// `MARFA_API_URL` is exactly the input this cannot afford to trust.
+    ///
+    /// Deny rather than allow because the set of disposable hosts is open --
+    /// a laptop, a container, a self-host on any name -- while the set that
+    /// must never be touched is small, known, and the one that matters.
+    private static let neverProvision: Set<String> = ["api.marfa.so"]
+
+    /// True when this run may create and destroy a space.
+    ///
+    /// Three conditions, all positive: the suite is configured, an instance
+    /// admin credential was supplied deliberately, and the target is not a
+    /// host on the deny list.
+    static var mayProvision: Bool {
+        guard let c = credentials, c.adminApiKey != nil else { return false }
+        guard let host = c.url.host()?.lowercased() else { return false }
+        return !neverProvision.contains(host)
+    }
 }
 
 /// Thrown when a test body runs without credentials, which the suite's gate
@@ -124,8 +157,35 @@ private final class LiveFixture {
     private var itemIds: [String] = []
     private var clients: [MarfaClient] = []
     private var runMarkers: [String] = []
+    private var scratchKeyIds: [String] = []
+    private var scratchSpaceIds: [String] = []
+    private var adminClient: MarfaClient?
 
     func track(item id: String) { itemIds.append(id) }
+
+    /// Registers an API key this run minted, so teardown revokes it on the
+    /// failing path as well as the passing one.
+    ///
+    /// **Only ever an id that came back from this run's own `keys.create`.**
+    /// The revoke route is space-admin gated and takes any id in the space, so
+    /// a teardown that swept by label — or by anything other than what it
+    /// watched being made — could revoke the credential another device, or the
+    /// operator, is holding. The id is the proof of provenance and nothing
+    /// else is.
+    func track(scratchKey id: String) { scratchKeyIds.append(id) }
+
+    /// Registers a space this run created, and the admin client that can
+    /// remove it.
+    ///
+    /// **Deleting the space is what makes the keys and rows inside it
+    /// somebody else's problem rather than a leak**, so it runs last and it
+    /// runs on every exit path, **including a cancelled one**. Only ever an id returned by this run's own
+    /// `POST /admin/spaces`: the delete route takes any id on the instance,
+    /// and the two real spaces on staging are the operator's.
+    func track(scratchSpace id: String, removingThrough admin: MarfaClient) {
+        scratchSpaceIds.append(id)
+        adminClient = admin
+    }
 
     /// Register a run marker so teardown can find rows this test caused but
     /// never held an id for.
@@ -195,6 +255,67 @@ private final class LiveFixture {
             try? await client.items.purge(id: id)
         }
         itemIds.removeAll()
+
+        // **No key revocation here, deliberately.** Every scratch key is
+        // minted inside the space below, and deleting a space takes its keys
+        // with it, so a second call could only ever be redundant. The loop
+        // that used to sit here was worse than redundant: it revoked through
+        // the operator's credential, which cannot reach a key in another
+        // space -- measured, `404` against `200` for the admin credential --
+        // and `try?` hid that. It read as a belt and was not one.
+        scratchKeyIds.removeAll()
+
+        // Last of all, and through the admin credential rather than `client`,
+        // which is scoped to a space it does not own. Deleting the space takes
+        // its keys and its rows with it, so it is the one step here that has to
+        // work.
+        //
+        // **Detached, because teardown may be running cancelled.**
+        // swift-testing enforces `.timeLimit` by cancelling the task, so a run
+        // that exhausts it arrives here with cancellation already set and every
+        // request throws before it is sent -- space, keys and rows all survive.
+        // That is precisely the path the control wait hands to the runner on
+        // purpose, so it is the path cleanup has to survive. A detached task
+        // does not inherit cancellation; awaiting its value keeps the ordering.
+        if let admin = adminClient {
+            let ids = scratchSpaceIds
+            scratchSpaceIds.removeAll()
+            await Task.detached { await LiveFixture.deleteSpaces(ids, through: admin) }.value
+        } else if !scratchSpaceIds.isEmpty {
+            // Unreachable while `track(scratchSpace:removingThrough:)` sets both
+            // together, and recorded rather than dropped because the alternative
+            // is forgetting a space with no way to name it again.
+            Issue.record("spaces \(scratchSpaceIds) tracked with no admin client to remove them")
+            scratchSpaceIds.removeAll()
+        }
+    }
+
+    /// Deletes the spaces this run created, reporting any that survive.
+    ///
+    /// `nonisolated` so the detached task above runs it clear of the cancelled
+    /// context it was spawned from.
+    nonisolated static func deleteSpaces(_ ids: [String], through admin: MarfaClient) async {
+        for id in ids {
+            // **Not `try?`.** The first version swallowed the result and three
+            // runs passed while leaving three spaces behind, because the route
+            // requires `confirm` and answered 400 every time. A cleanup that
+            // cannot fail reports success over work it never did. Recorded
+            // rather than thrown, so teardown on the failing path does not mask
+            // the failure that got it here.
+            do {
+                let result: DeletedSpace = try await admin.transport.request(
+                    method: .post,
+                    path: "/admin/spaces/\(id)/delete",
+                    body: DeleteSpaceInput(confirm: id),
+                    query: nil
+                )
+                if !result.deleted {
+                    Issue.record("space \(id) was not deleted and is still on the server")
+                }
+            } catch {
+                Issue.record("space \(id) survived teardown: \(error)")
+            }
+        }
     }
 }
 
@@ -209,6 +330,54 @@ private actor TaskBox<Value: Sendable> {
     func put(_ newValue: Value) { if value == nil { value = newValue } }
 }
 
+/// One `queueParked` announcement, as a named value rather than a tuple.
+///
+/// ``TaskBox`` needs a `Sendable` payload and the event carries two loose
+/// values; naming them is cheaper than reasoning about tuple conformance and
+/// says at the assertion which number is which.
+private struct ParkAnnouncement: Sendable {
+    let reason: PendingMutationBlockReason
+    let count: Int
+}
+
+/// The body `POST /keys` actually requires, which is not the body
+/// ``CreateKeyInput`` encodes.
+///
+/// **The kit cannot mint a key against a conforming server**, and this is where
+/// that was found. `scripts/openapi.json` lists `source` in the route's
+/// `required` array alongside `label`; `CreateKeyInput` has no such field and
+/// no way to set one, so every `keys.create` is answered
+/// `400 missing_required_field`. Nothing in the repository could have caught
+/// it: `RouteCoverageTests` compares the routes the SDK calls against the ones
+/// the spec declares and never reads a request body, and every unit test for
+/// this namespace asserts against a mock that accepts whatever it is handed.
+///
+/// Declared here rather than fixed here because the remedy is a change to a
+/// public wire type — a required field cannot be added as an optional and mean
+/// anything — and that is a decision with a public-surface baseline attached.
+/// The scenario below needs a key, so it sends the body the server documents
+/// and goes through the real transport to send it.
+/// The body `POST /admin/spaces/{id}/keys` requires.
+///
+/// Hand-rolled because the kit's own `keys.create` cannot express it: its input
+/// type carries no `source`, which the route requires, so that call cannot mint
+/// a key against any server. Filed as T-1407; remove this once it lands.
+private struct ScratchKeyInput: Codable, Sendable {
+    let label: String
+    let source: String
+    let role: String
+    let type_permissions: [String: String]
+    let default_tier: String
+}
+
+/// `POST /admin/spaces` takes a name and answers the created space.
+private struct CreateSpaceInput: Codable, Sendable { let name: String }
+private struct CreatedSpace: Codable, Sendable { let id: String }
+/// `POST /admin/spaces/{id}/delete` requires `confirm` to be the space id,
+/// spelled exactly. It is the fat-finger gate on an action with no undo.
+private struct DeleteSpaceInput: Codable, Sendable { let confirm: String }
+private struct DeletedSpace: Codable, Sendable { let deleted: Bool }
+
 /// What a synced client does against a real server.
 ///
 /// **Some of these are reproductions and some are regression guards**, and the
@@ -218,7 +387,9 @@ private actor TaskBox<Value: Sendable> {
 /// space and never against production — the tests write, and they delete what
 /// they wrote through a second client on the way out.
 ///
-/// Gated on `MARFA_API_URL` and `MARFA_API_KEY`; skipped, not passed, when
+/// Gated on `MARFA_API_URL` and `MARFA_API_KEY`; the one scenario that
+/// provisions a space of its own additionally needs `MARFA_ADMIN_API_KEY` and
+/// a target that is not production, and skips without them. Skipped, not passed, when
 /// either is unset.
 ///
 /// **Not every rule belongs here, and the ones missing are missing on
@@ -1152,38 +1323,305 @@ struct LiveSyncedClientTests {
 
     // MARK: - Rule 5, a refusal nobody can act on is not a classification
 
-    /// **Rule 5's auth arm, which needed no privileged credential after all.**
-    /// A `401` needs an *invalid* key, not a powerful one, and building a
-    /// synced client makes no network call — the writer lock and the origin
-    /// check are both local — so a client on a bogus key constructs, enqueues
-    /// and drains against the real server without touching a space or
-    /// creating a row.
+
+    /// **The auth arm driven against a credential the server really refused**,
+    /// which is the one acceptance criterion on T-1315 that no in-process test
+    /// can answer. `CredentialRefusedTests` proves the classification against a
+    /// stubbed transport: a queued `UnauthorizedError` parks the queue. What it
+    /// cannot say is whether a real server, asked by a real `URLSessionTransport`
+    /// with a key that has just been revoked, produces the failure that
+    /// classification is written for. A fixture is free to hand back a shape the
+    /// wire never carries.
     ///
-    /// **What it pins is that nothing is lost.** A `401` is classed
-    /// environmental, so the write stays queued rather than being blocked or
-    /// dropped. That is deliberate: credentials come back, and discarding a
-    /// person's edit because a token expired is the failure this arm exists to
-    /// prevent.
+    /// **The control is the half that makes the park mean something.** A key
+    /// that never worked parks identically to one that was revoked — which
+    /// ``aNeverValidCredentialParksTheQueue`` covers on its own — so this one
+    /// mints a scratch key, drives a write through it that the server accepts
+    /// and that is then read back through a second credential inside the same
+    /// space, and only then revokes it. Without that, the assertion below is
+    /// satisfied by a typo.
     ///
-    /// **What it cannot yet see, said here rather than found later:** the
-    /// contract asks for the queue to be *parked* with a stated reason after
-    /// the transport's single refresh, so an app can say why. Today it simply
-    /// stays pending, which is safe and silent. This asserts the safe half and
-    /// names the missing half rather than passing over it.
-    @Test("rule 5: a refused credential keeps the write rather than dropping it")
-    func aRefusedCredentialKeepsTheWrite() async throws {
+    /// **Only the key this run minted is ever revoked**, and it is named by the
+    /// id `keys.create` returned rather than by its label. See
+    /// `LiveFixture.track(scratchKey:)` for why that distinction is the whole
+    /// safety property.
+    @Test(
+        "rule 5: a credential revoked mid-session parks the queue it was carrying",
+        .enabled(
+            if: LiveServer.mayProvision,
+            "set MARFA_ADMIN_API_KEY, against a host that is not production: this scenario creates a space and deletes it"
+        )
+    )
+    func aRevokedCredentialParksTheQueue() async throws {
         let credentials = try credentials()
         let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
         let path = storePath()
         defer { removeStore(at: path) }
 
-        // **Through the fixture like every other scenario**, and for the
-        // reason the fixture's own doc gives: a `defer` that spawns an
-        // unawaited stop returns before the engine has stopped, and the store
-        // is then deleted underneath a client that goes on reconnecting,
-        // backing off and writing for the rest of a serialized suite. This
-        // scenario creates nothing on the server, so the fixture is here for
-        // the engine rather than for cleanup.
+        // The trait above already refused every run without this, so the
+        // unwrap is a formality rather than the gate.
+        let adminKey = try #require(credentials.adminApiKey)
+        let admin = MarfaClient(url: credentials.url, apiKey: adminKey)
+
+        try await withFixture(cleaningUpThrough: other) { fixture in
+            let run = runMarker()
+            let label = "t1315-drive-\(Int(Date().timeIntervalSince1970))-\(run)"
+
+            // MARK: a space of this run's own
+            //
+            // **Not the shared space, and that is the whole reason this
+            // scenario was rewritten.** The control below waits for a write to
+            // replay, and a client's first drain waits on its initial import,
+            // which pages every row in the space. Run against the operator's
+            // demo space -- 3,277 items when this was written, and growing
+            // every time anything else writes there -- the control raced the
+            // import rather than the kit, and the bound had to be raised twice
+            // before it failed anyway. An empty space makes the import trivial
+            // and the wait about the thing under test.
+            let space: CreatedSpace = try await admin.transport.request(
+                method: .post,
+                path: "/admin/spaces",
+                body: CreateSpaceInput(name: label),
+                query: nil
+            )
+            fixture.track(scratchSpace: space.id, removingThrough: admin)
+
+            // MARK: the two credentials, both inside that space
+            //
+            // The device carries one and the warden reads and revokes with the
+            // other. Two rather than one because the operator's credential
+            // cannot see into this space at all, so the read-back that makes
+            // the control mean something has to come from inside it.
+            // The device writes two notes and nothing else; only the warden
+            // has to revoke. `space_admin` on both was reaching for the role
+            // that would certainly work rather than the one the job needs.
+            func mintKey(_ suffix: String, role: String) async throws -> CreatedKey {
+                try await admin.transport.request(
+                    method: .post,
+                    path: "/admin/spaces/\(space.id)/keys",
+                    body: ScratchKeyInput(
+                        label: "\(label)-\(suffix)",
+                        source: "\(label)-\(suffix)",
+                        role: role,
+                        type_permissions: ["*": "write"],
+                        default_tier: "library"
+                    ),
+                    query: nil
+                )
+            }
+            let scratch = try await mintKey("device", role: "member")
+            let wardenKey = try await mintKey("warden", role: "space_admin")
+            // Tracked before anything else can throw. Deleting the space would
+            // take them anyway; this is the belt for a run that dies before the
+            // space id is usable.
+            fixture.track(scratchKey: scratch.id)
+            fixture.track(scratchKey: wardenKey.id)
+            let warden = MarfaClient(url: credentials.url, apiKey: wardenKey.key)
+
+            let device = try await MarfaClient.synced(
+                url: credentials.url, apiKey: scratch.key, storePath: path
+            )
+            fixture.stopOnExit(device)
+            let engine = try #require(device.syncEngine)
+            let queue = try #require(device.mutationQueue)
+
+            // Subscribed before the credential dies, because the announcement
+            // is half of what the acceptance criterion asks for and it is not
+            // re-emitted.
+            let parks = TaskBox<ParkAnnouncement>()
+            let events = engine.events
+            let watcher = Task {
+                for await event in events {
+                    if case .queueParked(let reason, let count) = event {
+                        await parks.put(ParkAnnouncement(reason: reason, count: count))
+                    }
+                }
+            }
+            defer { watcher.cancel() }
+
+            await engine.start()
+
+            // MARK: the control
+            let control = try await device.items.create(note("control write", run: run))
+            fixture.track(item: control.id)
+            // **The runner owns this bound, not a number chosen here.** The
+            // condition can be starved rather than merely delayed -- a drain
+            // waits on the import, and the import waits on however many rows
+            // the space holds -- and D61 is explicit that where that is true a
+            // number in the test body reports on the machine rather than on the
+            // code. The space is this run's own and holds nothing, so a wait
+            // that does not settle means the kit did not replay.
+            //
+            // **An hour, so that raising the suite's limit cannot quietly make
+            // this the operative bound.** A number merely "above the current
+            // limit" becomes load-bearing the moment somebody raises that limit
+            // for an unrelated reason, and nothing would say so. This one is
+            // not a bound anyone will cross; it exists because the helper's
+            // signature requires a `Duration`.
+            try await waitForDrain(
+                engine,
+                timeout: .seconds(60 * 60),
+                description: "the control write to replay under the scratch key"
+            )
+
+            // Read back through a second credential rather than this device's
+            // store, so what is established is that the *server* accepted a
+            // write from the scratch key -- which the local copy would show
+            // either way. The warden is inside the same space, because the
+            // operator's credential cannot see into it.
+            let asServerHasIt = try await warden.items.get(id: control.id)
+            #expect(
+                asServerHasIt.id == control.id,
+                "the scratch key never wrote anything, so a park after revoking it proves nothing"
+            )
+
+            let beforeRevocation = try await queue.counts
+            #expect(
+                beforeRevocation.isSettled,
+                "the queue must be empty before the credential dies, or the park below could be older: \(beforeRevocation)"
+            )
+
+            // MARK: the revocation
+            try await warden.keys.revoke(id: scratch.id)
+
+            // **Synchronised on the server, not slept through.** Revocation is
+            // the server's to apply and nothing here knows when it has; a write
+            // made while the key still worked would drain cleanly and the wait
+            // below would then time out against a kit that was behaving.
+            let onTheDeadKey = MarfaClient(url: credentials.url, apiKey: scratch.key)
+            try await waitUntil(
+                timeout: .seconds(60),
+                description: "the server to start refusing the revoked scratch key"
+            ) {
+                do {
+                    _ = try await onTheDeadKey.items.list(filters: recentNotes())
+                    return false
+                } catch let error as MarfaError {
+                    return error.status == 401
+                }
+            }
+
+            // MARK: the write that cannot be sent
+            let stranded = try await device.items.create(note("write after revocation", run: run))
+            fixture.track(item: stranded.id)
+
+            // The queue's own state, which is what an app reads, **and the
+            // announcement, which is the half with no handle on it.**
+            //
+            // The park lands in the store and the event reaches a detached
+            // watcher; those settle independently. Waiting on the store alone
+            // returns while the stream may not have delivered, and reading the
+            // box straight afterwards asserts about the moment before its
+            // subject happens. That failed one run in five -- the queue parked
+            // correctly every time and the announcement was nil -- which is
+            // the flake this suite has recorded twice before under other
+            // names. Both are in the condition now, so the wait is the
+            // synchronisation rather than a hope.
+            //
+            // Bounded well past the retry ceiling: a kit that still counted a
+            // `401` toward it would take five refusals and the engine's
+            // back-off between them, about a minute, before blocking under the
+            // wrong reason, and this has to tell that apart from parking.
+            try await waitUntil(
+                timeout: .seconds(120),
+                description: "the queue to stop and say so, however it chooses to"
+            ) {
+                let counts = try await queue.counts
+                let stopped = counts.blockedTotal > 0 || counts.deadLettered > 0
+                let announced = await parks.value != nil
+                return stopped && announced
+            }
+
+            let counts = try await queue.counts
+            let row = try #require(try await queue.fetchAll().first)
+            let dropped = try await queue.fetchDropped()
+            let announcement = await parks.value
+            let state = await engine.fullSyncState
+
+            print(
+                """
+                [T-1315] control write \(control.id) accepted by the server under the scratch key
+                [T-1315] after revocation: counts=\(counts)
+                [T-1315] row: state=\(row.state) reason=\(String(describing: row.blockedReason)) \
+                attempts=\(row.attemptCount) refusals=\(row.refusalCount) lastError=\(row.lastError ?? "none")
+                [T-1315] announcement: \(String(describing: announcement))
+                [T-1315] fullSyncState: \(state)
+                [T-1315] dead-lettered: \(dropped.count)
+                """
+            )
+
+            #expect(
+                row.state == .blocked,
+                "the write was left \(row.state) rather than parked, so the queue is still spinning on a dead credential"
+            )
+            #expect(
+                row.blockedReason == .credentialRefused,
+                "parked under \(String(describing: row.blockedReason)), which names the wrong remedy"
+            )
+            #expect(
+                counts.blocked[.credentialRefused] == 1,
+                "the credential class should hold the one queued write: \(counts.blocked)"
+            )
+            #expect(
+                row.refusalCount == 0,
+                "a refused credential must not spend the retry ceiling, which is for refusals of the write"
+            )
+            #expect(dropped.isEmpty, "a refused credential must never dead-letter an edit")
+            // The recorded text, which the scenario this replaces was the only
+            // thing asserting. An app shows this, so a park carrying no reason
+            // or the wrong one is a park nobody can act on.
+            let recorded = try #require(row.lastError, "a parked row recorded no error at all")
+            #expect(
+                recorded.contains("401") || recorded.lowercased().contains("unauthor"),
+                "the recorded error does not name the refusal: \(recorded)"
+            )
+
+            let park = try #require(announcement, "the parking was never announced, so an app cannot show it")
+            #expect(park.reason == .credentialRefused)
+            #expect(park.count >= 1, "the announcement carried no rows: \(park.count)")
+
+            if case .parked(let reason, let count) = state {
+                #expect(reason == .credentialRefused)
+                #expect(count >= 1)
+            } else {
+                Issue.record("fullSyncState reported \(state) over a parked queue")
+            }
+
+            // MARK: the credential is gone, read back rather than assumed
+            //
+            // Listed through the warden, which is inside the space the keys
+            // live in. Listing through the operator's credential would answer
+            // that space's keys instead and pass by construction, having read
+            // a set the scratch key was never in.
+            let remaining = try await warden.keys.list()
+            #expect(
+                remaining.contains(where: { $0.id == scratch.id }) == false,
+                "the scratch key survived the run"
+            )
+            #expect(
+                remaining.contains(where: { $0.id == wardenKey.id }),
+                "the warden should still be live here, or this list proves nothing"
+            )
+        }
+    }
+    /// **The other half of rule 5's auth arm: a credential that never worked.**
+    ///
+    /// The scenario above revokes a key that had just written successfully, so
+    /// what it proves is that a *live* credential going dead parks the queue.
+    /// This one starts with a key the server has never seen. The two look
+    /// identical from inside the queue, which is exactly why the control up
+    /// there matters — and why this case is worth keeping separately rather
+    /// than trusting one test to cover both.
+    ///
+    /// It needs no privileged credential and creates nothing on the server, so
+    /// it runs wherever the suite runs.
+    @Test("rule 5: a credential that never worked parks the queue too")
+    func aNeverValidCredentialParksTheQueue() async throws {
+        let credentials = try credentials()
+        let other = MarfaClient(url: credentials.url, apiKey: credentials.apiKey)
+        let path = storePath()
+        defer { removeStore(at: path) }
+
         try await withFixture(cleaningUpThrough: other) { fixture in
             let device = try await MarfaClient.synced(
                 url: credentials.url,
@@ -1195,45 +1633,38 @@ struct LiveSyncedClientTests {
             let queue = try #require(device.mutationQueue)
             await engine.start()
 
-            // Never reaches the server, so nothing is created and there is
-            // nothing to clean up.
-            let item = try await device.items.create(
-                note("unauthorized write", run: runMarker())
-            )
-            #expect(item.id.isEmpty == false)
+            // Never reaches the server, so there is nothing to clean up.
+            let stranded = try await device.items.create(note("never valid", run: runMarker()))
+            #expect(stranded.id.isEmpty == false)
 
-            // **Waited for, not slept through, and the number a broken kit
-            // would have to beat.** A kit that counted a `401` toward the
-            // retry ceiling blocks at `maxReplayAttempts`, which is five — so
-            // an assertion taken before the sixth attempt passes against
-            // exactly the defect this scenario is for. The bound is the
-            // engine's own back-off summed to that point: one second doubling
-            // to a thirty-second cap, so 1+2+4+8+16+30 is about a minute, and
-            // ninety seconds leaves room for the round trips between.
             try await waitUntil(
-                timeout: .seconds(90),
-                description: "the queue to make more attempts than the retry ceiling allows"
+                timeout: .seconds(60 * 60),
+                description: "the queue to stop, however it chooses to"
             ) {
-                try await queue.fetchAll().first.map { $0.attemptCount > 5 } ?? false
+                let counts = try await queue.counts
+                return counts.blockedTotal > 0 || counts.deadLettered > 0
             }
 
-            // Having established the write really was attempted and refused,
-            // repeatedly, what matters is that none of it counted.
             let row = try #require(try await queue.fetchAll().first)
-            #expect(row.state != .blocked, "a 401 is environmental: credentials come back")
-            #expect(
-                row.lastError?.contains("401") == true
-                    || row.lastError?.lowercased().contains("unauthor") == true,
-                "the recorded failure should be the credential refusal: \(row.lastError ?? "none")"
-            )
-
-            let rows = try await queue.fetchAll()
-            #expect(rows.count == 1, "the write was lost rather than kept")
-
             let dropped = try await queue.fetchDropped()
-            #expect(dropped.isEmpty, "a refused credential must never dead-letter an edit")
+
+            #expect(
+                row.blockedReason == .credentialRefused,
+                "parked under \(String(describing: row.blockedReason)) rather than the credential class"
+            )
+            #expect(
+                row.refusalCount == 0,
+                "a refused credential must not spend the retry ceiling"
+            )
+            #expect(dropped.isEmpty, "nothing is dropped: the write is kept for when a credential returns")
+            let recorded = try #require(row.lastError, "a parked row recorded no error at all")
+            #expect(
+                recorded.contains("401") || recorded.lowercased().contains("unauthor"),
+                "the recorded error does not name the refusal: \(recorded)"
+            )
         }
     }
+
 
     // MARK: - Rule 2, a key names one request
 
