@@ -42,6 +42,23 @@ import Foundation
 ///
 /// Neither document has been compared against a running server, so the
 /// counts here describe two committed files rather than a deployment.
+///
+/// **A body is outside what this can see, and that is not a gap it will
+/// grow into.** Everything here is keyed on verb plus path, so it reports
+/// that a wrapper exists and never what the wrapper sends. `keys.create`
+/// was wrapped, listed as covered, and could not succeed against any
+/// server: the platform requires a `source` on `POST /keys` and the input
+/// type carried no way to spell one, so every call was refused. This suite
+/// was green throughout and correctly so — a required field missing from
+/// an input type is not a route.
+///
+/// The check that catches that shape reads the spec's own `required` list
+/// for a door and asserts the encoded body against it, which has to live
+/// beside the namespace it covers rather than here.
+/// `Tests/MarfaSDKTests/KeysNamespaceTests.swift` has the first one. Add
+/// one per door that takes a body rather than trying to generalize this
+/// file, because the body a wrapper sends depends on arguments only its
+/// own test can supply.
 @Suite("SDK route coverage tracks the vendored spec")
 struct RouteCoverageTests {
 

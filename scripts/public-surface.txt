@@ -1291,10 +1291,11 @@ CreateKeyInput	struct	struct CreateKeyInput
 CreateKeyInput.edgePermissions	property	var edgePermissions: [String : EdgePermission]?
 CreateKeyInput.extensionPermissions	property	var extensionPermissions: [String : ExtensionPermission]?
 CreateKeyInput.init(from:)	init	init(from decoder: any Decoder) throws
-CreateKeyInput.init(label:role:typePermissions:extensionPermissions:edgePermissions:metadataPermissions:)	init	init(label: String, role: KeyRole? = nil, typePermissions: [String : TypePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, edgePermissions: [String : EdgePermission]? = nil, metadataPermissions: [String : MetadataPermission]? = nil)
+CreateKeyInput.init(label:source:role:typePermissions:extensionPermissions:edgePermissions:metadataPermissions:)	init	init(label: String, source: String, role: KeyRole? = nil, typePermissions: [String : TypePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, edgePermissions: [String : EdgePermission]? = nil, metadataPermissions: [String : MetadataPermission]? = nil)
 CreateKeyInput.label	property	var label: String
 CreateKeyInput.metadataPermissions	property	var metadataPermissions: [String : MetadataPermission]?
 CreateKeyInput.role	property	var role: KeyRole?
+CreateKeyInput.source	property	var source: String
 CreateKeyInput.typePermissions	property	var typePermissions: [String : TypePermission]?
 CreateOAuthProviderCredentialInput	struct	struct CreateOAuthProviderCredentialInput
 CreateOAuthProviderCredentialInput.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
