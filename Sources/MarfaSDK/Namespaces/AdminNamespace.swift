@@ -97,7 +97,7 @@ public struct AdminPlatformTypesNamespace: Sendable {
         try ensureRemote("admin.platformTypes.remove")
         let _: EmptyResponse = try await transport.request(
             method: .post,
-            path: "/admin/platform-types/\(id)/remove",
+            path: "/admin/platform-types/\(id.escapedPathSegment)/remove",
             body: nil,
             query: nil
         )
@@ -134,7 +134,7 @@ public struct AdminSpacesNamespace: Sendable {
         try ensureRemote("admin.spaces.get")
         return try await transport.request(
             method: .get,
-            path: "/admin/spaces/\(id)",
+            path: "/admin/spaces/\(id.escapedPathSegment)",
             body: nil,
             query: nil
         )
@@ -147,7 +147,7 @@ public struct AdminSpacesNamespace: Sendable {
         try ensureRemote("admin.spaces.suspend")
         return try await transport.request(
             method: .post,
-            path: "/admin/spaces/\(id)/suspend",
+            path: "/admin/spaces/\(id.escapedPathSegment)/suspend",
             body: nil,
             query: nil
         )
@@ -158,7 +158,7 @@ public struct AdminSpacesNamespace: Sendable {
         try ensureRemote("admin.spaces.unsuspend")
         return try await transport.request(
             method: .post,
-            path: "/admin/spaces/\(id)/unsuspend",
+            path: "/admin/spaces/\(id.escapedPathSegment)/unsuspend",
             body: nil,
             query: nil
         )
@@ -168,7 +168,7 @@ public struct AdminSpacesNamespace: Sendable {
         try ensureRemote("admin.spaces.metrics")
         return try await transport.request(
             method: .get,
-            path: "/admin/spaces/\(id)/metrics",
+            path: "/admin/spaces/\(id.escapedPathSegment)/metrics",
             body: nil,
             query: nil
         )
@@ -180,7 +180,7 @@ public struct AdminSpacesNamespace: Sendable {
         try ensureRemote("admin.spaces.keys")
         let response: SpaceApiKeysResponse = try await transport.request(
             method: .get,
-            path: "/admin/spaces/\(id)/keys",
+            path: "/admin/spaces/\(id.escapedPathSegment)/keys",
             body: nil,
             query: nil
         )

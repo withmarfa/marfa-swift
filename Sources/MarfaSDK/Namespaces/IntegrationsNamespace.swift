@@ -49,7 +49,7 @@ public struct IntegrationsNamespace: Sendable {
         try ensureRemote("integrations.get")
         return try await transport.request(
             method: .get,
-            path: "/integrations/\(id)",
+            path: "/integrations/\(id.escapedPathSegment)",
             body: nil,
             query: nil
         )

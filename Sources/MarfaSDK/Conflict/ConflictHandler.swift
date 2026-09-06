@@ -105,7 +105,7 @@ func handleConflictUpdateWithStats(
         do {
             result = try await transport.requestWithConflict(
                 method: .patch,
-                path: "/items/\(itemId)",
+                path: "/items/\(itemId.escapedPathSegment)",
                 body: body,
                 query: query,
                 idempotencyKey: keyForAttempt(

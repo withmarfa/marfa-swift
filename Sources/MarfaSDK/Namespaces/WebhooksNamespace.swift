@@ -39,7 +39,7 @@ public struct WebhooksNamespace: Sendable {
     public func get(id: String) async throws -> Webhook {
         try ensureRemote("webhooks.get")
         return try await transport.request(
-            method: .get, path: "/webhooks/\(id)", body: nil, query: nil
+            method: .get, path: "/webhooks/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 
@@ -47,7 +47,7 @@ public struct WebhooksNamespace: Sendable {
     public func update(id: String, input: UpdateWebhookInput) async throws -> Webhook {
         try ensureRemote("webhooks.update")
         return try await transport.request(
-            method: .patch, path: "/webhooks/\(id)", body: input, query: nil
+            method: .patch, path: "/webhooks/\(id.escapedPathSegment)", body: input, query: nil
         )
     }
 
@@ -55,7 +55,7 @@ public struct WebhooksNamespace: Sendable {
     public func delete(id: String) async throws {
         try ensureRemote("webhooks.delete")
         let _: EmptyResponse = try await transport.request(
-            method: .delete, path: "/webhooks/\(id)", body: nil, query: nil
+            method: .delete, path: "/webhooks/\(id.escapedPathSegment)", body: nil, query: nil
         )
     }
 
@@ -65,7 +65,7 @@ public struct WebhooksNamespace: Sendable {
         var query: [(String, String)] = []
         if let limit { query.append(("limit", String(limit))) }
         let response: DeliveriesResponse = try await transport.request(
-            method: .get, path: "/webhooks/\(id)/deliveries", body: nil,
+            method: .get, path: "/webhooks/\(id.escapedPathSegment)/deliveries", body: nil,
             query: query.isEmpty ? nil : query
         )
         return response.deliveries

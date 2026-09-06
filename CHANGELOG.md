@@ -7,6 +7,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Fixed
+
+- **An identifier carrying a reserved character now reaches the route it names.** Request paths were assembled by interpolating the identifier into a string literal, so a `/` in it opened a segment and a `#` took the rest of the path into a fragment that never left the process. **Nothing refused any of it.** `URLComponents(string:)` parses rather than encodes, and it repairs on the way through — a space and a bare percent are escaped for it — so the request was well-formed and went somewhere other than the caller asked. Every caller-supplied segment is percent-encoded as a segment now.
+
+  **Three call sites already encoded, with the wrong encoder.** A tag, an extension namespace, and the queue's replay of both used `CharacterSet.urlPathAllowed`, which keeps `/` because a path is allowed to hold separators — so they escaped everything except the character that breaks routing. They escape once now, through the same encoder as the rest.
+
+  **The escaping is `encodeURIComponent`'s, byte for byte**, which is what the platform's TypeScript client produces and what its routes already expect of an encoded segment. One consequence shows in a request log rather than in behavior: a blob hash goes out as `sha256%3A…` where it used to carry a literal colon. The route resolves unchanged, because a path parameter is decoded once on arrival.
+
+  **`blobs.url(hash:)` is fixed alongside them**, and it is the one URL here that no request builds — an app hands it to an image loader. It was composed with `appendingPathComponent`, which keeps `/` and re-escapes a `%`, so it needed its encoded path assigned directly instead.
+
+  No public API changes.
+
 ## [17.1.0] — 2026-09-05
 
 ### Added

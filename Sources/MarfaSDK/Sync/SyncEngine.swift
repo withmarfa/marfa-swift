@@ -2924,33 +2924,33 @@ public actor SyncEngine {
                     sourceId: p.sourceId
                 )
                 let _: ItemResponse = try await transport.request(
-                    method: .patch, path: "/items/\(p.id)", body: body, query: nil
+                    method: .patch, path: "/items/\(p.id.escapedPathSegment)", body: body, query: nil
                 )
             }
 
         case .deleteItem:
             let p = try decoder.decode(IDPayload.self, from: data)
             let _: EmptyResponse = try await transport.request(
-                method: .delete, path: "/items/\(p.id)", body: nil, query: nil
+                method: .delete, path: "/items/\(p.id.escapedPathSegment)", body: nil, query: nil
             )
 
         case .restoreItem:
             let p = try decoder.decode(IDPayload.self, from: data)
             let _: ItemResponse = try await transport.request(
-                method: .post, path: "/items/\(p.id)/restore", body: nil, query: nil
+                method: .post, path: "/items/\(p.id.escapedPathSegment)/restore", body: nil, query: nil
             )
 
         case .transitionItem:
             let p = try decoder.decode(TransitionPayload.self, from: data)
             let body = TransitionBody(state: p.state)
             let _: ItemResponse = try await transport.request(
-                method: .post, path: "/items/\(p.id)/transition", body: body, query: nil
+                method: .post, path: "/items/\(p.id.escapedPathSegment)/transition", body: body, query: nil
             )
 
         case .purgeItem:
             let p = try decoder.decode(IDPayload.self, from: data)
             let _: EmptyResponse = try await transport.request(
-                method: .delete, path: "/items/\(p.id)/purge", body: nil, query: nil
+                method: .delete, path: "/items/\(p.id.escapedPathSegment)/purge", body: nil, query: nil
             )
 
         case .createEdge:
@@ -2989,54 +2989,56 @@ public actor SyncEngine {
         case .updateEdge:
             let p = try decoder.decode(UpdateEdgePayload.self, from: data)
             let _: EdgeResponse = try await transport.request(
-                method: .patch, path: "/edges/\(p.id)",
+                method: .patch, path: "/edges/\(p.id.escapedPathSegment)",
                 body: UpdateEdgeBody(properties: p.properties), query: nil
             )
 
         case .deleteEdge:
             let p = try decoder.decode(IDPayload.self, from: data)
             let _: EmptyResponse = try await transport.request(
-                method: .delete, path: "/edges/\(p.id)", body: nil, query: nil
+                method: .delete, path: "/edges/\(p.id.escapedPathSegment)", body: nil, query: nil
             )
 
         case .setMetadata:
             let p = try decoder.decode(MetadataPayload.self, from: data)
             let _: MetadataResponse = try await transport.request(
-                method: .put, path: "/items/\(p.itemId)/metadata", body: p.input, query: nil
+                method: .put, path: "/items/\(p.itemId.escapedPathSegment)/metadata", body: p.input, query: nil
             )
 
         case .mergeMetadata:
             let p = try decoder.decode(MetadataPayload.self, from: data)
             let _: MetadataResponse = try await transport.request(
-                method: .patch, path: "/items/\(p.itemId)/metadata", body: p.input, query: nil
+                method: .patch, path: "/items/\(p.itemId.escapedPathSegment)/metadata", body: p.input, query: nil
             )
 
         case .addTags:
             let p = try decoder.decode(AddTagsPayload.self, from: data)
             let body = AddTagsBody(tags: p.tags)
             let _: MetadataResponse = try await transport.request(
-                method: .post, path: "/items/\(p.itemId)/tags", body: body, query: nil
+                method: .post, path: "/items/\(p.itemId.escapedPathSegment)/tags", body: body, query: nil
             )
 
         case .removeTag:
             let p = try decoder.decode(RemoveTagPayload.self, from: data)
             let _: MetadataResponse = try await transport.request(
-                method: .delete, path: "/items/\(p.itemId)/tags/\(p.tag)", body: nil, query: nil
+                method: .delete,
+                path: "/items/\(p.itemId.escapedPathSegment)/tags/\(p.tag.escapedPathSegment)",
+                body: nil, query: nil
             )
 
         case .setExtension:
             let p = try decoder.decode(SetExtensionPayload.self, from: data)
-            let encoded = p.namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.namespace
             let _: ExtensionsResponse = try await transport.request(
-                method: .put, path: "/items/\(p.itemId)/extensions/\(encoded)",
+                method: .put,
+                path: "/items/\(p.itemId.escapedPathSegment)/extensions/\(p.namespace.escapedPathSegment)",
                 body: p.data, query: nil
             )
 
         case .deleteExtension:
             let p = try decoder.decode(DeleteExtensionPayload.self, from: data)
-            let encoded = p.namespace.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p.namespace
             let _: EmptyResponse = try await transport.request(
-                method: .delete, path: "/items/\(p.itemId)/extensions/\(encoded)",
+                method: .delete,
+                path: "/items/\(p.itemId.escapedPathSegment)/extensions/\(p.namespace.escapedPathSegment)",
                 body: nil, query: nil
             )
 
@@ -3082,7 +3084,7 @@ public actor SyncEngine {
                 let alreadyOnServer: Bool
                 do {
                     let (_, response) = try await transport.rawRequest(
-                        method: .head, path: "/blobs/\(p.hash)",
+                        method: .head, path: "/blobs/\(p.hash.escapedPathSegment)",
                         body: nil, contentType: nil, query: nil
                     )
                     alreadyOnServer = response.statusCode == 200
