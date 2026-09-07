@@ -58,7 +58,7 @@ jobs:
       consumers: ${{ steps.pins.outputs.consumers }}
       latest: ${{ steps.pins.outputs.latest }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Compare each consumer's pin against the newest tag
         id: pins
         env:
