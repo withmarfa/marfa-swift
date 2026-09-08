@@ -1,297 +1,118 @@
 # MarfaSDK
 
-Swift SDK for the Marfa API. Equivalent to the TypeScript `@withmarfa/sdk`.
+Swift SDK for the Marfa API, equivalent to the TypeScript `@withmarfa/sdk`. SPM package, zero external dependencies, Apple platforms only, Swift 6 language mode with complete strict concurrency.
 
-Before re-deriving documented surfaces (types, edges, runtime substrates, connections, auth flows) from source, query the docs MCP at `https://docs.marfa.so/mcp` (or `marfa docs search "<query>"` from CLI). Docs live **only** in `withmarfa/docs` — never author docs pages here; when a change touches a public surface, open a companion `withmarfa/docs` PR and link it.
+**Query the docs MCP before re-deriving a documented surface** from source. Docs live only in `withmarfa/docs`; a change touching a public surface opens a companion pull request there.
 
-## Architecture
+## Shape
 
-- **SPM package**, zero external dependencies. Built from Foundation, Security, SwiftData, and `os`.
-- **Apple platforms only:** iOS, macOS, visionOS, watchOS, tvOS. `Package.swift` is the source of truth for minimum-deployment versions.
-- **Swift 6** language mode, complete strict concurrency.
-- **Two products:** `MarfaSDK` (client library) and `MarfaSDKTestSupport` (public test scaffolding: MockTransport, InMemoryKeychain, SwiftDataHelpers). Test support has no semver stability across SDK minor versions.
-- **`Transport` protocol** abstracts HTTP. `URLSessionTransport` is the production impl; `MockTransport` is in test-support.
-- **Namespaced API:** `client.items.create()`, `client.metadata.get()`, etc. Full set: `items`, `metadata`, `extensions`, `edges`, `blobs`, `types`, `keys`, `credentials`, `webhooks`, `profile`, `connections` (with nested `leaseTokens` and `inboundWebhooks`), `integrations`, `spaces`, `admin`, `auth`.
-- **`JSONValue`** enum for arbitrary JSON (Codable, Sendable, Hashable).
-- **Dates as ISO 8601 strings**, not `Date` — apps parse as needed.
-- **Error hierarchy:** `open class MarfaError` base with `final class` subclasses (`NotFoundError`, `UnauthorizedError`, `ForbiddenError`, `ValidationError`, `ConflictError`, `NetworkError`, `ResponseDecodingError`). Pattern-match on subclasses: `catch let error as NotFoundError`.
+- **Two products.** `MarfaSDK`, and `MarfaSDKTestSupport` for public test scaffolding. Test support carries no semver stability across SDK minor versions.
+- **`Transport` is a protocol**, with a URLSession implementation in production and a mock in test support. Everything HTTP routes through it, which is what the coverage check below can see.
+- **Namespaced API**, `client.items.create()` and so on. Dates cross the wire as ISO 8601 strings rather than `Date`, so apps parse as they need.
+- **Errors are an open base class with final subclasses**, so callers pattern-match on the subclass rather than on a code.
+- **Both client factories are `async throws`**, because `@ModelActor` construction must run off the main actor. A synced client's caller then starts the sync engine.
 
-### Local store & sync
+## The local store
 
-Four actors wire together for synced mode; `MarfaClient.local(path:)` runs pure-local (no mutations enqueued).
+SwiftData under `@ModelActor`, CloudKit-compatible from day one: no uniqueness constraints, all properties defaulted, all relationships optional with an explicit inverse, no deny rules, Codable enums by raw value.
 
-- **LocalStore** (`@ModelActor`) — SwiftData `ModelContainer` from `MarfaModelContainer.make(path:)`, or `open(path:)` where the caller wants to know whether the store survived. Live `@Model` classes under `LocalStore/Schema/Models/`, one `VersionedSchema` per version under `Schema/Versions/`, versioned via `MarfaMigrationPlan`. CloudKit-compatible from day one: no `#Unique`, all properties defaulted, all relationships optional with explicit inverse, no `.deny` rules, Codable enums via rawValue.
-- **Old schema versions own frozen copies of the model classes; the live classes are always the current version.** `Schema/Versions/FrozenV2.swift` holds them. The reverse arrangement — the new version owning copies — would repoint the store, the queue, every query and every test on each schema change. This one works because nesting is invisible to Core Data: an entity is identified by its name and hashed from that name and its property descriptions, not from where the Swift type lives. **Never edit a frozen namespace.** That changes what its version hashes to, no version then matches a real store of that age, the stage never applies, and the device takes the fail-safe path — silently, and never on a fresh install, which is every machine that would have caught it. `SchemaMigrationTests` compares the copies against the committed V2 store's own recorded hashes.
-- **Never instantiate a frozen model class in a test.** Two `@Model` classes sharing an entity name is what makes a versioned schema work, but SwiftData keys part of its runtime state by that name, so creating an *object* of the frozen class in a process that also creates objects of the live one leaves the two able to be confused. It surfaces as an `NSUnknownKeyException` naming the newest version's column, thrown from an insert that never mentions it, in whichever test runs next — it needs the whole suite's ordering to appear and is invisible when the file runs alone. Entity *descriptions* are fine, which is what building a container over an old version creates, and is all `SchemaMigrationTests` does. Seed an old store from the committed fixture instead, and read what it holds afterwards with SQLite rather than fetching. A device only instantiates the live classes, so none of this reaches an app.
-- **A store this build cannot open is quarantined, never deleted.** The store and its siblings are renamed into `<store>.quarantined-<timestamp>/`; a rename cannot fail for the reason the open failed, so it is the only step allowed to decide whether the app starts over, and **the rebuild is conditional on it** — no quarantine means `LocalStoreError.storeQuarantineFailed`, not a fresh store. A *sibling* that will not move is judged by what it is: a journal whose database has gone is removed, and **the support directory never is** — it holds the only copy of the externally-stored blob bytes and is inert to the store that replaces it, so deleting it would reach the end state this whole path exists to prevent. Salvage then reads the quarantined file with **raw SQLite**, because the refusal is a model-hash check and SwiftData is the one component guaranteed unable to read it, and writes the queue, the dead letters and the cursor to `recovered-queue.json` beside it. A read that stops mid-table is named in `StoreRecovery.truncatedTables` rather than reported as a total — `sqlite3_step` ends a table and hits a bad page identically. A rebuild that fails after a successful quarantine throws `LocalStoreError.storeRebuildFailed`, carrying the directory, because nothing else knows its name. A store recording a schema version this build does not have takes the same path. `StoreOpenResult.recovery` / `MarfaClient.storeRecovery` / `SyncEvent.storeRecovered(_:)` are how an app hears about it. Full account in `Sources/MarfaSDK/LocalStore/README.md`.
-- **MutationQueue** (`@ModelActor`) — shares LocalStore's `ModelContainer`; cross-actor saves serialize at the SQLite layer. One record per SDK mutation verb (`MutationKind`); `fetchAll()`/`remove(id:)`/`recordFailure(id:error:)` drain API returning Sendable `PendingMutationRecord` DTOs. Persists `last_event_id` cursor for SSE reconnection. `enqueueBlobUpload`/`purgeItem`/`dropMutationsReferencingLocalId` each commit as one `modelContext.save()`.
-- **ConnectionState** — `.offline`, `.connecting`, `.online`, `.syncing`, plus `isReachable`.
-- **ConnectionStateManager** (`actor`) — wraps `NWPathMonitor`; bridges `DispatchQueue` to actor via `Task { await self?.handlePath(_:) }`. Multicasts to `AsyncStream<ConnectionState>` subscribers via UUID-keyed `continuations`. `markSyncing()`/`markOnline()` for engine transitions.
-- **SyncEngine** (`actor`) — observes `ConnectionStateManager.stateUpdates`; on `.connecting` opens `GET /events` SSE with `Last-Event-ID` cursor; applies `item.*`, `edge.*`, `metadata.changed` to LocalStore; after stream closes, drains MutationQueue (markSyncing while replaying, markOnline when done); reconciles local-id → server-id for `createItem` replays. Writes go through the **`LocalStoreWriting`** protocol rather than the concrete actor — the store-side counterpart to `Transport`, so a test can substitute a store whose writes fail. SwiftData accepts everything the engine can construct, which otherwise leaves that whole half of a sync cycle untestable.
+- **Old schema versions own frozen copies of the model classes; the live classes are always the current version.** The reverse arrangement would repoint the store, the queue, every query and every test on each schema change. This one works because nesting is invisible to Core Data: an entity is identified by its name and hashed from that name and its property descriptions, not from where the Swift type lives.
+- **Never edit a frozen namespace.** That changes what its version hashes to, no version then matches a real store of that age, the stage never applies, and the device takes the fail-safe path, silently, and never on a fresh install, which is every machine that would have caught it.
+- **Never instantiate a frozen model class in a test.** Two model classes sharing an entity name is what makes a versioned schema work, but SwiftData keys part of its runtime state by that name, so creating an *object* of the frozen class in a process that also creates objects of the live one leaves the two able to be confused. It surfaces as an unknown-key exception naming the newest version's column, thrown from an insert that never mentions it, in whichever test runs next: it needs the whole suite's ordering to appear and is invisible when the file runs alone. Entity *descriptions* are fine. Seed an old store from the committed fixture instead, and read it back with raw SQLite rather than fetching.
+- **A store this build cannot open is quarantined, never deleted.** A rename cannot fail for the reason the open failed, so it is the only step allowed to decide whether the app starts over, and **the rebuild is conditional on it**: no quarantine means an error, not a fresh store. A sibling that will not move is judged by what it is, and **the support directory never is**: it holds the only copy of the externally-stored blob bytes and is inert to the store that replaces it, so deleting it would reach the end state this whole path exists to prevent. Salvage then reads the quarantined file with **raw SQLite**, because the refusal is a model-hash check and SwiftData is the one component guaranteed unable to read it. A read that stops mid-table is named as truncated rather than reported as a total, because stepping to the end of a table and hitting a bad page look identical.
+- **Predicate safety is pinned by a test**, because a predicate that compiles can still crash at runtime. Predicate against the raw columns rather than Codable enum cases, use captured-value short-circuits rather than composing predicates at runtime, and compare against the empty string rather than using emptiness helpers.
+- **The store's schema version only reaches disk from V3 onward.** The container was handed a schema built from a model array rather than from a versioned schema, so the identifier was never written and every older store on disk records the first version whatever it actually holds. The first version comparison that can tell the truth is the bump after V3.
 
-Both factories (`MarfaClient.local(path:)`, `MarfaClient.synced(url:apiKey:storePath:connectionManager:)`) are **`async throws`** — `@ModelActor` construction must run off the main actor, so every call site is `try await`. For synced clients the caller invokes `client.syncEngine?.start()`.
+### Applying the server's changes
 
-- **An inbound item frame is rebased, not copied over, and a frame behind the row is refused.** Both go through `LocalStore.applyServerItem(_:rebasing:)`, which reads the row, rebases and writes in one hop, so no other write to that row lands between its read and its write. **That guarantee stops at the row**: the queued edits are gathered in a separate call beforehand, so an edit enqueued in the gap is absent from the list and is not rebased — the field shows the server's value until the queue drains and the server echoes the edit back. The write is not lost, and closing the window needs the store and the queue under one lock, which they do not share. The rebase puts the device's own queued writes back on top of the server's row, so an edit that has not reached the server stays visible while another device's change to a different field still lands; replacing and dropping each get one of those halves and neither gets both. The version check is skipped while the row has queued writes, and that limit is load-bearing rather than an oversight: `updateItem` bumps the stored `version` on every local edit, so on such a row the column is an optimistic guess at what the server will assign rather than a server fact and cannot order anything. Closing it needs the server's version tracked apart from the visible one, which is a column and therefore a schema version. **An item frame never writes the metadata layer** — the server owns that layer and announces it as `metadata.changed` — and a test pins the separation.
+- **An inbound item frame is rebased, not copied over, and a frame behind the row is refused.** The read, the rebase and the write happen in one hop, so no other write to that row lands between them. **That guarantee stops at the row**: the queued edits are gathered beforehand, so an edit enqueued in the gap is not rebased and the field shows the server's value until the queue drains and the server echoes it back. The write is not lost, and closing the window needs the store and the queue under one lock, which they do not share. The version check is skipped while a row has queued writes, deliberately: a local edit bumps the stored version, so on such a row the column is an optimistic guess rather than a server fact and cannot order anything.
+- **An item frame never writes the metadata layer.** The server owns that layer and announces it separately.
+- **A removal reaches a device two ways and the engine has to apply both.** A purge says a row is gone for good, which is not what a trash says. The other way is silence: a row purged while the device was away is *absent* from the re-import rather than changed in it, so no event describes it and only the prune can notice.
+- **The prune's premise is that the keep-set is the entire server side, so every way of getting a short answer is a way of deleting rows.** Three are closed and each was a different set of rows destroyed. The import asks for every state, because the listing excludes trashed rows by default and reading that as the whole library empties the device's bin. It asks for metadata and system rows, because the route excludes those the same way while the stream that fills this store filters on nothing, so the keep-set would omit every device, connection and activity row. And a row the queue holds a create for is protected, asked once before the first page, because a write made during the paging that follows is queued *and* absent from the answer, which is exactly the shape a prune mistakes for a purge. A fourth way is a short *read* rather than a narrowed request, and a page claiming more results while carrying no cursor now throws rather than ending the loop silently. **The wire assertions in the removal tests are the only place a narrowed request can be caught**, because a mock answers whatever is queued regardless of the query. **Edges are not pruned**, which is the same defect one layer down and is not closed.
+- **An unrecognised event type is logged, not dropped.** A silent default arm made an unhandled type indistinguishable from one deliberately ignored, which is what let a purge announcement sit unapplied after the server began sending it.
 
-- **A removal reaches a device two ways, and the engine has to apply both.** `item.purged` says a row is gone for good, which is not what `item.deleted` says: that one is a trash and can come back. The other way is silence — a row purged while the device was away is *absent* from the re-import rather than changed in it, so no event describes it and only `LocalStore.pruneItems(keeping:protecting:)` can notice.
+### Local reads and search
 
-- **The prune's premise is that the keep-set is the entire server side, so every way of getting a short answer is a way of deleting rows.** Three are closed and each one was a different set of rows destroyed. The import asks `state=any`, because `GET /items` excludes trashed rows by default and reading that narrower answer as the whole library would empty the device's bin on every re-import. It asks `include=metadata,system`, because the route excludes `system.*` rows the same way while the stream that fills this store filters on nothing — so the keep-set would omit every device, connection and activity row and the prune would take the lot, emptying `connections.list()` against a server that still has all of them. And a row the queue holds a create for is protected: `refuseIfWorkIsStillQueued` asks once, before the first page, so a write made during the paging that follows is queued *and* absent from the answer, which is precisely the shape a prune mistakes for a purge. A fourth way is a short *read* rather than a narrowed request — a page claiming more results and carrying no cursor used to end the loop silently — and that now throws `InitialSyncError.unresumablePage`. **The wire assertions in `SyncEngineRemovalTests` are the only place a narrowed request can be caught**, because a mock answers whatever is queued regardless of the query; a fifth narrowing added to that request would be invisible everywhere else. **Edges are not pruned**, which is the same defect one layer down and is not closed here.
+Local search narrows on the indexed columns in a predicate and then scans the survivors in Swift, because the properties blob is invisible to the predicate engine and SwiftData has no full-text index. It takes the same filters as the remote call and mirrors the server's exclusions, and **its divergences are listed in the method's own doc comment**: matched fields, tags, subtype inheritance, limit handling, ranking and snippets all differ.
 
-- **An event type the engine does not recognize is logged, not dropped.** The `default` arm used to `break`, which made an unhandled type indistinguishable from one deliberately ignored — that is what let `item.purged` sit unapplied after the server began announcing it.
+**One interface, local baseline.** Search resolves through the store whenever the client has one, synced or not; asking the server's index is a separate, explicit call for the cases the divergences rule out. Sync used to switch this over, so the same call meant a local scan or a network round trip depending on a setting made once and forgotten.
 
-- **Local-first reads** — `metadata.listTags()` aggregates tags by fetching metadata rows where the parent item's `stateRaw != "trashed"` and bucketing in Swift (SwiftData predicates can't reach inside the JSON `tagsData` blob). `edges.listToTargets(targetIds:edgeType:limit:)` batches inbound-edge lookup: one local fetch with `Set.contains(targetId)`, bounded `TaskGroup` fan-out remotely (cap via `ClientConfiguration.maxBackrefBatchConcurrency`, default 8).
-- **Local search** — `LocalStore.searchItems(text:filters:)` (`LocalStore/LocalStoreSearch.swift`) narrows on `type` / `stateRaw` / `tierRaw` in a predicate, then scans the survivors in Swift over `title` and `body`; `properties` is a JSON blob the predicate engine can't see, and SwiftData has no FTS index. Takes the same `SearchFilters` as the remote call and mirrors the server's `system.*` and trashed exclusions plus its default limit of 20. It diverges on matched fields (only `title` and `body`, so types keying their text elsewhere — `core.entity*`, `core.highlight` — never match), tags (indexed as text server-side, not matched locally), `type` (literal, no subtype inheritance), `limit` range (server `1...100`; locally non-positive returns empty and larger values are honored), ranking (ordinal, not BM25) and snippets (none). All are listed in the method's doc comment alongside its measured cost, which is tens of milliseconds per thousand rows — `limit` caps the answer, not the work. `client.search(query:)` resolves through it whenever the client has a store, synced or not — one interface, local baseline. Sync used to switch it off, so the same call meant a local scan or a network round trip depending on a setting made once and forgotten. `client.searchRemote(query:)` is the explicit way to ask the index instead, for the cases the divergences above rule out: BM25 ranking, snippets, or a corpus wider than what has synced to the device.
-- **Predicate safety** — `LocalStore/Schema/PredicateConventions.swift` documents the predicate-safe subset every fetch must use; `Tests/MarfaSDKTests/PredicateSafetyTests.swift` regresses every supported shape so a predicate that compiles but crashes at runtime fails CI. Key rules: predicate against `*Raw` columns not Codable enum cases; use captured-value `&&` short-circuits not runtime `Predicate<T>` composition; use `prop != ""` for empty-string filtering (`isEmpty`/`!isEmpty` both misbehave in current SwiftData).
-- **The store's schema version reaches disk from V3 onward, and not before.** The container used to be handed a `Schema` built from a model array rather than from a versioned schema, so the identifier never got written and **every store on disk records `1.0.0`, V2 stores included** — read out of the committed fixture's own metadata, not inferred from the code. Fixed now, which means the first version comparison that can tell the truth is the bump *after* V3.
-- **CloudKit readiness** — `cloudKitDatabase` is consumer-set on `MarfaModelContainer.make(...)`; the schema is CloudKit-mirrored regardless. `swift run cloudkit-smoke` validates the schema against a developer's CloudKit container (see `Sources/MarfaSDK/LocalStore/README.md`). Manual run only — no CloudKit entitlements on CI runners.
+## The reactive layer
 
-### Reactive layer (@Observable, SwiftUI)
+Every query object is `@Observable` and `@MainActor`, so it passes straight to a SwiftUI view. They are vended by a store the client makes, which is `nil` for a network-only client, and they subscribe to context saves, debounce, and refetch on the main actor.
 
-All query objects are `@Observable @MainActor` — pass directly to SwiftUI views; changes propagate without `ObservableObject`. Shared listener machinery lives in `RefetchObserver` (`Reactive/MarfaStore.swift`).
+**Search is the one query that does not work on the main actor**, delegating the whole scan to the store actor and publishing results back, because it decodes each candidate's properties JSON. Its term is fixed per query, so search-as-you-type builds a new query per term and stops the old one.
 
-- **MarfaStore** (`@Observable @MainActor`) — vended via `client.makeStore()` (`nil` for network-only clients). Factory for live query objects; holds the shared `ModelContainer`, the `LocalStore` actor, and the `ProfileNamespace` reference.
-- **ItemQuery** — tracks `[Item]` for a `ListFilters`; subscribes to `ModelContext.didSave`, debounces 50 ms (`Reactive/RefreshDebounce.swift`), refetches on the `@MainActor`. Fields: `items`, `isLoading`, `error`; `stop()` cancels.
-- **TypedItemQuery<T: MarfaItem>** — like `ItemQuery` but maps records through `T.init?(from:)`. Backs `store.queryConnections(kind:state:)` (`TypedItemQuery<Connection>`) and `store.queryActivity(severity:limit:)` (`TypedItemQuery<Activity>`).
-- **SingleItemQuery** — one item by id; `item` is `nil` when purged.
-- **EdgesQuery** — outbound edges for a `sourceId`; optional `edgeType` and `limit`. Second initializer tracks every edge of a type space-wide.
-- **BackrefsQuery** — inbound edges for a batch of `targetIds`; `edgesByTarget: [String: [Edge]]` keyed by every requested id (unknown ids stay present with `[]`). Factory: `store.queryBackrefs(to:edgeType:limit:)`.
-- **TagsQuery** — `[TagWithCount]` sorted count desc, tag asc (same ordering as `metadata.listTags()` and the server). Factory: `store.queryTags()`. Aggregates in Swift over a relationship-prefetched fetch.
-- **ItemsWithMetadataQuery** — items + metadata composite. Two fetches per refresh, 1:1 join in Swift.
-- **SearchQuery** — `[SearchResult]` for a fixed search term. Factory: `store.querySearch(text:filters:)`. The one query that does **not** work on the main actor: it delegates the whole scan to the `LocalStore` actor and only publishes results back, because search decodes each candidate's `properties` JSON. The term is fixed per query — for search-as-you-type, build a new query per term and `stop()` the old one.
-- **PendingMutationsQuery** — `[PendingMutationRecord]` from the MutationQueue (queued writes awaiting replay). Factory: `store.queryPendingMutations()` — always returns; synced and pure-local clients both have a queue.
-- **BlobUploadProgressQuery** — per-blob upload progress for queued uploads. Factory: `store.queryBlobUploadProgress()` — `nil` in remote-only mode.
-- **FullSyncStateQuery** — running full-sync cursor + completion state. Factory: `store.queryFullSyncState()` — `nil` in remote-only mode.
-- **DroppedMutationsQuery** — `[DroppedMutationRecord]` for mutations the SyncEngine permanently failed and dropped (V2 schema). Factory: `store.queryDroppedMutations()` — `nil` in remote-only mode.
-- **ProfileStore** (`@Observable @MainActor`) — singleton view onto the calling user's `Profile`, built lazily via `store.profileStore` (`nil` in pure-local mode — `system.profile` is server-only). `refresh()` on demand; `update`/`uploadAvatar`/`deleteAvatar` write the returned profile back on success. No SwiftData persistence: the server owns `system.profile`, a virtual type joined from `users`/`auth_user` that fires no `item.*` SSE events.
+## Auth
 
-### Transport subsystems
+- **The flows take a server URL and derive the issuer themselves.** They used to take an issuer the caller derived and every consumer got it wrong, because a deployment publishes its issuer under a path while the server URL is the value everything else in this SDK wants. Passkey enrolment shares the label but derives no issuer: it builds an ordinary route, so it strips the path a caller supplied rather than appending one.
+- **The web session is ephemeral**, so each sign-in starts with a fresh cookie jar and signing out actually ends the identity provider's session.
+- **Native passkey sign-in is deliberately not implemented.** Those endpoints are session-cookie-gated rather than bearer-gated, so a native client cannot reach them. Once enrolled, the web sign-in page surfaces the passkey option.
+- **The transport refreshes on 401, and naming the token is what bounds recovery.** A 401 reports the refused credential back to the provider, which exchanges it only while it is still the credential in hand, so requests already in flight when a rotation lands do not each start their own refresh. A rejected grant latches, so later calls fail with no network at all.
+- **Keychain access goes through a protocol**, with an in-memory substitute in tests because SPM test binaries run unsigned.
 
-- **Error parsing** — internal `parseMarfaError(data:statusCode:decoder:)` in `Errors/ErrorParsing.swift`. All non-2xx paths route through it.
-- **Retry / rate limits / cancellation** — `RetryPolicy` struct (bounded exponential backoff with jitter, configurable per client) and `RateLimitState` actor (tracks `X-RateLimit-*` and `Retry-After`). `URLError(.cancelled)` translates to `CancellationError`.
-- **Observability** — `MarfaLogger` wraps `os.Logger` + `OSSignposter` on the `"sdk.marfa"` subsystem with categories `transport`, `sse`, `sync` (plus a `disabled` sentinel for tests). `ClientConfiguration.debugLogging` opts in to full-body logging at `.private` privacy.
-- **SSE** — `Transport.eventStream(path:query:lastEventID:)` returns `AsyncThrowingStream<SSEEvent, Error>`. `SSEParser` is WHATWG-conformant; id is sticky across events, retry attaches to the next event, blank-data blocks don't dispatch. Transport only — reconnect and cursor persistence belong to the consumer.
-- **Keychain** — `SecureStorage` protocol + `KeychainStorage` actor under `Auth/Storage/` (generic-password items under `kSecAttrService = "marfa.sdk"`, optional access group for app extensions). `MarfaClient.fromKeychain(...)` loads a stored key; `MarfaClient.saveToKeychain(...)` writes it back. `InMemoryKeychain` substitutes in unit tests because SPM test binaries run unsigned.
+## Route coverage
 
-### Auth surface (`Auth/`)
+A test compares the routes the SDK calls against the operations the vendored spec declares, **in both directions**. Nothing else does, and before it the two surfaces drifted apart silently.
 
-Three sibling sub-directories:
+**What it guarantees:** every call written through the transport in the library sources is either read into a method and path, or reported by file and line with the reason it could not be. A composed path is refused rather than half-read, because a concatenated path would otherwise read as a route the spec declares and neither direction would fire.
 
-- **`Auth/Storage/`** — `SecureStorage` protocol, `KeychainStorage` actor, `KeychainError`.
-- **`Auth/Core/`** — primitives shared by every flow: `Token` (access/refresh bundle), `TokenProvider` protocol with two impls (`StaticTokenProvider` wraps an API key; `StoredTokenProvider` actor caches an OAuth token and refreshes against the token endpoint from OIDC discovery), `PKCE` (S256 generators on CryptoKit), `AuthError` subclasses (`OAuthError`, `DeviceFlowError`, `PasskeyError`), and the `DeviceFlow` testability seams (`DeviceFlowHTTPClient` and `DeviceFlowClock` protocols, both `public`, both injected for unit testing without network or wall-clock). Test fakes (`FakeDeviceFlowHTTPClient`, `ManualDeviceFlowClock`) live in `MarfaSDKTestSupport`.
-- **`Auth/Flows/`** — three top-level types mirroring the TS SDK's `MarfaAuth` + `startDeviceFlow` split:
-  - `MarfaAuth` (`@MainActor` class) — Authorization Code + PKCE via an ephemeral `ASWebAuthenticationSession`; `signIn(presentationContextProvider:)` returns a `TokenProvider`. It takes a `serverURL:` and derives the OAuth issuer itself, as does `DeviceFlow.start` — both used to take an `issuer:` the caller derived, and every consumer written against that got it wrong, because a Marfa deployment publishes `https://<host>/auth` as its issuer and the server URL is the value everything else in this SDK wants. `Passkey.enroll` shares the `serverURL:` label but derives no issuer: it builds an ordinary route under the server, so it strips an `/auth` a caller supplied rather than appending one. The ephemeral session means each sign-in starts with a fresh cookie jar, so `signOut(_:)` actually ends the IdP session.
-  - `DeviceFlow` — free-function `start(...)` returning a `DeviceFlowHandle` actor whose `awaitToken()` polls `/auth/device/token` per RFC 8628. No UI; suitable for headless / TV / watch.
-  - `Passkey` (`@MainActor` enum) — exposes `enroll(serverURL:presentationContextProvider:)` only, opening `/auth/passkey/enroll` in `ASWebAuthenticationSession` and letting the web flow run the WebAuthn ceremony. Native `ASAuthorizationController` against Better-Auth's `/auth/passkey/*` endpoints is intentionally not implemented: those are session-cookie-gated, not OAuth-bearer-gated, so a native client can't reach them. Passkey sign-in goes through `MarfaAuth.signIn(...)` — once enrolled, the web sign-in page surfaces a "Use a passkey" button.
+**Prose never counts as a call, in either direction**, and this is the part that was wrong three times, so it is stated as the property rather than as the mechanism. Prose means anything the source contains that is not code the compiler runs, and **the definition is deliberately larger than the list of constructs modelled**, because narrowing it to what has been implemented is exactly what produced the last three defects. A construct that is prose and is not modelled is a gap in the implementation, not a case outside the rule. Over-blanking hides call sites; under-blanking *invents* them, and that is the silent direction, because an invented route subtracts a genuine gap from the report and takes the suite green.
 
-**Internal auth contract is unified through `TokenProvider`.** The transport awaits `tokenProvider.currentToken()` for the `Authorization: Bearer …` header on every request. `ClientConfiguration.apiKey` is preserved for the static path (`MarfaClient(url:apiKey:)`, `fromKeychain(...)`, `saveToKeychain(...)`), which wrap the key in `StaticTokenProvider`. OAuth callers use `MarfaClient(url:tokenProvider:)` or `MarfaClient.synced(url:tokenProvider:storePath:)`. `URLSessionTransport` adds **refresh-on-401**: a 401 reports the refused credential via `tokenProvider.invalidate(_:)` and retries once with the replacement before surfacing as `UnauthorizedError`. Naming the token is what bounds recovery — `StoredTokenProvider` exchanges it only while it is still the credential in hand, so requests already in flight when a rotation lands don't each start their own refresh, and a rejected grant latches so later calls fail with no network at all.
+**Attack the boundary, not only the internals.** Every defect found in this check was reached by testing whether the stated scope of its guarantee was true, not by finding a bug in the code. **A guarantee's stated scope is a claim like any other, and a claim that is only written down is a claim nothing checks.** When you state what a check delivers here, state what it cannot see in the same breath, say which of those you constructed an input for, and pin the ones you are leaving open with a test named for the limitation.
 
-### Multipart upload helper
+**What it does not cover:** HTTP that never goes through the transport. The OAuth code builds requests directly and most of those endpoints are read from the discovery document at runtime, so there is no literal to compare and no operation to compare it to.
 
-`Transport.uploadMultipart(method:path:fieldName:filename:data:mimeType:query:)` — RFC 7578 envelope with one file part, routed through `rawRequest` so retry, auth-refresh, and rate-limit handling all apply. Used by `ProfileNamespace.uploadAvatar(...)`. Note: `BlobsNamespace.upload(...)` POSTs raw bytes with the MIME type as Content-Type and does not use this helper.
+Two maps, and the distinction is the point. **Deliberately unwrapped** means the spec declares it and the SDK does not call it, on purpose, with a reason per entry; entries reading "no decision on record" are the ones worth revisiting. **Undeclared upstream** means the SDK calls it and the spec does not describe it, which has two causes needing opposite responses: an operation on the server's internal list is dropped from the public reference on purpose and there is nothing to fix, while a plain handler the reflection cannot see could be documented through the server's own hatch. Establish which before recording it. The suite also fails on stale entries, so a map cannot outlive what it describes.
 
-### System domain models (`DomainModels/System/`)
+**It measures against the vendored snapshot**, so everything it reports is relative to what was last synced. A separate scheduled workflow asks from outside whether the snapshot still matches the monorepo, because a trailing snapshot once cost a release: every signal was green over a connection install the SDK could not perform against any current server.
 
-Hand-written because codegen-domain currently scans only `core.*` types: `Connection` (typed wrapper for `system.connection`, surfacing `kind: ConnectionKind`, `scopes`, `integrationRef`, `runtimeStatus`, etc.) and `Activity` (typed wrapper for `system.activity`, surfacing `severity: ActivitySeverity`, `summary`, `connectionId`). Both conform to `MarfaItem` so they slot into `client.items.list({type: ...})`, `typedQuery<T>()`, and the `queryConnections` / `queryActivity` factories. The closed enums `ConnectionKind` (`app | integration`) and `ActivitySeverity` (`info | warning | error | actionRequired`) are hand-written under `Types/Wire/Hand/` so apps pattern-match without comparing raw strings.
-
-### Route coverage (`Tests/MarfaSDKTests/RouteCoverageTests.swift`)
-
-Compares the routes the SDK calls against the operations `scripts/openapi.json` declares, **in both directions**. Nothing else does: no generator reads the spec's `paths`, so before this the two surfaces drifted apart silently. It runs under `validate` with the rest of the suite and needs no separate wiring.
-
-Call sites are recovered by finding every `transport.<callee>(` in `Sources/MarfaSDK` and reading its argument list — parenthesis, string and interpolation aware, over a comment-stripped copy of the source — for a literal `method:` and a `path:` that is one whole string literal beginning with a slash. `eventStream` is the one shape with no `method:`; it is a GET by construction.
-
-**What that guarantees, exactly:** every call written as `transport.<callee>(…)` in those sources is either read into a `METHOD /path` or reported by file and line with the reason it could not be. Four shapes are named rather than dropped: a defaulted verb, a verb held in a variable, a path composed from more than one literal, and a path composed inside one literal by leading with an interpolation. The two composed shapes matter most — `"/items" + suffix` would otherwise read as `GET /items`, a route the spec declares, so neither direction of the check would fire — and they are refused alike.
-
-**Prose never counts as a call, in either direction.** This is the part that was wrong three times, so it is stated as the property rather than as the mechanism. *Prose* means anything the source contains that is not code the compiler runs. Two members are modeled — comments and string literals — and **the definition is deliberately larger than that list**, because narrowing it to what has been implemented is the exact move that produced the last three defects here. A regex literal is prose by this definition and is not modeled; it is refused instead, by a test that fails if one appears under `Sources/`. When you meet a construct that is prose and is not in the list, that is a gap in the implementation rather than a case outside the rule. Over-blanking, where code is taken for prose, hides call sites; the raw file is scanned for `transport.<callee>(` and every match must be accounted for. Under-blanking, where prose is taken for code, *invents* call sites, and that is the silent direction — an invented route subtracts a genuine declared-but-unwrapped operation from the report and takes the suite green over a real gap. Two things answer it: call recovery refuses a receiver sitting inside a string literal, and a separate comment scan — one that ignores literals, measures every `//` and `/*` occurrence independently, and so can only over-report — must find no unblanked comment text across a recovered call. Neither trusts the stripper.
-
-**The scanner models raw string literals**, which is load-bearing rather than fastidious: `#"say "hi"#` holds an odd number of quotes, and naive pairing then reads the rest of that line as literal text and silences both scope guards on a real call. `Inputs/BulkInputs.swift` carries a raw literal today. CRLF line endings are handled for the same reason — `Array(String)` yields `\r\n` as one grapheme, so comparing against `"\n"` silently mis-lexed a whole file and reported every finding at line 1.
-
-**`ScannerBehavior` drives the scan with constructed sources**, named for what each witnesses. **Not one per admitted limitation** — that was claimed and was not true, and an uncounted claim is the thing this file keeps getting caught by. Conditional compilation is admitted in the scanner's own docblock and nothing pins it; the regex-literal limitation is pinned by a refusal rather than by a witness, because the silent direction is not one a constructed input can be left sitting in. Sources that must never exist under `Sources/` live there: a raw literal that desynchronizes quote pairing, a route spelled inside a multiline literal, a file with CRLF endings. The tests that pin *limitations* assert a shape goes unreported, so closing one fails a test and forces the prose here to be corrected with it.
-
-Two further tests check the scan's *scope*: no `method:` or route-shaped `path:` argument may sit outside a recovered call (both read code positions only, so a `method:` inside a log line is not mistaken for an escaped HTTP call), and the excluded `Transport/` directory must hold no route literals. That last one is narrow on purpose and is worth knowing before trusting it: it finds a string literal beginning `"/` followed by a letter, and nothing else. A composed path (`"\(base)/items"`, `"/" + segment`, a multiline literal), a path with no leading slash, and one whose first segment is a parameter (`"/{id}/x"`) are all invisible to it — and it checks *literals*, not calls, so a helper in `Transport/` forwarding a caller's path passes because there is no literal to find. It narrows the excluded directory; it does not close it.
-
-**The shapes found to escape** — which is not the same as the shapes that escape, and the difference is the whole lesson below. A call on a receiver rebound away from the name `transport`, whose callee takes no `method:` and whose `path:` is neither slash-leading nor interpolation-leading, escapes every guard; guarding the rebinding is not cheap, since every namespace writes `self.transport = transport`. A string literal nested inside an interpolation ends the outer literal early, which costs a false report rather than a miss. Both are pinned in `ScannerBehavior`.
-
-**Attack the boundary, not only the internals.** Every defect found in this check across three rounds was reached the same way: not by finding a bug in the code, but by testing whether the *stated scope* of its guarantee was true. "Unreachable" had never had the input constructed. "Comments" was the wrong word for "prose", and a route written in a string literal walked through every guard because literals sat outside a boundary nobody had questioned. **A guarantee's stated scope is a claim like any other, and a claim that is only written down is a claim nothing checks.** When you state what a check delivers here, state what it cannot see in the same breath, say which of those you constructed an input for, and pin the ones you are leaving open with a test named for the limitation.
-
-**What it does not guarantee:** HTTP that never goes through `Transport` is outside the check entirely. The OAuth code (`OAuthDiscovery`, `TokenProvider`, `DeviceFlow`, `MarfaAuth`, `MarfaSession`) builds `URLRequest`s directly, and `Passkey` hands a URL to a system browser. Most of those endpoints are read out of the discovery document at runtime, so there is no path literal to compare and no spec operation to compare it to — but "every route the SDK calls" would be the wrong way to describe what is counted.
-
-Two maps, and the distinction between them is the point:
-
-- **`deliberatelyUnwrapped`** — the spec declares it, the SDK does not call it, and that is a decision. Each entry carries its reason. Several read "no decision on record", which is honest rather than a placeholder: the operation is unwrapped and nothing explains why. Those are the entries worth revisiting; the rest are settled.
-- **`undeclaredUpstream`** — the SDK calls it and the spec does not declare it. Not a missing wrapper: the wrapper works, and the route is live. Two causes, needing opposite responses. Nine of the fourteen are on the server's `INTERNAL_OPERATION_IDS` list and are dropped from the public reference on purpose — nothing to fix, and a PR to document them would reverse a stated policy. The other five are plain Hono handlers the `createRoute` reflection cannot see, which the server's `EXTRA_PATHS` hatch could document and does not; nothing says whether that was decided, so they read "no decision on record" too.
-
-**What it measures against, and the gap that leaves.** `scripts/openapi.json`, because that is the only spec a test in this repository can read. So everything this check reports is relative to what was last synced, and `sync-openapi.sh` is run by hand. That gap was open-ended until recently and cost a release: the snapshot sat four operations and five schemas behind, `freshness` re-ran codegen against the committed copy rather than re-syncing it, and this check compared the SDK against that same copy — every signal green over a connection install the SDK could not perform against any current server. The `Spec drift` workflow now asks the question from outside, daily, and reports when the two diverge. The check still measures against the snapshot; what changed is that a trailing snapshot announces itself instead of waiting for a consumer to find it.
-
-**When it fires**, read which direction. A new entry in the first means an operation appeared in the snapshot and nothing wraps it — write the wrapper, or add it to the map with the reason you chose not to. A new entry in the second means the SDK calls something the document does not describe: establish which cause before recording it, because the remedy differs and for the internal ones the remedy is nothing. The suite also fails on entries that have gone stale in either map, so a map cannot outlive what it describes.
-
-## Build
+## Build and test
 
 ```bash
 swift build
 swift test
 ```
 
-Real-Keychain tests tolerate `errSecMissingEntitlement` on unsigned SPM binaries; signed host apps exercise the real path.
+Real-Keychain tests tolerate a missing entitlement on unsigned SPM binaries; a signed host app exercises the real path.
 
-**One suite talks to a real server.** `LiveSyncedClientTests` is gated on `MARFA_API_URL` and `MARFA_API_KEY`, and when either is unset it is reported as skipped with every test named rather than silently absent.
+**One suite talks to a real server**, gated on a URL and key, and reported as skipped with every test named rather than silently absent when either is unset. It writes items and edges into whatever space the key reaches and deletes them again on every exit path, so it needs a space whose data is disposable. **Never run it, or conformance, against production.**
 
-```bash
-MARFA_API_URL=… MARFA_API_KEY=… swift test --filter LiveSyncedClient
-```
-
-Each test there asserts a contract a consumer depends on rather than a shape of the code, so a failure names the behavior that is missing instead of a refactor that moved something. It writes items and edges into whatever space the key reaches and deletes them again through a second client on every exit path, which means it needs a space whose data is disposable. **Never run it, or conformance, against production.**
-
-**The key has to be space-admin on that space**, or else hold extension permissions for the `live-suite` namespace. A scope-enforced key without either is refused at `extensions.set` while setting a fixture up, which reads as a failing reproduction and is nothing of the kind. The suite is `.serialized` for a related reason: each test holds an SSE stream for its duration, and run in parallel they compete for the space's viewer cap, where a refused stream is indistinguishable from a device that never got an event.
+**The key needs the extension permissions the suite's fixtures write**, or setup is refused at the extension write, which reads as a failing reproduction and is nothing of the kind. The suite is serialized for a related reason: each test holds an event stream for its duration, and in parallel they compete for the space's viewer cap, where a refused stream is indistinguishable from a device that never got an event.
 
 ## CI
 
-Two jobs in `.github/workflows/ci.yml`, plus two scheduled workflows that watch inputs rather than gate changes.
+- **`validate` is the gate**: build plus the full suite, on every pull request and every merge. A pull request is the only place that check can still stop something.
+- **`validate` runs on docs-only pull requests too**, deliberately. The branch ruleset requires it, and a required check that never reports because a path filter excluded it blocks the merge with no way for an agent to clear it. That costs one build on a macOS runner, accepted as the price of merging without a person clicking.
+- **`freshness` regenerates the codegen and diffs it, on main and dispatch only.** It guards drift in the vendored snapshots, which a source-only pull request cannot introduce.
+- **Spec drift and consumer pins are scheduled and watch inputs rather than gating changes.** Drift is not folded into `freshness`, because re-syncing there would redden pull requests that have nothing to do with the spec whenever the platform is ahead of an unrefreshed snapshot. Unset credentials fail rather than pass: a guard that cannot run must not report green.
+- **Neither job restores a remote build cache.** Swift precompiled modules embed absolute module-cache paths, so restoring artifacts after a workspace moves produces an immediate path mismatch. With no external dependencies a cold build is short enough that a cache adds failure state without earning its place.
+- **Tests were main-only once and a release tag was cut from a commit whose tests had never run.** Nothing between "compiles" and "tagged" executed the suite, and the missing fix shipped in a version number. Test cost on a pull request is small and predictable; the alternative is learning the same thing from a release artifact.
+- **Runner routing reads an Actions variable defaulting to hosted macOS.** Revert it to a hardcoded hosted label before this repository goes public: a self-hosted pool must never run an untrusted pull request.
 
-- **`validate` — build + full test suite. Runs on every PR and every merge to `main`.** `swift build` then `swift test --parallel`. This is the gate: a change is not validated until its tests have run, and a pull request is the only place that check can still stop something.
-- **`freshness` — the three codegen regens plus their diffs. Main and `workflow_dispatch` only.** It guards against drift in the vendored OpenAPI and core-type snapshots, which a source-only PR cannot introduce, and it costs three generator runs to say so. Running it per push would spend a lot to catch a class of change that arrives through a snapshot refresh, where the regen is part of the commit anyway.
-- **`validate` runs on every PR, including docs-only ones.** The `pull_request` trigger carries no `paths-ignore`: the branch ruleset requires this check, and a required check that never reports (because a docs-only PR was path-filtered out) blocks the merge with no way for an agent to clear it. So a docs-only PR pays one build + test on the macOS runner — accepted as the cost of fully autonomous delivery (no human merge clicks). If those macOS minutes add up, the cost-free fix is a cheap Ubuntu gate job that greenlights docs-only PRs without compiling.
-- **`Spec drift` — is `scripts/openapi.json` still the monorepo's `openapi.json`? Daily, plus dispatch, in its own workflow.** Byte-compares the two and prints the operations and wire types that moved, because "the files differ" over a 700KB document tells nobody what to do. It is not part of `freshness` on purpose: re-syncing there would go red whenever the platform's spec is ahead of an unrefreshed snapshot, which is the ordinary state between a platform change and the sync that follows, so it would redden pull requests that have nothing to do with the spec. Hosted rather than on the pool, and it reads the monorepo through `SHIPPING_GAP_TOKEN` — an organization secret already visible to every private repository in the org, so the check needs nothing provisioned. Unset on this repository it fails rather than passing: a guard that cannot run must not report green.
-- **`Consumer pins` — which SDK version each Swift consumer pins. Weekly, plus dispatch.** Lives here because this repository is the one that knows what "latest" means. Both apps pin `exactVersion`, so neither notices the SDK moving and the distance grows in silence.
-- **Both jobs build from their runner workspace without a remote `.build` cache.** Swift precompiled modules embed absolute module-cache paths, so restoring build artifacts after a workspace moves produces an immediate `SwiftShims` path mismatch. The package has no external dependencies and a cold build is short enough that the remote cache adds failure state without earning its place.
+## The public surface
 
-**Why tests moved onto PRs.** They were main-only, on the reasoning that macOS runners bill at 10x Ubuntu and the project is pre-release, so a broken `main` is a "fix before tagging" signal rather than an incident. That held until a release tag was cut from a commit whose tests had never run: nothing between "compiles" and "tagged" ever executed the suite, and the missing fix shipped in a version number. Test cost on a PR is small and predictable; the alternative is discovering the same thing from a release artifact.
+A committed file records every public and open declaration **as of the last release**. `validate` regenerates it at HEAD, compares, and fails when the unreleased section of the changelog does not name a declaration that was added, removed or retyped.
 
-**Local before pushing.** Run `swift test` locally anyway. CI catching it is a slower loop than catching it yourself.
+- **Regenerate the baseline at a release cut and never in between**, after the unreleased section has been renamed, so both moves land in one commit. Forgetting is loud rather than silent: the next change reports the last release's entries as unaccounted for.
+- **Additions are held to the same standard as removals**, which reads as excessive and is not. A release analysed as purely additive broke a consumer on first compile, because the SDK added a public name the consumer had already invented for the same concept. A changelog listing the names a version adds lets them see it before they bump.
+- **Members roll up**: a type that arrives or leaves is reported once rather than per member, and an enum's cases report as the enum, because a closed enum gaining a case breaks an exhaustive switch.
+- **What it cannot see is protocol conformances.** Dropping a public conformance is source-breaking and lives in the symbol graph's relationships under a pile of synthesised entries; separating declared from synthesised is its own piece of work, and this check is silent on that class.
 
-**Runner routing.** Both jobs read `runs-on` from the `CI_RUNNER` Actions variable, defaulting to `macos-latest`. `CI_RUNNER=self-hosted` routes them to a self-hosted Apple Silicon pool. Reverts to hardcoded `macos-latest` before this repo goes public.
+## Codegen
 
-## Public surface
+Three generators, all SwiftPM-driven, with committed output.
 
-`scripts/public-surface.txt` records every public and open declaration in `MarfaSDK` — path, kind, declaration — **as of the last release**. `validate` regenerates the surface at HEAD, compares the two, and fails when the `## [Unreleased]` section of `CHANGELOG.md` does not name a declaration that was added, removed or retyped.
-
-```bash
-./scripts/public-surface.sh                 # rewrite the baseline (release cuts only)
-./scripts/public-surface.sh /tmp/head.txt   # write the current surface somewhere else
-swift run public-surface check scripts/public-surface.txt /tmp/head.txt CHANGELOG.md
-```
-
-- **Regenerate the baseline at a release cut and never in between** — after the Unreleased section has been renamed to the version being cut, so the two moves land in one commit. Forgetting is loud rather than silent: the next change's check reports the last release's entries as unaccounted for, because they are no longer in Unreleased.
-- **Additions are held to the same standard as removals**, which is the part that reads as excessive and is not. A release analysed as purely additive broke a consumer on the first compile, because the SDK added a public name the consumer had already invented for the same concept. That is the predictable consequence of closing a gap a consumer worked around, so a changelog that lists the names a version adds lets them see it before they bump.
-- **Members roll up.** A type that arrives or leaves is reported once rather than once per member, and an enum's cases are reported as the enum, because a closed enum gaining a case breaks an exhaustive switch and that is a fact about the enum.
-- **The mention test is literal**, matching whole names: `Foo`, `Foo.bar`, or the call spelling for a namespace method (`auth.me`). It asks whether the name a consumer would search for is on the page, not whether the prose is good.
-- **What it cannot see: protocol conformances.** Dropping a public conformance is source-breaking and lives in the symbol graph's relationships, under a pile of synthesised `Sendable` and `Copyable` entries. Separating declared conformances from synthesised ones is its own piece of work, and this check is silent on that class.
-- **`MarfaSDKTestSupport` is deliberately outside the snapshot**, because it carries no semver stability across SDK minor versions and holding a changelog entry against every change to it would demand records this project does not promise.
+- **Generated files carry a do-not-edit header**, and a hand-edit is overwritten on the next regen.
+- **Freshness is gated in CI** by running the generator and diffing. A failure always resolves the same way: regenerate locally and commit the delta.
+- **The spec snapshot is vendored** to keep CI self-contained, and refreshed atomically by its sync script. Never edit it by hand.
 
 ## Conventions
 
 - American English.
-- Conventional Commits scoped by area: `feat(sse):`, `fix(transport):`, `refactor(client):`, etc. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`.
-- Explicit `CodingKeys` for snake_case ↔ camelCase mapping. Wire types expose camelCase externally.
-- All public types are `Sendable`. Mutable shared state is actor-isolated or behind an `NSLock.withLock` critical section.
-- No force unwraps. No `try!` outside test scaffolding where the invariant is unreachable.
-- Swift Testing (`@Suite`, `@Test`, `#expect`), not XCTest.
-- Comments are self-contained and make sense to anyone reading the repo cold. Explain *why* — the decision, constraint, or trade-off — not the *what* the code already states. Never reference internal trackers, ticket numbers, or project phases. If a comment doesn't earn its place, delete it; git carries the rest.
-
-## Codegen
-
-Three codegen tools, all SwiftPM-driven and committed to the repo. Shared rules across all three:
-
-- **Generated files carry a `// Code generated by ...; DO NOT EDIT.` header.** Hand-edits are overwritten on the next regen — don't make them.
-- **Freshness is gated in CI** by running the generator and `git diff --exit-code` against the output directory. A failure means the input moved or the generator emits differently than what's committed; resolution is always: regen locally, commit the delta.
-
-### Wire types
-
-Generated under `Sources/MarfaSDK/Types/Wire/Generated/` from the monorepo's OpenAPI spec. Stale files (types removed from the registry) are pruned on every run.
-
-Inputs:
-- **Spec snapshot** `scripts/openapi.json` — vendored copy of the monorepo's spec. Vendoring keeps CI self-contained (no cross-repo checkout, no shared secrets) and makes wire-type diffs readable alongside the regen. Don't edit it by hand; `sync-openapi.sh` refreshes it from `../marfa/openapi.json` and regenerates atomically.
-- **Registry** `scripts/wire-types.json` — maps Swift type names to JSON-pointer paths into the snapshot.
-
-Regenerate from the repo root:
-```bash
-./scripts/sync-openapi.sh   # monorepo's openapi.json changed (refreshes snapshot + regenerates)
-swift run codegen-wire      # registry-only change (snapshot current)
-```
-
-Freshness check: `swift run codegen-wire && git diff --exit-code` against `Types/Wire/Generated/`.
-
-Registry override mechanisms in `wire-types.json`:
-- `numericIntFields` — global list of JSON fields spec'd as `number` but whole integers in the SDK (`version`, `schema_version`, `attempt`, `status_code`, …). Widen when a new such field lands or a field comes out `Double`.
-- Per-type `fieldOverrides` — raw Swift type expressions substituted verbatim (e.g. `type_permissions: [String: TypePermission]`).
-- Per-type `enumOverrides` — reuse existing hand-written enums (`KeyRole`, `ItemState`, `TypePermission`, `ExtensionPermission`, `EdgePermission`, `MetadataPermission`) instead of emitting fresh siblings.
-
-Troubleshooting: confirm a pointer resolves with `jq -c 'getpath([...])' ../marfa/openapi.json`.
-
-What stays hand-written (not generated):
-- `Types/Wire/Hand/` — composite wrappers (`ItemWithMetadataWith`, `ItemEdgeGroup`), generic helpers (`PaginatedResult<T>`), envelopes (`ItemResponse`, `MetadataResponse`, `IntegrationsListResponse`, …), and closed enums the spec carries as plain strings (`ItemState`, `Tier`, `ConnectionKind`, `ActivitySeverity`, `FieldDefinition`, `SearchResult`).
-- `Conflict/ConflictStrategy.swift` — `ConflictStrategy`, `ConflictData`, `ConflictResolver`, `ConflictResult`. The wire shapes (`ConflictResponse`, `ConflictSnapshot`, `MergePolicy`, `MergePolicyStrategy`) are generated from the 409 response schema.
-- `Inputs/` — all SDK input shapes (`CreateItemInput`, `UpdateOptions`, `ListFilters`, `CreateKeyInput`, etc.).
-
-### Domain models
-
-Typed Swift structs per Marfa core type under `Sources/MarfaSDK/DomainModels/Generated/`. Each wraps a generic `Item`, exposing typed property accessors, a failable `init?(from:)` that validates the type string and required fields, and `toProperties()` for round-tripping into create/update calls. One struct per active core type — the active set is whatever the monorepo's `packages/types/core/` ships at codegen time.
-
-Regenerate from the repo root:
-```bash
-./scripts/sync-types.sh     # monorepo's type schemas changed
-swift run codegen-domain    # snapshot current
-```
-`sync-types.sh` copies `../marfa/packages/types/core/` into `scripts/MarfaCodegenCore/core-types/` then runs `codegen-domain`. The snapshot lives under `MarfaCodegenCore/` because that library bundles it as a resource for custom-type parent-chain resolution.
-
-Freshness check: `swift run codegen-domain && git diff --exit-code` against `DomainModels/Generated/`.
-
-`MarfaItem` protocol — hand-written at `DomainModels/MarfaItem.swift`. Provides `typeIdentifier: String`, `item: Item`, `init?(from:)`, `toProperties() -> [String: JSONValue]`, and default accessors for `id`, `type`, `state`, `createdAt`, `updatedAt`, `timestamp`, `version`, `source`, `sourceId`, `library`, `isActive`, `isTrashed`, `isArchived`.
-
-Field conventions:
-- Required fields are non-optional with `?? ""` / `?? 0` / `?? false` fallback (`init?` already guards presence).
-- Optional fields are `T?`, returning `nil` when absent.
-- Enum schema fields surface as `String?` (values in property doc comments).
-- Child type fields shadow same-named parent fields for doc comments; the type mapping is identical either way.
-
-### Custom types
-
-Parallel tool for **consumer apps** with their own custom Marfa types. Generates the same-shaped `MarfaItem`-conforming struct as domain-model codegen, with inheritance flattened into one struct per type. Core schemas for parent-chain resolution (`parent: core.note`, etc.) ship bundled in the `MarfaCodegenCore` resource — consumers never vendor core types. Any `core.*` id in the source is rejected; that namespace is always out of scope regardless of include/exclude globs.
-
-Ships as two executables plus one SwiftPM command plugin, all products of `MarfaSDK`, all consuming a single `marfa-codegen.json` at the consumer's repo root:
-```bash
-swift run codegen-custom-types                    # reads marfa-codegen.json, generates from local JSON schemas
-swift run sync-custom-types                        # GET /types against a live instance, caches schemas, then generates
-swift package generate-marfa-custom-types          # command-plugin wrapper; --sync invokes sync first
-```
-
-Input contract — `marfa-codegen.json`:
-```json
-{
-  "schema": 1,
-  "source": { "mode": "local", "directory": "MarfaTypes" },
-  "output": { "directory": "Sources/MyApp/MarfaTypes/Generated", "accessLevel": "public" },
-  "types": { "include": ["myapp.*"], "exclude": ["myapp.internal.**"] }
-}
-```
-Mode `"live"` replaces `directory` with `cacheDirectory` and reads `MARFA_API_URL` / `MARFA_API_KEY` from env. Unknown `schema` versions fail fast.
-
-Architecture:
-- `MarfaCodegenCore` — internal library target, Foundation-only. Holds `ConfigLoader`, `SchemaLoader`, `SchemaResolver`, `NameMapper`, `CodeEmitter`, `FileWriter`, `Generator`, `SyncRunner`, plus the bundled `core-types/` JSON resource. Not a product.
-- `codegen-custom-types` / `sync-custom-types` — executable targets at `scripts/`. Thin arg parsing over `Generator.run()` / `SyncRunner.run()`; sync uses URLSession directly, no `MarfaSDK` runtime dep.
-- `GenerateMarfaCustomTypes` — command plugin at `Plugins/`. Declares `writeToPackageDirectory` and `allowNetworkConnections(.all)`.
-
-Output shape mirrors domain-model codegen, with custom-type additions:
-- `public static let typeSchemaVersion` — the schema version this struct was generated against; consumers compare with `MarfaItem.schemaVersion` at runtime for drift detection.
-- Explicit `Sendable` conformance.
-- Parent fields grouped under `// MARK: - Inherited from <parent.id>` sections.
-- Swift-keyword field names emit with backtick escaping (`` `init` ``, `` `class` ``).
-- Access level toggled by `output.accessLevel` — `public` (default) or `internal`.
-
-Consumer freshness check — add to their own CI:
-```yaml
-- run: |
-    swift run codegen-custom-types
-    git diff --exit-code -- Sources/MyApp/MarfaTypes/Generated
-```
-
-Testing model (`CodegenCustomTypesTests`):
-- Unit tests cover `NameMapper`, `ConfigLoader`, `SchemaResolver`, filters, and the `Generator` flow.
-- `GoldenTests` runs the full generator against `Fixtures/schemas/*.json` and byte-compares to `Fixtures/expected/*.swift`.
-- `CodegenCompileCheckTests` — a second target whose sources are the pre-generated Swift files in `CompileCheck/`; it fails to build if output shape regresses.
-- `SyncTests` uses an in-memory `HTTPFetcher` mock. No live-server integration test — the mock covers the contract and keeps CI hermetic.
-
-Refreshing golden files after an intentional emitter change:
-1. Update `scripts/MarfaCodegenCore/CodeEmitter.swift`.
-2. Run the generator against `Tests/CodegenCustomTypesTests/Fixtures/schemas/` into a scratch dir.
-3. Copy the outputs over both `Fixtures/expected/*.swift` and `CompileCheck/*.swift`.
-4. `swift test --filter CodegenCustomTypesTests` to verify.
+- Conventional Commits scoped by area: `feat(sse):`, `fix(transport):`, `refactor(client):`.
+- Explicit `CodingKeys` for snake_case to camelCase mapping; wire types expose camelCase.
+- All public types are `Sendable`; mutable shared state is actor-isolated or behind a lock.
+- No force unwraps, and no `try!` outside test scaffolding where the invariant is unreachable.
+- Swift Testing, not XCTest.
+- Comments are self-contained and make sense to anyone reading the repository cold. Explain *why*, not the *what* the code already states, and never reference internal trackers or project phases.
