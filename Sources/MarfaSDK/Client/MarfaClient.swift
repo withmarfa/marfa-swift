@@ -44,12 +44,13 @@ public final class MarfaClient: Sendable {
 
     public let integrations: IntegrationsNamespace
 
-    /// `client.spaces.{getConfig, setConfig}` are space-admin-gated;
-    /// `client.spaces.quotas.{getOwn, getById, set}` mixes space and platform
-    /// admin per method. The server enforces the role split.
+    /// `client.spaces.{getConfig, setConfig}` need `space.settings`, and
+    /// `client.spaces.quotas.{getOwn, getById, set}` splits between
+    /// `space.usage` for a credential's own row and the operator key for a
+    /// space named by id. The server checks the permission per method.
     public let spaces: SpacesNamespace
 
-    /// Platform-admin-only operator surface.
+    /// The operator key's surface, and nothing else reaches it.
     /// Space quota read/write lives on ``spaces`` (`client.spaces.quotas.*`),
     /// not here.
     public let admin: AdminNamespace

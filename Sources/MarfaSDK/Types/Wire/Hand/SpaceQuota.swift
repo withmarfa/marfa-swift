@@ -5,9 +5,11 @@ import Foundation
 /// override row exists.
 ///
 /// Returned by every quota read path:
-/// - `client.spaces.quotas.getOwn()` — space-admin reading their own row
-/// - `client.spaces.quotas.getById(_:)` — platform-admin reading a specific space
-/// - `client.spaces.quotas.set(id:_:)` — platform-admin writing a row
+/// - `client.spaces.quotas.getOwn()` — a credential holding `space.usage`,
+///   reading its own space's row
+/// - `client.spaces.quotas.getById(_:)` — the operator key, reading a named
+///   space
+/// - `client.spaces.quotas.set(id:_:)` — the operator key, writing one
 public struct SpaceQuota: Codable, Sendable, Hashable {
     public let spaceId: String
     public let itemsLimit: Int?

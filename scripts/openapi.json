@@ -981,10 +981,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Type identifier; matches subtypes via inheritance"
+              "description": "Type identifier; matches subtypes via inheritance. A concrete identifier the space does not know is refused with 400 `unknown_type`; a wildcard over nothing answers an empty page."
             },
             "required": false,
-            "description": "Type identifier; matches subtypes via inheritance",
+            "description": "Type identifier; matches subtypes via inheritance. A concrete identifier the space does not know is refused with 400 `unknown_type`; a wildcard over nothing answers an empty page.",
             "name": "type",
             "in": "query"
           },
@@ -1568,7 +1568,8 @@
                           "type": "string",
                           "enum": [
                             "validation_error",
-                            "missing_required_field"
+                            "missing_required_field",
+                            "unknown_type"
                           ]
                         },
                         "message": {
@@ -4060,7 +4061,7 @@
           "Items"
         ],
         "summary": "Soft delete an item",
-        "description": "Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. A live `system.connection` is refused: uninstall it first, so its runtime credentials are revoked with it.",
+        "description": "Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. A live `system.connection` is refused. An integration is uninstalled first, so its runtime credentials are revoked with it; an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.",
         "security": [
           {
             "bearerAuth": []
@@ -4128,7 +4129,7 @@
             }
           },
           "400": {
-            "description": "The item is a live `system.connection`. Uninstall it first — removing the row here would leave its runtime credentials behind with nothing naming their owner.",
+            "description": "The item is a live `system.connection`. Uninstall an integration first, or revoke an app grant through `DELETE /auth/grants/{id}`: removing the row here would leave its runtime credentials, or the app's tokens and stored consent, behind with nothing naming their owner.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7024,7 +7025,7 @@
           "Items"
         ],
         "summary": "Permanently delete an item",
-        "description": "Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible and admin-only. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused: uninstall it first, so its runtime credentials are revoked with it.",
+        "description": "Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible, and requires `space.item_purge`. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused. An integration is uninstalled first, so its runtime credentials are revoked with it; an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.",
         "security": [
           {
             "bearerAuth": []
@@ -7092,7 +7093,7 @@
             }
           },
           "400": {
-            "description": "The item is a live `system.connection`. Uninstall it first — removing the row here would leave its runtime credentials behind with nothing naming their owner.",
+            "description": "The item is a live `system.connection`. Uninstall an integration first, or revoke an app grant through `DELETE /auth/grants/{id}`: removing the row here would leave its runtime credentials, or the app's tokens and stored consent, behind with nothing naming their owner.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7207,7 +7208,7 @@
             }
           },
           "403": {
-            "description": "Admin required, or the item is in a reserved namespace this credential may not write. The second reads `type_not_permitted` and is the answer for an untrashed row: purging is trash-then-purge, and a credential refused at the trash door would otherwise be told only that the item is not trashed, which describes an ordering mistake it did not make.",
+            "description": "`space.item_purge` is missing, or the item is in a reserved namespace this credential may not write. The second reads `type_not_permitted` and is the answer for an untrashed row: purging is trash-then-purge, and a credential refused at the trash door would otherwise be told only that the item is not trashed, which describes an ordering mistake it did not make.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7617,7 +7618,7 @@
           "Items"
         ],
         "summary": "Bulk upsert items",
-        "description": "Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`. Atomic by default; `source` is server-stamped from the credential, so any caller-supplied value is overwritten. Requires write access to each item's type (admin / space_admin bypass; members need the per-type permission), and operates only within the caller's space.\n\nAn entry that resolves a row of a different type is refused with `type_mismatch` — a write does not re-type the row it lands on. Passing `retype: true` for the batch moves those rows instead, which is how a corpus is brought onto a type a mapping now names. It is opt-in rather than inferred from a differing type, because a declared type accompanies nearly every write and inferring would move a corpus on an ordinary sync bug. Each move requires write on the type being entered as well as the one being left, and the resulting properties are validated against the destination: an item the destination type cannot accept is reported as an `errored` entry naming why, and the rest of the batch proceeds.\n\nAn ordinary update is validated too, against the row's own type and on the properties the write would leave on it rather than on the body alone, so a patch removing a required field is refused even though it names no invalid value. A refusal is an `errored` entry under `invalid_properties`; with the default `atomic` it rolls the page back instead, carrying that code in `details.code`.",
+        "description": "Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`. Atomic by default; `source` is server-stamped from the credential, so any caller-supplied value is overwritten. Requires write access to each item's type — the credential's own type permissions decide, and nothing bypasses them — and operates only within the caller's space.\n\nAn entry that resolves a row of a different type is refused with `type_mismatch` — a write does not re-type the row it lands on. Passing `retype: true` for the batch moves those rows instead, which is how a corpus is brought onto a type a mapping now names. It is opt-in rather than inferred from a differing type, because a declared type accompanies nearly every write and inferring would move a corpus on an ordinary sync bug. Each move requires write on the type being entered as well as the one being left, and the resulting properties are validated against the destination: an item the destination type cannot accept is reported as an `errored` entry naming why, and the rest of the batch proceeds.\n\nAn ordinary update is validated too, against the row's own type and on the properties the write would leave on it rather than on the body alone, so a patch removing a required field is refused even though it names no invalid value. A refusal is an `errored` entry under `invalid_properties`; with the default `atomic` it rolls the page back instead, carrying that code in `details.code`.",
         "security": [
           {
             "bearerAuth": []
@@ -8094,7 +8095,8 @@
                               "archived",
                               "trashed",
                               "revoked"
-                            ]
+                            ],
+                            "description": "Filter by lifecycle state. Omitting it applies the same default as `GET /items`: trashed rows are excluded. There is no `any` sentinel on this door — these four states are the whole structured vocabulary it accepts."
                           },
                           "source": {
                             "type": "string"
@@ -8170,7 +8172,8 @@
                               "archived",
                               "trashed",
                               "revoked"
-                            ]
+                            ],
+                            "description": "Filter by lifecycle state. Omitting it applies the same default as `GET /items`: trashed rows are excluded. There is no `any` sentinel on this door — these four states are the whole structured vocabulary it accepts."
                           },
                           "source": {
                             "type": "string"
@@ -8243,7 +8246,8 @@
                               "archived",
                               "trashed",
                               "revoked"
-                            ]
+                            ],
+                            "description": "Filter by lifecycle state. Omitting it applies the same default as `GET /items`: trashed rows are excluded. There is no `any` sentinel on this door — these four states are the whole structured vocabulary it accepts."
                           },
                           "source": {
                             "type": "string"
@@ -8322,7 +8326,8 @@
                               "archived",
                               "trashed",
                               "revoked"
-                            ]
+                            ],
+                            "description": "Filter by lifecycle state. Omitting it applies the same default as `GET /items`: trashed rows are excluded. There is no `any` sentinel on this door — these four states are the whole structured vocabulary it accepts."
                           },
                           "source": {
                             "type": "string"
@@ -8397,7 +8402,8 @@
                               "archived",
                               "trashed",
                               "revoked"
-                            ]
+                            ],
+                            "description": "Filter by lifecycle state. Omitting it applies the same default as `GET /items`: trashed rows are excluded. There is no `any` sentinel on this door — these four states are the whole structured vocabulary it accepts."
                           },
                           "source": {
                             "type": "string"
@@ -8471,7 +8477,8 @@
                               "archived",
                               "trashed",
                               "revoked"
-                            ]
+                            ],
+                            "description": "Filter by lifecycle state. Omitting it applies the same default as `GET /items`: trashed rows are excluded. There is no `any` sentinel on this door — these four states are the whole structured vocabulary it accepts."
                           },
                           "source": {
                             "type": "string"
@@ -8857,7 +8864,7 @@
             }
           },
           "403": {
-            "description": "Admin required (purge only)",
+            "description": "`space.item_purge` required (purge only)",
             "content": {
               "application/json": {
                 "schema": {
@@ -8990,7 +8997,7 @@
           "Items"
         ],
         "summary": "Get a bulk-action job",
-        "description": "Returns the current state of an asynchronous bulk-action job; once terminal, `result` carries the outcome envelope. Readable by the credential that created it, by an admin within the same space, and by a platform credential. A job in another space reads as absent.",
+        "description": "Returns the current state of an asynchronous bulk-action job; once terminal, `result` carries the outcome envelope. Readable by the credential that created it and by the operator key, and by nothing else: no space permission says \"read another credential's bulk jobs\". A job in another space reads as absent.",
         "security": [
           {
             "bearerAuth": []
@@ -9196,7 +9203,7 @@
             }
           },
           "403": {
-            "description": "Not the originating credential, and not an admin for this space",
+            "description": "Not the originating credential, and not the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -9589,7 +9596,7 @@
             }
           },
           "403": {
-            "description": "Not the originating credential, and not an admin for this space",
+            "description": "Not the originating credential, and not the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -13616,7 +13623,7 @@
           "Edges"
         ],
         "summary": "Update an edge",
-        "description": "Updates an edge's properties. The identity fields (edge type, source, and target) are immutable, so re-pointing an edge means deleting it and creating a new one. Passing `version` opts into optimistic concurrency: a stale value returns 409 carrying the edge as it now stands, and the client re-applies its change over that. Omitting it keeps the previous last-writer-wins behavior. The version moves on either way, and on every update applied rather than only on one that changes the properties — so a bulk upsert that rewrites identical properties still invalidates a version another client is holding.",
+        "description": "Updates an edge's properties. Properties merge shallowly with what the edge already holds, as they do on items, so a call naming one property leaves the others standing; there is no replace mode and no way to remove a single property: sending `null` stores a null rather than clearing the key, and deleting the edge to recreate it restarts its version at 1 and emits a delete and a create rather than an update. An edge's property set can therefore only grow. The identity fields (edge type, source, and target) are immutable, so re-pointing an edge means deleting it and creating a new one. Passing `version` opts into optimistic concurrency: a stale value returns 409 carrying the edge as it now stands, and the client re-applies its change over that. Omitting it keeps the previous last-writer-wins behavior. The version moves on either way, and on every update applied rather than only on one that changes the properties — so a bulk upsert that rewrites identical properties still invalidates a version another client is holding.",
         "security": [
           {
             "bearerAuth": []
@@ -14260,7 +14267,7 @@
           "Edges"
         ],
         "summary": "Bulk upsert edges",
-        "description": "Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and edge type (admin / space_admin bypass; members need both per-type permissions), and operates only within the caller's space.",
+        "description": "Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. An entry that matches an existing row merges its properties over that row's, as `PATCH /edges/{id}` does, so an upsert naming one property leaves the others standing. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and to the edge type, and operates only within the caller's space.",
         "security": [
           {
             "bearerAuth": []
@@ -14673,7 +14680,7 @@
           "Edge Types"
         ],
         "summary": "Register an edge type",
-        "description": "Registers a custom edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Space-admin or platform-admin; the registration is scoped to the caller's space and is invisible to other spaces. The eight core edge-type names are reserved and reject with a conflict, and custom types are flat with no inheritance.",
+        "description": "Registers a custom edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`; the registration is scoped to the caller's space and is invisible to other spaces. The eight core edge-type names are reserved and reject with a conflict, and custom types are flat with no inheritance.",
         "security": [
           {
             "bearerAuth": []
@@ -14909,7 +14916,7 @@
             }
           },
           "403": {
-            "description": "Space-admin required",
+            "description": "`space.schema` required",
             "content": {
               "application/json": {
                 "schema": {
@@ -15270,7 +15277,7 @@
           "Edge Types"
         ],
         "summary": "Delete an edge type",
-        "description": "Removes a custom edge type registration scoped to the caller's space. Space-admin or platform-admin; core edge types are rejected, another space's edge type resolves as not-found, and the request fails while any edges of this type still exist, so delete or migrate them first.",
+        "description": "Removes a custom edge type registration scoped to the caller's space. Requires `space.schema`; core edge types are rejected, another space's edge type resolves as not-found, and the request fails while any edges of this type still exist, so delete or migrate them first.",
         "security": [
           {
             "bearerAuth": []
@@ -15773,7 +15780,7 @@
           "Types"
         ],
         "summary": "Register a custom type",
-        "description": "Registers a custom type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; reserved roots, ancestor-field redefinitions, and property names shadowing first-class `Item` fields all reject with `400`. Admin keys bypass; non-admin credentials need the `metadata.types:write` scope, which is off by default.",
+        "description": "Registers a custom type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; reserved roots, ancestor-field redefinitions, and property names shadowing first-class `Item` fields all reject with `400`. Every credential needs the `metadata.types:write` scope, which is off by default. The operator key is no exception: this door reads the map like any other.",
         "security": [
           {
             "bearerAuth": []
@@ -16543,7 +16550,7 @@
           "Types"
         ],
         "summary": "Update a custom type",
-        "description": "Replaces a custom type's schema, re-running the registration-time correctness rails. Admin-only — core types are immutable and return 403; the structural diff between versions sets the required version bump, and a mismatch rejects with `422 version_bump_mismatch`.",
+        "description": "Replaces a custom type's schema, re-running the registration-time correctness rails. Requires `space.schema` — core types are immutable and return 403; the structural diff between versions sets the required version bump, and a mismatch rejects with `422 version_bump_mismatch`.",
         "security": [
           {
             "bearerAuth": []
@@ -16928,7 +16935,7 @@
           "Types"
         ],
         "summary": "Delete a custom type",
-        "description": "Removes a custom type registration. Admin-only — platform-shipped types are immutable.\n\nRejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.\n\nRejected with `409 type_in_use` if any item of the type still exists, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 invalid_type`).",
+        "description": "Removes a custom type registration. Requires `space.schema` — platform-shipped types are immutable.\n\nRejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.\n\nRejected with `409 type_in_use` if any item of the type still exists, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 invalid_type`).",
         "security": [
           {
             "bearerAuth": []
@@ -17305,10 +17312,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Restrict to a single type."
+              "description": "Restrict to a single type, subtypes included. A concrete identifier the space does not know is refused with 400 `unknown_type`."
             },
             "required": false,
-            "description": "Restrict to a single type.",
+            "description": "Restrict to a single type, subtypes included. A concrete identifier the space does not know is refused with 400 `unknown_type`.",
             "name": "type",
             "in": "query"
           },
@@ -17674,7 +17681,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "validation_error"
+                            "validation_error",
+                            "unknown_type"
                           ]
                         },
                         "message": {
@@ -20725,7 +20733,7 @@
           "Keys"
         ],
         "summary": "Create an API key",
-        "description": "Creates a new API key in the caller's space. The plaintext `key` is returned only in this response and never shown again, so store it securely. The new key's space is always the caller's: a `space_id` in the body is rejected, and a caller that has no space cannot mint `role: \"space_admin\"` (the key would inherit no space, so its authority would not stop at the boundary its role names). Use `POST /admin/spaces/{id}/keys` to mint into a specific space. `role` may not exceed the caller's own role (admin > space_admin > member); asking for a higher one returns 403, and `is_platform` is granted only when the caller is itself a platform credential. On a fresh server with zero keys, this runs in bootstrap mode (no auth, minted key is always admin); once any key exists, creation requires an admin or space_admin token.",
+        "description": "Creates a new API key in the caller's space. The plaintext `key` is returned only in this response and never shown again, so store it securely.\n\nThe new key's space is always the caller's: a `space_id` in the body is rejected. Use `POST /admin/spaces/{id}/keys` to mint into a named space.\n\nA credential is a set of permissions and nothing else. `space_permissions` names the space permissions the key holds; omitting it takes the creator's whole set, and anything named is clamped to what the creator holds, so a mint can narrow and can never widen. The content maps behave the same way, and a signed-in app must hold `space.keys` to reach this route at all.\n\nAn operator key mints another operator key here and nothing else, because the instance tier is the absence of a space binding and an operator caller has no space to hand down. `is_operator` is granted only when the caller is itself an operator key.\n\nOn a fresh server with zero keys this runs in bootstrap mode: the key it mints is the operator key, and the request must present the one-time secret the server printed to its log at startup, as a bearer token. That secret works once — the mint consumes it.\n\nIn keys mode the bootstrap call also provisions the instance's one space and mints a working key into it, returned as `space` and `space_key`. The operator key is not a working key — it holds no space and no permissions, because running the instance sits outside the permission model — so the space key is the one to configure a client with.",
         "security": [
           {
             "bearerAuth": []
@@ -20746,13 +20754,24 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
-                  "role": {
-                    "type": "string",
-                    "enum": [
-                      "instance_admin",
-                      "space_admin",
-                      "member"
-                    ]
+                  "space_permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "space.webhooks",
+                        "space.connections",
+                        "space.schema",
+                        "space.usage",
+                        "space.settings",
+                        "space.audit_read",
+                        "space.item_purge",
+                        "space.upstream_access",
+                        "space.credentials",
+                        "space.keys",
+                        "space.app_grants"
+                      ]
+                    }
                   },
                   "default_tier": {
                     "type": "string",
@@ -20761,7 +20780,7 @@
                       "feed"
                     ]
                   },
-                  "is_platform": {
+                  "is_operator": {
                     "type": "boolean"
                   },
                   "space_id": {
@@ -20808,6 +20827,16 @@
                         "write"
                       ]
                     }
+                  },
+                  "profile_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -20838,13 +20867,27 @@
                     "source": {
                       "type": "string"
                     },
-                    "role": {
-                      "type": "string",
-                      "enum": [
-                        "instance_admin",
-                        "space_admin",
-                        "member"
-                      ]
+                    "space_permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "space.webhooks",
+                          "space.connections",
+                          "space.schema",
+                          "space.usage",
+                          "space.settings",
+                          "space.audit_read",
+                          "space.item_purge",
+                          "space.upstream_access",
+                          "space.credentials",
+                          "space.keys",
+                          "space.app_grants"
+                        ]
+                      }
+                    },
+                    "oauth_client_id": {
+                      "type": "string"
                     },
                     "default_tier": {
                       "type": "string",
@@ -20853,7 +20896,7 @@
                         "feed"
                       ]
                     },
-                    "is_platform": {
+                    "is_operator": {
                       "type": "boolean"
                     },
                     "type_permissions": {
@@ -20897,12 +20940,158 @@
                         ]
                       }
                     },
+                    "profile_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
                     "created_at": {
                       "type": "string"
                     },
                     "last_used_at": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "space": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "The space provisioned by a keys-mode bootstrap call."
+                    },
+                    "space_key": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "space_permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "space.webhooks",
+                              "space.connections",
+                              "space.schema",
+                              "space.usage",
+                              "space.settings",
+                              "space.audit_read",
+                              "space.item_purge",
+                              "space.upstream_access",
+                              "space.credentials",
+                              "space.keys",
+                              "space.app_grants"
+                            ]
+                          }
+                        },
+                        "oauth_client_id": {
+                          "type": "string"
+                        },
+                        "default_tier": {
+                          "type": "string",
+                          "enum": [
+                            "library",
+                            "feed"
+                          ]
+                        },
+                        "is_operator": {
+                          "type": "boolean"
+                        },
+                        "type_permissions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "write",
+                              "none"
+                            ]
+                          }
+                        },
+                        "extension_permissions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "write"
+                            ]
+                          }
+                        },
+                        "edge_permissions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "write"
+                            ]
+                          }
+                        },
+                        "metadata_permissions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "write"
+                            ]
+                          }
+                        },
+                        "profile_permissions": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "write"
+                            ]
+                          }
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "last_used_at": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "key",
+                        "label",
+                        "source",
+                        "default_tier",
+                        "is_operator",
+                        "type_permissions",
+                        "created_at",
+                        "last_used_at"
+                      ],
+                      "description": "A working key bound to that space, holding everything in it. The plaintext is returned only here."
                     }
                   },
                   "required": [
@@ -20910,9 +21099,8 @@
                     "key",
                     "label",
                     "source",
-                    "role",
                     "default_tier",
-                    "is_platform",
+                    "is_operator",
                     "type_permissions",
                     "created_at",
                     "last_used_at"
@@ -20936,7 +21124,7 @@
             }
           },
           "400": {
-            "description": "Body carried a `space_id`, or the mint would produce a `space_admin` key with no space",
+            "description": "Body carried a `space_id`. A key is minted into its creator's space, so the space is never named in the body.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21048,7 +21236,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or space_admin, is an OAuth access token, or requested a role above its own.",
+            "description": "Caller does not hold `space.keys`, asked for reach its own credential does not cover, or asked to mint across the instance tier in either direction. A missing permission is named in `details.required_scope`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21179,7 +21367,7 @@
           "Keys"
         ],
         "summary": "List API keys",
-        "description": "Returns every API key in the caller's space without plaintext, which is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Admin or space_admin only.",
+        "description": "Returns every API key in the caller's space without plaintext, which is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Requires `space.keys`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.",
         "security": [
           {
             "bearerAuth": []
@@ -21207,8 +21395,29 @@
                           "source": {
                             "type": "string"
                           },
-                          "role": {
-                            "type": "string"
+                          "space_permissions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "space.webhooks",
+                                "space.connections",
+                                "space.schema",
+                                "space.usage",
+                                "space.settings",
+                                "space.audit_read",
+                                "space.item_purge",
+                                "space.upstream_access",
+                                "space.credentials",
+                                "space.keys",
+                                "space.app_grants"
+                              ]
+                            },
+                            "description": "The space permissions this credential holds, as the literals themselves. Omitted on a create request takes the creator's whole set; anything named is honoured and clamped to what the creator holds."
+                          },
+                          "oauth_client_id": {
+                            "type": "string",
+                            "description": "The registered client that minted this key, when a signed-in app did. Absent on a key a person or another key created directly."
                           },
                           "default_tier": {
                             "type": "string",
@@ -21217,7 +21426,7 @@
                               "feed"
                             ]
                           },
-                          "is_platform": {
+                          "is_operator": {
                             "type": "boolean"
                           },
                           "type_permissions": {
@@ -21278,9 +21487,8 @@
                           "id",
                           "label",
                           "source",
-                          "role",
                           "default_tier",
-                          "is_platform",
+                          "is_operator",
                           "type_permissions",
                           "created_at",
                           "last_used_at"
@@ -21443,7 +21651,7 @@
           "Keys"
         ],
         "summary": "Revoke an API key",
-        "description": "Revokes the key immediately; the next request bearing it returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. Admin or space_admin only.",
+        "description": "Revokes the key immediately; the next request bearing it returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. Requires `space.keys`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.",
         "security": [
           {
             "bearerAuth": []
@@ -21629,7 +21837,7 @@
           "Keys"
         ],
         "summary": "Update an API key",
-        "description": "Updates a key's label, default tier, or permission maps in place. `source` and `role` are immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change them. Admin or space_admin only.",
+        "description": "Updates a key's label, default tier, or permission maps in place. `source` is immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change it. Requires `space.keys`. A permission map may not be widened past what the calling credential itself holds, the operator key excepted, since running the instance sits outside the permission model. A key created by an app is never widened at all, by any caller including the operator key: it holds what that app held, and may only be narrowed.",
         "security": [
           {
             "bearerAuth": []
@@ -21705,10 +21913,36 @@
                       ]
                     }
                   },
-                  "source": {
-                    "nullable": true
+                  "profile_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
                   },
-                  "role": {
+                  "space_permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "space.webhooks",
+                        "space.connections",
+                        "space.schema",
+                        "space.usage",
+                        "space.settings",
+                        "space.audit_read",
+                        "space.item_purge",
+                        "space.upstream_access",
+                        "space.credentials",
+                        "space.keys",
+                        "space.app_grants"
+                      ]
+                    }
+                  },
+                  "source": {
                     "nullable": true
                   }
                 }
@@ -21733,13 +21967,29 @@
                     "source": {
                       "type": "string"
                     },
-                    "role": {
+                    "space_permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "space.webhooks",
+                          "space.connections",
+                          "space.schema",
+                          "space.usage",
+                          "space.settings",
+                          "space.audit_read",
+                          "space.item_purge",
+                          "space.upstream_access",
+                          "space.credentials",
+                          "space.keys",
+                          "space.app_grants"
+                        ]
+                      },
+                      "description": "The space permissions this credential holds, as the literals themselves. Omitted on a create request takes the creator's whole set; anything named is honoured and clamped to what the creator holds."
+                    },
+                    "oauth_client_id": {
                       "type": "string",
-                      "enum": [
-                        "instance_admin",
-                        "space_admin",
-                        "member"
-                      ]
+                      "description": "The registered client that minted this key, when a signed-in app did. Absent on a key a person or another key created directly."
                     },
                     "default_tier": {
                       "type": "string",
@@ -21748,7 +21998,7 @@
                         "feed"
                       ]
                     },
-                    "is_platform": {
+                    "is_operator": {
                       "type": "boolean"
                     },
                     "type_permissions": {
@@ -21809,9 +22059,8 @@
                     "id",
                     "label",
                     "source",
-                    "role",
                     "default_tier",
-                    "is_platform",
+                    "is_operator",
                     "type_permissions",
                     "created_at",
                     "last_used_at"
@@ -21948,7 +22197,7 @@
             }
           },
           "403": {
-            "description": "Admin only",
+            "description": "`space.keys` required, unless the caller is the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -22350,7 +22599,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or space_admin.",
+            "description": "Caller does not hold `space.credentials`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22675,7 +22924,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or space_admin.",
+            "description": "Caller does not hold `space.credentials`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22977,7 +23226,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or space_admin.",
+            "description": "Caller does not hold `space.credentials`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -23438,7 +23687,7 @@
             }
           },
           "403": {
-            "description": "Caller lacks is_platform: true",
+            "description": "Caller lacks is_operator: true",
             "content": {
               "application/json": {
                 "schema": {
@@ -24175,7 +24424,7 @@
           "Spaces"
         ],
         "summary": "Get the current space's configuration",
-        "description": "Returns the calling space's configuration — the optional `enforcement` levers plus the per-space cleanup-job retention overrides. Returns an empty object when nothing is configured. Admin or space_admin.",
+        "description": "Returns the calling space's configuration — the optional `enforcement` levers plus the per-space cleanup-job retention overrides. Returns an empty object when nothing is configured. Requires `space.settings`.",
         "security": [
           {
             "bearerAuth": []
@@ -24478,7 +24727,7 @@
           "Spaces"
         ],
         "summary": "Replace the current space's configuration",
-        "description": "Overwrites the space's config with the supplied object — full replacement, not a merge. An unknown key is refused rather than dropped, because a full replacement that ignores a typo erases every override the space had. Cleanup-job retention overrides must be non-negative, where `0` disables the corresponding job for this space. Admin or space_admin.",
+        "description": "Overwrites the space's config with the supplied object — full replacement, not a merge. An unknown key is refused rather than dropped, because a full replacement that ignores a typo erases every override the space had. Cleanup-job retention overrides must be non-negative, where `0` disables the corresponding job for this space. Requires `space.settings`.",
         "security": [
           {
             "bearerAuth": []
@@ -24938,7 +25187,7 @@
           "Spaces"
         ],
         "summary": "Get current space quotas",
-        "description": "Returns the calling space's quota ceilings, resolved from the credential so the caller doesn't need to know its own space id. A platform-admin key with no space id receives `400` — use `GET /spaces/{id}/quotas` with an explicit id instead. Admin or space_admin.",
+        "description": "Returns the calling space's quota ceilings, resolved from the credential so the caller doesn't need to know its own space id. A credential with no space binding receives `400` — use `GET /spaces/{id}/quotas` with an explicit id instead. Requires `space.usage`.",
         "security": [
           {
             "bearerAuth": []
@@ -25008,7 +25257,7 @@
             }
           },
           "400": {
-            "description": "Caller has no space_id (platform admin).",
+            "description": "Caller has no space binding.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25253,7 +25502,7 @@
           "Admin"
         ],
         "summary": "List dead-lettered integration dispatches",
-        "description": "Dispatches on the local integration substrate that exhausted their retry ladder, newest failure first. Each row carries the integration and connection the dispatch belonged to, the recorded failure reason, the delivery attempts consumed, and when the job was created and finally failed. Rows age out with the queue's own retention. Platform-admin only. Deployments without the local substrate answer 503.",
+        "description": "Dispatches on the local integration substrate that exhausted their retry ladder, newest failure first. Each row carries the integration and connection the dispatch belonged to, the recorded failure reason, the delivery attempts consumed, and when the job was created and finally failed. Rows age out with the queue's own retention. Operator key only. Deployments without the local substrate answer 503.",
         "security": [
           {
             "bearerAuth": []
@@ -25404,7 +25653,7 @@
             }
           },
           "403": {
-            "description": "Caller is not a platform admin",
+            "description": "Caller is not the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -25593,7 +25842,7 @@
           "Admin"
         ],
         "summary": "Replay one dead-lettered dispatch",
-        "description": "Re-queues exactly one named dead-lettered dispatch for one more delivery attempt. Only a job currently in the failed state can be replayed; replaying a job that was already replayed, is running, or has completed is refused with a 409 naming its actual state. A replayed job that fails again returns to the listing and can be replayed again. Platform-admin only. Deployments without the local substrate answer 503.",
+        "description": "Re-queues exactly one named dead-lettered dispatch for one more delivery attempt. Only a job currently in the failed state can be replayed; replaying a job that was already replayed, is running, or has completed is refused with a 409 naming its actual state. A replayed job that fails again returns to the listing and can be replayed again. Operator key only. Deployments without the local substrate answer 503.",
         "security": [
           {
             "bearerAuth": []
@@ -25709,7 +25958,7 @@
             }
           },
           "403": {
-            "description": "Caller is not a platform admin",
+            "description": "Caller is not the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -26012,7 +26261,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Lists platform type rows this instance still carries that the running build no longer ships, each with how many items across every space still carry the identifier. `/health` publishes the count of these as `platform_types`, a report that carries no status and never degrades the response; this is where the identifiers live, because that endpoint is unauthenticated. The count is read live rather than cached at boot: it is the part that changes without a restart, and a removal reasoning from a stale copy is the failure worth avoiding. Platform-admin only.",
+        "description": "Lists platform type rows this instance still carries that the running build no longer ships, each with how many items across every space still carry the identifier. `/health` publishes the count of these as `platform_types`, a report that carries no status and never degrades the response; this is where the identifiers live, because that endpoint is unauthenticated. The count is read live rather than cached at boot: it is the part that changes without a restart, and a removal reasoning from a stale copy is the failure worth avoiding. Operator key only.",
         "responses": {
           "200": {
             "description": "The drifted rows, with their live item counts",
@@ -26129,7 +26378,7 @@
             }
           },
           "403": {
-            "description": "Caller is not a platform admin",
+            "description": "Caller is not the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -26264,7 +26513,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Removes exactly one platform type row this build does not ship. Refused with `409` when the identifier is one the build still ships, so this can never remove a live type, and refused with `409` when items still carry it: the row is what makes those items resolve, and orphaning readable data to tidy a registry is the wrong trade. The item count is recomputed inside the request rather than read from the boot-time report. The type stops resolving on the next restart, since the in-memory registry is filled from the rows at boot. Platform-admin only.",
+        "description": "Removes exactly one platform type row this build does not ship. Refused with `409` when the identifier is one the build still ships, so this can never remove a live type, and refused with `409` when items still carry it: the row is what makes those items resolve, and orphaning readable data to tidy a registry is the wrong trade. The item count is recomputed inside the request rather than read from the boot-time report. The type stops resolving on the next restart, since the in-memory registry is filled from the rows at boot. Operator key only.",
         "parameters": [
           {
             "schema": {
@@ -26372,7 +26621,7 @@
             }
           },
           "403": {
-            "description": "Caller is not a platform admin",
+            "description": "Caller is not the operator key",
             "content": {
               "application/json": {
                 "schema": {
@@ -26627,10 +26876,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Filter to a single type identifier"
+              "description": "Filter to a single type identifier, subtypes included. A concrete identifier the space does not know is refused with 400 `unknown_type`."
             },
             "required": false,
-            "description": "Filter to a single type identifier",
+            "description": "Filter to a single type identifier, subtypes included. A concrete identifier the space does not know is refused with 400 `unknown_type`.",
             "name": "type",
             "in": "query"
           },
@@ -26687,10 +26936,10 @@
           {
             "schema": {
               "type": "string",
-              "description": "Platform admins scope the export to a specific space"
+              "description": "A caller with no space binding scopes the export to one space with this; a space-bound caller exports its own space and may not name another"
             },
             "required": false,
-            "description": "Platform admins scope the export to a specific space",
+            "description": "A caller with no space binding scopes the export to one space with this; a space-bound caller exports its own space and may not name another",
             "name": "target_space_id",
             "in": "query"
           }
@@ -26733,7 +26982,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "validation_error"
+                            "validation_error",
+                            "unknown_type"
                           ]
                         },
                         "message": {
@@ -26910,7 +27160,7 @@
           "Inbound Webhooks"
         ],
         "summary": "Register an inbound webhook subscription on a connection",
-        "description": "Registers an inbound-webhook subscription so the connection's upstream service can deliver events into Marfa. Signature verification uses the adapter named in the connection manifest's `webhook_verification.method`; the `secret` is returned only once, in this response.",
+        "description": "Registers an inbound-webhook subscription so the connection's upstream can deliver events into Marfa. Signature verification uses the adapter named in the connection manifest's `webhook_verification.method`; a manifest that declares none is refused, because nothing could verify the delivery. The `secret` is returned only once, in this response.",
         "security": [
           {
             "bearerAuth": []
@@ -30289,7 +30539,7 @@
           "Connections"
         ],
         "summary": "Install an integration",
-        "description": "Installs a connection from a registered integration manifest without the browser consent screen, for non-interactive operator and tooling use. Admin-only; runs the same compensating-write pipeline and audit trail as the HTML consent flow.",
+        "description": "Installs a connection from a registered integration manifest without the browser consent screen, for non-interactive operator and tooling use. Requires `space.connections`; runs the same compensating-write pipeline and audit trail as the HTML consent flow.",
         "security": [
           {
             "bearerAuth": []
@@ -30472,7 +30722,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -30965,7 +31215,7 @@
             }
           },
           "403": {
-            "description": "Caller is not a space admin or platform admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31219,7 +31469,7 @@
             }
           },
           "400": {
-            "description": "Connection is not an integration, is revoked, is already in the requested state, or (for resume) is not paused.",
+            "description": "Connection kind is not `integration`, is revoked, is already in the requested state, or (for resume) is not paused.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31331,7 +31581,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31584,7 +31834,7 @@
             }
           },
           "400": {
-            "description": "Connection is not an integration, is revoked, is already in the requested state, or (for resume) is not paused.",
+            "description": "Connection kind is not `integration`, is revoked, is already in the requested state, or (for resume) is not paused.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31696,7 +31946,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32049,7 +32299,7 @@
             }
           },
           "400": {
-            "description": "Connection is not an integration, or already revoked.",
+            "description": "Connection kind is not `integration`, or already revoked.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32161,7 +32411,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32349,8 +32599,8 @@
         "tags": [
           "Connections"
         ],
-        "summary": "Run an integration connection now",
-        "description": "Dispatches the connection's sweep immediately instead of waiting for its next scheduled tick. Only connections whose manifest declares the `manual` trigger may be run this way, and only where this deployment can actually dispatch the integration: an integration whose code runs somewhere else is refused rather than silently accepted. A paused connection is refused. The run is queued the same way a cron tick is, so it takes the same per-connection lock and cannot overlap a run already in flight.",
+        "summary": "Run a connection now",
+        "description": "Dispatches the connection's sweep immediately instead of waiting for its next scheduled tick. Only connections whose manifest declares the `manual` trigger may be run this way, and only where this deployment can actually dispatch the integration: a manifest declaring `runs_on: client` is refused, because its code runs on a machine Marfa does not have, and so is one this deployment does not install. A paused connection is refused. The run is queued the same way a cron tick is, so it takes the same per-connection lock and cannot overlap a run already in flight.",
         "security": [
           {
             "bearerAuth": []
@@ -32413,7 +32663,7 @@
             }
           },
           "400": {
-            "description": "Not an integration connection, revoked, paused, the manifest does not declare `manual`, or this deployment does not run the integration.",
+            "description": "Connection kind is not `integration`, revoked, paused, the manifest declares `runs_on: client` or no `manual` trigger, or this deployment does not install it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32525,7 +32775,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33131,7 +33381,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33318,7 +33568,7 @@
           "Connections"
         ],
         "summary": "Move a connection to a newer version of its integration",
-        "description": "Re-binds the connection to a newer registered version of the same integration, keeping its cursor state, and revokes its runtime credentials so the next mint projects permissions from the manifest it now resolves. Refuses with 403 when the newer manifest would grant more than the connection was installed with, naming exactly what is new: that move needs a space admin's approval through the install consent screen. Returns 400 when the connection already resolves the newest registered version, or when its stored settings do not satisfy the new manifest.",
+        "description": "Re-binds the connection to a newer registered version of the same integration, keeping its cursor state, and revokes its runtime credentials so the next mint projects permissions from the manifest it now resolves. Refuses with 403 when the newer manifest would grant more than the connection was installed with, naming exactly what is new: that move needs approval through the install consent screen. Returns 400 when the connection already resolves the newest registered version, or when its stored settings do not satisfy the new manifest.",
         "security": [
           {
             "bearerAuth": []
@@ -33417,7 +33667,7 @@
             }
           },
           "400": {
-            "description": "Not an integration connection, revoked, already current, carrying no integration reference, or its settings do not satisfy the newer manifest.",
+            "description": "Connection kind is not `integration`, revoked, already current, carrying no integration reference, or its settings do not satisfy the newer manifest.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33530,7 +33780,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin, or the newer manifest widens what the connection may do and needs consent.",
+            "description": "Caller does not hold `space.connections`, or the newer manifest widens what the connection may do and needs consent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33901,7 +34151,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34152,7 +34402,7 @@
             }
           },
           "400": {
-            "description": "A malformed body, or a connection that is not an integration, is revoked, carries no integration reference, or whose settings do not satisfy the newer manifest. A connection found to be already current before the move starts answers 409; one that another caller moves first, while this one waits for the connection's lock, answers 400 because the approved version is no longer ahead of it.",
+            "description": "A malformed body, or a connection whose kind is not `integration`, is revoked, carries no integration reference, or whose settings do not satisfy the newer manifest. A connection found to be already current before the move starts answers 409; one that another caller moves first, while this one waits for the connection's lock, answers 400 because the approved version is no longer ahead of it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34265,7 +34515,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin.",
+            "description": "Caller does not hold `space.connections`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35237,7 +35487,7 @@
             }
           },
           "403": {
-            "description": "`forbidden`: the credential is not a space admin. `scoped_credential_not_permitted`: it is, but its reach is narrower than the space — an OAuth token held to the scopes a user granted an app. A subscription is space-level and carries no credential, so a delivery cannot be narrowed to a grant; only a credential covering the whole space may register or re-point one.",
+            "description": "`forbidden`: the credential does not hold `space.webhooks`. `scoped_credential_not_permitted`: it does, but its content read is narrower than the space. A subscription is space-level and carries no credential of its own, so a delivery cannot be narrowed to what its creator could read; only a credential that can read the whole space may register or re-point one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35507,7 +35757,7 @@
             }
           },
           "403": {
-            "description": "The credential is not a space admin. Reading a space's webhook configuration is a space-admin operation like registering one.",
+            "description": "The credential does not hold `space.webhooks`. Reading a space's webhook configuration takes the same permission as registering one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35779,7 +36029,7 @@
             }
           },
           "403": {
-            "description": "The credential is not a space admin. Reading a space's webhook configuration is a space-admin operation like registering one.",
+            "description": "The credential does not hold `space.webhooks`. Reading a space's webhook configuration takes the same permission as registering one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36203,7 +36453,7 @@
             }
           },
           "403": {
-            "description": "`forbidden`: the credential is not a space admin. `scoped_credential_not_permitted`: it is, but its reach is narrower than the space — an OAuth token held to the scopes a user granted an app. A subscription is space-level and carries no credential, so a delivery cannot be narrowed to a grant; only a credential covering the whole space may register or re-point one.",
+            "description": "`forbidden`: the credential does not hold `space.webhooks`. `scoped_credential_not_permitted`: it does, but its content read is narrower than the space. A subscription is space-level and carries no credential of its own, so a delivery cannot be narrowed to what its creator could read; only a credential that can read the whole space may register or re-point one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36502,7 +36752,7 @@
             }
           },
           "403": {
-            "description": "`forbidden`: the credential is not a space admin. `scoped_credential_not_permitted`: it is, but its reach is narrower than the space — an OAuth token held to the scopes a user granted an app. A subscription is space-level and carries no credential, so a delivery cannot be narrowed to a grant; only a credential covering the whole space may create, re-point or destroy one.",
+            "description": "`forbidden`: the credential does not hold `space.webhooks`. `scoped_credential_not_permitted`: it does, but its content read is narrower than the space. A subscription is space-level and carries no credential of its own, so a delivery cannot be narrowed to what its creator could read; only a credential that can read the whole space may create, re-point or destroy one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36854,7 +37104,7 @@
             }
           },
           "403": {
-            "description": "The credential is not a space admin. Reading a space's webhook configuration is a space-admin operation like registering one.",
+            "description": "The credential does not hold `space.webhooks`. Reading a space's webhook configuration takes the same permission as registering one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37043,7 +37293,7 @@
           "Audit"
         ],
         "summary": "List audit log entries",
-        "description": "Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads — item/edge reads, SSE, and search are not logged. Admin or space_admin: a space-scoped caller sees only its own space's entries, a platform admin sees every entry.",
+        "description": "Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads — item/edge reads, SSE, and search are not logged. Requires `space.audit_read`: a space-bound caller sees only its own space's entries, a caller with no space binding sees every entry.",
         "security": [
           {
             "bearerAuth": []
@@ -37273,7 +37523,7 @@
             }
           },
           "403": {
-            "description": "Caller is not an admin or space_admin",
+            "description": "Caller does not hold `space.audit_read`",
             "content": {
               "application/json": {
                 "schema": {
@@ -37406,7 +37656,7 @@
           "Admin"
         ],
         "summary": "Create a space",
-        "description": "Creates an empty space and returns it. Platform-admin only. Pair with `POST /admin/spaces/{id}/keys` to issue a credential scoped to it.\n\nEvery other operator verb on a space already existed, so before this a space could only come into being through a hosted sign-up. That left an operator unable to provision a space for someone, and left anything that needs a space-scoped credential — a conformance suite, a test harness, a self-hoster seeding an instance — with no supported path to one.",
+        "description": "Creates an empty space and returns it. Takes the operator key. Pair with `POST /admin/spaces/{id}/keys` to issue a credential scoped to it.\n\nEvery other operator verb on a space already existed, so before this a space could only come into being through a hosted sign-up. That left an operator unable to provision a space for someone, and left anything that needs a space-scoped credential — a conformance suite, a test harness, a self-hoster seeding an instance — with no supported path to one.",
         "security": [
           {
             "bearerAuth": []
@@ -37781,7 +38031,7 @@
           "Admin"
         ],
         "summary": "Create a space-bound API key",
-        "description": "Creates an API key bound to the specified space. Platform-admin only. The plaintext key is returned only in this response.",
+        "description": "Creates an API key bound to the specified space. Takes the operator key. The plaintext key is returned only in this response.",
         "security": [
           {
             "bearerAuth": []
@@ -37814,13 +38064,24 @@
                     "minLength": 1,
                     "maxLength": 200
                   },
-                  "role": {
-                    "type": "string",
-                    "enum": [
-                      "instance_admin",
-                      "space_admin",
-                      "member"
-                    ]
+                  "space_permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "space.webhooks",
+                        "space.connections",
+                        "space.schema",
+                        "space.usage",
+                        "space.settings",
+                        "space.audit_read",
+                        "space.item_purge",
+                        "space.upstream_access",
+                        "space.credentials",
+                        "space.keys",
+                        "space.app_grants"
+                      ]
+                    }
                   },
                   "default_tier": {
                     "type": "string",
@@ -37869,6 +38130,16 @@
                         "write"
                       ]
                     }
+                  },
+                  "profile_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -37899,13 +38170,27 @@
                     "source": {
                       "type": "string"
                     },
-                    "role": {
-                      "type": "string",
-                      "enum": [
-                        "instance_admin",
-                        "space_admin",
-                        "member"
-                      ]
+                    "space_permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "space.webhooks",
+                          "space.connections",
+                          "space.schema",
+                          "space.usage",
+                          "space.settings",
+                          "space.audit_read",
+                          "space.item_purge",
+                          "space.upstream_access",
+                          "space.credentials",
+                          "space.keys",
+                          "space.app_grants"
+                        ]
+                      }
+                    },
+                    "oauth_client_id": {
+                      "type": "string"
                     },
                     "default_tier": {
                       "type": "string",
@@ -37914,7 +38199,7 @@
                         "feed"
                       ]
                     },
-                    "is_platform": {
+                    "is_operator": {
                       "type": "boolean"
                     },
                     "type_permissions": {
@@ -37958,6 +38243,16 @@
                         ]
                       }
                     },
+                    "profile_permissions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write"
+                        ]
+                      }
+                    },
                     "created_at": {
                       "type": "string"
                     },
@@ -37971,9 +38266,8 @@
                     "key",
                     "label",
                     "source",
-                    "role",
                     "default_tier",
-                    "is_platform",
+                    "is_operator",
                     "type_permissions",
                     "created_at",
                     "last_used_at"
@@ -38666,6 +38960,389 @@
         }
       }
     },
+    "/admin/accounts": {
+      "post": {
+        "operationId": "adminCreateAccount",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Create an account",
+        "description": "Creates an email + password account, already verified, with its own space, which it solely owns — the same shape a hosted sign-up produces. Takes the operator key. Answers with the account id and the space id; the password is never returned. The address must not already have an account, and the password must fall within the length the sign-in path itself enforces.\n\nThis is the only way to obtain an account where hosted sign-up is closed, which is the default: `POST /auth/sign-up/email` refuses there, and a space with an API key is not an account and cannot hold a browser session. The password goes through Better Auth's own hasher, so the account signs in immediately with no verification email. It is deliberate that the address arrives proven rather than proving itself, which makes this route unsuitable for handing an account to the person who owns the mailbox.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "The address. Lower-cased before it is stored."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The password the account signs in with. Refused when it falls outside the length the sign-in path itself enforces."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "Display name. Defaults to the address's local part, which is also what the space and the handle are derived from."
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The account's auth user id — the same id `POST /admin/accounts/{id}/delete` takes."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The address, lower-cased."
+                    },
+                    "space_id": {
+                      "type": "string",
+                      "description": "The space provisioned for this account."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "space_id"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              }
+            }
+          },
+          "400": {
+            "description": "The address is not a well-formed one, the password falls outside the length the sign-in path enforces, or this deployment has no user accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "409": {
+            "description": "An account already exists for that address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "conflict"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "429": {
+            "description": "Refused for rate or quota. `rate_limited` is the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. `quota_exceeded` is a space quota on a stored resource, carrying `details.resource`, `details.limit` and `details.current`; it is not a window, so it carries no `Retry-After` and waiting does not clear it. The limiter is only mounted on a deployment that enables rate limiting; the quota refusal is always reachable on the routes that reserve one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "rate_limited",
+                            "quota_exceeded"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "properties": {
+                            "resource": {
+                              "type": "string"
+                            },
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "current": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/accounts/{id}/delete": {
       "post": {
         "operationId": "adminDeleteAccount",
@@ -39041,6 +39718,396 @@
         }
       }
     },
+    "/admin/oauth-clients/{client_id}/delete": {
+      "post": {
+        "operationId": "adminDeleteOAuthClient",
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Remove an OAuth client and every grant made to it",
+        "description": "Operator-initiated removal of a dynamically registered OAuth client. Runs the grant cascade for every user who ever authorized it (access and refresh tokens, stored consent, outstanding codes), removes each grant's record from the space it belongs to, then deletes the client row. Idempotent: a client whose row is already gone still has its grants swept, which is how a client deleted by hand is repaired. The body's `confirm` must be the client id, spelled exactly; the mismatch refusal is the fat-finger gate on an action with no undo.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The client's `client_id`."
+            },
+            "required": true,
+            "description": "The client's `client_id`.",
+            "name": "client_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The client id, exactly. Refused otherwise."
+                  }
+                },
+                "required": [
+                  "confirm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The client and everything it held are gone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "client_row_deleted": {
+                      "type": "boolean",
+                      "description": "False when no `auth_oauth_client` row existed, which is the orphan-repair case."
+                    },
+                    "grants_removed": {
+                      "type": "integer",
+                      "description": "Grant records removed, across every space, each with its tokens, consent and codes."
+                    },
+                    "stray_records_deleted": {
+                      "type": "integer",
+                      "description": "Tokens, consent rows and device codes for the client that no grant record named: what a client deleted by hand leaves behind."
+                    }
+                  },
+                  "required": [
+                    "deleted",
+                    "client_row_deleted",
+                    "grants_removed",
+                    "stray_records_deleted"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              }
+            }
+          },
+          "400": {
+            "description": "`confirm` does not name this client id, or this deployment has no OAuth clients.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "validation_error"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "unauthorized"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "forbidden"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing carries this client id: no client row, no grant record, no token, consent or code. Nothing was deleted and no audit row is written, so a mistyped id is not recorded as a removal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "not_found"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "429": {
+            "description": "Refused for rate or quota. `rate_limited` is the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. `quota_exceeded` is a space quota on a stored resource, carrying `details.resource`, `details.limit` and `details.current`; it is not a window, so it carries no `Retry-After` and waiting does not clear it. The limiter is only mounted on a deployment that enables rate limiting; the quota refusal is always reachable on the routes that reserve one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "rate_limited",
+                            "quota_exceeded"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "properties": {
+                            "resource": {
+                              "type": "string"
+                            },
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "current": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            }
+          }
+        }
+      }
+    },
     "/events": {
       "get": {
         "operationId": "streamEvents",
@@ -39224,7 +40291,7 @@
         }
       }
     },
-    "/oauth2/register": {
+    "/auth/oauth2/register": {
       "post": {
         "operationId": "registerOAuthClient",
         "tags": [
@@ -39312,10 +40379,109 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              }
             }
           },
           "400": {
-            "description": "An RFC 7591 error object (invalid_client_metadata or invalid_redirect_uri)."
+            "description": "An RFC 7591 error object (invalid_client_metadata or invalid_redirect_uri).",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              }
+            }
+          },
+          "429": {
+            "description": "Refused for rate or quota. `rate_limited` is the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. `quota_exceeded` is a space quota on a stored resource, carrying `details.resource`, `details.limit` and `details.current`; it is not a window, so it carries no `Retry-After` and waiting does not clear it. The limiter is only mounted on a deployment that enables rate limiting; the quota refusal is always reachable on the routes that reserve one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "rate_limited",
+                            "quota_exceeded"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "object",
+                          "properties": {
+                            "resource": {
+                              "type": "string"
+                            },
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "current": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/X-Request-ID"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Error-Code": {
+                "$ref": "#/components/headers/X-Error-Code"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              }
+            }
           }
         }
       }
@@ -39644,7 +40810,7 @@
           "Auth"
         ],
         "summary": "Update the current user's handle",
-        "description": "Claims or changes the handle on the authenticated user. The handle is the user's public identifier — the same string that namespaces published types as `<handle>.<type>`. Lowercase alphanumeric and hyphens, 3–32 characters, no leading/trailing hyphens, no consecutive hyphens.\n\nReserved roots (`core`, `system`, `app`, `user`, `marfa`, `capability`) are rejected with `400 handle_reserved` — they are the type grammar's own first segments, and a handle is never a route. Case-insensitive collision with another user returns `409 conflict`. See [Handles and publishers](/guides/identity/handles-and-publishers).\n\n**Auth mode:** served only by deployments running `AUTH_MODE=hosted`. Instances in any other auth mode do not expose this endpoint.",
+        "description": "Claims or changes the handle on the authenticated user. The handle is the user's public identifier — the same string that namespaces published types as `<handle>.<type>`. Lowercase alphanumeric and hyphens, 3–32 characters, no leading/trailing hyphens, no consecutive hyphens.\n\nReserved roots (`core`, `system`, `app`, `user`, `marfa`, `space`) are rejected with `400 handle_reserved` — they are the type grammar's own first segments, and a handle is never a route. Case-insensitive collision with another user returns `409 conflict`. See [Handles and publishers](/guides/identity/handles-and-publishers).\n\n**Auth mode:** served only by deployments running `AUTH_MODE=hosted`. Instances in any other auth mode do not expose this endpoint.",
         "security": [
           {
             "bearerAuth": []

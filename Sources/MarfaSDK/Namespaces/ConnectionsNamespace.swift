@@ -180,7 +180,7 @@ public struct ConnectionsNamespace: Sendable {
     ///
     /// Defaults to every subscriber in the caller's space; pass
     /// ``PreviewEventRequest/connectionId`` to filter to one.
-    /// Space-admin only.
+    /// Needs `space.connections`.
     public func previewEvent(_ input: PreviewEventRequest) async throws -> PreviewEventResult {
         try ensureRemote("connections.previewEvent")
         return try await transport.request(

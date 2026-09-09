@@ -1,14 +1,23 @@
 {
   "created_at": "2026-04-14T10:00:00Z",
   "default_tier": "library",
-  "edge_permissions": { "parent": "write" },
-  "extension_permissions": { "marfa.source": "read" },
+  "edge_permissions": {
+    "parent": "write"
+  },
+  "extension_permissions": {
+    "marfa.source": "read"
+  },
   "id": "key_01NEW",
-  "is_platform": false,
+  "is_operator": false,
   "key": "marfa_k1_abcdef0123456789",
   "label": "New integration key",
   "last_used_at": "2026-04-14T10:00:00Z",
-  "role": "instance_admin",
   "source": "cli",
-  "type_permissions": { "core.note": "write" }
+  "space_permissions": [
+    "space.keys",
+    "space.webhooks"
+  ],
+  "type_permissions": {
+    "core.note": "write"
+  }
 }

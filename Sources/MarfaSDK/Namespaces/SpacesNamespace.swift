@@ -1,15 +1,15 @@
 import Foundation
 
 /// Space-scoped configuration and quotas. Mirrors the TS SDK's
-/// `client.spaces.*` surface — the SDK exposes one spaces surface; the
-/// server gates each method by role (space-admin vs platform-admin).
+/// `client.spaces.*` surface — the SDK exposes one spaces surface and the
+/// server gates each method on the permission it needs.
 ///
 /// Routes:
-/// - `GET /spaces/me/config` — space-admin (or platform-admin)
-/// - `PUT /spaces/me/config` — space-admin (or platform-admin)
-/// - `GET /spaces/me/quotas` — space-admin (or platform-admin)
-/// - `GET /spaces/{id}/quotas` — platform-admin only
-/// - `PUT /spaces/{id}/quotas` — platform-admin only
+/// - `GET /spaces/me/config` — `space.settings`
+/// - `PUT /spaces/me/config` — `space.settings`
+/// - `GET /spaces/me/quotas` — `space.usage`
+/// - `GET /spaces/{id}/quotas` — the operator key only
+/// - `PUT /spaces/{id}/quotas` — the operator key only
 ///
 /// A client created via ``MarfaClient/local(path:)`` has no live server;
 /// every method here throws ``LocalModeUnsupportedError``.
@@ -28,7 +28,7 @@ public struct SpacesNamespace: Sendable {
 
     /// Reads the calling space's configuration. Returns an empty
     /// ``SpaceConfig`` value when no overrides have been written.
-    /// Space-admin or platform-admin.
+    /// Needs `space.settings`.
     public func getConfig() async throws -> SpaceConfig {
         try ensureRemote("spaces.getConfig")
         return try await transport.request(
@@ -41,7 +41,7 @@ public struct SpacesNamespace: Sendable {
 
     /// Replaces the calling space's configuration. PUT semantics — every
     /// field absent from ``config`` reverts to the env default.
-    /// Space-admin or platform-admin.
+    /// Needs `space.settings`.
     @discardableResult
     public func setConfig(_ config: SpaceConfig) async throws -> SpaceConfig {
         try ensureRemote("spaces.setConfig")
@@ -53,9 +53,9 @@ public struct SpacesNamespace: Sendable {
         )
     }
 
-    /// Per-space quota read/write. Space-admin can read their own
-    /// row via ``SpaceQuotasNamespace/getOwn()``; reads and writes
-    /// targeting a specific space by id require platform-admin.
+    /// Per-space quota read and write. A credential holding `space.usage`
+    /// reads its own row via ``SpaceQuotasNamespace/getOwn()``; naming a
+    /// space by id is cross-space authority and takes the operator key.
     public var quotas: SpaceQuotasNamespace {
         SpaceQuotasNamespace(transport: transport, isLocalMode: isLocalMode)
     }
@@ -79,11 +79,10 @@ public struct SpaceQuotasNamespace: Sendable {
     /// Reads the calling space's quota row. The server resolves the
     /// space from the bearer; the SDK never sends the space id on this
     /// path. Returns a row of `nil` fields when no override is
-    /// configured. Space-admin (or platform-admin with a
-    /// space-bound key).
+    /// configured. Needs `space.usage`.
     ///
-    /// Platform-admin keys with no `space_id` receive `400` from the
-    /// server — use ``getById(_:)`` with an explicit id instead.
+    /// The operator key holds no space, so it receives `400` here — use
+    /// ``getById(_:)`` with an explicit id instead.
     public func getOwn() async throws -> SpaceQuota {
         try ensureRemote("spaces.quotas.getOwn")
         return try await transport.request(
@@ -94,7 +93,7 @@ public struct SpaceQuotasNamespace: Sendable {
         )
     }
 
-    /// Reads a specific space's quota row. Platform-admin only.
+    /// Reads a specific space's quota row. The operator key only.
     public func getById(_ spaceId: String) async throws -> SpaceQuota {
         try ensureRemote("spaces.quotas.getById")
         return try await transport.request(
@@ -108,7 +107,7 @@ public struct SpaceQuotasNamespace: Sendable {
     /// Sets per-space quota overrides. Each field is independent — a
     /// supplied non-`nil` value overrides the env default; an explicit
     /// `nil` resets that field to the env default. Field omission
-    /// leaves the existing override untouched. Platform-admin only.
+    /// leaves the existing override untouched. The operator key only.
     @discardableResult
     public func set(_ spaceId: String, _ input: SpaceQuotaInput) async throws -> SpaceQuota {
         try ensureRemote("spaces.quotas.set")

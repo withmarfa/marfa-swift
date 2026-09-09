@@ -358,7 +358,7 @@ private struct ParkAnnouncement: Sendable {
 private struct ScratchKeyInput: Codable, Sendable {
     let label: String
     let source: String
-    let role: String
+    let space_permissions: [String]
     let type_permissions: [String: String]
     let default_tier: String
 }
@@ -1381,7 +1381,10 @@ struct LiveSyncedClientTests {
                 body: ScratchKeyInput(
                     label: "\(label)-minter",
                     source: "\(label)-minter",
-                    role: "space_admin",
+                    // The minter has to hold `space.keys` to mint at all, and
+                    // whatever it hands down is clamped to what it holds — so
+                    // a narrow minter cannot be used to prove a narrow mint.
+                    space_permissions: ["space.keys"],
                     type_permissions: ["*": "write"],
                     default_tier: "library"
                 ),
@@ -1395,12 +1398,15 @@ struct LiveSyncedClientTests {
                 CreateKeyInput(
                     label: "\(label)-minted",
                     source: "\(label)-minted",
-                    role: .member,
+                    // Named empty rather than omitted. Omitting takes the
+                    // creator's whole set, so a key meant to hold nothing
+                    // administrative has to say so.
+                    spacePermissions: [],
                     typePermissions: ["core.note": .write]
                 )
             )
             fixture.track(scratchKey: made.id)
-            #expect(made.role == .member)
+            #expect(made.spacePermissions?.isEmpty ?? true)
             #expect(made.source == "\(label)-minted")
             #expect(!made.key.isEmpty)
 
@@ -1468,24 +1474,31 @@ struct LiveSyncedClientTests {
             // cannot see into this space at all, so the read-back that makes
             // the control mean something has to come from inside it.
             // The device writes two notes and nothing else; only the warden
-            // has to revoke. `space_admin` on both was reaching for the role
-            // that would certainly work rather than the one the job needs.
-            func mintKey(_ suffix: String, role: String) async throws -> CreatedKey {
+            // has to revoke. Naming what each needs rather than handing both
+            // the wider set is the whole point of the model: a permission is
+            // held or it is not, and there is no rank to reach for instead.
+            func mintKey(
+                _ suffix: String,
+                spacePermissions: [String]
+            ) async throws -> CreatedKey {
                 try await admin.transport.request(
                     method: .post,
                     path: "/admin/spaces/\(space.id)/keys",
                     body: ScratchKeyInput(
                         label: "\(label)-\(suffix)",
                         source: "\(label)-\(suffix)",
-                        role: role,
+                        space_permissions: spacePermissions,
                         type_permissions: ["*": "write"],
                         default_tier: "library"
                     ),
                     query: nil
                 )
             }
-            let scratch = try await mintKey("device", role: "member")
-            let wardenKey = try await mintKey("warden", role: "space_admin")
+            let scratch = try await mintKey("device", spacePermissions: [])
+            let wardenKey = try await mintKey(
+                "warden",
+                spacePermissions: ["space.keys"]
+            )
             // Tracked before anything else can throw. Deleting the space would
             // take them anyway; this is the belt for a run that dies before the
             // space id is usable.

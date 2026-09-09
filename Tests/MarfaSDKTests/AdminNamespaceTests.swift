@@ -110,8 +110,8 @@ struct AdminNamespaceTests {
                 id: "k-1",
                 label: "test-key",
                 source: "test",
-                role: "member",
-                isPlatform: false,
+                spacePermissions: [],
+                isOperator: false,
                 createdAt: "2026-05-01T00:00:00Z",
                 lastUsedAt: nil
             )

@@ -5,6 +5,76 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [19.0.0] — 2026-09-09
+
+### Breaking
+
+- **A key carries a permission set, not a role.** `CreateKeyInput.role` is gone
+  and `CreateKeyInput.spacePermissions` replaces it; `KeyRole` is gone and
+  `SpacePermission` replaces it, with the eleven `space.*` literals as its
+  cases. `ApiKey` and `CreatedKey` lose `role` and gain `spacePermissions`, and
+  `SpaceApiKeySummary` follows.
+
+  Every credential — an API key or an OAuth sign-in — now carries one set: its
+  content permission maps plus the space permissions it was named. No door
+  admits on rank, and what a mint may hand down is bounded by what its creator
+  holds.
+
+  ```swift
+  // Before
+  try await client.keys.create(
+      CreateKeyInput(label: "importer", source: "cli", role: .member)
+  )
+
+  // Now — named empty is a key with no administrative reach, which is what
+  // most keys want. Omitting takes the creator's whole set instead.
+  try await client.keys.create(
+      CreateKeyInput(label: "importer", source: "cli", spacePermissions: [])
+  )
+  ```
+
+- **`isPlatform` is `isOperator`, on `ApiKey`, `CreatedKey` and
+  `SpaceApiKeySummary`.** Running the instance is the operator key: it holds no
+  space and no permissions, because it is fenced outside the permission model
+  rather than sitting at the top of it. A space's key listing can never contain
+  one.
+
+- **`ApiKey` and `CreatedKey` gain `oauthClientId`.** A key an app minted
+  records which app minted it, so a keys page can group it there and revoking
+  the app can offer to revoke the key.
+
+### Added
+
+- `SpacePermission`, the closed set of eleven administrative surfaces a
+  credential may hold over a space. **One type, not three**: the generated
+  `ApiKey.spacePermissions` and `CreatedKey.spacePermissions` are `[SpacePermission]`,
+  so a value read off a key compares directly against one passed to
+  `CreateKeyInput`.
+- `CreateKeyInput.profilePermissions` and `ProfilePermission`. The server has
+  accepted a `profile_permissions` map on the key-mutation routes since this
+  release's spec; without the field a caller could not set it.
+
+### Fixed
+
+- **The wire generator emitted code that does not parse for any enum whose
+  values contain a dot.** `space.app_grants` produced `case space.appGrants`,
+  which Swift reads as two declarations on one line, so a single dotted value
+  took the whole generated file down. The dot is a name separator like `_` and
+  `-` now, and a case name that collides with a keyword is backticked. The
+  space permissions are the first dotted enum on the wire and will not be the
+  last.
+- **An `enumOverride` on an array field was silently ignored.** The override
+  handled a bare enum and a map of them and fell through for an array, so a
+  field routed to a hand-written type got a generated sibling instead — two
+  unrelated enums carrying the same raw values under different case names.
+  That is how the space permissions first arrived as three types.
+- **The generator now refuses a case name Swift would reject**, rather than
+  writing a file the compiler complains about at a line that does not name the
+  value at fault. A value made only of punctuation, one starting with a digit,
+  and two values collapsing to one name are each a hard stop naming the value
+  and pointing at the override that fixes it. The spec already carries a `"*"`
+  in one enum, reachable the moment somebody routes that field through here.
+
 ## [18.0.0] — 2026-09-06
 
 ### Breaking

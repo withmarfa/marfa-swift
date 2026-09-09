@@ -94,14 +94,15 @@ ApiKey.edgePermissions	property	let edgePermissions: [String : EdgePermission]?
 ApiKey.expiresAt	property	let expiresAt: String?
 ApiKey.extensionPermissions	property	let extensionPermissions: [String : ExtensionPermission]?
 ApiKey.id	property	let id: String
-ApiKey.init(createdAt:defaultTier:edgePermissions:expiresAt:extensionPermissions:id:isPlatform:label:lastUsedAt:metadataPermissions:role:source:typePermissions:)	init	init(createdAt: String, defaultTier: Tier, edgePermissions: [String : EdgePermission]? = nil, expiresAt: String? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, id: String, isPlatform: Bool, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : MetadataPermission]? = nil, role: KeyRole, source: String, typePermissions: [String : TypePermission])
+ApiKey.init(createdAt:defaultTier:edgePermissions:expiresAt:extensionPermissions:id:isOperator:label:lastUsedAt:metadataPermissions:oauthClientId:source:spacePermissions:typePermissions:)	init	init(createdAt: String, defaultTier: Tier, edgePermissions: [String : EdgePermission]? = nil, expiresAt: String? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, id: String, isOperator: Bool, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : MetadataPermission]? = nil, oauthClientId: String? = nil, source: String, spacePermissions: [SpacePermission]? = nil, typePermissions: [String : TypePermission])
 ApiKey.init(from:)	init	init(from decoder: any Decoder) throws
-ApiKey.isPlatform	property	let isPlatform: Bool
+ApiKey.isOperator	property	let isOperator: Bool
 ApiKey.label	property	let label: String
 ApiKey.lastUsedAt	property	let lastUsedAt: String?
 ApiKey.metadataPermissions	property	let metadataPermissions: [String : MetadataPermission]?
-ApiKey.role	property	let role: KeyRole
+ApiKey.oauthClientId	property	let oauthClientId: String?
 ApiKey.source	property	let source: String
+ApiKey.spacePermissions	property	let spacePermissions: [SpacePermission]?
 ApiKey.typePermissions	property	let typePermissions: [String : TypePermission]
 AuditEntry	struct	struct AuditEntry
 AuditEntry.action	property	let action: String
@@ -1291,11 +1292,12 @@ CreateKeyInput	struct	struct CreateKeyInput
 CreateKeyInput.edgePermissions	property	var edgePermissions: [String : EdgePermission]?
 CreateKeyInput.extensionPermissions	property	var extensionPermissions: [String : ExtensionPermission]?
 CreateKeyInput.init(from:)	init	init(from decoder: any Decoder) throws
-CreateKeyInput.init(label:source:role:typePermissions:extensionPermissions:edgePermissions:metadataPermissions:)	init	init(label: String, source: String, role: KeyRole? = nil, typePermissions: [String : TypePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, edgePermissions: [String : EdgePermission]? = nil, metadataPermissions: [String : MetadataPermission]? = nil)
+CreateKeyInput.init(label:source:spacePermissions:typePermissions:extensionPermissions:edgePermissions:metadataPermissions:profilePermissions:)	init	init(label: String, source: String, spacePermissions: [SpacePermission]? = nil, typePermissions: [String : TypePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, edgePermissions: [String : EdgePermission]? = nil, metadataPermissions: [String : MetadataPermission]? = nil, profilePermissions: [String : ProfilePermission]? = nil)
 CreateKeyInput.label	property	var label: String
 CreateKeyInput.metadataPermissions	property	var metadataPermissions: [String : MetadataPermission]?
-CreateKeyInput.role	property	var role: KeyRole?
+CreateKeyInput.profilePermissions	property	var profilePermissions: [String : ProfilePermission]?
 CreateKeyInput.source	property	var source: String
+CreateKeyInput.spacePermissions	property	var spacePermissions: [SpacePermission]?
 CreateKeyInput.typePermissions	property	var typePermissions: [String : TypePermission]?
 CreateOAuthProviderCredentialInput	struct	struct CreateOAuthProviderCredentialInput
 CreateOAuthProviderCredentialInput.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
@@ -1343,16 +1345,127 @@ CreatedKey.defaultTier	property	let defaultTier: Tier
 CreatedKey.edgePermissions	property	let edgePermissions: [String : EdgePermission]?
 CreatedKey.extensionPermissions	property	let extensionPermissions: [String : ExtensionPermission]?
 CreatedKey.id	property	let id: String
-CreatedKey.init(createdAt:defaultTier:edgePermissions:extensionPermissions:id:isPlatform:key:label:lastUsedAt:metadataPermissions:role:source:typePermissions:)	init	init(createdAt: String, defaultTier: Tier, edgePermissions: [String : EdgePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, id: String, isPlatform: Bool, key: String, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : MetadataPermission]? = nil, role: KeyRole, source: String, typePermissions: [String : TypePermission])
+CreatedKey.init(createdAt:defaultTier:edgePermissions:extensionPermissions:id:isOperator:key:label:lastUsedAt:metadataPermissions:oauthClientId:profilePermissions:source:space:spaceKey:spacePermissions:typePermissions:)	init	init(createdAt: String, defaultTier: Tier, edgePermissions: [String : EdgePermission]? = nil, extensionPermissions: [String : ExtensionPermission]? = nil, id: String, isOperator: Bool, key: String, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : MetadataPermission]? = nil, oauthClientId: String? = nil, profilePermissions: [String : CreatedKeyProfilePermissionsvalue]? = nil, source: String, space: CreatedKeySpace? = nil, spaceKey: CreatedKeySpaceKey? = nil, spacePermissions: [SpacePermission]? = nil, typePermissions: [String : TypePermission])
 CreatedKey.init(from:)	init	init(from decoder: any Decoder) throws
-CreatedKey.isPlatform	property	let isPlatform: Bool
+CreatedKey.isOperator	property	let isOperator: Bool
 CreatedKey.key	property	let key: String
 CreatedKey.label	property	let label: String
 CreatedKey.lastUsedAt	property	let lastUsedAt: String?
 CreatedKey.metadataPermissions	property	let metadataPermissions: [String : MetadataPermission]?
-CreatedKey.role	property	let role: KeyRole
+CreatedKey.oauthClientId	property	let oauthClientId: String?
+CreatedKey.profilePermissions	property	let profilePermissions: [String : CreatedKeyProfilePermissionsvalue]?
 CreatedKey.source	property	let source: String
+CreatedKey.space	property	let space: CreatedKeySpace?
+CreatedKey.spaceKey	property	let spaceKey: CreatedKeySpaceKey?
+CreatedKey.spacePermissions	property	let spacePermissions: [SpacePermission]?
 CreatedKey.typePermissions	property	let typePermissions: [String : TypePermission]
+CreatedKeyProfilePermissionsvalue	enum	enum CreatedKeyProfilePermissionsvalue
+CreatedKeyProfilePermissionsvalue.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeyProfilePermissionsvalue.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeyProfilePermissionsvalue.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeyProfilePermissionsvalue.hashValue	property	var hashValue: Int { get }
+CreatedKeyProfilePermissionsvalue.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeyProfilePermissionsvalue.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeyProfilePermissionsvalue.read	enum.case	case read
+CreatedKeyProfilePermissionsvalue.write	enum.case	case write
+CreatedKeySpace	struct	struct CreatedKeySpace
+CreatedKeySpace.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpace.id	property	let id: String
+CreatedKeySpace.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpace.init(id:name:)	init	init(id: String, name: String? = nil)
+CreatedKeySpace.name	property	let name: String?
+CreatedKeySpaceKey	struct	struct CreatedKeySpaceKey
+CreatedKeySpaceKey.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKey.createdAt	property	let createdAt: String
+CreatedKeySpaceKey.defaultTier	property	let defaultTier: CreatedKeySpaceKeyDefaultTier
+CreatedKeySpaceKey.edgePermissions	property	let edgePermissions: [String : CreatedKeySpaceKeyEdgePermissionsvalue]?
+CreatedKeySpaceKey.extensionPermissions	property	let extensionPermissions: [String : CreatedKeySpaceKeyExtensionPermissionsvalue]?
+CreatedKeySpaceKey.id	property	let id: String
+CreatedKeySpaceKey.init(createdAt:defaultTier:edgePermissions:extensionPermissions:id:isOperator:key:label:lastUsedAt:metadataPermissions:oauthClientId:profilePermissions:source:spacePermissions:typePermissions:)	init	init(createdAt: String, defaultTier: CreatedKeySpaceKeyDefaultTier, edgePermissions: [String : CreatedKeySpaceKeyEdgePermissionsvalue]? = nil, extensionPermissions: [String : CreatedKeySpaceKeyExtensionPermissionsvalue]? = nil, id: String, isOperator: Bool, key: String, label: String, lastUsedAt: String? = nil, metadataPermissions: [String : CreatedKeySpaceKeyMetadataPermissionsvalue]? = nil, oauthClientId: String? = nil, profilePermissions: [String : CreatedKeySpaceKeyProfilePermissionsvalue]? = nil, source: String, spacePermissions: [CreatedKeySpaceKeySpacePermissionsitem]? = nil, typePermissions: [String : CreatedKeySpaceKeyTypePermissionsvalue])
+CreatedKeySpaceKey.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKey.isOperator	property	let isOperator: Bool
+CreatedKeySpaceKey.key	property	let key: String
+CreatedKeySpaceKey.label	property	let label: String
+CreatedKeySpaceKey.lastUsedAt	property	let lastUsedAt: String?
+CreatedKeySpaceKey.metadataPermissions	property	let metadataPermissions: [String : CreatedKeySpaceKeyMetadataPermissionsvalue]?
+CreatedKeySpaceKey.oauthClientId	property	let oauthClientId: String?
+CreatedKeySpaceKey.profilePermissions	property	let profilePermissions: [String : CreatedKeySpaceKeyProfilePermissionsvalue]?
+CreatedKeySpaceKey.source	property	let source: String
+CreatedKeySpaceKey.spacePermissions	property	let spacePermissions: [CreatedKeySpaceKeySpacePermissionsitem]?
+CreatedKeySpaceKey.typePermissions	property	let typePermissions: [String : CreatedKeySpaceKeyTypePermissionsvalue]
+CreatedKeySpaceKeyDefaultTier	enum	enum CreatedKeySpaceKeyDefaultTier
+CreatedKeySpaceKeyDefaultTier.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeyDefaultTier.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeyDefaultTier.feed	enum.case	case feed
+CreatedKeySpaceKeyDefaultTier.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeyDefaultTier.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeyDefaultTier.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeyDefaultTier.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeyDefaultTier.library	enum.case	case library
+CreatedKeySpaceKeyEdgePermissionsvalue	enum	enum CreatedKeySpaceKeyEdgePermissionsvalue
+CreatedKeySpaceKeyEdgePermissionsvalue.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeyEdgePermissionsvalue.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeyEdgePermissionsvalue.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeyEdgePermissionsvalue.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeyEdgePermissionsvalue.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeyEdgePermissionsvalue.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeyEdgePermissionsvalue.read	enum.case	case read
+CreatedKeySpaceKeyEdgePermissionsvalue.write	enum.case	case write
+CreatedKeySpaceKeyExtensionPermissionsvalue	enum	enum CreatedKeySpaceKeyExtensionPermissionsvalue
+CreatedKeySpaceKeyExtensionPermissionsvalue.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeyExtensionPermissionsvalue.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeyExtensionPermissionsvalue.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeyExtensionPermissionsvalue.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeyExtensionPermissionsvalue.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeyExtensionPermissionsvalue.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeyExtensionPermissionsvalue.read	enum.case	case read
+CreatedKeySpaceKeyExtensionPermissionsvalue.write	enum.case	case write
+CreatedKeySpaceKeyMetadataPermissionsvalue	enum	enum CreatedKeySpaceKeyMetadataPermissionsvalue
+CreatedKeySpaceKeyMetadataPermissionsvalue.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeyMetadataPermissionsvalue.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeyMetadataPermissionsvalue.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeyMetadataPermissionsvalue.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeyMetadataPermissionsvalue.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeyMetadataPermissionsvalue.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeyMetadataPermissionsvalue.read	enum.case	case read
+CreatedKeySpaceKeyMetadataPermissionsvalue.write	enum.case	case write
+CreatedKeySpaceKeyProfilePermissionsvalue	enum	enum CreatedKeySpaceKeyProfilePermissionsvalue
+CreatedKeySpaceKeyProfilePermissionsvalue.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeyProfilePermissionsvalue.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeyProfilePermissionsvalue.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeyProfilePermissionsvalue.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeyProfilePermissionsvalue.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeyProfilePermissionsvalue.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeyProfilePermissionsvalue.read	enum.case	case read
+CreatedKeySpaceKeyProfilePermissionsvalue.write	enum.case	case write
+CreatedKeySpaceKeySpacePermissionsitem	enum	enum CreatedKeySpaceKeySpacePermissionsitem
+CreatedKeySpaceKeySpacePermissionsitem.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeySpacePermissionsitem.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeySpacePermissionsitem.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeySpacePermissionsitem.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeySpacePermissionsitem.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeySpacePermissionsitem.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeySpacePermissionsitem.spaceAppGrants	enum.case	case spaceAppGrants
+CreatedKeySpaceKeySpacePermissionsitem.spaceAuditRead	enum.case	case spaceAuditRead
+CreatedKeySpaceKeySpacePermissionsitem.spaceConnections	enum.case	case spaceConnections
+CreatedKeySpaceKeySpacePermissionsitem.spaceCredentials	enum.case	case spaceCredentials
+CreatedKeySpaceKeySpacePermissionsitem.spaceItemPurge	enum.case	case spaceItemPurge
+CreatedKeySpaceKeySpacePermissionsitem.spaceKeys	enum.case	case spaceKeys
+CreatedKeySpaceKeySpacePermissionsitem.spaceSchema	enum.case	case spaceSchema
+CreatedKeySpaceKeySpacePermissionsitem.spaceSettings	enum.case	case spaceSettings
+CreatedKeySpaceKeySpacePermissionsitem.spaceUpstreamAccess	enum.case	case spaceUpstreamAccess
+CreatedKeySpaceKeySpacePermissionsitem.spaceUsage	enum.case	case spaceUsage
+CreatedKeySpaceKeySpacePermissionsitem.spaceWebhooks	enum.case	case spaceWebhooks
+CreatedKeySpaceKeyTypePermissionsvalue	enum	enum CreatedKeySpaceKeyTypePermissionsvalue
+CreatedKeySpaceKeyTypePermissionsvalue.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+CreatedKeySpaceKeyTypePermissionsvalue.encode(to:)	method	func encode(to encoder: any Encoder) throws
+CreatedKeySpaceKeyTypePermissionsvalue.hash(into:)	method	func hash(into hasher: inout Hasher)
+CreatedKeySpaceKeyTypePermissionsvalue.hashValue	property	var hashValue: Int { get }
+CreatedKeySpaceKeyTypePermissionsvalue.init(from:)	init	init(from decoder: any Decoder) throws
+CreatedKeySpaceKeyTypePermissionsvalue.init(rawValue:)	init	init?(rawValue: String)
+CreatedKeySpaceKeyTypePermissionsvalue.none	enum.case	case none
+CreatedKeySpaceKeyTypePermissionsvalue.read	enum.case	case read
+CreatedKeySpaceKeyTypePermissionsvalue.write	enum.case	case write
 CreatedLeaseToken	struct	struct CreatedLeaseToken
 CreatedLeaseToken.capabilityId	property	let capabilityId: String
 CreatedLeaseToken.connectionId	property	let connectionId: String
@@ -1785,16 +1898,6 @@ JSONValue.string(_:)	enum.case	case string(String)
 JSONValue.stringValue	property	var stringValue: String? { get }
 JSONValue.toAny()	method	func toAny() -> Any?
 JSONValue.toDictionary(_:)	type.method	static func toDictionary(_ dict: [String : JSONValue]) -> [String : Any]
-KeyRole	enum	enum KeyRole
-KeyRole.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
-KeyRole.encode(to:)	method	func encode(to encoder: any Encoder) throws
-KeyRole.hash(into:)	method	func hash(into hasher: inout Hasher)
-KeyRole.hashValue	property	var hashValue: Int { get }
-KeyRole.init(from:)	init	init(from decoder: any Decoder) throws
-KeyRole.init(rawValue:)	init	init?(rawValue: String)
-KeyRole.instanceAdmin	enum.case	case instanceAdmin
-KeyRole.member	enum.case	case member
-KeyRole.spaceAdmin	enum.case	case spaceAdmin
 KeychainError	enum	enum KeychainError
 KeychainError.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 KeychainError.decodingFailed	enum.case	case decodingFailed
@@ -2513,6 +2616,15 @@ ProfileNamespace.deleteAvatar()	method	func deleteAvatar() async throws -> Profi
 ProfileNamespace.get()	method	func get() async throws -> Profile
 ProfileNamespace.update(_:)	method	func update(_ input: UpdateProfileInput) async throws -> Profile
 ProfileNamespace.uploadAvatar(_:mimeType:)	method	func uploadAvatar(_ data: Data, mimeType: String) async throws -> Profile
+ProfilePermission	enum	enum ProfilePermission
+ProfilePermission.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+ProfilePermission.encode(to:)	method	func encode(to encoder: any Encoder) throws
+ProfilePermission.hash(into:)	method	func hash(into hasher: inout Hasher)
+ProfilePermission.hashValue	property	var hashValue: Int { get }
+ProfilePermission.init(from:)	init	init(from decoder: any Decoder) throws
+ProfilePermission.init(rawValue:)	init	init?(rawValue: String)
+ProfilePermission.read	enum.case	case read
+ProfilePermission.write	enum.case	case write
 ProfileStore	class	@MainActor final class ProfileStore
 ProfileStore.deleteAvatar()	method	@discardableResult @MainActor func deleteAvatar() async throws -> Profile
 ProfileStore.error	property	@MainActor var error: (any Error)? { get set }
@@ -2660,12 +2772,12 @@ SpaceApiKeySummary.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Boo
 SpaceApiKeySummary.createdAt	property	let createdAt: String
 SpaceApiKeySummary.id	property	let id: String
 SpaceApiKeySummary.init(from:)	init	init(from decoder: any Decoder) throws
-SpaceApiKeySummary.init(id:label:source:role:isPlatform:createdAt:lastUsedAt:)	init	init(id: String, label: String, source: String, role: String, isPlatform: Bool, createdAt: String, lastUsedAt: String?)
-SpaceApiKeySummary.isPlatform	property	let isPlatform: Bool
+SpaceApiKeySummary.init(id:label:source:spacePermissions:isOperator:createdAt:lastUsedAt:)	init	init(id: String, label: String, source: String, spacePermissions: [String], isOperator: Bool, createdAt: String, lastUsedAt: String?)
+SpaceApiKeySummary.isOperator	property	let isOperator: Bool
 SpaceApiKeySummary.label	property	let label: String
 SpaceApiKeySummary.lastUsedAt	property	let lastUsedAt: String?
-SpaceApiKeySummary.role	property	let role: String
 SpaceApiKeySummary.source	property	let source: String
+SpaceApiKeySummary.spacePermissions	property	let spacePermissions: [String]
 SpaceBlobCounts	struct	struct SpaceBlobCounts
 SpaceBlobCounts.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 SpaceBlobCounts.count	property	let count: Int
@@ -2728,6 +2840,24 @@ SpaceMetrics.init(spaceId:items:blobs:recentActivity:generatedAt:)	init	init(spa
 SpaceMetrics.items	property	let items: SpaceItemCounts
 SpaceMetrics.recentActivity	property	let recentActivity: [SpaceActivityEntry]
 SpaceMetrics.spaceId	property	let spaceId: String
+SpacePermission	enum	enum SpacePermission
+SpacePermission.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
+SpacePermission.appGrants	enum.case	case appGrants
+SpacePermission.auditRead	enum.case	case auditRead
+SpacePermission.connections	enum.case	case connections
+SpacePermission.credentials	enum.case	case credentials
+SpacePermission.encode(to:)	method	func encode(to encoder: any Encoder) throws
+SpacePermission.hash(into:)	method	func hash(into hasher: inout Hasher)
+SpacePermission.hashValue	property	var hashValue: Int { get }
+SpacePermission.init(from:)	init	init(from decoder: any Decoder) throws
+SpacePermission.init(rawValue:)	init	init?(rawValue: String)
+SpacePermission.itemPurge	enum.case	case itemPurge
+SpacePermission.keys	enum.case	case keys
+SpacePermission.schema	enum.case	case schema
+SpacePermission.settings	enum.case	case settings
+SpacePermission.upstreamAccess	enum.case	case upstreamAccess
+SpacePermission.usage	enum.case	case usage
+SpacePermission.webhooks	enum.case	case webhooks
 SpaceQuota	struct	struct SpaceQuota
 SpaceQuota.!=(_:_:)	func.op	static func != (lhs: Self, rhs: Self) -> Bool
 SpaceQuota.blobsLimit	property	let blobsLimit: Int?

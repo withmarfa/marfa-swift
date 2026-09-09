@@ -20,13 +20,13 @@ struct KeysNamespaceTests {
             edgePermissions: nil,
             extensionPermissions: nil,
             id: id,
-            isPlatform: false,
+            isOperator: false,
             key: value,
             label: "test-key",
             lastUsedAt: nil,
             metadataPermissions: nil,
-            role: .member,
             source: "test",
+            spacePermissions: [],
             typePermissions: ["core.note": .write]
         )
     }
@@ -38,12 +38,12 @@ struct KeysNamespaceTests {
             edgePermissions: nil,
             extensionPermissions: nil,
             id: id,
-            isPlatform: false,
+            isOperator: false,
             label: "key-\(id)",
             lastUsedAt: nil,
             metadataPermissions: nil,
-            role: .member,
             source: "test",
+            spacePermissions: [],
             typePermissions: [:]
         )
     }
@@ -57,13 +57,13 @@ struct KeysNamespaceTests {
             CreateKeyInput(
                 label: "test-key",
                 source: "test-suite",
-                role: .member,
+                spacePermissions: [.keys, .webhooks],
                 typePermissions: ["core.note": .write]
             )
         )
 
         #expect(result.key == "marfa_k1_abc")
-        #expect(result.role == .member)
+        #expect(result.spacePermissions?.isEmpty ?? true)
         #expect(mock.calls[0].method == .post)
         #expect(mock.calls[0].path == "/keys")
 
@@ -72,7 +72,14 @@ struct KeysNamespaceTests {
         let json = try JSONSerialization.jsonObject(with: body) as! [String: Any]
         #expect(json["label"] as? String == "test-key")
         #expect(json["source"] as? String == "test-suite")
-        #expect(json["role"] as? String == "member")
+        // The dotted literals go over the wire as they are: the Swift case
+        // names are camelCase for the compiler's sake and mean nothing to the
+        // server, which knows only `space.keys`.
+        #expect(
+            json["space_permissions"] as? [String] == [
+                "space.keys", "space.webhooks",
+            ]
+        )
         let typePerms = json["type_permissions"] as? [String: String]
         #expect(typePerms?["core.note"] == "write")
     }

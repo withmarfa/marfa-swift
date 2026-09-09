@@ -12,12 +12,13 @@ public struct ApiKey: Codable, Sendable, Identifiable {
     public let expiresAt: String?
     public let extensionPermissions: [String: ExtensionPermission]?
     public let id: String
-    public let isPlatform: Bool
+    public let isOperator: Bool
     public let label: String
     public let lastUsedAt: String?
     public let metadataPermissions: [String: MetadataPermission]?
-    public let role: KeyRole
+    public let oauthClientId: String?
     public let source: String
+    public let spacePermissions: [SpacePermission]?
     public let typePermissions: [String: TypePermission]
 
     public init(
@@ -27,12 +28,13 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         expiresAt: String? = nil,
         extensionPermissions: [String: ExtensionPermission]? = nil,
         id: String,
-        isPlatform: Bool,
+        isOperator: Bool,
         label: String,
         lastUsedAt: String? = nil,
         metadataPermissions: [String: MetadataPermission]? = nil,
-        role: KeyRole,
+        oauthClientId: String? = nil,
         source: String,
+        spacePermissions: [SpacePermission]? = nil,
         typePermissions: [String: TypePermission]
     ) {
         self.createdAt = createdAt
@@ -41,12 +43,13 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         self.expiresAt = expiresAt
         self.extensionPermissions = extensionPermissions
         self.id = id
-        self.isPlatform = isPlatform
+        self.isOperator = isOperator
         self.label = label
         self.lastUsedAt = lastUsedAt
         self.metadataPermissions = metadataPermissions
-        self.role = role
+        self.oauthClientId = oauthClientId
         self.source = source
+        self.spacePermissions = spacePermissions
         self.typePermissions = typePermissions
     }
 
@@ -57,12 +60,13 @@ public struct ApiKey: Codable, Sendable, Identifiable {
         case expiresAt = "expires_at"
         case extensionPermissions = "extension_permissions"
         case id
-        case isPlatform = "is_platform"
+        case isOperator = "is_operator"
         case label
         case lastUsedAt = "last_used_at"
         case metadataPermissions = "metadata_permissions"
-        case role
+        case oauthClientId = "oauth_client_id"
         case source
+        case spacePermissions = "space_permissions"
         case typePermissions = "type_permissions"
     }
 }

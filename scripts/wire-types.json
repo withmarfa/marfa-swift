@@ -94,7 +94,7 @@
         "metadata_permissions": "[String: MetadataPermission]"
       },
       "enumOverrides": {
-        "role": "KeyRole",
+        "space_permissions": "SpacePermission",
         "default_tier": "Tier"
       }
     },
@@ -112,7 +112,7 @@
         "metadata_permissions": "[String: MetadataPermission]"
       },
       "enumOverrides": {
-        "role": "KeyRole",
+        "space_permissions": "SpacePermission",
         "default_tier": "Tier"
       }
     },
