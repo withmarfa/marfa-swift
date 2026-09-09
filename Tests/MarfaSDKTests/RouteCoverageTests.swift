@@ -89,7 +89,7 @@ struct RouteCoverageTests {
         "POST /lease-tokens/validate":
             "Introspection performed by the external service honoring a callback, to check a token it was handed. The SDK mints, lists and revokes lease tokens — it has no reason to introspect its own.",
 
-        "POST /oauth2/register":
+        "POST /auth/oauth2/register":
             "RFC 7591 dynamic client registration, unauthenticated and performed once when a client is provisioned. The SDK is configured with a client id rather than registering one at runtime, and a registration it made would be a credential nothing later deletes.",
 
         // Irreversible operator verbs. `AdminNamespace` wraps the reversible
@@ -103,6 +103,12 @@ struct RouteCoverageTests {
 
         "POST /admin/spaces/{}/delete":
             "Same boundary as account deletion: immediate and irreversible, and the reversible equivalents (suspend, unsuspend) are wrapped.",
+
+        "POST /admin/oauth-clients/{}/delete":
+            "Revokes a registered app and every grant made to it, taking the tokens, consent rows and codes with it. The same irreversible boundary, and the one most easily reached by mistake: registration is a side effect of a device-flow sign-in rather than a step anybody wrote, so an app deleting a client id it did not create is a plausible slip a wrapper would make one call away.",
+
+        "POST /admin/accounts":
+            "Creates an account and the space behind it. Sign-up is the account-creation path this SDK models, through the auth flows; a client minting accounts through the operator surface is provisioning rather than using the platform, and it needs the operator key, which an app never holds.",
 
         // Streaming and bulk transfer the transport cannot express.
 

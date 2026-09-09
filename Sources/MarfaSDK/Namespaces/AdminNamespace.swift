@@ -1,9 +1,10 @@
 import Foundation
 
 /// Operator-level admin surface. Backs the `my admin` CLI command tree.
-/// Every method requires a platform-admin key (`is_platform: true`);
+/// Every method requires the operator key (`is_operator: true`, and no
+/// space);
 /// non-platform credentials receive a `403 forbidden` — CLI/UI layers
-/// should render `"this command requires a platform-admin key"`.
+/// should render `"this command requires the operator key"`.
 ///
 /// A client created via ``MarfaClient/local(path:)`` has no live server;
 /// every method here throws ``LocalModeUnsupportedError``.
@@ -63,7 +64,7 @@ public struct AdminPlatformTypesNamespace: Sendable {
     /// A report rather than a prune. The count is read live rather than from
     /// the boot-time report, because it is the part that changes without a
     /// restart and reasoning about a removal from a stale copy is the
-    /// mistake worth avoiding. Platform-admin only.
+    /// mistake worth avoiding. The operator key only.
     public func drift() async throws -> [DriftedPlatformType] {
         try ensureRemote("admin.platformTypes.drift")
         let response: PlatformTypeDriftResponse = try await transport.request(
@@ -92,7 +93,7 @@ public struct AdminPlatformTypesNamespace: Sendable {
     /// Returns nothing: the route's body carries a constant `true` and an
     /// echo of `id`, so a caller learns nothing from it that it did not
     /// already have. What it needs to know arrives as a thrown error.
-    /// Platform-admin only.
+    /// The operator key only.
     public func remove(_ id: String) async throws {
         try ensureRemote("admin.platformTypes.remove")
         let _: EmptyResponse = try await transport.request(
@@ -106,7 +107,7 @@ public struct AdminPlatformTypesNamespace: Sendable {
 
 // MARK: - Spaces
 
-/// Per-space operator-surface for platform admins.
+/// Per-space operator surface, reached with the operator key.
 public struct AdminSpacesNamespace: Sendable {
 
     let transport: any Transport
@@ -142,7 +143,7 @@ public struct AdminSpacesNamespace: Sendable {
 
     /// Flip the space's status to `suspended`. Future non-GET requests
     /// from credentials in the space return HTTP 403 `space_suspended`;
-    /// reads pass through; platform-admin keys bypass. Idempotent.
+    /// reads pass through; the operator key is not suspended. Idempotent.
     public func suspend(id: String) async throws -> SpaceSummary {
         try ensureRemote("admin.spaces.suspend")
         return try await transport.request(
@@ -210,7 +211,7 @@ public struct AdminAccountDeletionNamespace: Sendable {
     ///
     /// Idempotent — re-running with no eligible rows returns 0. Only
     /// sweeps accounts already past `pending_deletion_at + grace_days`;
-    /// does not bypass the grace window. Platform-admin only.
+    /// does not bypass the grace window. The operator key only.
     @discardableResult
     public func purgeNow() async throws -> PurgeNowResult {
         try ensureRemote("admin.accountDeletion.purgeNow")
@@ -353,8 +354,19 @@ public struct SpaceApiKeySummary: Codable, Sendable, Hashable, Identifiable {
     public let id: String
     public let label: String
     public let source: String
-    public let role: String
-    public let isPlatform: Bool
+    /// The administrative surfaces this key reaches inside its space.
+    ///
+    /// Empty is an ordinary content credential, which is most of them. It is
+    /// the whole of what the key may do beyond its content maps: there is no
+    /// rank above it and nothing else a door consults.
+    public let spacePermissions: [String]
+    /// Whether this is the operator key.
+    ///
+    /// Never true in a space's listing, because the operator key holds no
+    /// space — it runs the instance and is fenced outside the permission
+    /// model rather than sitting at the top of it. The field is here because
+    /// the server sends it, not because a space can contain one.
+    public let isOperator: Bool
     public let createdAt: String
     public let lastUsedAt: String?
 
@@ -362,23 +374,24 @@ public struct SpaceApiKeySummary: Codable, Sendable, Hashable, Identifiable {
         id: String,
         label: String,
         source: String,
-        role: String,
-        isPlatform: Bool,
+        spacePermissions: [String],
+        isOperator: Bool,
         createdAt: String,
         lastUsedAt: String?
     ) {
         self.id = id
         self.label = label
         self.source = source
-        self.role = role
-        self.isPlatform = isPlatform
+        self.spacePermissions = spacePermissions
+        self.isOperator = isOperator
         self.createdAt = createdAt
         self.lastUsedAt = lastUsedAt
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, label, source, role
-        case isPlatform = "is_platform"
+        case id, label, source
+        case spacePermissions = "space_permissions"
+        case isOperator = "is_operator"
         case createdAt = "created_at"
         case lastUsedAt = "last_used_at"
     }

@@ -410,8 +410,30 @@ func renderCodingKeys(fields: [ResolvedField]) -> String {
 
 func renderEnum(name: String, cases: [String]) -> String {
     var out = "public enum \(name): String, Codable, Sendable, Hashable {\n"
+    var seen: Set<String> = []
     for value in cases.sorted() {
-        let swiftCase = toCamelCase(value)
+        let swiftCase = escapeSwiftIdentifier(toCamelCase(value))
+        // **Fail here rather than emit something that will not parse.** A
+        // value made only of punctuation, or one starting with a digit, or two
+        // values that collapse to the same name once separators are stripped,
+        // each produce a file the compiler rejects with an error pointing at
+        // the generated line rather than at the value that caused it. The
+        // spec carries a `"*"` in at least one enum today, reachable the
+        // moment somebody routes that field through this generator.
+        guard isValidSwiftIdentifier(swiftCase) else {
+            fatalError(
+                "codegen-wire: enum \(name) value \"\(value)\" produces "
+                    + "\"\(swiftCase)\", which is not a Swift identifier. Add an "
+                    + "enumOverride routing this field to a hand-written type."
+            )
+        }
+        guard seen.insert(swiftCase).inserted else {
+            fatalError(
+                "codegen-wire: enum \(name) has two values that both produce "
+                    + "the case name \"\(swiftCase)\". Add an enumOverride "
+                    + "routing this field to a hand-written type."
+            )
+        }
         if swiftCase == value {
             out += "    case \(swiftCase)\n"
         } else {
@@ -439,6 +461,19 @@ func resolveType(
         switch node {
         case .string, .stringEnum(_):
             return override
+        case .array(let element, let elementNullable):
+            // Array-of-stringEnum: route the element through the override and
+            // emit nothing. **Without this arm the override was silently
+            // ignored** — the array fell through to the ordinary path below,
+            // which registers a sibling enum named after the parent, so two
+            // types carrying the same list produced two unrelated enums with
+            // the same raw values and different case names. A caller then
+            // could not compare one against the other without going through
+            // strings, which is the whole thing an override exists to prevent.
+            if case .stringEnum(_) = element {
+                let wrapped = elementNullable ? "\(override)?" : override
+                return "[\(wrapped)]"
+            }
         case .constrainedMap(let valueNode, let valueNullable):
             // Map-of-stringEnum: route the value type through the override and
             // register the shared enum exactly once.
@@ -525,8 +560,16 @@ let reservedSwiftKeywords: Set<String> = [
     "rethrows", "async", "await", "any", "some", "Type", "inout",
 ]
 
+/// A Swift identifier from a wire token.
+///
+/// **The dot is a separator like the others, and leaving it out emitted code
+/// that does not parse.** A value such as `space.app_grants` produced `case
+/// space.appGrants`, which Swift reads as two declarations on one line — so a
+/// dotted enum value took the whole generated file down, silently, until a
+/// build. The platform's space permissions are the first dotted enum on the
+/// wire and they will not be the last.
 func toCamelCase(_ snake: String) -> String {
-    let parts = snake.split(whereSeparator: { $0 == "_" || $0 == "-" })
+    let parts = snake.split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
     guard let first = parts.first else { return snake }
     var result = String(first).lowercased()
     for segment in parts.dropFirst() {
@@ -539,6 +582,16 @@ func toCamelCase(_ snake: String) -> String {
 /// keyword. Used in property declarations, init signatures, and CodingKeys
 /// case labels — never in CodingKeys raw-string mappings (those carry the
 /// original JSON key).
+/// Whether a produced case name is something Swift will accept, backticks
+/// included. Bare-minimum grammar: a leading letter or underscore, then
+/// letters, digits and underscores.
+func isValidSwiftIdentifier(_ name: String) -> Bool {
+    let bare = name.hasPrefix("`") && name.hasSuffix("`") ? String(name.dropFirst().dropLast()) : name
+    guard let first = bare.first else { return false }
+    guard first.isLetter || first == "_" else { return false }
+    return bare.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+}
+
 func escapeSwiftIdentifier(_ name: String) -> String {
     reservedSwiftKeywords.contains(name) ? "`\(name)`" : name
 }

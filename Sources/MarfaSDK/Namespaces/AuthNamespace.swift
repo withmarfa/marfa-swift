@@ -6,9 +6,9 @@ import Foundation
 /// ``TokenProvider``. This namespace targets the post-sign-in
 /// account-lifecycle endpoints (`/auth/account/...`).
 ///
-/// **Authentication shape.** The server accepts EITHER a bearer
-/// (space_admin / admin in the user's space) OR a better-auth session
-/// cookie on these endpoints. The Swift SDK always sends the bearer; CLI
+/// **Authentication shape.** The server accepts EITHER a bearer carrying
+/// the permission the endpoint asks for OR a better-auth session cookie on
+/// these endpoints. The Swift SDK always sends the bearer; CLI
 /// and SDK callers operating with an API key or an OAuth token just work.
 /// Web flows that need the cookie path use the browser directly.
 ///

@@ -16,7 +16,7 @@ import Foundation
 /// happens at the OAuth proxy + callback paths; the plaintext is never
 /// returned by any read path.
 ///
-/// Space-admin only.
+/// Needs `space.credentials`.
 public struct CreateOAuthProviderCredentialInput: Codable, Sendable, Hashable {
     public var label: String
     public var oauthAuthorizeUrl: String
@@ -70,7 +70,7 @@ public struct CreateOAuthProviderCredentialInput: Codable, Sendable, Hashable {
 ///
 /// Returned credential id is used as `credential_ref` on
 /// ``ConnectionsNamespace/install(_:)`` for token-based integrations
-/// (Todoist, Readwise, Raindrop). Space-admin only.
+/// (Todoist, Readwise, Raindrop). Needs `space.credentials`.
 public struct CreateApiTokenCredentialInput: Codable, Sendable, Hashable {
     public var label: String
     public var upstreamBaseUrl: String
