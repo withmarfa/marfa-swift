@@ -1,10 +1,10 @@
 import Foundation
 
-/// Operator-level admin surface. Backs the `my admin` CLI command tree.
+/// The operator surface: the instance routes under `/admin`. Backs the
+/// `marfa operator` CLI command tree.
 /// Every method requires the operator key (`is_operator: true`, and no
-/// space);
-/// non-platform credentials receive a `403 forbidden` — CLI/UI layers
-/// should render `"this command requires the operator key"`.
+/// space); any other credential receives a `403 forbidden`, and CLI/UI
+/// layers should render `"this command requires the operator key"`.
 ///
 /// A client created via ``MarfaClient/local(path:)`` has no live server;
 /// every method here throws ``LocalModeUnsupportedError``.
