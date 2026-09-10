@@ -24,12 +24,6 @@ name: Spec drift
 # and the cost of a stale one is paid by whoever ships next.
 
 on:
-  schedule:
-    # Early UTC, so a finding is waiting at the start of the day. Offset from
-    # the monorepo's own drift guard rather than sharing its minute; the two
-    # watch different pairs of files and there is nothing to gain from them
-    # reporting together.
-    - cron: "41 7 * * *"
   workflow_dispatch:
 
 concurrency:
