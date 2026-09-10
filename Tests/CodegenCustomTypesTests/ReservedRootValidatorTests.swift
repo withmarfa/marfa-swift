@@ -6,7 +6,7 @@ struct ReservedRootValidatorTests {
 
     // MARK: - Reserved-root flags
 
-    @Test("system.* flagged for non-platform authors")
+    @Test("system.* flagged")
     func systemFlagged() {
         let warning = Generator.reservedRootWarning(for: "system.device")
         #expect(warning != nil)
