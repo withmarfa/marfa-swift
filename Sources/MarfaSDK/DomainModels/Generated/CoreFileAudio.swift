@@ -22,9 +22,6 @@ public struct CoreFileAudio: MarfaItem {
     /// Reference to the binary content (sha256:<hex>)
     public var blobRef: String { item.properties["blob_ref"]?.stringValue ?? "" }
 
-    /// Length in seconds
-    public var duration: Double { item.properties["duration"]?.doubleValue ?? 0 }
-
     /// MIME type
     public var mimeType: String { item.properties["mime_type"]?.stringValue ?? "" }
 
@@ -33,6 +30,9 @@ public struct CoreFileAudio: MarfaItem {
 
     /// What the file contains
     public var description: String? { item.properties["description"]?.stringValue }
+
+    /// Length in seconds (server enrichment: derived from the file when the client does not supply it)
+    public var duration: Double? { item.properties["duration"]?.doubleValue }
 
     /// Machine-extracted text content of the referenced blob (server enrichment: document text or image OCR)
     public var extractedText: String? { item.properties["extracted_text"]?.stringValue }
@@ -59,7 +59,6 @@ public struct CoreFileAudio: MarfaItem {
     public init?(from item: Item) {
         guard item.type == Self.typeIdentifier else { return nil }
         guard item.properties["blob_ref"]?.stringValue != nil else { return nil }
-        guard item.properties["duration"]?.doubleValue != nil else { return nil }
         guard item.properties["mime_type"]?.stringValue != nil else { return nil }
         self.item = item
     }
@@ -69,10 +68,10 @@ public struct CoreFileAudio: MarfaItem {
     public func toProperties() -> [String: JSONValue] {
         var props: [String: JSONValue] = [:]
         props["blob_ref"] = .string(blobRef)
-        props["duration"] = .double(duration)
         props["mime_type"] = .string(mimeType)
         if let v = author { props["author"] = .string(v) }
         if let v = description { props["description"] = .string(v) }
+        if let v = duration { props["duration"] = .double(v) }
         if let v = extractedText { props["extracted_text"] = .string(v) }
         if let v = language { props["language"] = .string(v) }
         if let v = notes { props["notes"] = .string(v) }

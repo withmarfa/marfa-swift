@@ -5,6 +5,47 @@ All notable changes to the Swift SDK are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking
+
+- **Derived media fields are optional.** `CoreFileImage.width` and
+  `CoreFileImage.height`, `CoreFileVideo.width`, `CoreFileVideo.height` and
+  `CoreFileVideo.duration`, and `CoreFileAudio.duration` are now `Int?` and
+  `Double?` rather than `Int` and `Double`. `init?(from:)` on those three types
+  no longer refuses an item that carries none of them.
+
+  The server derives these from the file on a best-effort basis, so an item can
+  legitimately have none — no dimensions are derived from MP4 or QuickTime at
+  all, which makes a video without them the ordinary result of an upload rather
+  than an edge case. The accessors previously reported a missing value as `0`,
+  which a caller could not tell from a real zero, and `toProperties()` wrote
+  that fabricated `0` back on a round trip.
+
+  ```swift
+  // Before — 0 for "the server never worked it out"
+  let label = "\(video.width) × \(video.height)"
+
+  // Now — absence is representable
+  let label = if let w = video.width, let h = video.height {
+      "\(w) × \(h)"
+  } else {
+      "Unknown"
+  }
+  ```
+
+### Fixed
+
+- **A core type schema the domain-model generator cannot read now fails the
+  run.** It used to warn and skip, and the prune that follows then deleted that
+  type's model, so an unreadable schema and a type deleted upstream produced
+  the same result from a run that exited 0. This is how the three types above
+  were removed from the SDK by a snapshot refresh: the generator required the
+  schema's `required` key to be present, and the platform relaxed the last
+  required field on each of them. The key is optional now, matching the loader
+  the custom-type generator already used, and a new test pins the property that
+  every non-deferred schema in the vendored snapshot has a generated model.
+
 ## [19.0.0] — 2026-09-09
 
 ### Breaking
