@@ -22,17 +22,8 @@ public struct CoreFileVideo: MarfaItem {
     /// Reference to the binary content (sha256:<hex>)
     public var blobRef: String { item.properties["blob_ref"]?.stringValue ?? "" }
 
-    /// Length in seconds
-    public var duration: Double { item.properties["duration"]?.doubleValue ?? 0 }
-
-    /// Height in pixels
-    public var height: Int { item.properties["height"]?.intValue ?? 0 }
-
     /// MIME type
     public var mimeType: String { item.properties["mime_type"]?.stringValue ?? "" }
-
-    /// Width in pixels
-    public var width: Int { item.properties["width"]?.intValue ?? 0 }
 
     /// Altitude in meters
     public var altitude: Double? { item.properties["altitude"]?.doubleValue }
@@ -43,8 +34,14 @@ public struct CoreFileVideo: MarfaItem {
     /// What the file contains
     public var description: String? { item.properties["description"]?.stringValue }
 
+    /// Length in seconds (server enrichment: derived from the file when the client does not supply it)
+    public var duration: Double? { item.properties["duration"]?.doubleValue }
+
     /// Machine-extracted text content of the referenced blob (server enrichment: document text or image OCR)
     public var extractedText: String? { item.properties["extracted_text"]?.stringValue }
+
+    /// Height in pixels (server enrichment: derived from the file when the client does not supply it)
+    public var height: Int? { item.properties["height"]?.intValue }
 
     /// BCP 47 language code (for spoken content)
     public var language: String? { item.properties["language"]?.stringValue }
@@ -67,6 +64,9 @@ public struct CoreFileVideo: MarfaItem {
     /// Web address
     public var url: String? { item.properties["url"]?.stringValue }
 
+    /// Width in pixels (server enrichment: derived from the file when the client does not supply it)
+    public var width: Int? { item.properties["width"]?.intValue }
+
     // MARK: - Init
 
     /// Returns `nil` if `item.type` does not match `core.file.video`
@@ -74,10 +74,7 @@ public struct CoreFileVideo: MarfaItem {
     public init?(from item: Item) {
         guard item.type == Self.typeIdentifier else { return nil }
         guard item.properties["blob_ref"]?.stringValue != nil else { return nil }
-        guard item.properties["duration"]?.doubleValue != nil else { return nil }
-        guard item.properties["height"]?.intValue != nil else { return nil }
         guard item.properties["mime_type"]?.stringValue != nil else { return nil }
-        guard item.properties["width"]?.intValue != nil else { return nil }
         self.item = item
     }
 
@@ -86,14 +83,13 @@ public struct CoreFileVideo: MarfaItem {
     public func toProperties() -> [String: JSONValue] {
         var props: [String: JSONValue] = [:]
         props["blob_ref"] = .string(blobRef)
-        props["duration"] = .double(duration)
-        props["height"] = .int(height)
         props["mime_type"] = .string(mimeType)
-        props["width"] = .int(width)
         if let v = altitude { props["altitude"] = .double(v) }
         if let v = author { props["author"] = .string(v) }
         if let v = description { props["description"] = .string(v) }
+        if let v = duration { props["duration"] = .double(v) }
         if let v = extractedText { props["extracted_text"] = .string(v) }
+        if let v = height { props["height"] = .int(v) }
         if let v = language { props["language"] = .string(v) }
         if let v = latitude { props["latitude"] = .double(v) }
         if let v = longitude { props["longitude"] = .double(v) }
@@ -101,6 +97,7 @@ public struct CoreFileVideo: MarfaItem {
         if let v = sourceUrl { props["source_url"] = .string(v) }
         if let v = title { props["title"] = .string(v) }
         if let v = url { props["url"] = .string(v) }
+        if let v = width { props["width"] = .int(v) }
         return props
     }
 }

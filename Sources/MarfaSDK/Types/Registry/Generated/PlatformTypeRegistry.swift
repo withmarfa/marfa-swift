@@ -166,7 +166,7 @@ enum PlatformTypeRegistry {
                 "author": .init(type: .string),
                 "blob_ref": .init(type: .string, isRequired: true),
                 "description": .init(type: .string),
-                "duration": .init(type: .number, isRequired: true),
+                "duration": .init(type: .number),
                 "extracted_text": .init(type: .string),
                 "language": .init(type: .string),
                 "links": .init(type: .array),
@@ -177,7 +177,7 @@ enum PlatformTypeRegistry {
                 "url": .init(type: .url),
             ],
             titleField: "title",
-            schemaVersion: 1
+            schemaVersion: 2
         ),
         "core.file.image": MarfaTypeDefinition(
             id: "core.file.image",
@@ -189,7 +189,7 @@ enum PlatformTypeRegistry {
                 "blob_ref": .init(type: .string, isRequired: true),
                 "description": .init(type: .string),
                 "extracted_text": .init(type: .string),
-                "height": .init(type: .integer, isRequired: true),
+                "height": .init(type: .integer),
                 "language": .init(type: .string),
                 "latitude": .init(type: .number),
                 "links": .init(type: .array),
@@ -199,10 +199,10 @@ enum PlatformTypeRegistry {
                 "source_url": .init(type: .url),
                 "title": .init(type: .string),
                 "url": .init(type: .url),
-                "width": .init(type: .integer, isRequired: true),
+                "width": .init(type: .integer),
             ],
             titleField: "title",
-            schemaVersion: 1
+            schemaVersion: 2
         ),
         "core.file.video": MarfaTypeDefinition(
             id: "core.file.video",
@@ -213,9 +213,9 @@ enum PlatformTypeRegistry {
                 "author": .init(type: .string),
                 "blob_ref": .init(type: .string, isRequired: true),
                 "description": .init(type: .string),
-                "duration": .init(type: .number, isRequired: true),
+                "duration": .init(type: .number),
                 "extracted_text": .init(type: .string),
-                "height": .init(type: .integer, isRequired: true),
+                "height": .init(type: .integer),
                 "language": .init(type: .string),
                 "latitude": .init(type: .number),
                 "links": .init(type: .array),
@@ -225,10 +225,10 @@ enum PlatformTypeRegistry {
                 "source_url": .init(type: .url),
                 "title": .init(type: .string),
                 "url": .init(type: .url),
-                "width": .init(type: .integer, isRequired: true),
+                "width": .init(type: .integer),
             ],
             titleField: "title",
-            schemaVersion: 1
+            schemaVersion: 2
         ),
         "core.highlight": MarfaTypeDefinition(
             id: "core.highlight",

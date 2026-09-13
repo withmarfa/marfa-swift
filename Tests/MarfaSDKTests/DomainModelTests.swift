@@ -248,12 +248,12 @@ struct DomainModelTests {
         }
     }
 
-    // MARK: - CoreFileImage (multiple required fields, integer types)
+    // MARK: - CoreFileImage (optional dimensions, integer types)
 
     @Suite("CoreFileImage")
     struct CoreFileImageTests {
 
-        @Test("Requires blob_ref, height, mime_type, width") func requiresAllFour() {
+        @Test("Requires blob_ref and mime_type only") func requiresBlobAndMime() throws {
             let full: [String: JSONValue] = [
                 "blob_ref": .string("sha256:abc"),
                 "mime_type": .string("image/jpeg"),
@@ -261,15 +261,31 @@ struct DomainModelTests {
                 "height": .int(1080),
             ]
             #expect(CoreFileImage(from: makeItem(properties: full)) != nil)
-            // Missing height
-            var partial = full; partial.removeValue(forKey: "height")
+            var partial = full; partial.removeValue(forKey: "blob_ref")
             #expect(CoreFileImage(from: makeItem(properties: partial)) == nil)
-            // Missing width
-            partial = full; partial.removeValue(forKey: "width")
+            partial = full; partial.removeValue(forKey: "mime_type")
             #expect(CoreFileImage(from: makeItem(properties: partial)) == nil)
         }
 
-        @Test("Typed integer and double accessors") func typedAccessors() {
+        /// The server derives dimensions from the file on a best-effort basis,
+        /// so an image can legitimately carry neither. The accessors report
+        /// that as `nil`; they used to report it as `0`, which a caller could
+        /// not tell from a genuine zero.
+        @Test("Dimensions are absent rather than zero") func dimensionsOptional() throws {
+            let item = makeItem(properties: [
+                "blob_ref": .string("sha256:abc"),
+                "mime_type": .string("image/jpeg"),
+            ])
+            let img = try #require(CoreFileImage(from: item))
+            #expect(img.width == nil)
+            #expect(img.height == nil)
+            // A round trip does not invent the fields it was not given.
+            let props = img.toProperties()
+            #expect(props["width"] == nil)
+            #expect(props["height"] == nil)
+        }
+
+        @Test("Typed integer and double accessors") func typedAccessors() throws {
             let item = makeItem(properties: [
                 "blob_ref": .string("sha256:abc"),
                 "mime_type": .string("image/jpeg"),
@@ -279,7 +295,7 @@ struct DomainModelTests {
                 "longitude": .double(-0.1),
                 "altitude": .double(10.5),
             ])
-            let img = CoreFileImage(from: item)!
+            let img = try #require(CoreFileImage(from: item))
             #expect(img.width == 800)
             #expect(img.height == 600)
             #expect(img.latitude == 51.5)
@@ -287,14 +303,14 @@ struct DomainModelTests {
             #expect(img.altitude == 10.5)
         }
 
-        @Test("toProperties encodes int fields correctly") func toProperties() {
+        @Test("toProperties encodes int fields correctly") func toProperties() throws {
             let item = makeItem(properties: [
                 "blob_ref": .string("sha256:abc"),
                 "mime_type": .string("image/jpeg"),
                 "width": .int(1920),
                 "height": .int(1080),
             ])
-            let img = CoreFileImage(from: item)!
+            let img = try #require(CoreFileImage(from: item))
             let props = img.toProperties()
             #expect(props["width"] == .int(1920))
             #expect(props["height"] == .int(1080))
@@ -307,6 +323,62 @@ struct DomainModelTests {
                 createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
                 schemaVersion: 1, source: "test", state: .active, tier: .feed,
                 timestamp: "2026-01-01T00:00:00Z", type: "core.file.image",
+                updatedAt: "2026-01-01T00:00:00Z", version: 1
+            )
+        }
+    }
+
+    // MARK: - CoreFileVideo / CoreFileAudio (derived fields)
+
+    /// Video is the case that forced the change rather than an illustration of
+    /// it: the server derives no dimensions at all from MP4 or QuickTime, so a
+    /// video item carrying neither `width` nor `height` is the ordinary result
+    /// of an upload, not an edge case.
+    @Suite("Derived media fields")
+    struct DerivedMediaFieldTests {
+
+        @Test("Video decodes with no dimensions or duration") func videoWithoutDerivedFields() throws {
+            let item = makeItem(type: "core.file.video", properties: [
+                "blob_ref": .string("sha256:abc"),
+                "mime_type": .string("video/mp4"),
+            ])
+            let video = try #require(CoreFileVideo(from: item))
+            #expect(video.width == nil)
+            #expect(video.height == nil)
+            #expect(video.duration == nil)
+            #expect(video.toProperties()["duration"] == nil)
+        }
+
+        @Test("Video still reads the fields when present") func videoWithDerivedFields() throws {
+            let item = makeItem(type: "core.file.video", properties: [
+                "blob_ref": .string("sha256:abc"),
+                "mime_type": .string("video/mp4"),
+                "width": .int(3840),
+                "height": .int(2160),
+                "duration": .double(12.5),
+            ])
+            let video = try #require(CoreFileVideo(from: item))
+            #expect(video.width == 3840)
+            #expect(video.height == 2160)
+            #expect(video.duration == 12.5)
+            #expect(video.toProperties()["duration"] == .double(12.5))
+        }
+
+        @Test("Audio decodes with no duration") func audioWithoutDuration() throws {
+            let item = makeItem(type: "core.file.audio", properties: [
+                "blob_ref": .string("sha256:abc"),
+                "mime_type": .string("audio/mpeg"),
+            ])
+            let audio = try #require(CoreFileAudio(from: item))
+            #expect(audio.duration == nil)
+            #expect(audio.toProperties()["duration"] == nil)
+        }
+
+        private func makeItem(type: String, properties: [String: JSONValue]) -> Item {
+            Item(
+                createdAt: "2026-01-01T00:00:00Z", id: "id", properties: properties,
+                schemaVersion: 2, source: "test", state: .active, tier: .feed,
+                timestamp: "2026-01-01T00:00:00Z", type: type,
                 updatedAt: "2026-01-01T00:00:00Z", version: 1
             )
         }
