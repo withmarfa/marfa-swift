@@ -62,6 +62,23 @@ struct TypeSchema: Decodable {
         case displayHints = "display_hints"
         case deferred = "_deferred"
     }
+
+    /// `required` is absent from a schema that constrains none of its fields,
+    /// so it decodes to the empty set rather than failing. Synthesized
+    /// decoding treats a missing key as an error for a non-optional property,
+    /// which made a type whose last required field was relaxed unparseable.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.parent = try c.decodeIfPresent(String.self, forKey: .parent)
+        self.label = try c.decodeIfPresent(String.self, forKey: .label)
+        self.description = try c.decodeIfPresent(String.self, forKey: .description)
+        self.version = try c.decode(Int.self, forKey: .version)
+        self.fields = try c.decode([String: FieldDefinition].self, forKey: .fields)
+        self.required = try c.decodeIfPresent([String].self, forKey: .required) ?? []
+        self.displayHints = try c.decodeIfPresent(DisplayHints.self, forKey: .displayHints)
+        self.deferred = try c.decodeIfPresent(Bool.self, forKey: .deferred)
+    }
 }
 
 // MARK: - Helpers
@@ -448,14 +465,20 @@ let typeFiles = (try? FileManager.default.contentsOfDirectory(
     at: typesDir, includingPropertiesForKeys: nil
 ))?.filter { $0.pathExtension == "json" } ?? []
 
+// A schema this generator cannot read is fatal, never skipped. Skipping left
+// an unreadable file indistinguishable from a type deleted upstream, and the
+// prune below resolves that ambiguity destructively: three models were removed
+// from the SDK by a run that printed warnings and exited 0.
 for file in typeFiles {
-    guard let data = try? Data(contentsOf: file),
-          let schema = try? decoder.decode(TypeSchema.self, from: data)
-    else {
-        print("warning: could not parse \(file.lastPathComponent)")
-        continue
+    do {
+        let schema = try decoder.decode(TypeSchema.self, from: try Data(contentsOf: file))
+        schemas[schema.id] = schema
+    } catch {
+        FileHandle.standardError.write(
+            Data("error: could not parse \(file.lastPathComponent): \(error)\n".utf8)
+        )
+        exit(1)
     }
-    schemas[schema.id] = schema
 }
 
 // Filter: active types only (no _deferred)
@@ -517,13 +540,15 @@ var registrySchemas = schemas
 for file in (try? FileManager.default.contentsOfDirectory(
     at: systemDir, includingPropertiesForKeys: nil
 ))?.filter({ $0.pathExtension == "json" }) ?? [] {
-    guard let data = try? Data(contentsOf: file),
-          let schema = try? decoder.decode(TypeSchema.self, from: data)
-    else {
-        print("warning: could not parse system/\(file.lastPathComponent)")
-        continue
+    do {
+        let schema = try decoder.decode(TypeSchema.self, from: try Data(contentsOf: file))
+        registrySchemas[schema.id] = schema
+    } catch {
+        FileHandle.standardError.write(
+            Data("error: could not parse system/\(file.lastPathComponent): \(error)\n".utf8)
+        )
+        exit(1)
     }
-    registrySchemas[schema.id] = schema
 }
 
 /// The server collapses four declared formats into a field type before
