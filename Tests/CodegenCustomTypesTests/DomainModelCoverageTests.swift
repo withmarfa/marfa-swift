@@ -19,9 +19,8 @@ import Foundation
 /// model on the public surface. A future input the generator cannot read fails
 /// here rather than quietly subtracting a type.
 ///
-/// What this cannot see is a schema missing from the *snapshot* — that is the
-/// spec-drift job's question, asked against the monorepo, and deliberately not
-/// asked here.
+/// What this cannot see is a schema missing from the *snapshot*: nothing
+/// here compares the snapshot with the monorepo.
 @Suite("Every vendored core schema has a generated model")
 struct DomainModelCoverageTests {
 

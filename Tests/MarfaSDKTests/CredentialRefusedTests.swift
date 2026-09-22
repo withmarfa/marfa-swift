@@ -186,9 +186,9 @@ struct CredentialRefusedTests {
                 kind: .createItem, refusalCount: 0, ceiling: 5
             ) == nil
         )
-        // The other two the changelog names in the same sentence. Both are
-        // covered through the engine by `networkClassNeverBlocks`; this is the
-        // test that reads as the guard for the claim, so it should carry them.
+        // The other two network failures. Both are covered through the engine
+        // by `networkClassNeverBlocks`; this is the test that reads as the
+        // guard for the claim, so it should carry them.
         #expect(
             PendingMutationBlockReason.classify(
                 error: MarfaError(code: "rate_limited", message: "slow down", status: 429),

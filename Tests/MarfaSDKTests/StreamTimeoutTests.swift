@@ -172,9 +172,8 @@ struct StreamTimeoutTests {
             """
         )
 
-        // The published derivation. The changelog, the property's own doc
-        // comment and the Swift docs page all say "twice the server's
-        // heartbeat", and a claim in three places that nothing checks is a
+        // The published derivation. The property's own doc comment says
+        // "twice the server's heartbeat", and a claim nothing checks is a
         // claim that drifts. Asserted as the relationship rather than as 60,
         // so the number can move as long as the reasoning still holds.
         #expect(
