@@ -35,16 +35,8 @@ import SwiftData
 /// one. The cost to a device is unchanged either way: it takes the stage it
 /// was going to take, carrying whatever shape that version has when it ships.
 ///
-/// **V3 is closed. It ships in `17.0.0`.** Devices hold V3 stores from that
-/// release onward, so the next column needs a V4 and a V3-to-V4 stage. This
-/// paragraph named V3 as the open one until the day it was cut; if you are
-/// reading it and the newest tag is later than `v17.0.0`, check the tag rather
-/// than this sentence.
-///
-/// So before adding a version, **check whether the current one has shipped**.
-/// Reaching for a new one out of habit buys nothing and costs every device an
-/// extra stage. The check is a tag: if the current version's changelog entry
-/// is still under `## [Unreleased]`, the version is still open.
+/// **V3 is closed.** Devices hold V3 stores, so the next column needs a V4 and
+/// a V3-to-V4 stage.
 ///
 /// The one consequence worth knowing is developer-only. A store built from an
 /// intermediate state of an open version records `3.0.0` while holding a shape
