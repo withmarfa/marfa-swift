@@ -6,7 +6,7 @@ Under rebuild. This repository is becoming the Swift package `Marfa`, product `M
 
 - **Every version is the previous one plus 0.0.1, whatever the size of the change.** Numbering starts again from 0: the first version is 0.0.1.
 - A commit's type (`feat`, `fix`, a breaking change) never decides a version.
-- A version exists only as a git tag on the monorepo, and tags are August's. The monorepo's release workflow reads the tag and brings the package its version; this repository has no release workflow of its own, and agents never add one, create a tag, or write a version into a file.
+- A version exists only as a git tag on the monorepo, and tags are August's. The monorepo's release workflow reads the tag and brings the package its version; this repository's own `release.yml` goes with the earlier engine, and agents never add a release workflow here, create a tag, or write a version into a file.
 
 ## In force
 
