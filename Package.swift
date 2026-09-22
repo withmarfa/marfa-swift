@@ -51,7 +51,7 @@ let package = Package(
                 "sync-types.sh", "codegen-domain.swift",
                 "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
                 "cloudkit-smoke",
-                "consumer-pins.sh", "openapi-source.txt", "spec-drift.sh",
+                "openapi-source.txt",
             ],
             sources: ["codegen-wire.swift"]
         ),
@@ -63,7 +63,7 @@ let package = Package(
                 "sync-types.sh", "codegen-wire.swift",
                 "MarfaCodegenCore", "codegen-custom-types", "sync-custom-types",
                 "cloudkit-smoke",
-                "consumer-pins.sh", "openapi-source.txt", "spec-drift.sh",
+                "openapi-source.txt",
             ],
             sources: ["codegen-domain.swift"]
         ),
