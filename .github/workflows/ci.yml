@@ -23,14 +23,14 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # `validate` (build and the full suite) runs on every pull request and every
-# merge. `freshness` regenerates the codegen and diffs it on `main` only: it
-# catches drift in vendored inputs, which a source-only pull request cannot
-# introduce.
+# merge. `freshness` regenerates the codegen and diffs it on a push to `main`
+# and on a dispatch: it catches drift in vendored inputs, which a source-only
+# pull request cannot introduce.
 
 jobs:
   validate:
     name: Build + test
-    runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
+    runs-on: [self-hosted, macOS, ARM64, withmarfa]
     # Max observed 6m54s, median 2m01s. The 3.4x spread is contention on the
     # shared pool, so the bound has to clear the max rather than the median.
     timeout-minutes: 15
@@ -50,7 +50,7 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.CI_RUNNER || 'macos-latest' }}
+    runs-on: [self-hosted, macOS, ARM64, withmarfa]
     # Three codegen regenerations plus a git diff have taken up to 3m50s.
     timeout-minutes: 10
     steps:

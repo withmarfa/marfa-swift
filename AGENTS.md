@@ -6,13 +6,13 @@ Under rebuild. This repository is becoming the Swift package `Marfa`, product `M
 
 - **Every version is the previous one plus 0.0.1, whatever the size of the change.** Numbering starts again from 0: the first version is 0.0.1.
 - A commit's type (`feat`, `fix`, a breaking change) never decides a version.
-- A version exists only as a git tag on the monorepo, and tags are August's. The monorepo's release workflow reads the tag and brings the package its version; this repository's own `release.yml` goes with the earlier engine, and agents never add a release workflow here, create a tag, or write a version into a file.
+- A version exists only as a git tag on the monorepo, and tags are August's. The monorepo's release workflow reads the tag and brings the package its version; this repository has no release workflow, and agents never add one, create a tag, or write a version into a file.
 
 ## In force
 
 - American English in code, comments and commits. Scoped Conventional Commits (`feat(package):`, `fix(ci):`).
 - Feature branches and pull requests; never push `main`. A session merges its own pull request once every required check is green and every finding its reviewers raised is fixed: squash, branch deleted.
-- Every Actions workflow runs on the self-hosted runner pool, never on GitHub-hosted runners. The workflows that break this today (`release.yml`, `consumer-pins.yml`, `spec-drift.yml`, and `ci.yml`'s hosted fallback) go with the earlier engine.
+- Every Actions workflow runs on the self-hosted runner pool, never on GitHub-hosted runners.
 - No personal details of any machine or person in this repository: no absolute paths, hostnames, account names or credentials.
 - Removed means gone: no shims, no aliases, no compatibility paths.
 - A comment survives only if it explains a why the code cannot.
