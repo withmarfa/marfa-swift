@@ -1,12 +1,18 @@
 # marfa-swift-sdk
 
-Under rebuild. This repository is becoming the Swift package `Marfa`, product `Marfa`: a thin layer over `MarfaCore`, the Rust engine every native client embeds, built from the monorepo `withmarfa/marfa`. The package will do no networking, storage or syncing of its own; the core does all three. Until that lands the tree still holds the earlier SwiftData engine (`MarfaSDK`), which is not supported and goes in the change that puts `Marfa` in its place, not before.
+Under rebuild. This repository is the Swift package `Marfa`, product `Marfa`: a thin layer over `MarfaCore`, the Rust engine every native client embeds, built from the monorepo `withmarfa/marfa`. The package does no networking, storage or syncing of its own; the core does all three.
+
+## Layout and build
+
+- Three targets. `MarfaCoreFFI` is the core as a binary, `Frameworks/MarfaCoreFFI.xcframework`, gitignored. `MarfaCore` is the Swift glue UniFFI generates for it, committed. `Marfa` is the hand-written layer apps import.
+- `core.pin` names the monorepo commit the package is built against. `scripts/core.sh` checks that commit out, runs its `core/bindings/swift/build.sh`, and copies the framework and the glue in; CI fails when the committed glue differs from what the pinned commit generates.
+- After `scripts/core.sh`: `swift build` to build, `swift test` to test.
 
 ## Versions
 
 - **Every version is the previous one plus 0.0.1, whatever the size of the change.** Numbering starts again from 0: the first version is 0.0.1.
 - A commit's type (`feat`, `fix`, a breaking change) never decides a version.
-- A version exists only as a git tag on the monorepo, and tags are August's. The monorepo's release workflow reads the tag and brings the package its version; this repository has no release workflow, and agents never add one, create a tag, or write a version into a file.
+- A version exists only as a git tag on the monorepo, and tags are the maintainer's. The monorepo's release workflow reads the tag and brings the package its version; this repository has no release workflow, and agents never add one, create a tag, or write a version into a file.
 
 ## In force
 
