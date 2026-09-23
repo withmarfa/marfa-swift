@@ -41,12 +41,20 @@ jobs:
 
       - name: Select Xcode
         run: |
-          latest=$( { ls -1 /Applications/ | grep -E '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1; } || true )
-          if [[ -z "$latest" ]]; then
+          shopt -s nullglob
+          apps=(/Applications/Xcode*.app)
+          if (( ${#apps[@]} == 0 )); then
             echo "::error::This runner carries the xcode label and has no Xcode in /Applications."
             exit 1
           fi
-          echo "DEVELOPER_DIR=/Applications/$latest/Contents/Developer" >> "$GITHUB_ENV"
+          latest="$(printf '%s\n' "${apps[@]}" | sort -V | tail -1)"
+          echo "DEVELOPER_DIR=${latest}/Contents/Developer" >> "$GITHUB_ENV"
+
+      # Everything but the glue, which UniFFI writes and the pin decides.
+      - name: Lint
+        run: |
+          swift format lint --strict --configuration .swift-format -r \
+            Package.swift Sources/Marfa Sources/MarfaCore/Names.swift Tests Examples/MarfaSample/Sources
 
       # Homebrew's rustup is keg-only, so nothing it installs is on the default
       # PATH, and cargo-swift is wherever `cargo install` put it.

@@ -34,10 +34,11 @@ public final class WorkingCopy: Sendable {
         queue = Queue(core: core)
     }
 
-    /// Opens the store at `store`, making it when absent. Without a server
-    /// it reads what it holds and queues writes; with one it also hydrates,
-    /// catches up, follows and drains. A second opener of one store gets a
-    /// reading handle.
+    /// Opens the store at `store`, making it when absent.
+    ///
+    /// Without a server it reads what it holds and queues writes; with one it
+    /// also hydrates, catches up, follows and drains. A second opener of one
+    /// store gets a reading handle.
     public static func open(store: URL, server: Server? = nil) async throws -> WorkingCopy {
         let core = try await background {
             try Core.open(path: store.path, url: server?.url.absoluteString, key: server?.key)
@@ -79,10 +80,11 @@ public final class WorkingCopy: Sendable {
         }
     }
 
-    /// Every change to the copy while the stream is held: the writes this
-    /// working copy makes, and, where it has a server, each event the server
-    /// sends as it lands. A reader is told each time the writer saves.
-    /// Ending the iteration stops what feeds it.
+    /// Every change to the copy while the stream is held.
+    ///
+    /// That is the writes this working copy makes and, where it has a server,
+    /// each event the server sends as it lands. A reader is told each time the
+    /// writer saves. Ending the iteration stops what feeds it.
     public func changes() -> AsyncStream<Change> {
         AsyncStream { continuation in
             let token = observers.add(continuation)
@@ -134,7 +136,9 @@ public struct Items: Sendable {
     let core: Core
     let observers: Observers
 
-    public func list(_ filters: ListFilters = ListFilters(), sort: Sort = Sort(field: .createdAt, direction: .descending))
+    public func list(
+        _ filters: ListFilters = ListFilters(), sort: Sort = Sort(field: .createdAt, direction: .descending)
+    )
         async throws -> [Item]
     {
         try await background { [core] in try core.list(filters: filters.core, sort: sort).map(Item.init) }
@@ -204,8 +208,7 @@ public struct Edges: Sendable {
         return try await write { core in try core.createEdge(draft: draft) }
     }
 
-    public func update(_ id: String, properties: [String: JSONValue], baseVersion: Int64) async throws -> QueuedWrite
-    {
+    public func update(_ id: String, properties: [String: JSONValue], baseVersion: Int64) async throws -> QueuedWrite {
         let edit = CoreEdgeEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion)
         return try await write { core in try core.updateEdge(id: id, edit: edit) }
     }
@@ -290,8 +293,9 @@ public struct Blobs: Sendable {
         return written
     }
 
-    /// Where a blob's bytes are held, fetched first where they are not. With
-    /// no bytes and no way to fetch them, `MarfaError.BytesAbsent`.
+    /// Where a blob's bytes are held, fetched first where they are not.
+    ///
+    /// With no bytes and no way to fetch them, `MarfaError.BytesAbsent`.
     public func get(_ hash: String) async throws -> URL {
         URL(fileURLWithPath: try await background { [core] in try core.blob(hash: hash) })
     }

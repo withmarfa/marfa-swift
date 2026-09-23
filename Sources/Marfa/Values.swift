@@ -92,7 +92,9 @@ public struct SearchHit: Sendable, Hashable {
     }
 }
 
-/// A create, before it is queued. The tags are queued as writes of their own.
+/// A create, before it is queued.
+///
+/// The tags are queued as writes of their own.
 public struct Draft: Sendable, Hashable {
     public var type: String
     public var properties: [String: JSONValue]
@@ -137,8 +139,10 @@ public struct Edit: Sendable, Hashable {
     }
 }
 
-/// Narrowing for a list. Leaving `state` unset answers the active state, as
-/// the server does; `allStates` lifts that, and a named state wins.
+/// Narrowing for a list.
+///
+/// Leaving `state` unset answers the active state, as the server does;
+/// `allStates` lifts that, and a named state wins.
 public struct ListFilters: Sendable, Hashable {
     public var type: String?
     public var state: ItemState?

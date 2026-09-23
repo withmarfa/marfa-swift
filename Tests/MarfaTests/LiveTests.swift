@@ -3,8 +3,9 @@ import Testing
 
 @testable import Marfa
 
-/// The server a live test runs against, named by `MARFA_API_URL` and
-/// `MARFA_API_KEY`. Without them the live tests are skipped by name.
+/// The server a live test runs against, named by `MARFA_API_URL` and `MARFA_API_KEY`.
+///
+/// Without them the live tests are skipped by name.
 enum Live {
     static let server: Server? = {
         let environment = ProcessInfo.processInfo.environment
@@ -32,7 +33,8 @@ struct LiveServer {
         let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let title = "Live \(UUID())"
-        let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": .string(title), "body": "b"], tier: .feed))
+        let created = try await copy.items.create(
+            Draft(type: "core.note", properties: ["title": .string(title), "body": "b"], tier: .feed))
         let tagged = try await copy.tags.add("favorite", to: created.itemId ?? "")
         let report = try await copy.queue.drain()
         let verdicts = report.verdicts.filter { [created.id, tagged.id].contains($0.id) }.map(\.verdict)
@@ -44,7 +46,8 @@ struct LiveServer {
     @Test func attachedBytesAreFetchedByAStoreThatNeverHeldThem() async throws {
         let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-        let note = try await copy.items.create(Draft(type: "core.note", properties: ["title": "with a file", "body": "b"], tier: .feed))
+        let note = try await copy.items.create(
+            Draft(type: "core.note", properties: ["title": "with a file", "body": "b"], tier: .feed))
         let file = FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).txt")
         let bytes = Data("bytes \(UUID())\n".utf8)
         try bytes.write(to: file)

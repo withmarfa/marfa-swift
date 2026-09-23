@@ -1,9 +1,10 @@
 import Foundation
 import Security
 
-/// Where a working copy's slice comes from: a server, and the key that
-/// reaches it. The key is held in memory for as long as the working copy is
-/// open and never written by the package.
+/// Where a working copy's slice comes from: a server, and the key that reaches it.
+///
+/// The key is held in memory for as long as the working copy is open and never
+/// written by the package.
 public struct Server: Sendable, Hashable {
     public var url: URL
     public var key: String

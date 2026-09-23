@@ -23,9 +23,13 @@ enum Scenario {
 
             case "write":
                 let first = try await copy.items.create(
-                    Draft(type: "core.note", properties: ["title": "Sample first", "body": "written offline"], tier: .feed))
+                    Draft(
+                        type: "core.note", properties: ["title": "Sample first", "body": "written offline"], tier: .feed
+                    ))
                 let second = try await copy.items.create(
-                    Draft(type: "core.note", properties: ["title": "Sample second", "body": "the other end"], tier: .feed))
+                    Draft(
+                        type: "core.note", properties: ["title": "Sample second", "body": "the other end"], tier: .feed)
+                )
                 let firstId = first.itemId ?? ""
                 let held = try await copy.items.get(firstId)
                 _ = try await copy.items.update(
@@ -39,8 +43,11 @@ enum Scenario {
                 print("queued \(queued.count) write(s)")
                 for write in queued { print("  \(write.kind)  \(describe(write.verdict))") }
                 let offline = try await copy.queue.drain()
-                print("drain with the server away: sent \(offline.sent), answered \(offline.verdicts.filter { $0.verdict != nil }.count)")
-                expect(offline.verdicts.allSatisfy { $0.verdict == nil }, "a drain with the server away answered a write")
+                print(
+                    "drain with the server away: sent \(offline.sent), answered \(offline.verdicts.filter { $0.verdict != nil }.count)"
+                )
+                expect(
+                    offline.verdicts.allSatisfy { $0.verdict == nil }, "a drain with the server away answered a write")
 
             case "drain":
                 let report = try await copy.queue.drain()
