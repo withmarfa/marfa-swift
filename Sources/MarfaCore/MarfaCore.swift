@@ -1009,6 +1009,10 @@ open class MarfaCore: MarfaCoreProtocol, @unchecked Sendable {
     }
 
     
+    /**
+     * Opens the file at `path`, creating it when absent. `url` and `key`
+     * go together; without them only local reads work.
+     */
 public static func `open`(path: String, url: String?, key: String?)throws  -> MarfaCore  {
     return try  FfiConverterTypeMarfaCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_constructor_marfacore_open(
@@ -1020,8 +1024,6 @@ public static func `open`(path: String, url: String?, key: String?)throws  -> Ma
 }
     
     /**
-     * Opens the file at `path`, creating it when absent. `url` and `key`
-     * go together; without them only local reads work.
      * Opens a store another process writes, to read it only: never the
      * writer, never a write, and a path with no store is refused.
      */
@@ -1467,8 +1469,8 @@ public func FfiConverterTypeMarfaCore_lower(_ value: MarfaCore) -> UInt64 {
 
 
 /**
- * A held stream, stopped by `stop`. The call returns at once; the thread
- * reading the stream ends at the server's next frame.
+ * A held stream, stopped by `stop` or by letting it go. The follow ends
+ * within a quarter second of either, and `ended` is called once it has.
  */
 public protocol SubscriptionProtocol: AnyObject, Sendable {
     
@@ -1476,8 +1478,8 @@ public protocol SubscriptionProtocol: AnyObject, Sendable {
     
 }
 /**
- * A held stream, stopped by `stop`. The call returns at once; the thread
- * reading the stream ends at the server's next frame.
+ * A held stream, stopped by `stop` or by letting it go. The follow ends
+ * within a quarter second of either, and `ended` is called once it has.
  */
 open class Subscription: SubscriptionProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -4647,10 +4649,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_subscription_stop() != 64667) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_marfacore_open() != 16541) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_marfacore_open() != 37008) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_marfacore_open_reader() != 14017) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_marfacore_open_reader() != 52709) {
         return InitializationResult.apiChecksumMismatch
     }
 

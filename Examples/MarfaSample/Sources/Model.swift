@@ -28,11 +28,14 @@ final class Model {
                 _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
             }
             await refresh()
-            for await _ in copy.changes() {
+            for await change in copy.changes() {
+                if case .stopped(let error) = change.origin {
+                    message = "no longer following the server: \(error.message)"
+                }
                 await refresh()
             }
         } catch {
-            message = "\(error)"
+            message = error.localizedDescription
         }
     }
 
@@ -46,7 +49,7 @@ final class Model {
             }
             queued = try await copy.queue.all()
         } catch {
-            message = "\(error)"
+            message = error.localizedDescription
         }
     }
 
@@ -56,7 +59,7 @@ final class Model {
             try await work(copy)
             message = what
         } catch {
-            message = "\(what): \(error)"
+            message = "\(what): \(error.localizedDescription)"
         }
         await refresh()
     }

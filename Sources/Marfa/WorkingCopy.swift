@@ -1,17 +1,16 @@
 import Foundation
 import MarfaCore
+import MarfaCoreNames
 import Synchronization
 
 /// A local copy of a slice of one server, and the queue of writes it holds
 /// for that server.
 ///
-/// Every call runs the core off the caller's thread: the core blocks on its
-/// store and on the network, and an app's main actor must not.
+/// Every call that can wait on the store or the network runs the core off
+/// the caller's thread, which an app's main actor must never wait on.
 public final class WorkingCopy: Sendable {
     let core: Core
-    let hasServer: Bool
-    let reading: Bool
-    let observers = Observers()
+    let feed: Feed
 
     public let items: Items
     public let edges: Edges
@@ -21,29 +20,31 @@ public final class WorkingCopy: Sendable {
     public let blobs: Blobs
     public let queue: Queue
 
-    init(core: Core, hasServer: Bool, reading: Bool) {
+    init(core: Core, hasServer: Bool) {
         self.core = core
-        self.hasServer = hasServer
-        self.reading = reading
-        items = Items(core: core, observers: observers)
-        edges = Edges(core: core, observers: observers)
-        tags = Tags(core: core, observers: observers)
-        metadata = Metadata(core: core, observers: observers)
-        extensions = Extensions(core: core, observers: observers)
-        blobs = Blobs(core: core, observers: observers)
-        queue = Queue(core: core)
+        let source: Feed.Source =
+            core.heldHandle() == .reader ? .watch : hasServer ? .follow : .none
+        feed = Feed(core: core, source: source)
+        items = Items(core: core, feed: feed)
+        edges = Edges(core: core, feed: feed)
+        tags = Tags(core: core, feed: feed)
+        metadata = Metadata(core: core, feed: feed)
+        extensions = Extensions(core: core, feed: feed)
+        blobs = Blobs(core: core, feed: feed)
+        queue = Queue(core: core, feed: feed)
     }
 
     /// Opens the store at `store`, making it when absent.
     ///
     /// Without a server it reads what it holds and queues writes; with one it
     /// also hydrates, catches up, follows and drains. A second opener of one
-    /// store gets a reading handle.
+    /// store gets a reading handle, and its `changes()` watch for the
+    /// writer's saves.
     public static func open(store: URL, server: Server? = nil) async throws -> WorkingCopy {
         let core = try await background {
             try Core.open(path: store.path, url: server?.url.absoluteString, key: server?.key)
         }
-        return WorkingCopy(core: core, hasServer: server != nil, reading: false)
+        return WorkingCopy(core: core, hasServer: server != nil)
     }
 
     /// Opens a store another process writes, to read it only: it never takes
@@ -51,7 +52,7 @@ public final class WorkingCopy: Sendable {
     /// and it refuses a path where no store has been made.
     public static func openReader(store: URL) async throws -> WorkingCopy {
         let core = try await background { try Core.openReader(path: store.path) }
-        return WorkingCopy(core: core, hasServer: false, reading: true)
+        return WorkingCopy(core: core, hasServer: false)
     }
 
     /// The writer, or a reader of a store another process writes.
@@ -63,12 +64,20 @@ public final class WorkingCopy: Sendable {
 
     /// Replaces the copy with every item of `types` at `tier`.
     public func hydrate(types: [String], tier: Tier) async throws -> HydrateReport {
-        try await background { [core] in try core.hydrate(types: types, tier: tier) }
+        let report = try await background { [core] in try core.hydrate(types: types, tier: tier) }
+        feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
+        feed.resume()
+        return report
     }
 
     /// Applies every event since the last hydration or catch-up.
     public func catchUp() async throws -> CatchUpReport {
-        try await background { [core] in try core.catchUp() }
+        let report = try await background { [core] in try core.catchUp() }
+        if report.applied > 0 {
+            feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+        }
+        feed.resume()
+        return report
     }
 
     /// Full-text search over titles, bodies and tags, best match first.
@@ -80,38 +89,31 @@ public final class WorkingCopy: Sendable {
         }
     }
 
-    /// Every change to the copy while the stream is held.
+    /// What changes in the copy while the stream is held, to read again by.
     ///
-    /// That is the writes this working copy makes and, where it has a server,
-    /// each event the server sends as it lands. A reader is told each time the
-    /// writer saves. Ending the iteration stops what feeds it.
+    /// Each write this working copy makes, told once by the call that made
+    /// it; for a writer with a server, each event its held event stream
+    /// applies; for a reader, each save the writer makes; and a hydration, a
+    /// catch-up that applied events or a drain that recorded verdicts, after
+    /// which many rows may differ. One event stream feeds every stream held.
+    /// Where what feeds them stops with an error, each is told with
+    /// `.stopped` and goes on hearing local writes, and the next hydration,
+    /// catch-up or stream starts it again. Ending the iteration lets the
+    /// stream go.
     public func changes() -> AsyncStream<Change> {
-        AsyncStream { continuation in
-            let token = observers.add(continuation)
-            if reading {
-                let watch = Task { [core] in
-                    var seen = try? core.dataVersion()
-                    while !Task.isCancelled {
-                        try? await Task.sleep(for: .milliseconds(250))
-                        guard let now = try? core.dataVersion(), now != seen else { continue }
-                        seen = now
-                        continuation.yield(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil))
-                    }
-                }
-                continuation.onTermination = { [observers] _ in
-                    watch.cancel()
-                    observers.remove(token)
-                }
-            } else if hasServer {
-                let subscription = core.follow(listener: Listener(continuation))
-                continuation.onTermination = { [observers] _ in
-                    subscription.stop()
-                    observers.remove(token)
-                }
-            } else {
-                continuation.onTermination = { [observers] _ in observers.remove(token) }
-            }
+        let (stream, continuation) = AsyncStream<Change>.makeStream()
+        if let token = feed.add(continuation) {
+            continuation.onTermination = { [feed] _ in feed.remove(token) }
         }
+        return stream
+    }
+
+    /// Ends every stream `changes()` handed out and stops what fed them.
+    ///
+    /// The store, and a writer's claim on it, are let go once nothing holds
+    /// this working copy any more.
+    public func close() {
+        feed.close()
     }
 }
 
@@ -124,6 +126,17 @@ public struct Change: Sendable, Hashable {
         case server(event: String, cursor: String)
         /// The writer saved; a reader reads again.
         case saved(dataVersion: Int64)
+        /// Many rows may have changed at once.
+        case refreshed(Refresh)
+        /// What fed the stream stopped with this error. Local writes are
+        /// still told.
+        case stopped(MarfaError)
+    }
+
+    public enum Refresh: Sendable, Hashable {
+        case hydrated
+        case caughtUp
+        case drained
     }
 
     public let origin: Origin
@@ -134,7 +147,7 @@ public struct Change: Sendable, Hashable {
 /// Items: read, and each write queued with its own verdict to come.
 public struct Items: Sendable {
     let core: Core
-    let observers: Observers
+    let feed: Feed
 
     public func list(
         _ filters: ListFilters = ListFilters(), sort: Sort = Sort(field: .createdAt, direction: .descending)
@@ -177,14 +190,14 @@ public struct Items: Sendable {
             try core.attach(id: id, path: file.path, attachment: attachment)
         }
         for write in [attached.upload, attached.item, attached.edge] {
-            observers.announce(write)
+            feed.announce(write)
         }
         return attached
     }
 
     private func write(_ work: @escaping @Sendable (Core) throws -> QueuedWrite) async throws -> QueuedWrite {
         let written = try await background { [core] in try work(core) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 }
@@ -192,19 +205,20 @@ public struct Items: Sendable {
 /// Edges between items, each its own write.
 public struct Edges: Sendable {
     let core: Core
-    let observers: Observers
+    let feed: Feed
 
     /// The edges the copy holds from one item.
     public func from(_ id: String) async throws -> [Edge] {
         try await background { [core] in try core.edgesFrom(id: id).map(Edge.init) }
     }
 
-    public func create(from source: String, to target: String, type: String, properties: [String: JSONValue] = [:])
-        async throws -> QueuedWrite
-    {
+    public func create(
+        from source: String, to target: String, type: String, properties: [String: JSONValue] = [:],
+        id: String? = nil
+    ) async throws -> QueuedWrite {
         let draft = CoreEdgeDraft(
             sourceId: source, targetId: target, edgeType: type, propertiesJson: try Properties.text(properties),
-            id: nil)
+            id: id)
         return try await write { core in try core.createEdge(draft: draft) }
     }
 
@@ -219,7 +233,7 @@ public struct Edges: Sendable {
 
     private func write(_ work: @escaping @Sendable (Core) throws -> QueuedWrite) async throws -> QueuedWrite {
         let written = try await background { [core] in try work(core) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 }
@@ -227,17 +241,17 @@ public struct Edges: Sendable {
 /// Tags on an item, one write per tag.
 public struct Tags: Sendable {
     let core: Core
-    let observers: Observers
+    let feed: Feed
 
     public func add(_ tag: String, to id: String) async throws -> QueuedWrite {
         let written = try await background { [core] in try core.addTag(id: id, tag: tag) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 
     public func remove(_ tag: String, from id: String) async throws -> QueuedWrite {
         let written = try await background { [core] in try core.removeTag(id: id, tag: tag) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 }
@@ -245,17 +259,17 @@ public struct Tags: Sendable {
 /// An item's tags, written whole or merged into what is there.
 public struct Metadata: Sendable {
     let core: Core
-    let observers: Observers
+    let feed: Feed
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
         let written = try await background { [core] in try core.replaceMetadata(id: id, tags: tags) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 
     public func mergeTags(_ tags: [String], into id: String) async throws -> QueuedWrite {
         let written = try await background { [core] in try core.mergeMetadata(id: id, tags: tags) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 }
@@ -263,20 +277,20 @@ public struct Metadata: Sendable {
 /// An item's extension namespaces, each its own write.
 public struct Extensions: Sendable {
     let core: Core
-    let observers: Observers
+    let feed: Feed
 
     public func write(_ namespace: String, _ body: [String: JSONValue], on id: String) async throws -> QueuedWrite {
         let text = try Properties.text(body)
         let written = try await background { [core] in
             try core.writeExtension(id: id, namespace: namespace, bodyJson: text)
         }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 
     public func delete(_ namespace: String, from id: String) async throws -> QueuedWrite {
         let written = try await background { [core] in try core.deleteExtension(id: id, namespace: namespace) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 }
@@ -284,18 +298,18 @@ public struct Extensions: Sendable {
 /// Blobs' bytes: uploaded as queued writes, fetched when asked for.
 public struct Blobs: Sendable {
     let core: Core
-    let observers: Observers
+    let feed: Feed
 
     /// Holds a file's bytes beside the store and queues their upload.
     public func put(file: URL, mimeType: String? = nil) async throws -> QueuedWrite {
         let written = try await background { [core] in try core.putBlob(path: file.path, mimeType: mimeType) }
-        observers.announce(written)
+        feed.announce(written)
         return written
     }
 
     /// Where a blob's bytes are held, fetched first where they are not.
     ///
-    /// With no bytes and no way to fetch them, `MarfaError.BytesAbsent`.
+    /// With no bytes and no way to fetch them, `MarfaError.bytesAbsent`.
     public func get(_ hash: String) async throws -> URL {
         URL(fileURLWithPath: try await background { [core] in try core.blob(hash: hash) })
     }
@@ -309,6 +323,7 @@ public struct Blobs: Sendable {
 /// The writes the copy holds for the server, and what became of each.
 public struct Queue: Sendable {
     let core: Core
+    let feed: Feed
 
     public func all() async throws -> [QueuedWrite] {
         try await background { [core] in try core.queue() }
@@ -316,7 +331,11 @@ public struct Queue: Sendable {
 
     /// Sends what the queue holds, once, and records each verdict.
     public func drain() async throws -> DrainReport {
-        try await background { [core] in try core.drain() }
+        let report = try await background { [core] in try core.drain() }
+        if !report.verdicts.isEmpty {
+            feed.announce(Change(origin: .refreshed(.drained), itemId: nil, edgeId: nil))
+        }
+        return report
     }
 
     /// Sends a blocked or dead write again, under a fresh key.
@@ -335,56 +354,186 @@ public struct Queue: Sendable {
     }
 }
 
-/// Runs blocking core work on a thread of its own and hands the result back.
+/// Runs blocking core work on a thread of its own and hands the result back,
+/// with the core's errors as the package's.
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
         DispatchQueue.global(qos: .userInitiated).async {
-            continuation.resume(with: Result { try work() })
+            continuation.resume(with: Result { try translated(work) })
         }
     }
 }
 
-/// The streams told of the writes this working copy makes.
-final class Observers: Sendable {
-    private let held = Mutex<[UUID: AsyncStream<Change>.Continuation]>([:])
+func translated<T>(_ work: () throws -> T) throws -> T {
+    do {
+        return try work()
+    } catch let error as CoreMarfaError {
+        throw MarfaError(error)
+    } catch let error as DecodingError {
+        throw MarfaError.decoding(message: "\(error)")
+    }
+}
 
-    func add(_ continuation: AsyncStream<Change>.Continuation) -> UUID {
+/// The streams `changes()` handed out, and the one source that feeds them.
+///
+/// That is a held event stream for a writer with a server, and a watch on the
+/// store for a reader. One however many streams are held, because two event
+/// streams on one store would each move its one cursor.
+final class Feed: Sendable {
+    enum Source {
+        case none, follow, watch
+    }
+
+    private enum Running {
+        case follow(CoreSubscription)
+        case watch(Task<Void, Never>)
+
+        func stop() {
+            switch self {
+            case .follow(let subscription): subscription.stop()
+            case .watch(let task): task.cancel()
+            }
+        }
+    }
+
+    private struct State {
+        var streams: [UUID: AsyncStream<Change>.Continuation] = [:]
+        var running: Running?
+        /// Moves with every start and stop, so a source that ends after it
+        /// was replaced cannot clear its replacement.
+        var generation = 0
+        var closed = false
+    }
+
+    let core: Core
+    let source: Source
+    private let state = Mutex(State())
+
+    init(core: Core, source: Source) {
+        self.core = core
+        self.source = source
+    }
+
+    var count: Int { state.withLock { $0.streams.count } }
+    var isRunning: Bool { state.withLock { $0.running != nil } }
+
+    /// Holds a stream and starts the source where none runs. `nil`, with
+    /// the stream finished, once the working copy is closed.
+    func add(_ continuation: AsyncStream<Change>.Continuation) -> UUID? {
         let token = UUID()
-        held.withLock { $0[token] = continuation }
-        return token
+        let added = state.withLock { state -> Bool in
+            guard !state.closed else { return false }
+            state.streams[token] = continuation
+            start(&state)
+            return true
+        }
+        if !added { continuation.finish() }
+        return added ? token : nil
     }
 
     func remove(_ token: UUID) {
-        _ = held.withLock { $0.removeValue(forKey: token) }
+        state.withLock { state in
+            state.streams.removeValue(forKey: token)
+            if state.streams.isEmpty { stop(&state) }
+        }
     }
 
-    var count: Int { held.withLock { $0.count } }
+    /// Starts the source again where streams are held and it stopped.
+    func resume() {
+        state.withLock { state in
+            if !state.streams.isEmpty { start(&state) }
+        }
+    }
+
+    func close() {
+        let streams = state.withLock { state in
+            state.closed = true
+            stop(&state)
+            defer { state.streams = [:] }
+            return Array(state.streams.values)
+        }
+        for continuation in streams { continuation.finish() }
+    }
 
     func announce(_ write: QueuedWrite) {
-        let change = Change(origin: .local(write.kind), itemId: write.itemId, edgeId: write.edgeId)
-        for continuation in held.withLock({ Array($0.values) }) {
+        announce(Change(origin: .local(write.kind), itemId: write.itemId, edgeId: write.edgeId))
+    }
+
+    func announce(_ change: Change) {
+        for continuation in state.withLock({ Array($0.streams.values) }) {
             continuation.yield(change)
+        }
+    }
+
+    /// The source of `generation` ended on its own, with `error` where it
+    /// failed rather than was stopped.
+    func ended(generation: Int, error: MarfaError?) {
+        let current = state.withLock { state -> Bool in
+            guard state.generation == generation, state.running != nil else { return false }
+            state.running = nil
+            return true
+        }
+        if current, let error {
+            announce(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
+        }
+    }
+
+    private func start(_ state: inout State) {
+        guard state.running == nil else { return }
+        state.generation += 1
+        let generation = state.generation
+        switch source {
+        case .none:
+            return
+        case .follow:
+            state.running = .follow(core.follow(listener: Listener(feed: self, generation: generation)))
+        case .watch:
+            state.running = .watch(Task { [core] in await self.watch(core, generation: generation) })
+        }
+    }
+
+    private func stop(_ state: inout State) {
+        state.running?.stop()
+        state.running = nil
+        state.generation += 1
+    }
+
+    private func watch(_ core: Core, generation: Int) async {
+        do {
+            var seen = try await background { try core.dataVersion() }
+            while !Task.isCancelled {
+                try await Task.sleep(for: .milliseconds(250))
+                let now = try await background { try core.dataVersion() }
+                guard now != seen else { continue }
+                seen = now
+                announce(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil))
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            ended(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
         }
     }
 }
 
 /// What the core tells of each event a held stream applies.
 final class Listener: CoreChangeListener, Sendable {
-    let continuation: AsyncStream<Change>.Continuation
+    let feed: Feed
+    let generation: Int
 
-    init(_ continuation: AsyncStream<Change>.Continuation) {
-        self.continuation = continuation
+    init(feed: Feed, generation: Int) {
+        self.feed = feed
+        self.generation = generation
     }
 
     func changed(change: CoreChange) {
-        continuation.yield(
+        feed.announce(
             Change(
                 origin: .server(event: change.event, cursor: change.cursor), itemId: change.itemId,
                 edgeId: change.edgeId))
     }
 
-    /// The stream ended, stopped or refused: the caller's iteration ends too.
     func ended(error: CoreMarfaError?) {
-        continuation.finish()
+        feed.ended(generation: generation, error: error.map(MarfaError.init))
     }
 }

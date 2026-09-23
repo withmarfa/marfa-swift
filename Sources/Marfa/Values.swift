@@ -1,5 +1,6 @@
 import Foundation
 import MarfaCore
+import MarfaCoreNames
 
 // The core's own values, under the package's names. Each already says what
 // the package would: a closed set, or a record with nothing to translate.
@@ -21,9 +22,81 @@ public typealias CatchUpReport = CoreCatchUpReport
 public typealias Status = CoreStatus
 public typealias Attachment = CoreAttachment
 public typealias Attached = CoreAttached
-/// Every way the core refuses or fails, each case carrying the core's own
-/// sentence and, where the server answered, its code.
-public typealias MarfaError = CoreMarfaError
+
+/// Every way the core refuses or fails.
+///
+/// Each case carries the core's own sentence as `message`, and the server's
+/// `code` where the server answered.
+public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
+    case notFound(code: String, message: String)
+    case unauthorized(code: String, message: String)
+    case forbidden(code: String, message: String)
+    case validation(code: String, message: String)
+    case unknownType(message: String)
+    case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?)
+    case server(status: UInt16, code: String, message: String)
+    case network(message: String)
+    case decoding(message: String)
+    case store(message: String)
+    case noServer(message: String)
+    case noCursor(message: String)
+    case hydrationIncomplete(message: String)
+    /// The store at `path` was made by another build; discard it and hydrate.
+    case wrongSchema(expected: String, found: String, path: String, message: String)
+    case readingHandle(message: String)
+    case catchUpTooOld(minRetainedId: String, message: String)
+    case streamIncomplete(reason: String, message: String)
+    case wrongServer(expected: String, got: String, message: String)
+    /// The item is whole and its bytes are not here, nor can they be fetched.
+    case bytesAbsent(hash: String, reason: String, message: String)
+    case invalid(message: String)
+
+    /// The core's sentence, fit to show a person.
+    public var message: String {
+        switch self {
+        case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
+            .validation(_, let message), .unknownType(let message), .rateLimited(_, let message, _),
+            .server(_, _, let message), .network(let message), .decoding(let message), .store(let message),
+            .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message),
+            .wrongSchema(_, _, _, let message), .readingHandle(let message), .catchUpTooOld(_, let message),
+            .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
+            .invalid(let message):
+            message
+        }
+    }
+
+    public var errorDescription: String? { message }
+
+    init(_ error: CoreMarfaError) {
+        switch error {
+        case .NotFound(let code, let message): self = .notFound(code: code, message: message)
+        case .Unauthorized(let code, let message): self = .unauthorized(code: code, message: message)
+        case .Forbidden(let code, let message): self = .forbidden(code: code, message: message)
+        case .Validation(let code, let message): self = .validation(code: code, message: message)
+        case .UnknownType(let message): self = .unknownType(message: message)
+        case .RateLimited(let code, let message, let retryAfterSeconds):
+            self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
+        case .Server(let status, let code, let message): self = .server(status: status, code: code, message: message)
+        case .Network(let message): self = .network(message: message)
+        case .Decoding(let message): self = .decoding(message: message)
+        case .Store(let message): self = .store(message: message)
+        case .NoServer(let message): self = .noServer(message: message)
+        case .NoCursor(let message): self = .noCursor(message: message)
+        case .HydrationIncomplete(let message): self = .hydrationIncomplete(message: message)
+        case .WrongSchema(let expected, let found, let path, let message):
+            self = .wrongSchema(expected: expected, found: found, path: path, message: message)
+        case .ReadingHandle(let message): self = .readingHandle(message: message)
+        case .CatchUpTooOld(let minRetainedId, let message):
+            self = .catchUpTooOld(minRetainedId: minRetainedId, message: message)
+        case .StreamIncomplete(let reason, let message): self = .streamIncomplete(reason: reason, message: message)
+        case .WrongServer(let expected, let got, let message):
+            self = .wrongServer(expected: expected, got: got, message: message)
+        case .BytesAbsent(let hash, let reason, let message):
+            self = .bytesAbsent(hash: hash, reason: reason, message: message)
+        case .Invalid(let message): self = .invalid(message: message)
+        }
+    }
+}
 
 /// An item as the working copy holds it.
 public struct Item: Sendable, Hashable, Identifiable {
@@ -33,6 +106,7 @@ public struct Item: Sendable, Hashable, Identifiable {
     public let state: ItemState
     public let tier: Tier?
     public let version: Int64
+    public let schemaVersion: Int64
     public let source: String
     public let sourceId: String?
     public let occurredAt: String
@@ -47,6 +121,7 @@ public struct Item: Sendable, Hashable, Identifiable {
         state = item.state
         tier = item.tier
         version = item.version
+        schemaVersion = item.schemaVersion
         source = item.source
         sourceId = item.sourceId
         occurredAt = item.occurredAt
@@ -67,6 +142,8 @@ public struct Edge: Sendable, Hashable, Identifiable {
     public let edgeType: String
     public let properties: [String: JSONValue]
     public let version: Int64
+    public let createdAt: String
+    public let updatedAt: String
 
     init(_ edge: CoreEdge) throws {
         id = edge.id
@@ -75,6 +152,8 @@ public struct Edge: Sendable, Hashable, Identifiable {
         edgeType = edge.edgeType
         properties = try Properties.object(edge.propertiesJson)
         version = edge.version
+        createdAt = edge.createdAt
+        updatedAt = edge.updatedAt
     }
 }
 
@@ -94,48 +173,58 @@ public struct SearchHit: Sendable, Hashable {
 
 /// A create, before it is queued.
 ///
-/// The tags are queued as writes of their own.
+/// The tags are queued as writes of their own. Where `sourceId` names a row
+/// the server already holds, the create lands on it, and `baseVersion` makes
+/// that conditional on the version it was read at.
 public struct Draft: Sendable, Hashable {
     public var type: String
     public var properties: [String: JSONValue]
     public var tags: [String]
     public var tier: Tier?
     public var id: String?
+    public var source: String?
     public var sourceId: String?
     public var occurredAt: String?
+    public var baseVersion: Int64?
 
     public init(
         type: String, properties: [String: JSONValue] = [:], tags: [String] = [], tier: Tier? = nil,
-        id: String? = nil, sourceId: String? = nil, occurredAt: String? = nil
+        id: String? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil,
+        baseVersion: Int64? = nil
     ) {
         self.type = type
         self.properties = properties
         self.tags = tags
         self.tier = tier
         self.id = id
+        self.source = source
         self.sourceId = sourceId
         self.occurredAt = occurredAt
+        self.baseVersion = baseVersion
     }
 
     func core() throws -> CoreDraft {
         CoreDraft(
             type: type, id: id, propertiesJson: try Properties.text(properties), tags: tags, tier: tier,
-            source: nil, sourceId: sourceId, occurredAt: occurredAt, baseVersion: nil)
+            source: source, sourceId: sourceId, occurredAt: occurredAt, baseVersion: baseVersion)
     }
 }
 
-/// A change to an item: whole field values, and the version it was read at.
+/// A change to an item: whole field values, the version it was read at, and
+/// a new `sourceId` where the item moves.
 public struct Edit: Sendable, Hashable {
     public var properties: [String: JSONValue]
     public var baseVersion: Int64
+    public var sourceId: String?
 
-    public init(properties: [String: JSONValue], baseVersion: Int64) {
+    public init(properties: [String: JSONValue], baseVersion: Int64, sourceId: String? = nil) {
         self.properties = properties
         self.baseVersion = baseVersion
+        self.sourceId = sourceId
     }
 
     func core() throws -> CoreEdit {
-        CoreEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion, sourceId: nil)
+        CoreEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion, sourceId: sourceId)
     }
 }
 

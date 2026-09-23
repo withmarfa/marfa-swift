@@ -3,8 +3,8 @@ import Marfa
 
 /// The sample run unattended, one phase per launch, printing each step and
 /// checking what it expects: `hydrate` with the server up, `write` with it
-/// stopped, `drain` once it is back, and `catch-up` after a change made
-/// elsewhere.
+/// stopped, `drain` once it is back, and `catch-up`, which makes a note
+/// through a second working copy and reads it back through this one.
 enum Scenario {
     static func run(_ phase: String, configuration: Configuration) async -> Bool {
         var passed = true
@@ -42,12 +42,22 @@ enum Scenario {
                 let queued = try await copy.queue.all()
                 print("queued \(queued.count) write(s)")
                 for write in queued { print("  \(write.kind)  \(describe(write.verdict))") }
+                // Two creates, the edit, the tag, the link, and the three
+                // writes an attachment is.
+                expect(queued.count == 8, "queued \(queued.count) writes, not 8")
                 let offline = try await copy.queue.drain()
-                print(
-                    "drain with the server away: sent \(offline.sent), answered \(offline.verdicts.filter { $0.verdict != nil }.count)"
-                )
+                let answered = offline.verdicts.filter { $0.verdict != nil }.count
+                print("drain with the server away: sent \(offline.sent), answered \(answered)")
+                expect(offline.sent > 0, "a drain with the server away tried nothing")
+                expect(answered == 0, "a drain with the server away answered a write")
+                // A write that waits on one still unanswered is held for it,
+                // which is the only verdict a drain reaches with no server.
+                let after = try await copy.queue.all()
+                let waiting = after.filter { $0.verdict == .blocked(reason: .awaitingDependency) }.count
+                print("held for an earlier write: \(waiting)")
                 expect(
-                    offline.verdicts.allSatisfy { $0.verdict == nil }, "a drain with the server away answered a write")
+                    after.allSatisfy { $0.verdict == nil || $0.verdict == .blocked(reason: .awaitingDependency) },
+                    "a write was answered with the server away")
 
             case "drain":
                 let report = try await copy.queue.drain()
@@ -60,10 +70,12 @@ enum Scenario {
                 expect(edited?.tags.contains("favorite") == true, "the edit lost its tag")
 
             case "catch-up":
+                let title = "Made elsewhere \(UUID())"
+                try await makeElsewhere(title, configuration: configuration)
                 let report = try await copy.catchUp()
                 print("caught up: applied \(report.applied)")
                 let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
-                expect(notes.contains { $0.title == "Made by the binary" }, "the change made elsewhere did not arrive")
+                expect(notes.contains { $0.title == title }, "the change made elsewhere did not arrive")
 
             default:
                 print("name a phase: hydrate, write, drain or catch-up")
@@ -75,5 +87,20 @@ enum Scenario {
         }
         print("scenario \(phase): \(passed ? "passed" : "failed")")
         return passed
+    }
+
+    /// A note made through a working copy of its own beside this one's
+    /// store, and sent.
+    static func makeElsewhere(_ title: String, configuration: Configuration) async throws {
+        let store = configuration.store.deletingLastPathComponent().appending(path: "elsewhere-\(UUID()).sqlite")
+        let elsewhere = try await WorkingCopy.open(store: store, server: configuration.server)
+        _ = try await elsewhere.hydrate(types: ["core.note"], tier: .feed)
+        _ = try await elsewhere.items.create(
+            Draft(type: "core.note", properties: ["title": .string(title), "body": "elsewhere"], tier: .feed))
+        let sent = try await elsewhere.queue.drain()
+        guard !sent.verdicts.isEmpty, sent.verdicts.allSatisfy({ $0.verdict == .accepted }) else {
+            throw MarfaError.invalid(message: "the note made elsewhere was not accepted: \(sent.verdicts)")
+        }
+        print("made \(title) elsewhere")
     }
 }

@@ -5,6 +5,9 @@ import Foundation
 public enum JSONValue: Sendable, Hashable {
     case null
     case bool(Bool)
+    /// A number written without a fraction or an exponent, kept exact: a
+    /// `Double` holds integers exactly only up to 2^53.
+    case integer(Int64)
     case number(Double)
     case string(String)
     case array([JSONValue])
@@ -14,8 +17,17 @@ public enum JSONValue: Sendable, Hashable {
         if case .string(let value) = self { value } else { nil }
     }
 
+    /// Either kind of number, as a `Double`.
     public var number: Double? {
-        if case .number(let value) = self { value } else { nil }
+        switch self {
+        case .number(let value): value
+        case .integer(let value): Double(value)
+        default: nil
+        }
+    }
+
+    public var integer: Int64? {
+        if case .integer(let value) = self { value } else { nil }
     }
 
     public var bool: Bool? {
@@ -30,6 +42,8 @@ extension JSONValue: Codable {
             self = .null
         } else if let value = try? container.decode(Bool.self) {
             self = .bool(value)
+        } else if let value = try? container.decode(Int64.self) {
+            self = .integer(value)
         } else if let value = try? container.decode(Double.self) {
             self = .number(value)
         } else if let value = try? container.decode(String.self) {
@@ -46,6 +60,7 @@ extension JSONValue: Codable {
         switch self {
         case .null: try container.encodeNil()
         case .bool(let value): try container.encode(value)
+        case .integer(let value): try container.encode(value)
         case .number(let value): try container.encode(value)
         case .string(let value): try container.encode(value)
         case .array(let value): try container.encode(value)
@@ -60,7 +75,7 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, Expre
 {
     public init(nilLiteral: ()) { self = .null }
     public init(booleanLiteral value: Bool) { self = .bool(value) }
-    public init(integerLiteral value: Int) { self = .number(Double(value)) }
+    public init(integerLiteral value: Int64) { self = .integer(value) }
     public init(floatLiteral value: Double) { self = .number(value) }
     public init(stringLiteral value: String) { self = .string(value) }
     public init(arrayLiteral elements: JSONValue...) { self = .array(elements) }

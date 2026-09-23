@@ -3,9 +3,9 @@ import Security
 
 /// Where a working copy's slice comes from: a server, and the key that reaches it.
 ///
-/// The key is held in memory for as long as the working copy is open and never
-/// written by the package.
-public struct Server: Sendable, Hashable {
+/// A working copy holds the key in memory and never writes it to its store;
+/// keeping it between launches is `Keychain`'s job, and the caller's choice.
+public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible {
     public var url: URL
     public var key: String
 
@@ -13,6 +13,10 @@ public struct Server: Sendable, Hashable {
         self.url = url
         self.key = key
     }
+
+    /// The server, never the key, so a log that prints one leaks nothing.
+    public var description: String { "Server(\(url.absoluteString))" }
+    public var debugDescription: String { description }
 }
 
 /// A key kept in the Keychain as a generic password.

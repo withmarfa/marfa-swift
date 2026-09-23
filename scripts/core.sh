@@ -19,6 +19,11 @@ if [[ -n "${MARFA_MONOREPO:-}" ]]; then
     echo "core.sh: ${src} is at ${head}, and core.pin names ${pin}" >&2
     exit 1
   fi
+  # A change on top of the pin would build glue the pin does not generate.
+  if [[ -n "$(git -C "${src}" status --porcelain)" ]]; then
+    echo "core.sh: ${src} has changes on top of ${pin}" >&2
+    exit 1
+  fi
 else
   src="${root}/.build/marfa"
   if [[ ! -d "${src}/.git" ]]; then
