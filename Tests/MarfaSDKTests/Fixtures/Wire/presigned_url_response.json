@@ -1,4 +1,0 @@
-{
-  "expires_in": 300,
-  "url": "https://blobs.example.com/sha256:abcdef?sig=xyz"
-}

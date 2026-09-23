@@ -1,9 +1,0 @@
-{
-  "action": "item.create",
-  "details": { "type": "core.note", "id": "itm_01JABCXYZ" },
-  "id": "aud_01ABC",
-  "key_id": "key_01ABC",
-  "resource_id": "itm_01JABCXYZ",
-  "resource_type": "item",
-  "timestamp": "2026-04-14T10:00:00Z"
-}
