@@ -19,6 +19,13 @@ enum Live {
     }
 }
 
+/// Where the live tests are required, a missing server fails rather than
+/// skipping them, so a run that lost its server cannot pass on the unit tests.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil))
+func theLiveTestsHaveAServerWhereTheyAreRequired() {
+    #expect(Live.server != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_API_URL or MARFA_API_KEY is not")
+}
+
 @Suite(.enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"))
 struct LiveServer {
     @Test func aWriteMadeHereIsAnsweredAndHeld() async throws {

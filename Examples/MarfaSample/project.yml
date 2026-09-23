@@ -28,6 +28,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.withmarfa.sample
         PRODUCT_NAME: MarfaSample
         ENABLE_HARDENED_RUNTIME: NO
+        # The core ships arm64 slices only.
+        EXCLUDED_ARCHS: x86_64
   MarfaSample-iOS:
     type: application
     platform: iOS

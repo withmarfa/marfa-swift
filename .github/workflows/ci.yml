@@ -2,135 +2,110 @@ name: CI
 
 on:
   pull_request:
-    # No paths-ignore here: a required status check must report on every PR,
-    # including docs-only ones, or branch protection blocks the merge.
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - 'LICENSE'
   workflow_dispatch:
 
-# A pull request's next push supersedes the run before it, so canceling is
-# free there. On `main` every merge is a commit nothing else will validate,
-# and GitHub keeps one pending run per concurrency group, canceling the
-# pending one when a newer arrives: a shared group would drop commits that
-# land close together. So `main` gets a group per commit.
+# A pull request's next push supersedes the run before it. On `main` every
+# merge keeps its own run, because a shared group would drop commits that land
+# close together.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# `validate` (build and the full suite) runs on every pull request and every
-# merge. `freshness` regenerates the codegen and diffs it on a push to `main`
-# and on a dispatch: it catches drift in vendored inputs, which a source-only
-# pull request cannot introduce.
-
 jobs:
   validate:
     name: Build + test
-    runs-on: [self-hosted, macOS, ARM64, withmarfa]
-    # Max observed 6m54s, median 2m01s. The 3.4x spread is contention on the
-    # shared pool, so the bound has to clear the max rather than the median.
-    timeout-minutes: 15
+    # `xcode` because the core's iOS slices and the sample need the iOS SDK,
+    # which a Command Line Tools install does not carry.
+    runs-on: [self-hosted, macOS, ARM64, xcode, withmarfa]
+    timeout-minutes: 60
+    env:
+      MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
     steps:
       - uses: actions/checkout@v7
 
-      - uses: ./.github/actions/swift-toolchain
+      - name: Read the pin
+        id: pin
+        run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
 
-      - name: Build
-        run: swift build
+      # The monorepo is private. SHIPPING_GAP_TOKEN is the organization's
+      # secret that reads it; the name is the guard it was first cut for.
+      - name: Check out the core at the pin
+        uses: actions/checkout@v7
+        with:
+          repository: withmarfa/marfa
+          ref: ${{ steps.pin.outputs.sha }}
+          token: ${{ secrets.SHIPPING_GAP_TOKEN }}
+          path: .build/marfa
 
-      - name: Test
-        run: swift test --parallel
-
-  freshness:
-    name: Codegen freshness
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-      || github.event_name == 'workflow_dispatch'
-    runs-on: [self-hosted, macOS, ARM64, withmarfa]
-    # Three codegen regenerations plus a git diff have taken up to 3m50s.
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/swift-toolchain
-
-      - name: Codegen freshness (wire types)
+      - name: Select Xcode
         run: |
-          swift run codegen-wire
-          if ! git diff --exit-code -- Sources/MarfaSDK/Types/Wire/Generated; then
-            echo "::error::codegen-wire output is stale. Run 'swift run codegen-wire' (or './scripts/sync-openapi.sh' if the OpenAPI snapshot is behind) locally and commit the delta."
+          latest=$( { ls -1 /Applications/ | grep -E '^Xcode(_[0-9.]+)?\.app$' | sort -V | tail -1; } || true )
+          if [[ -z "$latest" ]]; then
+            echo "::error::This runner carries the xcode label and has no Xcode in /Applications."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=/Applications/$latest/Contents/Developer" >> "$GITHUB_ENV"
+
+      # Homebrew's rustup is keg-only, so nothing it installs is on the default
+      # PATH, and cargo-swift is wherever `cargo install` put it.
+      - name: Put the Rust toolchain on PATH
+        run: |
+          echo "/opt/homebrew/opt/rustup/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Add the iOS targets
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build the core and check its glue
+        run: |
+          scripts/core.sh
+          if ! git diff --exit-code -- Sources/MarfaCore/MarfaCore.swift; then
+            echo "::error::Sources/MarfaCore/MarfaCore.swift is not what the pinned core generates. Run scripts/core.sh and commit it."
             exit 1
           fi
 
-      - name: Codegen freshness (domain models and the type registry)
-        # `codegen-domain` emits two things from one input, and both are
-        # diffed: the domain-model structs, and the runtime type registry the
-        # device validates writes against. The registry is listed explicitly
-        # rather than folded into the same directory because the generator
-        # prunes anything in the domain-model output it did not emit as a
-        # struct — a registry living there would be deleted on the next run.
-        run: |
-          swift run codegen-domain
-          if ! git diff --exit-code -- Sources/MarfaSDK/DomainModels/Generated Sources/MarfaSDK/Types/Registry/Generated; then
-            echo "::error::codegen-domain output is stale. Run 'swift run codegen-domain' (or './scripts/sync-types.sh' if the core-types snapshot is behind) locally and commit the delta."
-            exit 1
-          fi
+      - uses: pnpm/action-setup@v6
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+          package_json_file: .build/marfa/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
 
-      - name: Codegen freshness (custom-types fixtures)
-        # Two-stage check.
-        #
-        # Stage 1 regenerates Tests/CodegenCustomTypesTests/Fixtures/expected/
-        # from Fixtures/schemas/ via codegen-custom-types and diffs the result
-        # against the committed expected/ files. Catches emitter drift and
-        # schema edits that weren't accompanied by a regen.
-        #
-        # Stage 2 byte-compares Fixtures/expected/ against
-        # Tests/CodegenCustomTypesTests/CompileCheck/ — a hand-maintained
-        # mirror used as a compile-time check. Catches the failure mode where
-        # someone edits one copy and forgets the other (GoldenTests only
-        # reads expected/, so divergence here ships silently otherwise).
-        #
-        # The schemas are copied to a temp dir under a folder named
-        # `MarfaTypes` because the codegen embeds the source path into each
-        # file's header comment (e.g. `// Source: MarfaTypes/foo.json`).
-        # Pointing source.directory at the in-repo schemas dir would change
-        # that header and produce false-positive drift on every run.
-        # GoldenTests uses the same MarfaTypes-copy pattern.
+      # server-up.sh runs the server through tsx, which resolves
+      # @withmarfa/shared through its dist.
+      - name: Build the server at the pin
+        working-directory: .build/marfa
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter "@withmarfa/server..." build
+
+      - name: Build and test against a booted server
+        env:
+          MARFA_LIVE_REQUIRED: '1'
         run: |
           set -euo pipefail
-          tmpdir="$(mktemp -d)"
-          mkdir -p "$tmpdir/MarfaTypes"
-          cp Tests/CodegenCustomTypesTests/Fixtures/schemas/*.json "$tmpdir/MarfaTypes/"
-          cat > "$tmpdir/marfa-codegen.json" <<JSON
-          {
-            "schema": 1,
-            "source": {
-              "mode": "local",
-              "directory": "MarfaTypes"
-            },
-            "output": {
-              "directory": "$GITHUB_WORKSPACE/Tests/CodegenCustomTypesTests/Fixtures/expected",
-              "accessLevel": "public"
-            }
-          }
-          JSON
-          swift run codegen-custom-types --config "$tmpdir/marfa-codegen.json"
+          # The trap goes in before the boot: a boot that fails partway has
+          # already started a server, and a later trap would never stop it.
+          export MARFA_SERVER_ENV="${RUNNER_TEMP}/marfa-swift-live.env"
+          trap '"${MARFA_MONOREPO}/core/scripts/server-down.sh" "${MARFA_SERVER_ENV}" || true' EXIT
+          # Assigned before it is evaluated, because `eval` of an empty string
+          # succeeds and would hide a failed boot.
+          server_env="$("${MARFA_MONOREPO}/core/scripts/server-up.sh")"
+          eval "${server_env}"
+          export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
+          swift build
+          swift test
 
-          if ! git diff --exit-code -- Tests/CodegenCustomTypesTests/Fixtures/expected; then
-            echo "::error::codegen-custom-types fixtures are stale. Run the regen procedure documented in Tests/CodegenCustomTypesTests/CompileCheckTests.swift locally and commit the delta."
-            exit 1
-          fi
-
-          drift=0
-          for f in Tests/CodegenCustomTypesTests/Fixtures/expected/*.swift; do
-            base="$(basename "$f")"
-            if ! cmp -s "$f" "Tests/CodegenCustomTypesTests/CompileCheck/$base"; then
-              echo "::error::CompileCheck/$base diverges from Fixtures/expected/$base. CompileCheck is a byte-for-byte mirror of expected — refresh per Tests/CodegenCustomTypesTests/CompileCheckTests.swift and commit."
-              drift=1
-            fi
+      - name: Build the sample for macOS and the iOS simulator
+        working-directory: Examples/MarfaSample
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate --quiet
+          for target in 'MarfaSample-macOS|generic/platform=macOS' 'MarfaSample-iOS|generic/platform=iOS Simulator'; do
+            xcodebuild -quiet -project MarfaSample.xcodeproj \
+              -scheme "${target%%|*}" -destination "${target#*|}" \
+              -derivedDataPath "${RUNNER_TEMP}/marfa-sample" build
           done
-          [[ $drift -eq 0 ]] || exit 1
