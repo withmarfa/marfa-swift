@@ -322,7 +322,11 @@ struct LiveServer {
         #expect(reader.feed.watchTask == nil)
     }
 
-    /// The watch starts from where the store stood when `changes()` returned.
+    /// A save made as soon as a reader listens is told, each of five times.
+    ///
+    /// The watch's task starts on another thread at once, so against the
+    /// core this rarely races a save; `Changes` holds the start to the
+    /// version read before `changes()` returns.
     @Test func aSaveMadeAsSoonAsAReaderListensIsTold() async throws {
         let store = Live.store()
         let writer = try await Live.hydrated(store)

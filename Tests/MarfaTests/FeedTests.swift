@@ -300,6 +300,8 @@ struct Changes {
         let second = Heard(copy.changes())
         try await eventually("a stream taken after was told at once") { second.all == [failed] }
         #expect(copy.feed.watchTask == nil, "a new stream started the failed watch again")
+        // The store reads again, so a watch started now would run on.
+        core.state.withLock { $0.readsFail = nil }
         _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
         #expect(copy.feed.watchTask == nil, "a hydration or catch-up started a reader's failed watch again")
