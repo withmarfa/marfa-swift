@@ -281,6 +281,22 @@ struct Changes {
         #expect(copy.feed.watchTask == nil)
     }
 
+    /// The version a reader's first `changes()` reads can wait on the store,
+    /// and holds nothing else of the copy while it does.
+    @Test func aReaderListeningWhileTheStoreIsBusyHoldsNothingElse() async throws {
+        let core = FakeCore.reader()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let gate = core.holdNextRead()
+        let listening = Task.detached { Heard(copy.changes()) }
+        try await eventually("the first read is held") { core.aReadWasHeld }
+        _ = try await bounded("the feed's count", within: 1) { copy.feed.count }
+        gate.signal()
+        let heard = try await bounded("changes()") { await listening.value }
+        core.save()
+        try await eventually("the save was told") { !heard.all.isEmpty }
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func aSaveMadeAsSoonAsAReaderListensIsTold() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
