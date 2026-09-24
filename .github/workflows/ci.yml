@@ -76,13 +76,12 @@ jobs:
       - name: Add the iOS targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-      # Both generated sources are held to the pin: the glue, and the wire
-      # types, which core.sh writes into an emptied directory so a file the
-      # generator did not write shows up here too.
+      # Both generated sources are held to the pin: the glue and the wire
+      # types. Their directories are emptied here as well as by core.sh, so a
+      # committed file the pinned commit does not generate shows as deleted
+      # whatever core.sh leaves.
       - name: Build the core and check what it generates
         run: |
-          # Emptied here too, so a committed file the pinned commit does not
-          # generate shows as deleted whatever scripts/core.sh leaves.
           rm -rf Sources/MarfaCore Sources/MarfaTypes
           scripts/core.sh
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
