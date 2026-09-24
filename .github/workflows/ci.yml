@@ -81,6 +81,9 @@ jobs:
       # generator did not write shows up here too.
       - name: Build the core and check what it generates
         run: |
+          # Emptied here too, so a committed file the pinned commit does not
+          # generate shows as deleted whatever scripts/core.sh leaves.
+          rm -rf Sources/MarfaCore Sources/MarfaTypes
           scripts/core.sh
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
             git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
