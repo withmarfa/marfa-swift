@@ -63,20 +63,29 @@ public final class WorkingCopy: Sendable {
     }
 
     /// Replaces the copy with every item of `types` at `tier`.
+    ///
+    /// The event stream `changes()` holds stops while it runs and starts
+    /// again after, from the cursor the hydration stored.
     public func hydrate(types: [String], tier: Tier) async throws -> HydrateReport {
+        await feed.pause()
+        defer { feed.unpause() }
         let report = try await background { [core] in try core.hydrate(types: types, tier: tier) }
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
-        feed.resume()
         return report
     }
 
     /// Applies every event since the last hydration or catch-up.
+    ///
+    /// The event stream `changes()` holds stops while it runs, because the
+    /// core lets one stream at a time move the cursor, and starts again
+    /// after.
     public func catchUp() async throws -> CatchUpReport {
+        await feed.pause()
+        defer { feed.unpause() }
         let report = try await background { [core] in try core.catchUp() }
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
-        feed.resume()
         return report
     }
 
@@ -93,13 +102,21 @@ public final class WorkingCopy: Sendable {
     ///
     /// Each write this working copy makes, told once by the call that made
     /// it; for a writer with a server, each event its held event stream
-    /// applies; for a reader, each save the writer makes; and a hydration, a
-    /// catch-up that applied events or a drain that recorded verdicts, after
-    /// which many rows may differ. One event stream feeds every stream held.
-    /// Where what feeds them stops with an error, each is told with
-    /// `.stopped` and goes on hearing local writes, and the next hydration,
-    /// catch-up or stream starts it again. Ending the iteration lets the
-    /// stream go.
+    /// applies; for a reader, each save the writer makes once this has
+    /// returned; and a hydration, a catch-up that applied events or a drain
+    /// that recorded verdicts, after which many rows may differ. One event
+    /// stream, or one watch on the store, feeds every stream held, and stops
+    /// once none is.
+    ///
+    /// For a reader this reads where the store stands before it returns, so
+    /// a save made straight after it is told rather than taken as where the
+    /// watch began.
+    ///
+    /// Where what feeds them stops with an error, each stream is told with
+    /// `.stopped`, as is a stream taken while it stays stopped, and all go
+    /// on hearing local writes. A writer's next hydration or catch-up starts
+    /// its event stream again; a reader's watch starts again only in a
+    /// working copy opened anew. Ending the iteration lets the stream go.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
         if let token = feed.add(continuation) {
@@ -108,12 +125,14 @@ public final class WorkingCopy: Sendable {
         return stream
     }
 
-    /// Ends every stream `changes()` handed out and stops what fed them.
+    /// Ends every stream `changes()` handed out, and returns once what fed
+    /// them has stopped.
     ///
-    /// The store, and a writer's claim on it, are let go once nothing holds
-    /// this working copy any more.
-    public func close() {
-        feed.close()
+    /// A held event stream runs on a thread of the core's that holds the
+    /// store, and a writer's claim on it, until it ends. The store is let go
+    /// once nothing holds this working copy any more.
+    public func close() async {
+        await feed.close()
     }
 }
 
@@ -377,32 +396,46 @@ func translated<T>(_ work: () throws -> T) throws -> T {
 /// The streams `changes()` handed out, and the one source that feeds them.
 ///
 /// That is a held event stream for a writer with a server, and a watch on the
-/// store for a reader. One however many streams are held, because two event
-/// streams on one store would each move its one cursor.
+/// store for a reader. One however many streams are held, because the core
+/// lets one stream at a time move a store's cursor.
 final class Feed: Sendable {
     enum Source {
         case none, follow, watch
     }
 
-    private enum Running {
-        case follow(CoreSubscription)
-        case watch(Task<Void, Never>)
+    private enum Phase {
+        case idle
+        case following(generation: Int, CoreSubscription)
+        /// Asked to stop and not yet ended. The core lets go of its stream
+        /// only as the follow ends, so nothing that takes the stream may
+        /// start until then.
+        case stopping(generation: Int)
+        case watching(generation: Int, Task<Void, Never>)
 
-        func stop() {
+        func runs(_ generation: Int) -> Bool {
             switch self {
-            case .follow(let subscription): subscription.stop()
-            case .watch(let task): task.cancel()
+            case .idle: false
+            case .following(let current, _), .stopping(let current), .watching(let current, _):
+                current == generation
             }
         }
     }
 
     private struct State {
         var streams: [UUID: AsyncStream<Change>.Continuation] = [:]
-        var running: Running?
-        /// Moves with every start and stop, so a source that ends after it
-        /// was replaced cannot clear its replacement.
+        var phase = Phase.idle
+        /// Moves with every start, so a source that was stopped or replaced
+        /// reaches nothing when it speaks late.
         var generation = 0
+        /// Hydrations and catch-ups under way, each holding the follow off.
+        var pauses = 0
+        /// The source ended on its own, and only the next hydration or
+        /// catch-up starts it again: a follow ends on what asking again does
+        /// not clear.
+        var halted = false
+        var failure: MarfaError?
         var closed = false
+        var waitingForStop: [CheckedContinuation<Void, Never>] = []
     }
 
     let core: Core
@@ -415,44 +448,79 @@ final class Feed: Sendable {
     }
 
     var count: Int { state.withLock { $0.streams.count } }
-    var isRunning: Bool { state.withLock { $0.running != nil } }
 
-    /// Holds a stream and starts the source where none runs. `nil`, with
-    /// the stream finished, once the working copy is closed.
+    /// The watch that runs, where one does.
+    var watchTask: Task<Void, Never>? {
+        state.withLock { state in
+            if case .watching(_, let task) = state.phase { task } else { nil }
+        }
+    }
+
+    /// Holds a stream, and starts the source where it should run and does
+    /// not. `nil`, with the stream finished, once the working copy is closed.
     func add(_ continuation: AsyncStream<Change>.Continuation) -> UUID? {
         let token = UUID()
-        let added = state.withLock { state -> Bool in
-            guard !state.closed else { return false }
+        let (added, failure) = state.withLock { state -> (Bool, MarfaError?) in
+            guard !state.closed else { return (false, nil) }
             state.streams[token] = continuation
-            start(&state)
-            return true
+            settle(&state)
+            return (true, state.halted ? state.failure : nil)
         }
-        if !added { continuation.finish() }
-        return added ? token : nil
+        guard added else {
+            continuation.finish()
+            return nil
+        }
+        if let failure {
+            continuation.yield(Change(origin: .stopped(failure), itemId: nil, edgeId: nil))
+        }
+        return token
     }
 
     func remove(_ token: UUID) {
         state.withLock { state in
             state.streams.removeValue(forKey: token)
-            if state.streams.isEmpty { stop(&state) }
+            settle(&state)
         }
     }
 
-    /// Starts the source again where streams are held and it stopped.
-    func resume() {
+    /// Stops the follow, returns once it has ended, and holds it off until
+    /// `unpause`.
+    ///
+    /// A watch moves no cursor, so a pause leaves it running.
+    func pause() async {
+        guard source == .follow else { return }
         state.withLock { state in
-            if !state.streams.isEmpty { start(&state) }
+            state.pauses += 1
+            settle(&state)
+        }
+        await untilStopped()
+    }
+
+    /// Lets the follow start again, and afresh where it had failed.
+    func unpause() {
+        guard source == .follow else { return }
+        state.withLock { state in
+            state.pauses -= 1
+            state.halted = false
+            state.failure = nil
+            settle(&state)
         }
     }
 
-    func close() {
-        let streams = state.withLock { state in
+    /// Ends every stream, and returns once the source has stopped.
+    func close() async {
+        let (streams, watch) = state.withLock { state in
             state.closed = true
-            stop(&state)
-            defer { state.streams = [:] }
-            return Array(state.streams.values)
+            var watch: Task<Void, Never>?
+            if case .watching(_, let task) = state.phase { watch = task }
+            settle(&state)
+            let streams = Array(state.streams.values)
+            state.streams = [:]
+            return (streams, watch)
         }
         for continuation in streams { continuation.finish() }
+        await untilStopped()
+        await watch?.value
     }
 
     func announce(_ write: QueuedWrite) {
@@ -465,48 +533,102 @@ final class Feed: Sendable {
         }
     }
 
-    /// The source of `generation` ended on its own, with `error` where it
-    /// failed rather than was stopped.
-    func ended(generation: Int, error: MarfaError?) {
-        let current = state.withLock { state -> Bool in
-            guard state.generation == generation, state.running != nil else { return false }
-            state.running = nil
-            return true
+    /// Tells `change` while the source of `generation` is the one that
+    /// runs, so one stopped or replaced tells nothing.
+    func announce(_ change: Change, from generation: Int) {
+        let streams = state.withLock { state in
+            state.phase.runs(generation) ? Array(state.streams.values) : []
         }
-        if current, let error {
-            announce(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
+        for continuation in streams { continuation.yield(change) }
+    }
+
+    /// The source of `generation` ended: stopped as asked, or on its own
+    /// with `error`.
+    func ended(generation: Int, error: MarfaError?) {
+        typealias Ended = (told: [AsyncStream<Change>.Continuation], waiting: [CheckedContinuation<Void, Never>])
+        let ended = state.withLock { state -> Ended in
+            switch state.phase {
+            case .stopping(let current) where current == generation:
+                state.phase = .idle
+                let waiting = state.waitingForStop
+                state.waitingForStop = []
+                settle(&state)
+                return ([], waiting)
+            case .following(let current, _) where current == generation,
+                .watching(let current, _) where current == generation:
+                state.phase = .idle
+                state.halted = true
+                state.failure = error
+                return (error == nil ? [] : Array(state.streams.values), [])
+            default:
+                return ([], [])
+            }
+        }
+        if let error {
+            for continuation in ended.told {
+                continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
+            }
+        }
+        for continuation in ended.waiting { continuation.resume() }
+    }
+
+    private func untilStopped() async {
+        await withCheckedContinuation { continuation in
+            let stopped = state.withLock { state -> Bool in
+                guard case .stopping = state.phase else { return true }
+                state.waitingForStop.append(continuation)
+                return false
+            }
+            if stopped { continuation.resume() }
         }
     }
 
-    private func start(_ state: inout State) {
-        guard state.running == nil else { return }
-        state.generation += 1
-        let generation = state.generation
+    /// Starts the source or stops it, to match whether it should run: a
+    /// stream held and nothing holding it off.
+    private func settle(_ state: inout State) {
+        let wanted =
+            source != .none && !state.streams.isEmpty && state.pauses == 0 && !state.halted && !state.closed
+        switch state.phase {
+        case .idle where wanted:
+            state.generation += 1
+            state.phase = start(generation: state.generation)
+        case .following(let generation, let subscription) where !wanted:
+            subscription.stop()
+            state.phase = .stopping(generation: generation)
+        case .watching(_, let task) where !wanted:
+            task.cancel()
+            state.phase = .idle
+        default:
+            break
+        }
+    }
+
+    private func start(generation: Int) -> Phase {
         switch source {
         case .none:
-            return
+            return .idle
         case .follow:
-            state.running = .follow(core.follow(listener: Listener(feed: self, generation: generation)))
+            return .following(
+                generation: generation, core.follow(listener: Listener(feed: self, generation: generation)))
         case .watch:
-            state.running = .watch(Task { [core] in await self.watch(core, generation: generation) })
+            // Read before the caller goes on, so a save it makes next moves
+            // the version past this one.
+            let seen = Result { try translated { try core.dataVersion() } }
+            return .watching(
+                generation: generation,
+                Task { [core] in await self.watch(core, from: seen, generation: generation) })
         }
     }
 
-    private func stop(_ state: inout State) {
-        state.running?.stop()
-        state.running = nil
-        state.generation += 1
-    }
-
-    private func watch(_ core: Core, generation: Int) async {
+    private func watch(_ core: Core, from seen: Result<Int64, any Error>, generation: Int) async {
         do {
-            var seen = try await background { try core.dataVersion() }
-            while !Task.isCancelled {
+            var seen = try seen.get()
+            while true {
                 try await Task.sleep(for: .milliseconds(250))
                 let now = try await background { try core.dataVersion() }
                 guard now != seen else { continue }
                 seen = now
-                announce(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil))
+                announce(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil), from: generation)
             }
         } catch is CancellationError {
             return
@@ -530,7 +652,8 @@ final class Listener: CoreChangeListener, Sendable {
         feed.announce(
             Change(
                 origin: .server(event: change.event, cursor: change.cursor), itemId: change.itemId,
-                edgeId: change.edgeId))
+                edgeId: change.edgeId),
+            from: generation)
     }
 
     func ended(error: CoreMarfaError?) {

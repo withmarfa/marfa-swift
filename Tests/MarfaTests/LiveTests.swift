@@ -18,6 +18,25 @@ enum Live {
     static func store() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).sqlite")
     }
+
+    static func file(_ text: String, named name: String = "marfa-live-\(UUID()).txt") throws -> URL {
+        let file = FileManager.default.temporaryDirectory.appending(path: name)
+        try Data(text.utf8).write(to: file)
+        return file
+    }
+
+    /// A working copy of every note at `feed`.
+    static func hydrated(_ store: URL = store()) async throws -> WorkingCopy {
+        let copy = try await WorkingCopy.open(store: store, server: server)
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        return copy
+    }
+
+    static func note(_ title: String, tags: [String] = [], occurredAt: String? = nil) -> Draft {
+        Draft(
+            type: "core.note", properties: ["title": .string(title), "body": "b"], tags: tags, tier: .feed,
+            occurredAt: occurredAt)
+    }
 }
 
 /// Where the live tests are required, a missing server fails rather than
@@ -30,11 +49,9 @@ func theLiveTestsHaveAServerWhereTheyAreRequired() {
 @Suite(.enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"))
 struct LiveServer {
     @Test func aWriteMadeHereIsAnsweredAndHeld() async throws {
-        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        let copy = try await Live.hydrated()
         let title = "Live \(UUID())"
-        let created = try await copy.items.create(
-            Draft(type: "core.note", properties: ["title": .string(title), "body": "b"], tier: .feed))
+        let created = try await copy.items.create(Live.note(title))
         let tagged = try await copy.tags.add("favorite", to: created.itemId ?? "")
         let report = try await copy.queue.drain()
         let verdicts = report.verdicts.filter { [created.id, tagged.id].contains($0.id) }.map(\.verdict)
@@ -44,14 +61,10 @@ struct LiveServer {
     }
 
     @Test func attachedBytesAreFetchedByAStoreThatNeverHeldThem() async throws {
-        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-        let note = try await copy.items.create(
-            Draft(type: "core.note", properties: ["title": "with a file", "body": "b"], tier: .feed))
-        let file = FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).txt")
-        let bytes = Data("bytes \(UUID())\n".utf8)
-        try bytes.write(to: file)
-        let attached = try await copy.items.attach(to: note.itemId ?? "", file: file)
+        let copy = try await Live.hydrated()
+        let note = try await copy.items.create(Live.note("with a file"))
+        let text = "bytes \(UUID())\n"
+        let attached = try await copy.items.attach(to: note.itemId ?? "", file: try Live.file(text))
         let hash = try #require(attached.upload.blob)
         #expect(try await copy.blobs.isHeld(hash))
         let report = try await copy.queue.drain()
@@ -64,14 +77,13 @@ struct LiveServer {
         let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
         #expect(try await !fresh.blobs.isHeld(hash))
         let fetched = try await fresh.blobs.get(hash)
-        #expect(try Data(contentsOf: fetched) == bytes)
+        #expect(try Data(contentsOf: fetched) == Data(text.utf8))
         #expect(try await fresh.blobs.isHeld(hash))
     }
 
     /// Each verdict a write can reach from a server that answered.
     @Test func eachVerdictArrivesTyped() async throws {
-        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        let copy = try await Live.hydrated()
         let titled = try await copy.items.create(
             Draft(type: "core.note", properties: ["title": "first", "body": "first"], tier: .feed))
         let bodied = try await copy.items.create(
@@ -89,8 +101,7 @@ struct LiveServer {
         // the last writer, and `body` keeps both copies. Two notes, because
         // two edits to one note wait on each other and the second is sent
         // on the first's answer.
-        let elsewhere = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-        _ = try await elsewhere.hydrate(types: ["core.note"], tier: .feed)
+        let elsewhere = try await Live.hydrated()
         _ = try await copy.items.update(titledId, Edit(properties: ["title": "second"], baseVersion: 1))
         _ = try await copy.items.update(bodiedId, Edit(properties: ["body": "second"], baseVersion: 1))
         report = try await copy.queue.drain()
@@ -112,10 +123,8 @@ struct LiveServer {
         // Hydrated under the good key by a copy that is gone before the
         // store opens again, so the second open is the writer.
         let id = try await { () async throws -> String in
-            let copy = try await WorkingCopy.open(store: store, server: Live.server)
-            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-            let note = try await copy.items.create(
-                Draft(type: "core.note", properties: ["title": "keyed", "body": "b"], tier: .feed))
+            let copy = try await Live.hydrated(store)
+            let note = try await copy.items.create(Live.note("keyed"))
             _ = try await copy.queue.drain()
             return try #require(note.itemId)
         }()
@@ -127,55 +136,129 @@ struct LiveServer {
         #expect(report.verdicts.first { $0.id == blocked.id }?.verdict == .blocked(reason: .credentialRefused))
     }
 
-    /// A reader of a store the writer saves to is told each save.
-    @Test func aReaderIsToldTheWriterSaved() async throws {
+    /// A reader of a store the writer saves to is told each save, once, and
+    /// within a second, the first of them made as soon as it listened.
+    @Test func aReaderIsToldEachSaveOnceAndWithinASecond() async throws {
         let store = Live.store()
-        let writer = try await WorkingCopy.open(store: store, server: Live.server)
-        _ = try await writer.hydrate(types: ["core.note"], tier: .feed)
+        let writer = try await Live.hydrated(store)
         let reader = try await WorkingCopy.openReader(store: store)
-        var saves = reader.changes().makeAsyncIterator()
-        try await eventually("the reader started watching") { reader.feed.isRunning }
-        _ = try await writer.items.create(
-            Draft(type: "core.note", properties: ["title": "saved", "body": "b"], tier: .feed))
-        guard case .saved = await saves.next()?.origin else {
-            Issue.record("the reader was not told the writer saved")
-            return
+        let heard = Heard(reader.changes())
+        var made: [Date] = []
+        for save in 1...3 {
+            made.append(.now)
+            _ = try await writer.items.create(Live.note("saved \(save)"))
+            try await Task.sleep(for: .milliseconds(700))
         }
-        reader.close()
-        try await eventually("the watch stopped") { !reader.feed.isRunning }
+        try await Task.sleep(for: .seconds(1))
+        let saves = heard.saves
+        #expect(saves.count == 3, "\(heard.all)")
+        for (madeAt, told) in zip(made, saves) {
+            #expect(told.at.timeIntervalSince(madeAt) < 1, "a save was told \(told.at.timeIntervalSince(madeAt))s late")
+        }
+
+        let watch = try #require(reader.feed.watchTask)
+        await reader.close()
+        #expect(watch.isCancelled)
+        #expect(reader.feed.watchTask == nil)
+    }
+
+    /// The watch starts from where the store stood when `changes()` returned.
+    @Test func aSaveMadeAsSoonAsAReaderListensIsTold() async throws {
+        let store = Live.store()
+        let writer = try await Live.hydrated(store)
+        let reader = try await WorkingCopy.openReader(store: store)
+        for save in 1...5 {
+            let heard = Heard(reader.changes())
+            _ = try await writer.items.create(Live.note("at once \(save)"))
+            try await eventually("save \(save) was told", within: 1) { !heard.saves.isEmpty }
+            heard.stop()
+            try await eventually("the stream was let go") { reader.feed.count == 0 }
+        }
+    }
+
+    /// A second `open` of a store gets a reader, and watches the writer's
+    /// saves as an `openReader` does, rather than following the server,
+    /// which the core refuses a reader.
+    @Test func aSecondOpenerIsToldTheWritersSaves() async throws {
+        let store = Live.store()
+        let writer = try await Live.hydrated(store)
+        let second = try await WorkingCopy.open(store: store, server: Live.server)
+        #expect(second.handle == .reader)
+        let heard = Heard(second.changes())
+        _ = try await writer.items.create(Live.note("seen by the second opener"))
+        try await eventually("the second opener was told the writer saved") { !heard.saves.isEmpty }
+        #expect(heard.stops.isEmpty)
+        await second.close()
     }
 
     @Test func aChangeMadeElsewhereArrivesOnTheStream() async throws {
-        let watching = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-        _ = try await watching.hydrate(types: ["core.note"], tier: .feed)
-        let elsewhere = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-        _ = try await elsewhere.hydrate(types: ["core.note"], tier: .feed)
-
-        // Made before the watch starts and sent after it, so the event
-        // waited for is this one and not another test's running beside it.
-        let made = try await elsewhere.items.create(
-            Draft(type: "core.note", properties: ["title": "from elsewhere", "body": "b"], tier: .feed))
-        let arrived = Task { () -> Change? in
-            for await change in watching.changes() {
-                if case .server(event: "item.created", _) = change.origin, change.itemId == made.itemId {
-                    return change
-                }
-            }
-            return nil
-        }
-        try await Task.sleep(for: .seconds(1))
+        let watching = try await Live.hydrated()
+        let elsewhere = try await Live.hydrated()
+        let made = try await elsewhere.items.create(Live.note("from elsewhere"))
+        let other = try await elsewhere.items.create(Live.note("linked from elsewhere"))
+        let linked = try await elsewhere.edges.create(
+            from: try #require(made.itemId), to: try #require(other.itemId), type: "references")
+        // The follow starts from the cursor the hydration stored, which is
+        // before these were sent, so none is missed however long it takes to
+        // connect.
+        let heard = Heard(watching.changes())
         _ = try await elsewhere.queue.drain()
-        let deadline = Task {
-            try await Task.sleep(for: .seconds(20))
-            arrived.cancel()
+
+        func arrived(_ event: String, where matches: (Change) -> Bool) -> Change? {
+            heard.all.first { change in
+                guard case .server(event, _) = change.origin else { return false }
+                return matches(change)
+            }
         }
-        let change = await arrived.value
-        deadline.cancel()
-        #expect(change?.itemId == made.itemId)
-        let held = try await watching.items.get(made.itemId ?? "")
-        #expect(held?.title == "from elsewhere")
-        // The last stream let go stops the event stream it shared.
-        try await eventually("the follow stopped once no stream held it") { !watching.feed.isRunning }
+        try await eventually("the note and the edge arrived", within: 20) {
+            arrived("item.created") { $0.itemId == made.itemId } != nil
+                && arrived("edge.created") { $0.edgeId == linked.edgeId } != nil
+        }
+        guard case .server(_, let cursor) = arrived("item.created", where: { $0.itemId == made.itemId })?.origin
+        else { return }
+        #expect(Int(cursor) != nil, "the change carried the cursor \(cursor)")
+        #expect(try await watching.items.get(made.itemId ?? "")?.title == "from elsewhere")
+
+        // The last stream let go stops the follow, and the core has its
+        // stream back for a catch-up of its own.
+        heard.stop()
+        try await eventually("the follow let go of the stream") {
+            (try? await background { [core = watching.core] in try core.catchUp() }) != nil
+        }
+    }
+
+    /// The core lets one stream at a time move the cursor, so a catch-up or
+    /// a hydration stops the follow while it runs and starts it after.
+    @Test func aCatchUpAndAHydrationRunWhileAStreamIsHeld() async throws {
+        let copy = try await Live.hydrated()
+        let heard = Heard(copy.changes())
+        // Long enough for the follow to hold the stream.
+        try await Task.sleep(for: .milliseconds(300))
+        _ = try await copy.catchUp()
+        _ = try await copy.hydrate(types: ["core.note", "core.file"], tier: .feed)
+
+        let elsewhere = try await Live.hydrated()
+        let made = try await elsewhere.items.create(Live.note("after the hydration"))
+        _ = try await elsewhere.queue.drain()
+        try await eventually("the follow started again and told the note", within: 20) {
+            heard.all.contains { $0.itemId == made.itemId }
+        }
+        #expect(heard.stops.isEmpty, "\(heard.stops)")
+        await copy.close()
+    }
+
+    @Test func closingLetsGoOfTheStore() async throws {
+        let store = Live.store()
+        try await { () async throws in
+            let copy = try await Live.hydrated(store)
+            let heard = Heard(copy.changes())
+            try await Task.sleep(for: .milliseconds(300))
+            await copy.close()
+            withExtendedLifetime(heard) {}
+        }()
+        try await eventually("a new open of the store was its writer", within: 1) {
+            try await WorkingCopy.open(store: store).handle == .writer
+        }
     }
 }
 

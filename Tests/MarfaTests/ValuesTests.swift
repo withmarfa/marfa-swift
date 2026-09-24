@@ -1,26 +1,8 @@
 import Foundation
-import MarfaCore
 import MarfaCoreNames
 import Testing
 
 @testable import Marfa
-
-func temporaryStore() -> URL {
-    FileManager.default.temporaryDirectory.appending(path: "marfa-\(UUID()).sqlite")
-}
-
-/// Waits for `condition`, polling, and records an issue once `seconds` pass
-/// without it.
-func eventually(_ what: String, within seconds: Double = 5, _ condition: () async throws -> Bool) async throws {
-    let deadline = Date.now.addingTimeInterval(seconds)
-    while try await !condition() {
-        guard Date.now < deadline else {
-            Issue.record("never: \(what)")
-            return
-        }
-        try await Task.sleep(for: .milliseconds(20))
-    }
-}
 
 @Suite struct Values {
     @Test func jsonRoundTripsThroughTheTextTheCoreTakes() throws {
@@ -206,82 +188,4 @@ func eventually(_ what: String, within seconds: Double = 5, _ condition: () asyn
         }
     }
 
-    /// A second `open` of a store gets a reader, and watches the writer's
-    /// saves as an `openReader` does rather than following a server.
-    @Test func aSecondOpenerWatchesRatherThanFollows() async throws {
-        let path = temporaryStore()
-        let server = Server(url: URL(string: "http://127.0.0.1:9")!, key: "k")
-        let writer = try await WorkingCopy.open(store: path, server: server)
-        let second = try await WorkingCopy.open(store: path, server: server)
-        #expect(writer.feed.source == .follow)
-        #expect(second.handle == .reader)
-        #expect(second.feed.source == .watch)
-    }
-}
-
-@Suite struct Changes {
-    func write(_ kind: WriteKind, item: String) -> QueuedWrite {
-        QueuedWrite(
-            id: "q", kind: kind, itemId: item, targetId: nil, edgeId: nil, namespace: nil, tag: "t", blob: nil,
-            baseVersion: nil, idempotencyKey: "k", dependsOn: [], verdict: nil, answer: nil, refusals: 0,
-            queuedAt: "", answeredAt: nil)
-    }
-
-    @Test func aWriteIsToldToEveryStreamHeldAndNoneAfterItEnds() async throws {
-        let feed = Feed(core: try Core.open(path: temporaryStore().path, url: nil, key: nil), source: .none)
-        let (first, firstContinuation) = AsyncStream<Marfa.Change>.makeStream()
-        let (second, secondContinuation) = AsyncStream<Marfa.Change>.makeStream()
-        let firstToken = try #require(feed.add(firstContinuation))
-        _ = try #require(feed.add(secondContinuation))
-        var firstHeard = first.makeAsyncIterator()
-        var secondHeard = second.makeAsyncIterator()
-
-        feed.announce(write(.addTag, item: "n1"))
-        #expect(await firstHeard.next() == Marfa.Change(origin: .local(.addTag), itemId: "n1", edgeId: nil))
-        #expect(await secondHeard.next() == Marfa.Change(origin: .local(.addTag), itemId: "n1", edgeId: nil))
-
-        feed.remove(firstToken)
-        firstContinuation.finish()
-        feed.announce(write(.removeTag, item: "n2"))
-        #expect(await secondHeard.next() == Marfa.Change(origin: .local(.removeTag), itemId: "n2", edgeId: nil))
-        #expect(await firstHeard.next() == nil, "a stream that ended was still told")
-    }
-
-    @Test func endingTheIterationLetsGoOfTheStream() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        let stream = copy.changes()
-        #expect(copy.feed.count == 1)
-        let listening = Task {
-            for await _ in stream {}
-        }
-        listening.cancel()
-        await listening.value
-        try await eventually("the stream was let go") { copy.feed.count == 0 }
-    }
-
-    @Test func closingEndsEveryStreamAndRefusesNew() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        var held = copy.changes().makeAsyncIterator()
-        copy.close()
-        #expect(await held.next() == nil)
-        var later = copy.changes().makeAsyncIterator()
-        #expect(await later.next() == nil)
-        #expect(copy.feed.count == 0)
-    }
-
-    /// A follow the core refuses, here for want of a hydration, is told to
-    /// every stream, and local writes go on being told after it.
-    @Test func aFollowThatStopsIsToldAndLocalWritesGoOn() async throws {
-        let copy = try await WorkingCopy.open(
-            store: temporaryStore(), server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "k"))
-        var heard = copy.changes().makeAsyncIterator()
-        let stopped = await heard.next()
-        guard case .stopped(.noCursor) = stopped?.origin else {
-            Issue.record("the refused follow was not told: \(String(describing: stopped))")
-            return
-        }
-        #expect(!copy.feed.isRunning)
-        copy.feed.announce(write(.addTag, item: "n1"))
-        #expect(await heard.next()?.origin == .local(.addTag))
-    }
 }
