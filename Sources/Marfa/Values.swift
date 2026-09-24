@@ -49,6 +49,12 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case wrongServer(expected: String, got: String, message: String)
     /// The item is whole and its bytes are not here, nor can they be fetched.
     case bytesAbsent(hash: String, reason: String, message: String)
+    /// The server speaks a contract this build was not made for, and its
+    /// answer was not read. `served` is the contract the answer named, or nil
+    /// where a success named none. Where `writeSent`, the answer was to a
+    /// write, which may have taken effect: it stays queued, and goes again
+    /// under its idempotency key once the app speaks the server's contract.
+    case contractMismatch(served: String?, expected: UInt64, status: UInt16, writeSent: Bool, message: String)
     case invalid(message: String)
 
     /// The core's sentence, fit to show a person.
@@ -60,7 +66,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .catchUpTooOld(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
-            .invalid(let message):
+            .contractMismatch(_, _, _, _, let message), .invalid(let message):
             message
         }
     }
@@ -93,6 +99,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .wrongServer(expected: expected, got: got, message: message)
         case .BytesAbsent(let hash, let reason, let message):
             self = .bytesAbsent(hash: hash, reason: reason, message: message)
+        case .ContractMismatch(let served, let expected, let status, let writeSent, let message):
+            self = .contractMismatch(
+                served: served, expected: expected, status: status, writeSent: writeSent, message: message)
         case .Invalid(let message): self = .invalid(message: message)
         }
     }

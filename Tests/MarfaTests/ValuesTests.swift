@@ -183,6 +183,14 @@ struct Errors {
         (.StreamIncomplete(reason: "r", message: "m"), .streamIncomplete(reason: "r", message: "m")),
         (.WrongServer(expected: "a", got: "b", message: "m"), .wrongServer(expected: "a", got: "b", message: "m")),
         (.BytesAbsent(hash: "h", reason: "r", message: "m"), .bytesAbsent(hash: "h", reason: "r", message: "m")),
+        (
+            .ContractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m"),
+            .contractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m")
+        ),
+        (
+            .ContractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m"),
+            .contractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m")
+        ),
         (.Invalid(message: "m"), .invalid(message: "m")),
     ]
 
@@ -196,7 +204,7 @@ struct Errors {
     /// The switch in `Marfa.MarfaError.init` is exhaustive, so a new core case
     /// fails the build; this keeps the list above from missing one it maps.
     @Test func everyCaseIsListedOnce() {
-        #expect(Set(Self.cases.map { "\($0.1)".prefix { $0 != "(" } }).count == 20)
+        #expect(Set(Self.cases.map { "\($0.1)".prefix { $0 != "(" } }).count == 21)
     }
 
     /// Each write that carries JSON, given a value JSON cannot hold.
