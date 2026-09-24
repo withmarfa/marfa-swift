@@ -62,12 +62,22 @@ enum Scenario {
             case "drain":
                 let report = try await copy.queue.drain()
                 for entry in report.verdicts { print("  \(entry.kind)  \(describe(entry.verdict))") }
-                expect(!report.verdicts.isEmpty, "the drain sent nothing")
+                expect(report.verdicts.count == 8, "the drain sent \(report.verdicts.count) writes, not 8")
+                expect(report.held == 0, "the drain held \(report.held) write(s) back")
                 expect(report.verdicts.allSatisfy { $0.verdict == .accepted }, "a write was not accepted")
                 let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
-                let edited = notes.first { $0.title == "Sample first, edited" }
                 print("notes: \(notes.map { "\($0.title ?? "-") v\($0.version)" })")
-                expect(edited?.tags.contains("favorite") == true, "the edit lost its tag")
+                guard let first = notes.first(where: { $0.title == "Sample first, edited" }),
+                    let second = notes.first(where: { $0.title == "Sample second" })
+                else {
+                    expect(false, "the two notes the write phase made are not both held")
+                    break
+                }
+                expect(first.tags.contains("favorite"), "the edit lost its tag")
+                let links = try await copy.edges.from(first.id).filter { $0.edgeType == "references" }
+                print("links from the first note: \(links.map(\.targetId))")
+                expect(links.map(\.targetId) == [second.id], "the link does not run from the first note to the second")
+                try await checkAttachment(on: first, in: copy, expect)
 
             case "catch-up":
                 let title = "Made elsewhere \(UUID())"
@@ -87,6 +97,25 @@ enum Scenario {
         }
         print("scenario \(phase): \(passed ? "passed" : "failed")")
         return passed
+    }
+
+    /// The file the write phase attached to `note`: held, attached to it,
+    /// and its bytes the ones written.
+    static func checkAttachment(
+        on note: Item, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
+    ) async throws {
+        let files = try await copy.items.list(ListFilters(type: "core.file"))
+        guard let file = files.first(where: { $0.title == "sample-attachment.txt" }),
+            let hash = file.properties["blob_ref"]?.string
+        else {
+            expect(false, "the attached file is not held with its bytes named: \(files.map(\.title))")
+            return
+        }
+        let attachedTo = try await copy.edges.from(file.id).filter { $0.edgeType == "attached-to" }.map(\.targetId)
+        print("the file is attached to: \(attachedTo)")
+        expect(attachedTo == [note.id], "the file is not attached to the first note")
+        let bytes = try Data(contentsOf: try await copy.blobs.get(hash))
+        expect(bytes == Data("attached offline\n".utf8), "the file's bytes are not the ones attached")
     }
 
     /// A note made through a working copy of its own beside this one's

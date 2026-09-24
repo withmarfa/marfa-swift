@@ -19,23 +19,45 @@ final class Model {
         self.configuration = configuration
     }
 
+    /// Opens the working copy, once however often the view appears.
     func open() async {
         guard copy == nil, configuration.scenario == nil else { return }
         do {
-            let copy = try await WorkingCopy.open(store: configuration.store, server: configuration.server)
-            self.copy = copy
-            if try await copy.status().hydration != .complete, configuration.server != nil {
-                _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-            }
-            await refresh()
-            for await change in copy.changes() {
-                if case .stopped(let error) = change.origin {
-                    message = "no longer following the server: \(error.message)"
-                }
-                await refresh()
-            }
+            copy = try await WorkingCopy.open(store: configuration.store, server: configuration.server)
         } catch {
             message = error.localizedDescription
+        }
+    }
+
+    /// Hydrates the copy where it is not, then reads again on each change
+    /// until the view that called it goes away.
+    func listen() async {
+        guard let copy else { return }
+        await hydrate(copy)
+        await refresh()
+        for await change in copy.changes() {
+            if case .stopped(let error) = change.origin {
+                message = "no longer following the server: \(error.message)"
+            }
+            await refresh()
+        }
+    }
+
+    /// Tries until a hydration lands, since a first launch with the server
+    /// away has nothing to show until one does.
+    private func hydrate(_ copy: WorkingCopy) async {
+        guard configuration.server != nil else { return }
+        while !Task.isCancelled {
+            do {
+                if try await copy.status().hydration != .complete {
+                    _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+                    message = "hydrated"
+                }
+                return
+            } catch {
+                message = "not hydrated yet, trying again: \(error.localizedDescription)"
+                try? await Task.sleep(for: .seconds(5))
+            }
         }
     }
 

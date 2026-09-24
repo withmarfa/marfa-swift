@@ -17,7 +17,10 @@ struct SampleApp: App {
     var body: some Scene {
         WindowGroup {
             NotesView(model: model)
-                .task { await model.open() }
+                .task {
+                    await model.open()
+                    await model.listen()
+                }
         }
     }
 }
