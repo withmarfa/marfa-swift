@@ -109,12 +109,17 @@ import Testing
         #expect(search.tags == ["b", "c"])
     }
 
-    @Test func aServerNeverPrintsItsKey() {
+    @Test func aServerNeverShowsItsKey() {
         let server = Server(url: URL(string: "https://marfa.example")!, key: "mk_secret")
-        #expect(!"\(server)".contains("mk_secret"))
-        #expect(!String(reflecting: server).contains("mk_secret"))
-        // The witness: it does print the server.
-        #expect("\(server)".contains("marfa.example"))
+        var dumped = ""
+        dump(server, to: &dumped)
+        let shown = ["\(server)", String(reflecting: server), dumped]
+        for text in shown {
+            #expect(!text.contains("mk_secret"), "\(text)")
+            // The witness: each shows the server.
+            #expect(text.contains("marfa.example"), "\(text)")
+        }
+        #expect(Mirror(reflecting: server).children.map(\.label) == ["url"])
     }
 }
 

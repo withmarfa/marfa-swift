@@ -5,7 +5,7 @@ import Security
 ///
 /// A working copy holds the key in memory and never writes it to its store;
 /// keeping it between launches is `Keychain`'s job, and the caller's choice.
-public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible {
+public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var url: URL
     public var key: String
 
@@ -17,6 +17,8 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// The server, never the key, so a log that prints one leaks nothing.
     public var description: String { "Server(\(url.absoluteString))" }
     public var debugDescription: String { description }
+    /// The server alone, so `dump` and a debugger's view leak nothing either.
+    public var customMirror: Mirror { Mirror(self, children: ["url": url]) }
 }
 
 /// A key kept in the Keychain as a generic password.
