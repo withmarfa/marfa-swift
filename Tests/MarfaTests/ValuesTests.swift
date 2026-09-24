@@ -206,7 +206,7 @@ struct Errors {
     /// A case dropped from the list fails here. A case the core adds fails the
     /// build at the exhaustive switch in `Marfa.MarfaError.init`, and joins the
     /// list and this count.
-    @Test func everyCaseIsListedOnce() {
+    @Test func everyCaseIsListed() {
         #expect(Set(Self.cases.map { "\($0.1)".prefix { $0 != "(" } }).count == 21)
     }
 

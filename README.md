@@ -12,7 +12,7 @@ swift build
 swift test        # the live tests run when MARFA_API_URL and MARFA_API_KEY name a server
 ```
 
-`scripts/core.sh` needs the Rust toolchain with the iOS targets (`rustup target add aarch64-apple-ios aarch64-apple-ios-sim`) and access to the private monorepo, which it clones into `.build/marfa`, or reads from `MARFA_MONOREPO` when that names a clean checkout already at the pin. The monorepo's build installs the cargo-swift version it names.
+`scripts/core.sh` needs the Rust toolchain and access to the private monorepo, which it clones into `.build/marfa`, or reads from `MARFA_MONOREPO` when that names a clean checkout already at the pin. The monorepo's build installs the cargo-swift version it names, which adds the iOS targets it builds for where they are missing.
 
 ```swift
 import Marfa

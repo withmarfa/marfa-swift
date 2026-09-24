@@ -159,7 +159,7 @@ final class FakeCore: Core, @unchecked Sendable {
         }
         if refused {
             later {
-                self.end(index, with: .Invalid(message: Self.streamHeld))
+                self.end(index, with: .Invalid(message: Self.refusal))
             }
         }
         return FakeSubscription { [self] in
@@ -227,13 +227,13 @@ final class FakeCore: Core, @unchecked Sendable {
 
     /// The core's refusal while another hydration, catch-up or follow holds
     /// the stream.
-    static let streamHeld =
+    static let refusal =
         "this working copy is already hydrating, catching up or following; one at a time moves its cursor"
 
     private func refreshing() throws {
         let held = state.withLock { $0.streamHeld }
         if held {
-            throw CoreMarfaError.Invalid(message: Self.streamHeld)
+            throw CoreMarfaError.Invalid(message: Self.refusal)
         }
     }
 
