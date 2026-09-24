@@ -37,6 +37,22 @@ enum Live {
             type: "core.note", properties: ["title": .string(title), "body": "b"], tags: tags, tier: .feed,
             occurredAt: occurredAt)
     }
+
+    /// Registers a type on the server, which the working copy has no door for.
+    static func register(_ type: [String: Any]) async throws {
+        guard let server else {
+            Issue.record("no server to register a type on")
+            return
+        }
+        var request = URLRequest(url: server.url.appending(path: "types"))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(server.key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: type)
+        let (body, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode
+        #expect(status == 201, "registering a type answered \(status ?? 0): \(String(decoding: body, as: UTF8.self))")
+    }
 }
 
 /// Where the live tests are required, a missing server fails rather than
@@ -55,11 +71,45 @@ struct LiveServer {
         let title = "Live \(UUID())"
         let created = try await copy.items.create(Live.note(title))
         let tagged = try await copy.tags.add("favorite", to: created.itemId ?? "")
+        // A twin with the same title and no tag, which only the tag keeps out.
+        let twin = try await copy.items.create(Live.note(title))
         let report = try await copy.queue.drain()
-        let verdicts = report.verdicts.filter { [created.id, tagged.id].contains($0.id) }.map(\.verdict)
-        #expect(verdicts == [.accepted, .accepted])
+        let verdicts = report.verdicts.filter { [created.id, tagged.id, twin.id].contains($0.id) }.map(\.verdict)
+        #expect(verdicts == [.accepted, .accepted, .accepted])
+        let both = try await copy.search(title, filters: SearchFilters(type: "core.note"))
+        #expect(both.count == 2)
         let found = try await copy.search(title, filters: SearchFilters(type: "core.note", tags: ["favorite"]))
-        #expect(found.map(\.item.title) == [title])
+        #expect(found.map(\.item.id) == [created.itemId])
+    }
+
+    /// A thumbnail written through the copy is read back from the held row,
+    /// and an item of the same type that carries none has none: the witness
+    /// that the first answer is the row's own.
+    @Test func aThumbnailIsReadFromTheHeldRow() async throws {
+        let type = "user.snapshot\(UUID().uuidString.prefix(8).lowercased())"
+        try await Live.register([
+            "id": type, "fields": ["title": ["type": "string"], "thumbnail": ["type": "thumbnail"]],
+        ])
+        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+        _ = try await copy.hydrate(types: [type], tier: .feed)
+        let bytes = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data("snapshot".utf8)
+        let with = try await copy.items.create(
+            Draft(
+                type: type,
+                properties: [
+                    "title": "With an image",
+                    "thumbnail": .string("data:image/png;base64,\(bytes.base64EncodedString())"),
+                ], tier: .feed))
+        let without = try await copy.items.create(Draft(type: type, properties: ["title": "Without"], tier: .feed))
+        let report = try await copy.queue.drain()
+        let verdicts = report.verdicts.filter { [with.id, without.id].contains($0.id) }.map(\.verdict)
+        #expect(verdicts == [.accepted, .accepted])
+        let withId = try #require(with.itemId)
+        let withoutId = try #require(without.itemId)
+        let thumbnail = try #require(try await copy.items.thumbnail(withId))
+        #expect(thumbnail.mimeType == "image/png")
+        #expect(thumbnail.bytes == bytes)
+        #expect(try await copy.items.thumbnail(withoutId) == nil)
     }
 
     @Test func attachedBytesAreFetchedByAStoreThatNeverHeldThem() async throws {

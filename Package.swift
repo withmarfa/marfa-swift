@@ -5,7 +5,14 @@ let package = Package(
     name: "Marfa",
     platforms: [.iOS(.v18), .macOS(.v15)],
     products: [
-        .library(name: "Marfa", targets: ["Marfa"])
+        .library(name: "Marfa", targets: ["Marfa"]),
+        // The server's wire shapes, for an app that reads an answer the
+        // working copy does not hold. Its own product, so an app that uses
+        // only the working copy never compiles them.
+        .library(name: "MarfaTypes", targets: ["MarfaTypes"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0")
     ],
     targets: [
         // The core, built by scripts/core.sh from the commit core.pin names.
@@ -29,9 +36,20 @@ let package = Package(
             dependencies: ["MarfaCore", "MarfaCoreNames"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // Generated from the pinned openapi.json by the same script.
+        .target(
+            name: "MarfaTypes",
+            dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "MarfaTests",
-            dependencies: ["Marfa", "MarfaCore", "MarfaCoreNames"],
+            dependencies: ["Marfa", "MarfaCore", "MarfaCoreNames", "MarfaTypes"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "MarfaTypesTests",
+            dependencies: ["MarfaTypes"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

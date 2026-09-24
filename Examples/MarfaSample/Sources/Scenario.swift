@@ -2,8 +2,10 @@ import Foundation
 import Marfa
 
 /// The sample run unattended, one phase per launch, printing each step and
-/// checking what it expects: `hydrate` with the server up, `write` with it
-/// stopped, `drain` once it is back, and `catch-up`, which makes a note
+/// checking what it expects: `hydrate` with the server up, which also sends
+/// one note so the server has given it a version; `write` with the server
+/// stopped, which edits that note twice and searches what it wrote; `drain`
+/// once it is back, which searches again; and `catch-up`, which makes a note
 /// through a second working copy and reads it back through this one.
 enum Scenario {
     static func run(_ phase: String, configuration: Configuration) async -> Bool {
@@ -20,6 +22,13 @@ enum Scenario {
             case "hydrate":
                 let report = try await copy.hydrate(types: ["core.note"], tier: .feed)
                 print("hydrated \(report.items) item(s) at feed")
+                _ = try await copy.items.create(
+                    Draft(type: "core.note", properties: ["title": "Sample kept", "body": "sent online"], tier: .feed))
+                let sent = try await copy.queue.drain()
+                print("sent online: \(sent.verdicts.map { describe($0.verdict) })")
+                expect(sent.verdicts.map(\.verdict) == [.accepted], "the note sent online was not accepted")
+                // So the queue the write phase reads holds only what it queues.
+                _ = try await copy.queue.forgetAnswered()
 
             case "write":
                 let first = try await copy.items.create(
@@ -39,12 +48,30 @@ enum Scenario {
                 let file = FileManager.default.temporaryDirectory.appending(path: "sample-attachment.txt")
                 try Data("attached offline\n".utf8).write(to: file)
                 _ = try await copy.items.attach(to: firstId, file: file)
+                // Two edits of one property of a note the server has given a
+                // version, one after the other: each is based on the version
+                // the copy holds, which the first does not move while it is
+                // unanswered.
+                let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
+                guard let kept = notes.first(where: { $0.title == "Sample kept" }) else {
+                    expect(false, "the note sent online is not held")
+                    break
+                }
+                var edits: [QueuedWrite] = []
+                for body in ["edited offline once", "edited offline twice"] {
+                    let read = try await copy.items.get(kept.id)
+                    edits.append(
+                        try await copy.items.update(
+                            kept.id, Edit(properties: ["body": .string(body)], baseVersion: read?.version ?? 0)))
+                }
+                expect(edits.count == 2 && edits[1].follows == edits[0].id, "the second edit does not follow the first")
+                try await checkSearch(first: firstId, kept: kept.id, in: copy, expect)
                 let queued = try await copy.queue.all()
                 print("queued \(queued.count) write(s)")
                 for write in queued { print("  \(write.kind)  \(describe(write.verdict))") }
-                // Two creates, the edit, the tag, the link, and the three
-                // writes an attachment is.
-                expect(queued.count == 8, "queued \(queued.count) writes, not 8")
+                // Two creates, the edit, the tag, the link, the three writes
+                // an attachment is, and the two edits of the kept note.
+                expect(queued.count == 10, "queued \(queued.count) writes, not 10")
                 let offline = try await copy.queue.drain()
                 let answered = offline.verdicts.filter { $0.verdict != nil }.count
                 print("drain with the server away: sent \(offline.sent), answered \(answered)")
@@ -62,7 +89,7 @@ enum Scenario {
             case "drain":
                 let report = try await copy.queue.drain()
                 for entry in report.verdicts { print("  \(entry.kind)  \(describe(entry.verdict))") }
-                expect(report.verdicts.count == 8, "the drain sent \(report.verdicts.count) writes, not 8")
+                expect(report.verdicts.count == 10, "the drain sent \(report.verdicts.count) writes, not 10")
                 expect(report.held == 0, "the drain held \(report.held) write(s) back")
                 expect(report.verdicts.allSatisfy { $0.verdict == .accepted }, "a write was not accepted")
                 let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
@@ -78,6 +105,16 @@ enum Scenario {
                 print("links from the first note: \(links.map(\.targetId))")
                 expect(links.map(\.targetId) == [second.id], "the link does not run from the first note to the second")
                 try await checkAttachment(on: first, in: copy, expect)
+                // Both edits of the kept note landed, the second over the
+                // first, and neither made a copy of the note.
+                let kept = notes.filter { $0.title == "Sample kept" }
+                print("the kept note: \(kept.map { "\($0.properties["body"]?.string ?? "-") v\($0.version)" })")
+                expect(
+                    kept.map { $0.properties["body"]?.string } == ["edited offline twice"],
+                    "the kept note does not hold its second edit, alone")
+                if let keptId = kept.first?.id {
+                    try await checkSearch(first: first.id, kept: keptId, in: copy, expect)
+                }
 
             case "catch-up":
                 let title = "Made elsewhere \(UUID())"
@@ -116,6 +153,20 @@ enum Scenario {
         expect(attachedTo == [note.id], "the file is not attached to the first note")
         let bytes = try Data(contentsOf: try await copy.blobs.get(hash))
         expect(bytes == Data("attached offline\n".utf8), "the file's bytes are not the ones attached")
+    }
+
+    /// A search for a word the bodies of both `first` and `kept` hold: over
+    /// every note it finds both, and narrowed to the favorite tag, which only
+    /// `first` carries, it finds `first` alone.
+    static func checkSearch(
+        first: String, kept: String, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
+    ) async throws {
+        let notes = try await copy.search("offline", filters: SearchFilters(type: "core.note"))
+        let favorites = try await copy.search("offline", filters: SearchFilters(type: "core.note", tags: ["favorite"]))
+        let titles = { (hits: [SearchHit]) in hits.map { $0.item.title ?? "-" } }
+        print("searched for offline: \(titles(notes)), narrowed to favorites: \(titles(favorites))")
+        expect(Set([first, kept]).isSubset(of: Set(notes.map(\.item.id))), "a search of the notes did not find both")
+        expect(favorites.map(\.item.id) == [first], "a search narrowed to favorites did not find the first note alone")
     }
 
     /// A note made through a working copy of its own beside this one's

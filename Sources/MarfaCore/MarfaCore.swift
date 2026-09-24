@@ -567,6 +567,24 @@ fileprivate struct FfiConverterString: FfiConverter {
     }
 }
 
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterData: FfiConverterRustBuffer {
+    typealias SwiftType = Data
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+        let len: Int32 = try readInt(&buf)
+        return Data(try readBytes(&buf, count: Int(len)))
+    }
+
+    public static func write(_ value: Data, into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        writeBytes(&buf, value)
+    }
+}
+
 
 
 
@@ -934,6 +952,14 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     func search(query: String, filters: SearchFilters, limit: UInt32) throws  -> [SearchHit]
     
     func status() throws  -> Status
+    
+    /**
+     * The thumbnail an item carries, from the copy with no request; none
+     * where its type declares none or it carries none. An item the copy does
+     * not hold throws `NotFound` with the code `not_held`, and a held value
+     * that is not a thumbnail throws `Decoding` naming the item.
+     */
+    func thumbnail(id: String) throws  -> Thumbnail?
     
     /**
      * Moves an item to another lifecycle state.
@@ -1363,6 +1389,21 @@ open func status()throws  -> Status  {
     return try  FfiConverterTypeStatus_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_marfacore_status(
             self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * The thumbnail an item carries, from the copy with no request; none
+     * where its type declares none or it carries none. An item the copy does
+     * not hold throws `NotFound` with the code `not_held`, and a held value
+     * that is not a thumbnail throws `Decoding` naming the item.
+     */
+open func thumbnail(id: String)throws  -> Thumbnail?  {
+    return try  FfiConverterOptionTypeThumbnail.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_thumbnail(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
     )
 })
 }
@@ -1960,6 +2001,12 @@ public struct DrainReport: Equatable, Hashable {
      * Why the drain stopped before the queue was empty, where it did.
      */
     public var stopped: String?
+    /**
+     * The sources the server said this credential's key does not claim,
+     * where a create naming one was refused for it: every create naming
+     * one is blocked `credential_refused` until the key claims it.
+     */
+    public var unclaimedSources: [String]
     public var retryAfterSeconds: UInt64?
 
     // Default memberwise initializers are never public by default, so we
@@ -1967,11 +2014,17 @@ public struct DrainReport: Equatable, Hashable {
     public init(sent: UInt64, held: UInt64, verdicts: [DrainVerdict], 
         /**
          * Why the drain stopped before the queue was empty, where it did.
-         */stopped: String?, retryAfterSeconds: UInt64?) {
+         */stopped: String?, 
+        /**
+         * The sources the server said this credential's key does not claim,
+         * where a create naming one was refused for it: every create naming
+         * one is blocked `credential_refused` until the key claims it.
+         */unclaimedSources: [String], retryAfterSeconds: UInt64?) {
         self.sent = sent
         self.held = held
         self.verdicts = verdicts
         self.stopped = stopped
+        self.unclaimedSources = unclaimedSources
         self.retryAfterSeconds = retryAfterSeconds
     }
 
@@ -1995,6 +2048,7 @@ public struct FfiConverterTypeDrainReport: FfiConverterRustBuffer {
                 held: FfiConverterUInt64.read(from: &buf), 
                 verdicts: FfiConverterSequenceTypeDrainVerdict.read(from: &buf), 
                 stopped: FfiConverterOptionString.read(from: &buf), 
+                unclaimedSources: FfiConverterSequenceString.read(from: &buf), 
                 retryAfterSeconds: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
@@ -2004,6 +2058,7 @@ public struct FfiConverterTypeDrainReport: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.held, into: &buf)
         FfiConverterSequenceTypeDrainVerdict.write(value.verdicts, into: &buf)
         FfiConverterOptionString.write(value.stopped, into: &buf)
+        FfiConverterSequenceString.write(value.unclaimedSources, into: &buf)
         FfiConverterOptionUInt64.write(value.retryAfterSeconds, into: &buf)
     }
 }
@@ -2667,7 +2722,15 @@ public struct QueuedWrite: Equatable, Hashable {
     public var blob: String?
     public var baseVersion: Int64?
     public var idempotencyKey: String
+    /**
+     * The writes this one cannot go without, and is refused with.
+     */
     public var dependsOn: [String]
+    /**
+     * The write ahead of this one to the same row or edge, which it goes
+     * out after and is not refused with.
+     */
+    public var follows: String?
     public var verdict: Verdict?
     /**
      * The server's answer, whole, as it arrived.
@@ -2682,7 +2745,14 @@ public struct QueuedWrite: Equatable, Hashable {
     public init(id: String, kind: WriteKind, itemId: String?, targetId: String?, edgeId: String?, namespace: String?, tag: String?, 
         /**
          * The blob an upload carries, by its hash.
-         */blob: String?, baseVersion: Int64?, idempotencyKey: String, dependsOn: [String], verdict: Verdict?, 
+         */blob: String?, baseVersion: Int64?, idempotencyKey: String, 
+        /**
+         * The writes this one cannot go without, and is refused with.
+         */dependsOn: [String], 
+        /**
+         * The write ahead of this one to the same row or edge, which it goes
+         * out after and is not refused with.
+         */follows: String?, verdict: Verdict?, 
         /**
          * The server's answer, whole, as it arrived.
          */answer: String?, refusals: Int64, queuedAt: String, answeredAt: String?) {
@@ -2697,6 +2767,7 @@ public struct QueuedWrite: Equatable, Hashable {
         self.baseVersion = baseVersion
         self.idempotencyKey = idempotencyKey
         self.dependsOn = dependsOn
+        self.follows = follows
         self.verdict = verdict
         self.answer = answer
         self.refusals = refusals
@@ -2731,6 +2802,7 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
                 baseVersion: FfiConverterOptionInt64.read(from: &buf), 
                 idempotencyKey: FfiConverterString.read(from: &buf), 
                 dependsOn: FfiConverterSequenceString.read(from: &buf), 
+                follows: FfiConverterOptionString.read(from: &buf), 
                 verdict: FfiConverterOptionTypeVerdict.read(from: &buf), 
                 answer: FfiConverterOptionString.read(from: &buf), 
                 refusals: FfiConverterInt64.read(from: &buf), 
@@ -2751,6 +2823,7 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
         FfiConverterOptionInt64.write(value.baseVersion, into: &buf)
         FfiConverterString.write(value.idempotencyKey, into: &buf)
         FfiConverterSequenceString.write(value.dependsOn, into: &buf)
+        FfiConverterOptionString.write(value.follows, into: &buf)
         FfiConverterOptionTypeVerdict.write(value.verdict, into: &buf)
         FfiConverterOptionString.write(value.answer, into: &buf)
         FfiConverterInt64.write(value.refusals, into: &buf)
@@ -3030,6 +3103,63 @@ public func FfiConverterTypeStatus_lift(_ buf: RustBuffer) throws -> Status {
 #endif
 public func FfiConverterTypeStatus_lower(_ value: Status) -> RustBuffer {
     return FfiConverterTypeStatus.lower(value)
+}
+
+
+/**
+ * An item's thumbnail: the image's type and its bytes.
+ */
+public struct Thumbnail: Equatable, Hashable {
+    public var mimeType: String
+    public var bytes: Data
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(mimeType: String, bytes: Data) {
+        self.mimeType = mimeType
+        self.bytes = bytes
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Thumbnail: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeThumbnail: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Thumbnail {
+        return
+            try Thumbnail(
+                mimeType: FfiConverterString.read(from: &buf), 
+                bytes: FfiConverterData.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Thumbnail, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.mimeType, into: &buf)
+        FfiConverterData.write(value.bytes, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThumbnail_lift(_ buf: RustBuffer) throws -> Thumbnail {
+    return try FfiConverterTypeThumbnail.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeThumbnail_lower(_ value: Thumbnail) -> RustBuffer {
+    return FfiConverterTypeThumbnail.lower(value)
 }
 
 // Note that we don't yet support `indirect` for enums.
@@ -3410,6 +3540,18 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
      */
     case BytesAbsent(hash: String, reason: String, message: String
     )
+    /**
+     * The server speaks a contract this build was not made for, and its
+     * answer was not read.
+     */
+    case ContractMismatch(
+        /**
+         * The contract the answer named, or none where a success named none.
+         */served: String?, expected: UInt64, status: UInt16, 
+        /**
+         * The answer was to a write, which may have taken effect.
+         */writeSent: Bool, message: String
+    )
     case Invalid(message: String
     )
 
@@ -3515,7 +3657,14 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .Invalid(
+        case 20: return .ContractMismatch(
+            served: try FfiConverterOptionString.read(from: &buf), 
+            expected: try FfiConverterUInt64.read(from: &buf), 
+            status: try FfiConverterUInt16.read(from: &buf), 
+            writeSent: try FfiConverterBool.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 21: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -3642,8 +3791,17 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Invalid(message):
+        case let .ContractMismatch(served,expected,status,writeSent,message):
             writeInt(&buf, Int32(20))
+            FfiConverterOptionString.write(served, into: &buf)
+            FfiConverterUInt64.write(expected, into: &buf)
+            FfiConverterUInt16.write(status, into: &buf)
+            FfiConverterBool.write(writeSent, into: &buf)
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Invalid(message):
+            writeInt(&buf, Int32(21))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -4283,6 +4441,30 @@ fileprivate struct FfiConverterOptionTypeItem: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeThumbnail: FfiConverterRustBuffer {
+    typealias SwiftType = Thumbnail?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeThumbnail.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeThumbnail.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeItemState: FfiConverterRustBuffer {
     typealias SwiftType = ItemState?
 
@@ -4632,6 +4814,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_status() != 15439) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_thumbnail() != 60315) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_transition_item() != 15207) {

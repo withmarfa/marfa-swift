@@ -25,6 +25,7 @@ jobs:
       # Beside the workspace rather than in it, so the checkout's clean keeps
       # it and the core is rebuilt only where the pin moved.
       CARGO_TARGET_DIR: ${{ github.workspace }}/../core-target
+      MARFA_GENERATOR_BUILD: ${{ github.workspace }}/../generator-build
     steps:
       - uses: actions/checkout@v7
 
@@ -32,14 +33,14 @@ jobs:
         id: pin
         run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
 
-      # The monorepo is private; SHIPPING_GAP_TOKEN is the organization's
-      # secret that reads it.
+      # The monorepo is private; MONOREPO_DEPLOY_KEY is the private half of a
+      # read-only deploy key on it.
       - name: Check out the core at the pin
         uses: actions/checkout@v7
         with:
           repository: withmarfa/marfa
           ref: ${{ steps.pin.outputs.sha }}
-          token: ${{ secrets.SHIPPING_GAP_TOKEN }}
+          ssh-key: ${{ secrets.MONOREPO_DEPLOY_KEY }}
           path: .build/marfa
 
       # The release Xcode, never a beta beside it.
@@ -75,11 +76,18 @@ jobs:
       - name: Add the iOS targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-      - name: Build the core and check its glue
+      # Both generated sources are held to the pin: the glue, and the wire
+      # types, which core.sh writes into an emptied directory so a file the
+      # generator did not write shows up here too.
+      - name: Build the core and check what it generates
         run: |
+          # Emptied here too, so a committed file the pinned commit does not
+          # generate shows as deleted whatever scripts/core.sh leaves.
+          rm -rf Sources/MarfaCore Sources/MarfaTypes
           scripts/core.sh
-          if ! git diff --exit-code -- Sources/MarfaCore/MarfaCore.swift; then
-            echo "::error::Sources/MarfaCore/MarfaCore.swift is not what the pinned core generates. Run scripts/core.sh and commit it."
+          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
+            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
+            echo "::error::The glue or the wire types are not what the pinned commit generates. Run scripts/core.sh and commit them."
             exit 1
           fi
 

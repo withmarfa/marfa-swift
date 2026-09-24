@@ -37,3 +37,4 @@ public typealias CoreAttached = Attached
 public typealias CoreMarfaError = MarfaError
 public typealias CoreSubscription = Subscription
 public typealias CoreChangeListener = ChangeListener
+public typealias CoreThumbnail = Thumbnail
