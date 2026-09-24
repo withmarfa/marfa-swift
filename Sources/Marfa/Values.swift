@@ -3,7 +3,9 @@ import MarfaCore
 import MarfaCoreNames
 
 // The core's own values, under the package's names. Each already says what
-// the package would: a closed set, or a record with nothing to translate.
+// the package would: a closed set, or a record whose fields the package
+// passes on as they are, `QueuedWrite.answer` being the server's answer as
+// the JSON text it arrived as.
 public typealias Tier = CoreTier
 public typealias ItemState = CoreItemState
 public typealias WriteKind = CoreWriteKind
@@ -220,7 +222,7 @@ public struct Draft: Sendable, Hashable {
     }
 }
 
-/// A change to an item: whole field values, the version it was read at, and
+/// A change to an item: whole property values, the version it was read at, and
 /// a new `sourceId` where the item moves.
 public struct Edit: Sendable, Hashable {
     public var properties: [String: JSONValue]

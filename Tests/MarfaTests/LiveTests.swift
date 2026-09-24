@@ -133,7 +133,9 @@ struct LiveServer {
         #expect(try await fresh.blobs.isHeld(hash))
     }
 
-    /// Each verdict a write can reach from a server that answered.
+    /// The four verdicts a server's answer settles a write with here:
+    /// `accepted`, `refused`, `merged` and `conflicted`. `blocked` has a test
+    /// of its own below, and `dead` is not reached.
     @Test func eachVerdictArrivesTyped() async throws {
         let copy = try await Live.hydrated()
         let titled = try await copy.items.create(

@@ -1,4 +1,4 @@
-# marfa-swift-sdk
+# marfa-swift
 
 The Swift package `Marfa`: a thin layer over `MarfaCore`, the Rust engine in the monorepo `withmarfa/marfa` that every native client embeds. The core holds the working copy, the queue of writes and their verdicts, the event stream and blobs; this package gives them Swift types and `async` calls.
 
@@ -12,7 +12,7 @@ swift build
 swift test        # the live tests run when MARFA_API_URL and MARFA_API_KEY name a server
 ```
 
-`scripts/core.sh` needs the Rust toolchain and access to the private monorepo, which it clones into `.build/marfa`, or reads from `MARFA_MONOREPO` when that names a clean checkout already at the pin. The monorepo's build installs the cargo-swift version it names.
+`scripts/core.sh` needs the Rust toolchain and access to the private monorepo, which it clones into `.build/marfa`, or reads from `MARFA_MONOREPO` when that names a clean checkout already at the pin. The monorepo's build installs the cargo-swift version it names, which adds the iOS targets it builds for where they are missing.
 
 ```swift
 import Marfa

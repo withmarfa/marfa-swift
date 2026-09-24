@@ -7,7 +7,10 @@ import Synchronization
 /// for that server.
 ///
 /// Every call that can wait on the store or the network runs the core off
-/// the caller's thread, which an app's main actor must never wait on.
+/// the caller's thread, which an app's main actor must never wait on. The one
+/// exception is the version a reader's first `changes()` reads before it
+/// returns, so that a save made after the call is told; it waits on the
+/// connection the copy's other reads share.
 public final class WorkingCopy: Sendable {
     let core: Core
     let feed: Feed
@@ -472,10 +475,20 @@ final class Feed: Sendable {
     /// not. `nil`, with the stream finished, once the working copy is closed.
     func add(_ continuation: AsyncStream<Change>.Continuation) -> UUID? {
         let token = UUID()
+        // Where this stream starts the watch, its version is read before the
+        // caller goes on, so a save it makes next moves the version past this
+        // one, and outside the lock, since the read can wait on the store.
+        let starts =
+            source == .watch
+            && state.withLock { state in
+                guard case .idle = state.phase else { return false }
+                return !state.closed && !state.halted
+            }
+        let seen = starts ? Result { try translated { try core.dataVersion() } } : nil
         let (added, failure) = state.withLock { state -> (Bool, MarfaError?) in
             guard !state.closed else { return (false, nil) }
             state.streams[token] = continuation
-            settle(&state)
+            settle(&state, seen: seen)
             return (true, state.halted ? state.failure : nil)
         }
         guard added else {
@@ -597,13 +610,17 @@ final class Feed: Sendable {
 
     /// Starts the source or stops it, to match whether it should run: a
     /// stream held and nothing holding it off.
-    private func settle(_ state: inout State) {
+    ///
+    /// A watch starts from `seen`, which only `add` passes, since only a
+    /// stream added starts one. It is read here instead where the watch
+    /// stopped between `add`'s look and this call.
+    private func settle(_ state: inout State, seen: Result<Int64, any Error>? = nil) {
         let wanted =
             source != .none && !state.streams.isEmpty && state.pauses == 0 && !state.halted && !state.closed
         switch state.phase {
         case .idle where wanted:
             state.generation += 1
-            state.phase = start(generation: state.generation)
+            state.phase = start(generation: state.generation, seen: seen)
         case .following(let generation, let subscription) where !wanted:
             subscription.stop()
             state.phase = .stopping(generation: generation)
@@ -615,7 +632,7 @@ final class Feed: Sendable {
         }
     }
 
-    private func start(generation: Int) -> Phase {
+    private func start(generation: Int, seen: Result<Int64, any Error>?) -> Phase {
         switch source {
         case .none:
             return .idle
@@ -623,9 +640,7 @@ final class Feed: Sendable {
             return .following(
                 generation: generation, core.follow(listener: Listener(feed: self, generation: generation)))
         case .watch:
-            // Read before the caller goes on, so a save it makes next moves
-            // the version past this one.
-            let seen = Result { try translated { try core.dataVersion() } }
+            let seen = seen ?? Result { try translated { try core.dataVersion() } }
             return .watching(
                 generation: generation,
                 Task { [core] in await self.watch(core, from: seen, generation: generation) })

@@ -4,7 +4,7 @@ import Security
 /// Where a working copy's slice comes from: a server, and the key that reaches it.
 ///
 /// A working copy holds the key in memory and never writes it to its store;
-/// keeping it between launches is `Keychain`'s job, and the caller's choice.
+/// `Keychain` keeps it between launches, where the caller chooses to.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var url: URL
     public var key: String
