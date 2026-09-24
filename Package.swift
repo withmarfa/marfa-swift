@@ -44,7 +44,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MarfaTests",
-            dependencies: ["Marfa", "MarfaCore", "MarfaCoreNames"],
+            dependencies: ["Marfa", "MarfaCore", "MarfaCoreNames", "MarfaTypes"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
