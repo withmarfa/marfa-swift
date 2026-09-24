@@ -20,6 +20,15 @@ import Testing
         #expect(try Properties.text(read).contains("9007199254740993"))
     }
 
+    /// What `JSONValue.integer` says of itself.
+    @Test func aNumberReadsAsAnIntegerWhereInt64HoldsItsValue() throws {
+        let read = try Properties.object(#"{"a":1.0,"b":1e2,"c":9223372036854775808,"d":1.5}"#)
+        #expect(read["a"] == .integer(1))
+        #expect(read["b"] == .integer(100))
+        #expect(read["c"] == .number(9_223_372_036_854_775_808))
+        #expect(read["d"] == .number(1.5))
+    }
+
     @Test func anItemCrossesWhole() throws {
         let item = try Item(
             CoreItem(
