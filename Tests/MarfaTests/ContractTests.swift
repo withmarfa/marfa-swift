@@ -24,17 +24,16 @@ struct ContractTests {
     }
 
     /// The witness: the same server on the contract the types describe is
-    /// not refused for it.
-    @Test func aServerOnTheContractTheTypesDescribeIsNotRefusedForIt() async throws {
+    /// read past the check, as far as the empty page it answers, which names
+    /// no event cursor.
+    @Test func aServerOnTheContractTheTypesDescribeIsReadPastTheCheck() async throws {
         let server = try await ContractServer.start(contract: marfaContractVersion)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
         do {
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-        } catch let error as MarfaError {
-            guard case .contractMismatch = error else { return }
-            Issue.record("a server on contract \(marfaContractVersion) was refused: \(error)")
-        }
+            Issue.record("an empty page hydrated")
+        } catch MarfaError.noCursor {}
     }
 }
 

@@ -26,6 +26,11 @@ private let live: (url: URL, key: String)? = {
     return (url, key)
 }()
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil))
+func theLiveTestHasAServerWhereItIsRequired() {
+    #expect(live != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_API_URL or MARFA_API_KEY is not")
+}
+
 /// The pinned server's own answers read as the types generated from its
 /// document: the root names the contract they were generated for, and a
 /// page holding a note this test sends reads it as an item.

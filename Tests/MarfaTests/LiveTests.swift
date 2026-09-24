@@ -71,11 +71,15 @@ struct LiveServer {
         let title = "Live \(UUID())"
         let created = try await copy.items.create(Live.note(title))
         let tagged = try await copy.tags.add("favorite", to: created.itemId ?? "")
+        // A twin with the same title and no tag, which only the tag keeps out.
+        let twin = try await copy.items.create(Live.note(title))
         let report = try await copy.queue.drain()
-        let verdicts = report.verdicts.filter { [created.id, tagged.id].contains($0.id) }.map(\.verdict)
-        #expect(verdicts == [.accepted, .accepted])
+        let verdicts = report.verdicts.filter { [created.id, tagged.id, twin.id].contains($0.id) }.map(\.verdict)
+        #expect(verdicts == [.accepted, .accepted, .accepted])
+        let both = try await copy.search(title, filters: SearchFilters(type: "core.note"))
+        #expect(both.count == 2)
         let found = try await copy.search(title, filters: SearchFilters(type: "core.note", tags: ["favorite"]))
-        #expect(found.map(\.item.title) == [title])
+        #expect(found.map(\.item.id) == [created.itemId])
     }
 
     /// A thumbnail written through the copy is read back from the held row,
