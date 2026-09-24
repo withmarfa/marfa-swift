@@ -1,0 +1,46 @@
+name: MarfaSample
+options:
+  bundleIdPrefix: com.withmarfa
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+packages:
+  Marfa:
+    path: ../..
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    GENERATE_INFOPLIST_FILE: YES
+    MARKETING_VERSION: "0.0.0"
+    CURRENT_PROJECT_VERSION: "0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+targets:
+  MarfaSample-macOS:
+    type: application
+    platform: macOS
+    sources: [Sources]
+    dependencies:
+      - package: Marfa
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.withmarfa.sample
+        PRODUCT_NAME: MarfaSample
+        ENABLE_HARDENED_RUNTIME: NO
+        # The core ships arm64 slices only.
+        EXCLUDED_ARCHS: x86_64
+  MarfaSample-iOS:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: Marfa
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.withmarfa.sample
+        PRODUCT_NAME: MarfaSample
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # The core ships arm64 slices only.
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
