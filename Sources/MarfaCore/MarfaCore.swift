@@ -2722,7 +2722,15 @@ public struct QueuedWrite: Equatable, Hashable {
     public var blob: String?
     public var baseVersion: Int64?
     public var idempotencyKey: String
+    /**
+     * The writes this one cannot go without, and is refused with.
+     */
     public var dependsOn: [String]
+    /**
+     * The write ahead of this one to the same row or edge, which it goes
+     * out after and is not refused with.
+     */
+    public var follows: String?
     public var verdict: Verdict?
     /**
      * The server's answer, whole, as it arrived.
@@ -2737,7 +2745,14 @@ public struct QueuedWrite: Equatable, Hashable {
     public init(id: String, kind: WriteKind, itemId: String?, targetId: String?, edgeId: String?, namespace: String?, tag: String?, 
         /**
          * The blob an upload carries, by its hash.
-         */blob: String?, baseVersion: Int64?, idempotencyKey: String, dependsOn: [String], verdict: Verdict?, 
+         */blob: String?, baseVersion: Int64?, idempotencyKey: String, 
+        /**
+         * The writes this one cannot go without, and is refused with.
+         */dependsOn: [String], 
+        /**
+         * The write ahead of this one to the same row or edge, which it goes
+         * out after and is not refused with.
+         */follows: String?, verdict: Verdict?, 
         /**
          * The server's answer, whole, as it arrived.
          */answer: String?, refusals: Int64, queuedAt: String, answeredAt: String?) {
@@ -2752,6 +2767,7 @@ public struct QueuedWrite: Equatable, Hashable {
         self.baseVersion = baseVersion
         self.idempotencyKey = idempotencyKey
         self.dependsOn = dependsOn
+        self.follows = follows
         self.verdict = verdict
         self.answer = answer
         self.refusals = refusals
@@ -2786,6 +2802,7 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
                 baseVersion: FfiConverterOptionInt64.read(from: &buf), 
                 idempotencyKey: FfiConverterString.read(from: &buf), 
                 dependsOn: FfiConverterSequenceString.read(from: &buf), 
+                follows: FfiConverterOptionString.read(from: &buf), 
                 verdict: FfiConverterOptionTypeVerdict.read(from: &buf), 
                 answer: FfiConverterOptionString.read(from: &buf), 
                 refusals: FfiConverterInt64.read(from: &buf), 
@@ -2806,6 +2823,7 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
         FfiConverterOptionInt64.write(value.baseVersion, into: &buf)
         FfiConverterString.write(value.idempotencyKey, into: &buf)
         FfiConverterSequenceString.write(value.dependsOn, into: &buf)
+        FfiConverterOptionString.write(value.follows, into: &buf)
         FfiConverterOptionTypeVerdict.write(value.verdict, into: &buf)
         FfiConverterOptionString.write(value.answer, into: &buf)
         FfiConverterInt64.write(value.refusals, into: &buf)

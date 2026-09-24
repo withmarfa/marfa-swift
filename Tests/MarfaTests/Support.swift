@@ -273,6 +273,6 @@ final class FakeSubscription: CoreSubscription, @unchecked Sendable {
 func write(_ kind: WriteKind, item: String?, target: String? = nil, edge: String? = nil) -> QueuedWrite {
     QueuedWrite(
         id: "q-\(UUID())", kind: kind, itemId: item, targetId: target, edgeId: edge, namespace: nil, tag: nil,
-        blob: nil, baseVersion: nil, idempotencyKey: "k", dependsOn: [], verdict: nil, answer: nil, refusals: 0,
-        queuedAt: "", answeredAt: nil)
+        blob: nil, baseVersion: nil, idempotencyKey: "k", dependsOn: [], follows: nil, verdict: nil, answer: nil,
+        refusals: 0, queuedAt: "", answeredAt: nil)
 }
