@@ -161,6 +161,41 @@ import Testing
     @Test func everyCaseIsListedOnce() {
         #expect(Set(Self.cases.map { "\($0.1)".prefix { $0 != "(" } }).count == 20)
     }
+
+    /// Each write that carries JSON, given a value JSON cannot hold.
+    ///
+    /// The copy was never hydrated, so the core would refuse any write that
+    /// reached it; `invalid` says the value was refused before it did.
+    @Test func aValueJSONCannotHoldIsRefusedAsInvalid() async throws {
+        let copy = try await WorkingCopy.open(store: temporaryStore())
+        let unwritable: [String: JSONValue] = ["r": .number(.nan)]
+        let infinite: [String: JSONValue] = ["r": .number(-.infinity)]
+        let writes: [(String, @Sendable () async throws -> QueuedWrite)] = [
+            ("create", { try await copy.items.create(Draft(type: "core.note", properties: unwritable)) }),
+            ("update", { try await copy.items.update("n1", Edit(properties: infinite, baseVersion: 1)) }),
+            ("edge", { try await copy.edges.create(from: "a", to: "b", type: "references", properties: unwritable) }),
+            ("edge update", { try await copy.edges.update("e1", properties: infinite, baseVersion: 1) }),
+            ("extension", { try await copy.extensions.write("ns", unwritable, on: "n1") }),
+        ]
+        for (name, write) in writes {
+            await #expect {
+                _ = try await write()
+            } throws: { error in
+                guard case Marfa.MarfaError.invalid(let message) = error else {
+                    Issue.record("\(name) threw \(error)")
+                    return false
+                }
+                return message.contains("r cannot be written as JSON")
+            }
+        }
+        // The witness: a value JSON holds reaches the core, which refuses the
+        // write for its own reason.
+        await #expect {
+            _ = try await copy.items.create(Draft(type: "core.note", properties: ["r": .number(1)]))
+        } throws: { error in
+            if case Marfa.MarfaError.hydrationIncomplete = error { true } else { false }
+        }
+    }
 }
 
 @Suite struct Opening {

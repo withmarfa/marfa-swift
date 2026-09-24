@@ -235,15 +235,19 @@ public struct Edges: Sendable {
         from source: String, to target: String, type: String, properties: [String: JSONValue] = [:],
         id: String? = nil
     ) async throws -> QueuedWrite {
-        let draft = CoreEdgeDraft(
-            sourceId: source, targetId: target, edgeType: type, propertiesJson: try Properties.text(properties),
-            id: id)
-        return try await write { core in try core.createEdge(draft: draft) }
+        try await write { core in
+            try core.createEdge(
+                draft: CoreEdgeDraft(
+                    sourceId: source, targetId: target, edgeType: type,
+                    propertiesJson: try Properties.text(properties), id: id))
+        }
     }
 
     public func update(_ id: String, properties: [String: JSONValue], baseVersion: Int64) async throws -> QueuedWrite {
-        let edit = CoreEdgeEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion)
-        return try await write { core in try core.updateEdge(id: id, edit: edit) }
+        try await write { core in
+            try core.updateEdge(
+                id: id, edit: CoreEdgeEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion))
+        }
     }
 
     public func delete(_ id: String) async throws -> QueuedWrite {
@@ -299,9 +303,8 @@ public struct Extensions: Sendable {
     let feed: Feed
 
     public func write(_ namespace: String, _ body: [String: JSONValue], on id: String) async throws -> QueuedWrite {
-        let text = try Properties.text(body)
         let written = try await background { [core] in
-            try core.writeExtension(id: id, namespace: namespace, bodyJson: text)
+            try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
         }
         feed.announce(written)
         return written
@@ -390,6 +393,9 @@ func translated<T>(_ work: () throws -> T) throws -> T {
         throw MarfaError(error)
     } catch let error as DecodingError {
         throw MarfaError.decoding(message: "\(error)")
+    } catch EncodingError.invalidValue(_, let context) {
+        let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+        throw MarfaError.invalid(message: "\(path) cannot be written as JSON: \(context.debugDescription)")
     }
 }
 
