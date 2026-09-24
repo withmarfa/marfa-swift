@@ -57,11 +57,14 @@ enum Scenario {
                     expect(false, "the note sent online is not held")
                     break
                 }
+                var edits: [QueuedWrite] = []
                 for body in ["edited offline once", "edited offline twice"] {
                     let read = try await copy.items.get(kept.id)
-                    _ = try await copy.items.update(
-                        kept.id, Edit(properties: ["body": .string(body)], baseVersion: read?.version ?? 0))
+                    edits.append(
+                        try await copy.items.update(
+                            kept.id, Edit(properties: ["body": .string(body)], baseVersion: read?.version ?? 0)))
                 }
+                expect(edits.count == 2 && edits[1].follows == edits[0].id, "the second edit does not follow the first")
                 try await checkSearch(first: firstId, kept: kept.id, in: copy, expect)
                 let queued = try await copy.queue.all()
                 print("queued \(queued.count) write(s)")
