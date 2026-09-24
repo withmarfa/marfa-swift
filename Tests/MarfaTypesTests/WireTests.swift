@@ -16,6 +16,10 @@ import Testing
     #expect(row.id == "i1")
     #expect(row.schemaVersion == 1)
     #expect(page.nextCursor == nil)
+    // The witness that the cursor's name is read at all.
+    let next = try JSONDecoder().decode(
+        Components.Schemas.ItemPage.self, from: Data(#"{"data":[],"next_cursor":"c1"}"#.utf8))
+    #expect(next.nextCursor == "c1")
 }
 
 /// The server a live test reads, named by `MARFA_API_URL` and `MARFA_API_KEY`.

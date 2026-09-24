@@ -110,8 +110,7 @@ final class Heard: Sendable {
 ///
 /// Its follows keep the core's rules: one stream at a time, let go only as
 /// the follow ends, and `ended` told a moment after `stop`. Its hydration
-/// and catch-up refuse while a follow holds the stream, as a core that makes
-/// a hydration take the stream does, so a feed passes against either core.
+/// and catch-up refuse while a follow holds the stream, as the core's do.
 final class FakeCore: Core, @unchecked Sendable {
     struct Follow {
         let listener: any CoreChangeListener
@@ -124,7 +123,6 @@ final class FakeCore: Core, @unchecked Sendable {
         var handle = CoreHandle.writer
         var follows: [Follow] = []
         var streamHeld = false
-        var refreshes = 0
         var caughtUp = CoreCatchUpReport(applied: 0, skipped: 0, cursor: "1", reachedHead: true)
         var drained = CoreDrainReport(
             sent: 0, held: 0, verdicts: [], stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
@@ -161,7 +159,7 @@ final class FakeCore: Core, @unchecked Sendable {
         }
         if refused {
             later {
-                self.end(index, with: .Invalid(message: "this working copy is already catching up or following"))
+                self.end(index, with: .Invalid(message: Self.streamHeld))
             }
         }
         return FakeSubscription { [self] in
@@ -227,14 +225,15 @@ final class FakeCore: Core, @unchecked Sendable {
 
     var aReadWasHeld: Bool { state.withLock { $0.gated } }
 
+    /// The core's refusal while another hydration, catch-up or follow holds
+    /// the stream.
+    static let streamHeld =
+        "this working copy is already hydrating, catching up or following; one at a time moves its cursor"
+
     private func refreshing() throws {
-        let held = state.withLock { state in
-            state.refreshes += 1
-            return state.streamHeld
-        }
+        let held = state.withLock { $0.streamHeld }
         if held {
-            throw CoreMarfaError.Invalid(
-                message: "this working copy is already catching up or following; one stream at a time moves its cursor")
+            throw CoreMarfaError.Invalid(message: Self.streamHeld)
         }
     }
 

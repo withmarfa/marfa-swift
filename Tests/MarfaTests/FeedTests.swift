@@ -234,6 +234,9 @@ struct Changes {
             heard.all == [stopped(.network(message: "gone")), refreshed(.drained)]
         }
         #expect(core.follows.count == 1, "a drain started the failed follow again")
+        // The witness: a catch-up does start it again.
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        try await eventually("a catch-up started the follow again") { core.follows.count == 2 }
         try await bounded("close") { await copy.close() }
     }
 
