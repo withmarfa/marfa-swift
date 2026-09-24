@@ -22,6 +22,49 @@ func eventually(_ what: String, within seconds: Double = 5, _ condition: () asyn
     }
 }
 
+/// A wait that did not finish in time.
+struct Unfinished: Error, CustomStringConvertible {
+    let what: String
+    var description: String { "\(what) did not finish" }
+}
+
+/// Runs `work`, and gives up on it once `seconds` pass.
+///
+/// A suite's time limit cancels a test, and cancellation cannot end an
+/// await that ignores it, such as a task's value or a continuation nobody
+/// resumes: a test waiting on one would hang past its limit.
+func bounded<T: Sendable>(
+    _ what: String, within seconds: Double = 10, _ work: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    try await withCheckedThrowingContinuation { continuation in
+        let answer = Answer(continuation)
+        Task {
+            do {
+                answer.resume(with: .success(try await work()))
+            } catch {
+                answer.resume(with: .failure(error))
+            }
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            answer.resume(with: .failure(Unfinished(what: what)))
+        }
+    }
+}
+
+/// A continuation resumed by whichever answer comes first.
+private final class Answer<T: Sendable>: Sendable {
+    private let waiting: Mutex<CheckedContinuation<T, any Error>?>
+
+    init(_ continuation: CheckedContinuation<T, any Error>) {
+        waiting = Mutex(continuation)
+    }
+
+    func resume(with result: Result<T, any Error>) {
+        waiting.withLock { $0.take() }?.resume(with: result)
+    }
+}
+
 /// Every change a stream tells, gathered as it arrives, with when.
 final class Heard: Sendable {
     private final class Log: Sendable {

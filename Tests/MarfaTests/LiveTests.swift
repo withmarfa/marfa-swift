@@ -188,7 +188,7 @@ struct LiveServer {
         try await eventually("every write was told") { heard.locals.count >= expected.count }
         try await Task.sleep(for: .milliseconds(300))
         #expect(heard.locals == expected)
-        await copy.close()
+        try await bounded("close") { await copy.close() }
     }
 
     @Test func eachWriteDoesWhatItNames() async throws {
@@ -317,7 +317,7 @@ struct LiveServer {
         }
 
         let watch = try #require(reader.feed.watchTask)
-        await reader.close()
+        try await bounded("close") { await reader.close() }
         #expect(watch.isCancelled)
         #expect(reader.feed.watchTask == nil)
     }
@@ -348,7 +348,7 @@ struct LiveServer {
         _ = try await writer.items.create(Live.note("seen by the second opener"))
         try await eventually("the second opener was told the writer saved") { !heard.saves.isEmpty }
         #expect(heard.stops.isEmpty)
-        await second.close()
+        try await bounded("close") { await second.close() }
     }
 
     @Test func aChangeMadeElsewhereArrivesOnTheStream() async throws {
@@ -394,8 +394,10 @@ struct LiveServer {
         let heard = Heard(copy.changes())
         // Long enough for the follow to hold the stream.
         try await Task.sleep(for: .milliseconds(300))
-        _ = try await copy.catchUp()
-        _ = try await copy.hydrate(types: ["core.note", "core.file"], tier: .feed)
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        _ = try await bounded("the hydration") {
+            try await copy.hydrate(types: ["core.note", "core.file"], tier: .feed)
+        }
 
         let elsewhere = try await Live.hydrated()
         let made = try await elsewhere.items.create(Live.note("after the hydration"))
@@ -404,7 +406,7 @@ struct LiveServer {
             heard.all.contains { $0.itemId == made.itemId }
         }
         #expect(heard.stops.isEmpty, "\(heard.stops)")
-        await copy.close()
+        try await bounded("close") { await copy.close() }
     }
 
     @Test func closingLetsGoOfTheStore() async throws {
@@ -413,7 +415,7 @@ struct LiveServer {
             let copy = try await Live.hydrated(store)
             let heard = Heard(copy.changes())
             try await Task.sleep(for: .milliseconds(300))
-            await copy.close()
+            try await bounded("close") { await copy.close() }
             withExtendedLifetime(heard) {}
         }()
         try await eventually("a new open of the store was its writer", within: 1) {
