@@ -387,6 +387,28 @@ struct LiveServer {
         }
     }
 
+    /// The core lets go of its stream only as a follow ends, a moment after
+    /// it is stopped, so a stream taken in that moment waits for the end
+    /// rather than being refused.
+    @Test func aStreamTakenAsSoonAsTheLastIsLetGoIsFed() async throws {
+        let watching = try await Live.hydrated()
+        let first = Heard(watching.changes())
+        // Long enough for the follow to hold the stream.
+        try await Task.sleep(for: .milliseconds(300))
+        first.stop()
+        try await eventually("the first stream was let go") { watching.feed.count == 0 }
+        let second = Heard(watching.changes())
+
+        let elsewhere = try await Live.hydrated()
+        let made = try await elsewhere.items.create(Live.note("after a stream was let go"))
+        _ = try await elsewhere.queue.drain()
+        try await eventually("the note arrived on the second stream", within: 20) {
+            second.all.contains { $0.itemId == made.itemId }
+        }
+        #expect(second.stops.isEmpty, "\(second.stops)")
+        try await bounded("close") { await watching.close() }
+    }
+
     /// The core lets one stream at a time move the cursor, so a catch-up or
     /// a hydration stops the follow while it runs and starts it after.
     @Test func aCatchUpAndAHydrationRunWhileAStreamIsHeld() async throws {

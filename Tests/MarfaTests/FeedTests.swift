@@ -300,7 +300,24 @@ struct Changes {
         let second = Heard(copy.changes())
         try await eventually("a stream taken after was told at once") { second.all == [failed] }
         #expect(copy.feed.watchTask == nil, "a new stream started the failed watch again")
+        _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        #expect(copy.feed.watchTask == nil, "a hydration or catch-up started a reader's failed watch again")
         try await bounded("close") { await copy.close() }
+    }
+
+    /// A watch moves no cursor, so a hydration or catch-up leaves it running.
+    @Test func aReadersWatchRunsOnThroughAHydrationAndACatchUp() async throws {
+        let core = FakeCore.reader()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let heard = Heard(copy.changes())
+        let watch = try #require(copy.feed.watchTask)
+        _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        #expect(copy.feed.watchTask == watch)
+        #expect(!watch.isCancelled)
+        try await bounded("close") { await copy.close() }
+        withExtendedLifetime(heard) {}
     }
 
     @Test func aWatchStoppedMidReadTellsNothing() async throws {
