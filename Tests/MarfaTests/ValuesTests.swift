@@ -1,10 +1,12 @@
 import Foundation
 import MarfaCoreNames
+import Security
 import Testing
 
 @testable import Marfa
 
-@Suite struct Values {
+@Suite(.timeLimit(.minutes(1)))
+struct Values {
     @Test func jsonRoundTripsThroughTheTextTheCoreTakes() throws {
         let properties: [String: JSONValue] = [
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
@@ -27,6 +29,23 @@ import Testing
         #expect(read["b"] == .integer(100))
         #expect(read["c"] == .number(9_223_372_036_854_775_808))
         #expect(read["d"] == .number(1.5))
+    }
+
+    @Test func eachAccessorAnswersItsOwnKindOnly() {
+        #expect(JSONValue.integer(3).integer == 3)
+        #expect(JSONValue.number(3).integer == nil)
+        #expect(JSONValue.integer(3).number == 3)
+        #expect(JSONValue.number(0.5).number == 0.5)
+        #expect(JSONValue.string("3").number == nil)
+        #expect(JSONValue.bool(true).bool == true)
+        #expect(JSONValue.bool(false).bool == false)
+        #expect(JSONValue.integer(1).bool == nil)
+        #expect(JSONValue.string("s").string == "s")
+        #expect(JSONValue.bool(true).string == nil)
+    }
+
+    @Test func aLiteralNamingAKeyTwiceKeepsTheLast() {
+        #expect(JSONValue(dictionaryLiteral: ("a", 1), ("b", 2), ("a", 3)) == .object(["a": 3, "b": 2]))
     }
 
     @Test func anItemCrossesWhole() throws {
@@ -68,12 +87,14 @@ import Testing
     }
 
     @Test func propertiesTheCoreCannotReadAreRefusedRatherThanEmptied() {
-        #expect(throws: DecodingError.self) {
-            try Item(
-                CoreItem(
-                    id: "n1", type: "core.note", propertiesJson: "[1,2]", state: .active, tier: nil, version: 1,
-                    schemaVersion: 1, source: "device", sourceId: nil, occurredAt: "", createdAt: "",
-                    updatedAt: "", tags: []))
+        let unreadable = CoreItem(
+            id: "n1", type: "core.note", propertiesJson: "[1,2]", state: .active, tier: nil, version: 1,
+            schemaVersion: 1, source: "device", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "",
+            tags: [])
+        #expect {
+            try translated { try Item(unreadable) }
+        } throws: { error in
+            if case Marfa.MarfaError.decoding = error { true } else { false }
         }
     }
 
@@ -97,24 +118,25 @@ import Testing
         #expect(try Properties.object(edit.propertiesJson) == ["title": "u"])
     }
 
-    @Test func filtersCrossWhole() {
+    @Test(arguments: [true, false])
+    func filtersCrossWhole(allStates: Bool) {
         let list = ListFilters(
-            type: "core.note", state: .archived, allStates: true, tier: .library, tags: ["a"],
+            type: "core.note", state: .archived, allStates: allStates, tier: .library, tags: ["a"],
             occurredAfter: "2026-01-01T00:00:00Z", occurredBefore: "2026-02-01T00:00:00Z", limit: 5, offset: 2
         ).core
         #expect(list.type == "core.note")
         #expect(list.state == .archived)
-        #expect(list.allStates)
+        #expect(list.allStates == allStates)
         #expect(list.tier == .library)
         #expect(list.tags == ["a"])
         #expect(list.occurredAfter == "2026-01-01T00:00:00Z")
         #expect(list.occurredBefore == "2026-02-01T00:00:00Z")
         #expect(list.limit == 5)
         #expect(list.offset == 2)
-        let search = SearchFilters(type: "core.file", state: .active, allStates: false, tags: ["b", "c"]).core
+        let search = SearchFilters(type: "core.file", state: .active, allStates: allStates, tags: ["b", "c"]).core
         #expect(search.type == "core.file")
         #expect(search.state == .active)
-        #expect(!search.allStates)
+        #expect(search.allStates == allStates)
         #expect(search.tags == ["b", "c"])
     }
 
@@ -132,7 +154,8 @@ import Testing
     }
 }
 
-@Suite struct Errors {
+@Suite(.timeLimit(.minutes(1)))
+struct Errors {
     /// Every case the core can throw, and the case and fields it arrives as.
     static let cases: [(CoreMarfaError, Marfa.MarfaError)] = [
         (.NotFound(code: "c", message: "m"), .notFound(code: "c", message: "m")),
@@ -212,7 +235,8 @@ import Testing
     }
 }
 
-@Suite struct Opening {
+@Suite(.timeLimit(.minutes(1)))
+struct Opening {
     @Test func aReadingOpenRefusesAPathWithNoStoreAndMakesNone() async throws {
         let path = temporaryStore()
         await #expect {
@@ -236,5 +260,49 @@ import Testing
             if case Marfa.MarfaError.hydrationIncomplete = error { true } else { false }
         }
     }
+}
 
+/// Whether this process may keep a generic password at all, asked of the
+/// Keychain directly rather than through the code under test.
+enum KeychainAnswers {
+    static let here: Bool = {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword, kSecAttrService: "marfa-tests-probe-\(UUID())",
+            kSecAttrAccount: "probe",
+        ]
+        var item = query
+        item[kSecValueData] = Data("probe".utf8)
+        guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { return false }
+        SecItemDelete(query as CFDictionary)
+        return true
+    }()
+}
+
+@Suite(.enabled(if: KeychainAnswers.here, "the Keychain does not answer this process"), .timeLimit(.minutes(1)))
+struct KeychainKeys {
+    let service = "marfa-tests-\(UUID())"
+
+    @Test func savingAgainReplacesTheKey() throws {
+        defer { try? Keychain.delete(service: service, account: "a") }
+        try Keychain.save(key: "first", service: service, account: "a")
+        #expect(try Keychain.key(service: service, account: "a") == "first")
+        try Keychain.save(key: "second", service: service, account: "a")
+        #expect(try Keychain.key(service: service, account: "a") == "second")
+    }
+
+    @Test func aKeyNeverKeptIsNothing() throws {
+        defer { try? Keychain.delete(service: service, account: "kept") }
+        #expect(try Keychain.key(service: service, account: "never") == nil)
+        // The witness: a key kept under the same service is found.
+        try Keychain.save(key: "k", service: service, account: "kept")
+        #expect(try Keychain.key(service: service, account: "kept") == "k")
+    }
+
+    @Test func deletingAKeyNeverKeptIsNoError() throws {
+        try Keychain.delete(service: service, account: "never")
+        // The witness: deleting a key kept removes it.
+        try Keychain.save(key: "k", service: service, account: "kept")
+        try Keychain.delete(service: service, account: "kept")
+        #expect(try Keychain.key(service: service, account: "kept") == nil)
+    }
 }

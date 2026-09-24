@@ -41,12 +41,14 @@ enum Live {
 
 /// Where the live tests are required, a missing server fails rather than
 /// skipping them, so a run that lost its server cannot pass on the unit tests.
-@Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil))
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil), .timeLimit(.minutes(1)))
 func theLiveTestsHaveAServerWhereTheyAreRequired() {
     #expect(Live.server != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_API_URL or MARFA_API_KEY is not")
 }
 
-@Suite(.enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"))
+@Suite(
+    .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
+    .timeLimit(.minutes(2)))
 struct LiveServer {
     @Test func aWriteMadeHereIsAnsweredAndHeld() async throws {
         let copy = try await Live.hydrated()
@@ -118,7 +120,9 @@ struct LiveServer {
         #expect(fields == ["body"])
     }
 
-    @Test func aWriteUnderARefusedKeyIsBlocked() async throws {
+    /// A refused key parks every write, and a release sends a write again:
+    /// one by id, or every write blocked for a reason.
+    @Test func writesUnderARefusedKeyAreBlockedAndReleased() async throws {
         let store = Live.store()
         // Hydrated under the good key by a copy that is gone before the
         // store opens again, so the second open is the writer.
@@ -131,9 +135,165 @@ struct LiveServer {
         let refusedKey = try #require(Live.server).with(key: "mk_not_a_key")
         let unkeyed = try await WorkingCopy.open(store: store, server: refusedKey)
         #expect(unkeyed.handle == .writer)
-        let blocked = try await unkeyed.tags.add("favorite", to: id)
-        let report = try await unkeyed.queue.drain()
-        #expect(report.verdicts.first { $0.id == blocked.id }?.verdict == .blocked(reason: .credentialRefused))
+        let first = try await unkeyed.tags.add("favorite", to: id)
+        let second = try await unkeyed.tags.add("pinned", to: id)
+        _ = try await unkeyed.queue.drain()
+        func verdict(_ write: QueuedWrite) async throws -> Verdict? {
+            try await unkeyed.queue.all().first { $0.id == write.id }?.verdict
+        }
+        #expect(try await verdict(first) == .blocked(reason: .credentialRefused))
+        #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
+
+        #expect(try await unkeyed.queue.release(first.id))
+        #expect(try await verdict(first) == nil)
+        #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
+        #expect(try await unkeyed.queue.release(reason: .keySpent) == 0)
+        #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
+        #expect(try await unkeyed.queue.release(reason: .credentialRefused) == 1)
+        #expect(try await verdict(second) == nil)
+    }
+
+    @Test func eachWriteIsToldOnceAsTheWriteItWas() async throws {
+        let copy = try await Live.hydrated()
+        let heard = Heard(copy.changes())
+        var writes: [QueuedWrite] = []
+        func record(_ write: QueuedWrite) -> QueuedWrite {
+            writes.append(write)
+            return write
+        }
+        let a = try #require(record(try await copy.items.create(Live.note("told a"))).itemId)
+        let b = try #require(record(try await copy.items.create(Live.note("told b"))).itemId)
+        let version = try #require(try await copy.items.get(a)).version
+        _ = record(try await copy.items.update(a, Edit(properties: ["title": "told a, edited"], baseVersion: version)))
+        _ = record(try await copy.tags.add("told", to: a))
+        _ = record(try await copy.tags.remove("told", from: a))
+        _ = record(try await copy.metadata.replaceTags(of: a, with: ["x"]))
+        _ = record(try await copy.metadata.mergeTags(["y"], into: a))
+        _ = record(try await copy.extensions.write("told", ["k": 1], on: a))
+        _ = record(try await copy.extensions.delete("told", from: a))
+        let edge = record(try await copy.edges.create(from: a, to: b, type: "references"))
+        let edgeId = try #require(edge.edgeId)
+        #expect(edge.targetId != edgeId)
+        let edgeVersion = try #require(try await copy.edges.from(a).first).version
+        _ = record(try await copy.edges.update(edgeId, properties: [:], baseVersion: edgeVersion))
+        _ = record(try await copy.edges.delete(edgeId))
+        _ = record(try await copy.items.transition(b, to: .archived))
+        _ = record(try await copy.items.delete(b))
+        _ = record(try await copy.items.restore(b))
+        _ = record(try await copy.blobs.put(file: try Live.file("put \(UUID())")))
+        let attached = try await copy.items.attach(to: a, file: try Live.file("attached \(UUID())"))
+        writes += [attached.upload, attached.item, attached.edge]
+
+        let expected = writes.map { Change(origin: .local($0.kind), itemId: $0.itemId, edgeId: $0.edgeId) }
+        try await eventually("every write was told") { heard.locals.count >= expected.count }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.locals == expected)
+        await copy.close()
+    }
+
+    @Test func eachWriteDoesWhatItNames() async throws {
+        let copy = try await Live.hydrated()
+        let a = try #require(try await copy.items.create(Live.note("named a")).itemId)
+        let b = try #require(try await copy.items.create(Live.note("named b")).itemId)
+        func tags() async throws -> Set<String> { Set(try #require(try await copy.items.get(a)).tags) }
+
+        _ = try await copy.tags.add("x", to: a)
+        _ = try await copy.tags.add("y", to: a)
+        #expect(try await tags() == ["x", "y"])
+        _ = try await copy.tags.remove("x", from: a)
+        #expect(try await tags() == ["y"])
+        _ = try await copy.metadata.mergeTags(["z"], into: a)
+        #expect(try await tags() == ["y", "z"])
+        _ = try await copy.metadata.replaceTags(of: a, with: ["w"])
+        #expect(try await tags() == ["w"])
+
+        let wrote = try await copy.extensions.write("named", ["k": 1], on: a)
+        #expect(wrote.kind == .writeExtension)
+        let deleted = try await copy.extensions.delete("named", from: a)
+        #expect(deleted.kind == .deleteExtension)
+        #expect(deleted.namespace == "named")
+
+        _ = try await copy.items.transition(a, to: .archived)
+        #expect(try await copy.items.get(a)?.state == .archived)
+        _ = try await copy.items.delete(b)
+        #expect(try await copy.items.get(b) == nil)
+        _ = try await copy.items.restore(b)
+        #expect(try await copy.items.get(b)?.state == .active)
+
+        let edgeId = UUID().uuidString.lowercased()
+        let linked = try await copy.edges.create(from: a, to: b, type: "references", id: edgeId)
+        #expect(linked.edgeId == edgeId)
+        let from = try await copy.edges.from(a)
+        #expect(from.map(\.id) == [edgeId])
+        #expect(from.map(\.targetId) == [b])
+        #expect(try await copy.edges.from(b).isEmpty)
+        // The core refuses an update based on a version it does not hold,
+        // naming that version, which shows the base version reached it.
+        let held = try #require(from.first).version
+        await #expect {
+            _ = try await copy.edges.update(edgeId, properties: [:], baseVersion: held + 7)
+        } throws: { error in
+            guard case Marfa.MarfaError.invalid(let message) = error else { return false }
+            return message.contains("version \(held + 7)")
+        }
+        let updated = try await copy.edges.update(edgeId, properties: [:], baseVersion: held)
+        #expect(updated.baseVersion == held)
+    }
+
+    @Test func anUploadAndAnAttachmentKeepWhatTheyWereGiven() async throws {
+        let copy = try await Live.hydrated()
+        let note = try #require(try await copy.items.create(Live.note("given")).itemId)
+
+        let given = try await copy.blobs.put(file: try Live.file("given \(UUID())"), mimeType: "text/markdown")
+        let guessed = try await copy.blobs.put(file: try Live.file("guessed \(UUID())"))
+        _ = try await copy.queue.drain()
+        let answered = try await copy.queue.all()
+        func mimeType(_ write: QueuedWrite) throws -> JSONValue? {
+            let row = try #require(answered.first { $0.id == write.id })
+            #expect(row.verdict == .accepted)
+            return try Properties.object(try #require(row.answer))["mime_type"]
+        }
+        #expect(try mimeType(given) == "text/markdown")
+        // The witness: without one, the type is the file's extension's.
+        #expect(try mimeType(guessed) == "text/plain")
+
+        let attached = try await copy.items.attach(
+            to: note, file: try Live.file("attached \(UUID())"), Attachment(mimeType: "text/csv", title: "Given title"))
+        let fileId = try #require(attached.item.itemId)
+        let file = try #require(try await copy.items.get(fileId))
+        #expect(file.title == "Given title")
+        #expect(file.properties["mime_type"] == "text/csv")
+        // The witness: without one, the title is the file's name.
+        let name = "plain-\(UUID()).txt"
+        let plain = try await copy.items.attach(to: note, file: try Live.file("plain", named: name))
+        let plainId = try #require(plain.item.itemId)
+        let plainFile = try #require(try await copy.items.get(plainId))
+        #expect(plainFile.title == name)
+        #expect(plainFile.properties["mime_type"] == "text/plain")
+    }
+
+    @Test func searchAndListNarrowAsAsked() async throws {
+        let copy = try await Live.hydrated()
+        let word = "heron\(UUID().uuidString.prefix(8).lowercased())"
+        let tag = "narrow-\(UUID())"
+        var ids: [String] = []
+        for day in 1...3 {
+            let written = try await copy.items.create(
+                Live.note("\(word) \(day)", tags: [tag], occurredAt: "2026-01-0\(day)T00:00:00.000Z"))
+            ids.append(try #require(written.itemId))
+        }
+        #expect(try await copy.search(word).count == 3)
+        #expect(try await copy.search(word, limit: 2).count == 2)
+
+        let filters = ListFilters(type: "core.note", tags: [tag])
+        let ascending = try await copy.items.list(filters, sort: Sort(field: .occurredAt, direction: .ascending))
+        #expect(ascending.map(\.id) == ids)
+        let descending = try await copy.items.list(filters, sort: Sort(field: .occurredAt, direction: .descending))
+        #expect(descending.map(\.id) == ids.reversed())
+
+        _ = try await copy.items.transition(ids[0], to: .archived)
+        #expect(Set(try await copy.search(word).map(\.item.id)) == Set(ids[1...]))
+        #expect(Set(try await copy.search(word, filters: SearchFilters(allStates: true)).map(\.item.id)) == Set(ids))
     }
 
     /// A reader of a store the writer saves to is told each save, once, and
