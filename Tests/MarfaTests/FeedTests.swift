@@ -187,7 +187,7 @@ struct Changes {
         #expect(core.follows.count == 1, "a new stream started the failed follow again")
 
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
-        #expect(core.follows.count == 2)
+        try #require(core.follows.count == 2)
         core.fail(1, with: .Network(message: "gone"))
         try await eventually("the second failure was told") { first.stops.count == 2 }
         _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
@@ -307,6 +307,17 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
+    /// A first read that fails is told as the case the core threw, not as a
+    /// store failure around it.
+    @Test func aReaderWhoseFirstReadFailsIsToldTheCase() async throws {
+        let core = FakeCore.reader()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        core.state.withLock { $0.readsFail = .Invalid(message: "gone") }
+        let heard = Heard(copy.changes())
+        try await eventually("the failure was told") { heard.all == [stopped(.invalid(message: "gone"))] }
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func aWatchThatFailsIsToldAndStaysStopped() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
@@ -350,7 +361,7 @@ struct Changes {
         first.stop()
         try await eventually("the first stream was let go") { copy.feed.count == 0 }
         core.save()
-        let second = Heard(copy.changes())
+        let second = try await bounded("changes()") { Heard(copy.changes()) }
         gate.signal()
         try await Task.sleep(for: .milliseconds(600))
         #expect(second.all.isEmpty, "the stopped watch told what it read after it was stopped")
