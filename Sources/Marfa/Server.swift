@@ -17,7 +17,8 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// The server, never the key, so a log that prints one leaks nothing.
     public var description: String { "Server(\(url.absoluteString))" }
     public var debugDescription: String { description }
-    /// The server alone, so `dump` and a debugger's view leak nothing either.
+    /// The server alone, so `dump` and whatever else reflects on it leak
+    /// nothing either.
     public var customMirror: Mirror { Mirror(self, children: ["url": url]) }
 }
 
