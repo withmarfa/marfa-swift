@@ -5,7 +5,7 @@
 #
 #   scripts/core.sh                         # fetches the monorepo into .build/marfa
 #   MARFA_MONOREPO=<checkout> scripts/core.sh  # a checkout already at the pin
-#   MARFA_GENERATOR_BUILD=<dir>             # where the generator is built
+#   MARFA_GENERATOR_BUILD=<dir> scripts/core.sh  # the generator built there
 #
 # Needs the Rust toolchain and cargo-swift, which the monorepo's build.sh
 # installs when it is missing.
@@ -41,10 +41,12 @@ built="${src}/core/bindings/swift/MarfaCore"
 mkdir -p "${root}/Frameworks"
 rm -rf "${root}/Frameworks/MarfaCoreFFI.xcframework"
 cp -R "${built}/MarfaCoreFFI.xcframework" "${root}/Frameworks/"
-cp "${built}/Sources/MarfaCore/MarfaCore.swift" "${root}/Sources/MarfaCore/MarfaCore.swift"
+# The glue, and the wire types below, go into an emptied directory, so that
+# only what the pinned commit generates is left there.
+rm -rf "${root}/Sources/MarfaCore"
+cp -R "${built}/Sources/MarfaCore" "${root}/Sources/MarfaCore"
 
-# The wire types, by the generator generator/Package.swift pins, into an
-# emptied directory so a file the generator no longer writes goes with it.
+# The wire types, by the generator generator/Package.swift pins.
 scratch="${MARFA_GENERATOR_BUILD:-${root}/generator/.build}"
 swift build --quiet -c release --package-path "${root}/generator" --scratch-path "${scratch}" \
   --product swift-openapi-generator
