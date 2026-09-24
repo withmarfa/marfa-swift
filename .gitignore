@@ -10,6 +10,9 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 Package.resolved
+# The generator's own pins are what keep the wire types reproducible.
+!/generator/Package.resolved
+/generator/.build
 
 # Claude Code local-only (do not commit)
 .claude/settings.local.json
