@@ -435,17 +435,21 @@ struct LiveServer {
         try await bounded("close") { await copy.close() }
     }
 
+    /// The follow's thread holds the store until the follow ends, so an
+    /// open made as soon as `close()` returns is the writer only where
+    /// `close()` waited for that end.
     @Test func closingLetsGoOfTheStore() async throws {
-        let store = Live.store()
-        try await { () async throws in
-            let copy = try await Live.hydrated(store)
-            let heard = Heard(copy.changes())
-            try await Task.sleep(for: .milliseconds(300))
-            try await bounded("close") { await copy.close() }
-            withExtendedLifetime(heard) {}
-        }()
-        try await eventually("a new open of the store was its writer", within: 1) {
-            try await WorkingCopy.open(store: store).handle == .writer
+        for _ in 1...5 {
+            let store = Live.store()
+            try await { () async throws in
+                let copy = try await Live.hydrated(store)
+                let heard = Heard(copy.changes())
+                // Long enough for the follow to hold the stream.
+                try await Task.sleep(for: .milliseconds(300))
+                try await bounded("close") { await copy.close() }
+                withExtendedLifetime(heard) {}
+            }()
+            #expect(try await WorkingCopy.open(store: store).handle == .writer)
         }
     }
 }
