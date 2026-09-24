@@ -181,6 +181,12 @@ public struct Items: Sendable {
         try await background { [core] in try core.get(id: id).map(Item.init) }
     }
 
+    /// The thumbnail the item carries, where its type declares one, read from
+    /// the held row with no request.
+    public func thumbnail(_ id: String) async throws -> Thumbnail? {
+        try await background { [core] in try core.thumbnail(id: id) }
+    }
+
     public func create(_ draft: Draft) async throws -> QueuedWrite {
         try await write { core in try core.createItem(draft: draft.core()) }
     }

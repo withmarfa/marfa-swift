@@ -126,7 +126,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var streamHeld = false
         var refreshes = 0
         var caughtUp = CoreCatchUpReport(applied: 0, skipped: 0, cursor: "1", reachedHead: true)
-        var drained = CoreDrainReport(sent: 0, held: 0, verdicts: [], stopped: nil, retryAfterSeconds: nil)
+        var drained = CoreDrainReport(
+            sent: 0, held: 0, verdicts: [], stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
         var dataVersion: Int64 = 0
         var gate: DispatchSemaphore?
         var gated = false

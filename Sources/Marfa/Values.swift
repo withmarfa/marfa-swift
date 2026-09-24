@@ -22,6 +22,7 @@ public typealias CatchUpReport = CoreCatchUpReport
 public typealias Status = CoreStatus
 public typealias Attachment = CoreAttachment
 public typealias Attached = CoreAttached
+public typealias Thumbnail = CoreThumbnail
 
 /// Every way the core refuses or fails.
 ///

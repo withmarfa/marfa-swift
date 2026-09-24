@@ -2,4 +2,4 @@
 
 /// The contract version these types describe: the document's `info.version`,
 /// which an instance's root answers as `contract`.
-public let marfaContractVersion = 1
+public let marfaContractVersion = 2
