@@ -8,13 +8,7 @@ import Testing
 ///
 /// Without them the live tests are skipped by name.
 enum Live {
-    static let server: Server? = {
-        let environment = ProcessInfo.processInfo.environment
-        guard let url = environment["MARFA_API_URL"].flatMap(URL.init(string:)),
-            let key = environment["MARFA_API_KEY"]
-        else { return nil }
-        return Server(url: url, key: key)
-    }()
+    static let server: Server? = try? Server.fromEnvironment()
 
     static func store() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).sqlite")

@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 /// Where a working copy's slice comes from: a server, and the key that reaches it.
 ///
@@ -14,56 +13,40 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
         self.key = key
     }
 
+    /// Why the environment's server could not be taken.
+    public enum EnvironmentError: Error, Hashable, CustomStringConvertible {
+        /// `MARFA_API_URL` is set, with a key beside it, and is not an http or https address with a host.
+        case notAServer(String)
+
+        public var description: String {
+            switch self {
+            case .notAServer(let url): "MARFA_API_URL is \(url), which is not an http or https address with a host"
+            }
+        }
+    }
+
+    /// The server `MARFA_API_URL` and `MARFA_API_KEY` name, where both are set, and nothing where either is
+    /// missing or empty.
+    ///
+    /// A server named here takes the place of one kept in the Keychain, which a client then neither reads nor
+    /// writes: this is how an agent or a test runs a client with nobody at the keyboard. An address that
+    /// names no server is refused rather than passed over, so a mistyped one never falls back to a kept key.
+    public static func fromEnvironment(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws(EnvironmentError) -> Server? {
+        guard let text = environment["MARFA_API_URL"], !text.isEmpty,
+            let key = environment["MARFA_API_KEY"], !key.isEmpty
+        else { return nil }
+        guard let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased()),
+            let host = url.host(), !host.isEmpty
+        else { throw .notAServer(text) }
+        return Server(url: url, key: key)
+    }
+
     /// The server, never the key, so a log that prints one leaks nothing.
     public var description: String { "Server(\(url.absoluteString))" }
     public var debugDescription: String { description }
     /// The server alone, so `dump` and whatever else reflects on it leak
     /// nothing either.
     public var customMirror: Mirror { Mirror(self, children: ["url": url]) }
-}
-
-/// A key kept in the Keychain as a generic password.
-public enum Keychain {
-    /// The Keychain refused, with its own status.
-    public struct Failure: Error, Hashable {
-        public let status: OSStatus
-    }
-
-    /// Keeps `key`, replacing any key already kept under the same names.
-    public static func save(key: String, service: String, account: String) throws {
-        let query = self.query(service: service, account: account)
-        let status = SecItemUpdate(query as CFDictionary, [kSecValueData: Data(key.utf8)] as CFDictionary)
-        if status == errSecItemNotFound {
-            var item = query
-            item[kSecValueData] = Data(key.utf8)
-            try check(SecItemAdd(item as CFDictionary, nil))
-        } else {
-            try check(status)
-        }
-    }
-
-    /// The key kept under these names, or nothing where none is.
-    public static func key(service: String, account: String) throws -> String? {
-        var query = self.query(service: service, account: account)
-        query[kSecReturnData] = true
-        query[kSecMatchLimit] = kSecMatchLimitOne
-        var found: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &found)
-        if status == errSecItemNotFound { return nil }
-        try check(status)
-        return (found as? Data).map { String(decoding: $0, as: UTF8.self) }
-    }
-
-    public static func delete(service: String, account: String) throws {
-        let status = SecItemDelete(query(service: service, account: account) as CFDictionary)
-        if status != errSecItemNotFound { try check(status) }
-    }
-
-    private static func query(service: String, account: String) -> [CFString: Any] {
-        [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: account]
-    }
-
-    private static func check(_ status: OSStatus) throws {
-        if status != errSecSuccess { throw Failure(status: status) }
-    }
 }

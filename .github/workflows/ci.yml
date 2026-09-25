@@ -121,7 +121,16 @@ jobs:
           eval "${server_env}"
           export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
           swift build
+          # The tests keep keys in keychains of their own, under this service;
+          # the login keychain is the person's and holds after the suite what
+          # it held before it.
+          service=com.withmarfa.marfa-swift.tests
+          scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-before"
           swift test
+          if ! scripts/login-keychain.sh "${service}" | diff "${RUNNER_TEMP}/login-keychain-before" -; then
+            echo "::error::The tests changed the login keychain under ${service}."
+            exit 1
+          fi
 
       - name: Build the sample for macOS and the iOS simulator
         working-directory: Examples/MarfaSample

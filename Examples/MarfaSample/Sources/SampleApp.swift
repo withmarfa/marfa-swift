@@ -37,17 +37,17 @@ struct Configuration: Sendable {
 
     static func fromLaunch() -> Configuration {
         let arguments = CommandLine.arguments
-        let environment = ProcessInfo.processInfo.environment
         func value(_ flag: String) -> String? {
             arguments.firstIndex(of: flag).flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
         }
-        let url = (value("--server") ?? environment["MARFA_API_URL"]).flatMap(URL.init(string:))
-        let key = value("--key") ?? environment["MARFA_API_KEY"]
+        let named = value("--server").flatMap(URL.init(string:)).flatMap { url in
+            value("--key").map { Server(url: url, key: $0) }
+        }
         let folder = URL.applicationSupportDirectory.appending(path: "MarfaSample")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return Configuration(
             store: value("--store").map { URL(fileURLWithPath: $0) } ?? folder.appending(path: "notes.sqlite"),
-            server: url.flatMap { url in key.map { Server(url: url, key: $0) } },
+            server: named ?? (try? Server.fromEnvironment()),
             scenario: value("--scenario"))
     }
 }

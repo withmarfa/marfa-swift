@@ -1,6 +1,5 @@
 import Foundation
 import MarfaCoreNames
-import Security
 import Testing
 
 @testable import Marfa
@@ -270,50 +269,5 @@ struct Opening {
         } throws: { error in
             if case Marfa.MarfaError.hydrationIncomplete = error { true } else { false }
         }
-    }
-}
-
-/// Whether this process may keep a generic password at all, asked of the
-/// Keychain directly rather than through the code under test.
-enum KeychainAnswers {
-    static let here: Bool = {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword, kSecAttrService: "marfa-tests-probe-\(UUID())",
-            kSecAttrAccount: "probe",
-        ]
-        var item = query
-        item[kSecValueData] = Data("probe".utf8)
-        guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { return false }
-        SecItemDelete(query as CFDictionary)
-        return true
-    }()
-}
-
-@Suite(.enabled(if: KeychainAnswers.here, "the Keychain does not answer this process"), .timeLimit(.minutes(1)))
-struct KeychainKeys {
-    let service = "marfa-tests-\(UUID())"
-
-    @Test func savingAgainReplacesTheKey() throws {
-        defer { try? Keychain.delete(service: service, account: "a") }
-        try Keychain.save(key: "first", service: service, account: "a")
-        #expect(try Keychain.key(service: service, account: "a") == "first")
-        try Keychain.save(key: "second", service: service, account: "a")
-        #expect(try Keychain.key(service: service, account: "a") == "second")
-    }
-
-    @Test func aKeyNeverKeptIsNothing() throws {
-        defer { try? Keychain.delete(service: service, account: "kept") }
-        #expect(try Keychain.key(service: service, account: "never") == nil)
-        // The witness: a key kept under the same service is found.
-        try Keychain.save(key: "k", service: service, account: "kept")
-        #expect(try Keychain.key(service: service, account: "kept") == "k")
-    }
-
-    @Test func deletingAKeyNeverKeptIsNoError() throws {
-        try Keychain.delete(service: service, account: "never")
-        // The witness: deleting a key kept removes it.
-        try Keychain.save(key: "k", service: service, account: "kept")
-        try Keychain.delete(service: service, account: "kept")
-        #expect(try Keychain.key(service: service, account: "kept") == nil)
     }
 }
