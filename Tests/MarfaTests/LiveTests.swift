@@ -8,13 +8,9 @@ import Testing
 ///
 /// Without them the live tests are skipped by name.
 enum Live {
-    static let server: Server? = {
-        let environment = ProcessInfo.processInfo.environment
-        guard let url = environment["MARFA_API_URL"].flatMap(URL.init(string:)),
-            let key = environment["MARFA_API_KEY"]
-        else { return nil }
-        return Server(url: url, key: key)
-    }()
+    /// The environment's server, or why the address it names is none.
+    static let named = Result { try Server.fromEnvironment() }
+    static var server: Server? { try? named.get() }
 
     static func store() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).sqlite")
@@ -106,6 +102,7 @@ enum Live {
 /// skipping them, so a run that lost its server cannot pass on the unit tests.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil), .timeLimit(.minutes(1)))
 func theLiveTestsHaveAServerWhereTheyAreRequired() {
+    #expect(throws: Never.self) { try Live.named.get() }
     #expect(Live.server != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_API_URL or MARFA_API_KEY is not")
 }
 

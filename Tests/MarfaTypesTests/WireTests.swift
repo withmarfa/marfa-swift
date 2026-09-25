@@ -25,7 +25,10 @@ import Testing
 /// The server a live test reads, named by `MARFA_API_URL` and `MARFA_API_KEY`.
 private let live: (url: URL, key: String)? = {
     let environment = ProcessInfo.processInfo.environment
-    guard let url = environment["MARFA_API_URL"].flatMap(URL.init(string:)), let key = environment["MARFA_API_KEY"]
+    // The same reading as `Server.fromEnvironment`, which this target cannot import.
+    guard let text = environment["MARFA_API_URL"], !text.isEmpty, let key = environment["MARFA_API_KEY"], !key.isEmpty,
+        let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased()),
+        !(url.host() ?? "").isEmpty
     else { return nil }
     return (url, key)
 }()
