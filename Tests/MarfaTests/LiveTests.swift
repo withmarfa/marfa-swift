@@ -22,20 +22,31 @@ enum Live {
 
     /// Writes a dead write into a store's queue, and answers its id.
     ///
-    /// Its reason column names `reason`, as the ceiling never leaves one. The
-    /// answers a drain counts toward the ceiling are ones a test cannot ask a
-    /// real server for, so the row is written rather than drained into being.
+    /// The row is as the ceiling leaves one, but for its reason column, which
+    /// names `reason` where no dead row the core writes carries one: a release
+    /// reading the reason without the verdict would take it. That is why the
+    /// row is written here rather than drained into being.
     static func deadWrite(in store: URL, reason: String) throws -> String {
         var db: OpaquePointer?
-        try #require(sqlite3_open(store.path, &db) == SQLITE_OK)
+        try #require(sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
         defer { sqlite3_close(db) }
         sqlite3_busy_timeout(db, 5_000)
         let id = UUID().uuidString.lowercased()
         let insert = """
-            INSERT INTO queue (id, kind, idempotency_key, payload, verdict, reason, sent, queued_at)
-            VALUES ('\(id)', 'update_item', '\(id)', '{}', 'dead', '\(reason)', 1, '2026-01-01T00:00:00Z')
+            INSERT INTO queue (id, kind, idempotency_key, payload, verdict, reason, refusals, sent,
+                               queued_at, answered_at)
+            VALUES (?1, 'update_item', ?1, '{}', 'dead', ?2, 5, 1,
+                    '2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z')
             """
-        try #require(sqlite3_exec(db, insert, nil, nil, nil) == SQLITE_OK)
+        var statement: OpaquePointer?
+        try #require(
+            sqlite3_prepare_v2(db, insert, -1, &statement, nil) == SQLITE_OK,
+            "\(String(cString: sqlite3_errmsg(db)))")
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(statement, 1, id, -1, transient)
+        sqlite3_bind_text(statement, 2, reason, -1, transient)
+        try #require(sqlite3_step(statement) == SQLITE_DONE, "\(String(cString: sqlite3_errmsg(db)))")
         return id
     }
 
@@ -220,10 +231,10 @@ struct LiveServer {
         // released below, so a release reading the reason without the
         // verdict would take it.
         let dead = try Live.deadWrite(in: store, reason: "credential_refused")
-        func deadVerdict() async throws -> Verdict? {
-            try await unkeyed.queue.all().first { $0.id == dead }?.verdict
+        func deadRow() async throws -> QueuedWrite? {
+            try await unkeyed.queue.all().first { $0.id == dead }
         }
-        #expect(try await deadVerdict() == .dead)
+        #expect(try await deadRow()?.verdict == .dead)
 
         #expect(try await unkeyed.queue.release(first.id))
         #expect(try await verdict(first) == nil)
@@ -232,10 +243,12 @@ struct LiveServer {
         #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
         #expect(try await unkeyed.queue.release(reason: .credentialRefused) == 1)
         #expect(try await verdict(second) == nil)
-        #expect(try await deadVerdict() == .dead, "a release by reason released a dead write")
-        // The witness: the dead write is one a release takes, by its id.
+        #expect(try await deadRow()?.verdict == .dead, "a release by reason released a dead write")
+        // The witness: the dead write is one a release takes, by its id, and
+        // it is still queued afterwards, unanswered.
         #expect(try await unkeyed.queue.release(dead))
-        #expect(try await deadVerdict() == nil)
+        let released = try #require(try await deadRow())
+        #expect(released.verdict == nil)
     }
 
     @Test func eachWriteIsToldOnceAsTheWriteItWas() async throws {
