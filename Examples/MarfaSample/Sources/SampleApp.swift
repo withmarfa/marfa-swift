@@ -35,6 +35,16 @@ struct Configuration: Sendable {
     var server: Server?
     var scenario: String?
 
+    /// The environment's server; an address that names none is said on stderr, and the sample works offline.
+    private static func environmentServer() -> Server? {
+        do {
+            return try Server.fromEnvironment()
+        } catch {
+            FileHandle.standardError.write(Data("\(error)\n".utf8))
+            return nil
+        }
+    }
+
     static func fromLaunch() -> Configuration {
         let arguments = CommandLine.arguments
         func value(_ flag: String) -> String? {
@@ -47,7 +57,7 @@ struct Configuration: Sendable {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return Configuration(
             store: value("--store").map { URL(fileURLWithPath: $0) } ?? folder.appending(path: "notes.sqlite"),
-            server: named ?? (try? Server.fromEnvironment()),
+            server: named ?? environmentServer(),
             scenario: value("--scenario"))
     }
 }
