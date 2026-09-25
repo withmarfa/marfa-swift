@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 
 @testable import Marfa
@@ -17,6 +18,25 @@ enum Live {
 
     static func store() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).sqlite")
+    }
+
+    /// Writes a dead write into a store's queue, and answers its id.
+    ///
+    /// Its reason column names `reason`, as the ceiling never leaves one. The
+    /// answers a drain counts toward the ceiling are ones a test cannot ask a
+    /// real server for, so the row is written rather than drained into being.
+    static func deadWrite(in store: URL, reason: String) throws -> String {
+        var db: OpaquePointer?
+        try #require(sqlite3_open(store.path, &db) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        let id = UUID().uuidString.lowercased()
+        let insert = """
+            INSERT INTO queue (id, kind, idempotency_key, payload, verdict, reason, sent, queued_at)
+            VALUES ('\(id)', 'update_item', '\(id)', '{}', 'dead', '\(reason)', 1, '2026-01-01T00:00:00Z')
+            """
+        try #require(sqlite3_exec(db, insert, nil, nil, nil) == SQLITE_OK)
+        return id
     }
 
     static func file(_ text: String, named name: String = "marfa-live-\(UUID()).txt") throws -> URL {
@@ -173,7 +193,8 @@ struct LiveServer {
     }
 
     /// A refused key parks every write, and a release sends a write again:
-    /// one by id, or every write blocked for a reason.
+    /// one by id, or every write blocked for a reason, which never takes a
+    /// dead one.
     @Test func writesUnderARefusedKeyAreBlockedAndReleased() async throws {
         let store = Live.store()
         // Hydrated under the good key by a copy that is gone before the
@@ -195,6 +216,14 @@ struct LiveServer {
         }
         #expect(try await verdict(first) == .blocked(reason: .credentialRefused))
         #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
+        // Beside them, a dead write whose reason column names the reason
+        // released below, so a release reading the reason without the
+        // verdict would take it.
+        let dead = try Live.deadWrite(in: store, reason: "credential_refused")
+        func deadVerdict() async throws -> Verdict? {
+            try await unkeyed.queue.all().first { $0.id == dead }?.verdict
+        }
+        #expect(try await deadVerdict() == .dead)
 
         #expect(try await unkeyed.queue.release(first.id))
         #expect(try await verdict(first) == nil)
@@ -203,6 +232,10 @@ struct LiveServer {
         #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
         #expect(try await unkeyed.queue.release(reason: .credentialRefused) == 1)
         #expect(try await verdict(second) == nil)
+        #expect(try await deadVerdict() == .dead, "a release by reason released a dead write")
+        // The witness: the dead write is one a release takes, by its id.
+        #expect(try await unkeyed.queue.release(dead))
+        #expect(try await deadVerdict() == nil)
     }
 
     @Test func eachWriteIsToldOnceAsTheWriteItWas() async throws {
