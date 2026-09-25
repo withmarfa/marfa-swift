@@ -50,6 +50,22 @@ enum Live {
         return id
     }
 
+    /// The reason column of one queued write, as the store holds it.
+    static func reasonColumn(of id: String, in store: URL) throws -> String? {
+        var db: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        var statement: OpaquePointer?
+        try #require(
+            sqlite3_prepare_v2(db, "SELECT reason FROM queue WHERE id = ?1", -1, &statement, nil) == SQLITE_OK,
+            "\(String(cString: sqlite3_errmsg(db)))")
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        try #require(sqlite3_step(statement) == SQLITE_ROW, "no queued write \(id)")
+        return sqlite3_column_text(statement, 0).map { String(cString: $0) }
+    }
+
     static func file(_ text: String, named name: String = "marfa-live-\(UUID()).txt") throws -> URL {
         let file = FileManager.default.temporaryDirectory.appending(path: name)
         try Data(text.utf8).write(to: file)
@@ -235,6 +251,10 @@ struct LiveServer {
             try await unkeyed.queue.all().first { $0.id == dead }
         }
         #expect(try await deadRow()?.verdict == .dead)
+        // Spelled as the core spells the reason on a row it blocked, or the
+        // seeded row names a reason no release reads and guards nothing.
+        #expect(try Live.reasonColumn(of: dead, in: store) == Live.reasonColumn(of: second.id, in: store))
+        let deadKey = try #require(try await deadRow()).idempotencyKey
 
         #expect(try await unkeyed.queue.release(first.id))
         #expect(try await verdict(first) == nil)
@@ -244,6 +264,9 @@ struct LiveServer {
         #expect(try await unkeyed.queue.release(reason: .credentialRefused) == 1)
         #expect(try await verdict(second) == nil)
         #expect(try await deadRow()?.verdict == .dead, "a release by reason released a dead write")
+        #expect(
+            try await deadRow()?.idempotencyKey == deadKey,
+            "a release by reason gave a dead write a fresh key, which is half a release")
         // The witness: the dead write is one a release takes, by its id, and
         // it is still queued afterwards, unanswered.
         #expect(try await unkeyed.queue.release(dead))
