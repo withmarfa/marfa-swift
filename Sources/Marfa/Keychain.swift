@@ -27,7 +27,11 @@ public struct Keychain: Sendable {
     /// It is not in the user's search list, so a search that names no keychain never finds it, and only calls
     /// through this value name it. Every call unlocks it with its own password first, so a keychain that
     /// locked itself meanwhile is never unlocked by asking a person. `discard` removes it.
+    ///
+    /// Refuses keychain prompts for the whole process, the system keychain's included, since a test must never
+    /// wait on a person: a call that would ask one fails instead.
     public static func isolated() throws -> Keychain {
+        SecKeychainSetUserInteractionAllowed(false)
         let folder = FileManager.default.temporaryDirectory.appending(path: "marfa-keychain-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let file = folder.appending(path: "keys.keychain-db")
