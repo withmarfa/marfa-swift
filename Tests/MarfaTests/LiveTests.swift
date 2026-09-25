@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 
 @testable import Marfa
@@ -17,6 +18,52 @@ enum Live {
 
     static func store() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).sqlite")
+    }
+
+    /// Writes a dead write into a store's queue, and answers its id.
+    ///
+    /// The row is as the ceiling leaves one, but for its reason column, which
+    /// names `reason` where no dead row the core writes carries one: a release
+    /// reading the reason without the verdict would take it. That is why the
+    /// row is written here rather than drained into being.
+    static func deadWrite(in store: URL, reason: String) throws -> String {
+        var db: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        let id = UUID().uuidString.lowercased()
+        let insert = """
+            INSERT INTO queue (id, kind, idempotency_key, payload, verdict, reason, refusals, sent,
+                               queued_at, answered_at)
+            VALUES (?1, 'update_item', ?1, '{}', 'dead', ?2, 5, 1,
+                    '2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z')
+            """
+        var statement: OpaquePointer?
+        try #require(
+            sqlite3_prepare_v2(db, insert, -1, &statement, nil) == SQLITE_OK,
+            "\(String(cString: sqlite3_errmsg(db)))")
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(statement, 1, id, -1, transient)
+        sqlite3_bind_text(statement, 2, reason, -1, transient)
+        try #require(sqlite3_step(statement) == SQLITE_DONE, "\(String(cString: sqlite3_errmsg(db)))")
+        return id
+    }
+
+    /// The reason column of one queued write, as the store holds it.
+    static func reasonColumn(of id: String, in store: URL) throws -> String? {
+        var db: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        var statement: OpaquePointer?
+        try #require(
+            sqlite3_prepare_v2(db, "SELECT reason FROM queue WHERE id = ?1", -1, &statement, nil) == SQLITE_OK,
+            "\(String(cString: sqlite3_errmsg(db)))")
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        try #require(sqlite3_step(statement) == SQLITE_ROW, "no queued write \(id)")
+        return sqlite3_column_text(statement, 0).map { String(cString: $0) }
     }
 
     static func file(_ text: String, named name: String = "marfa-live-\(UUID()).txt") throws -> URL {
@@ -173,7 +220,8 @@ struct LiveServer {
     }
 
     /// A refused key parks every write, and a release sends a write again:
-    /// one by id, or every write blocked for a reason.
+    /// one by id, or every write blocked for a reason, which never takes a
+    /// dead one.
     @Test func writesUnderARefusedKeyAreBlockedAndReleased() async throws {
         let store = Live.store()
         // Hydrated under the good key by a copy that is gone before the
@@ -195,6 +243,18 @@ struct LiveServer {
         }
         #expect(try await verdict(first) == .blocked(reason: .credentialRefused))
         #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
+        // Beside them, a dead write whose reason column names the reason
+        // released below, so a release reading the reason without the
+        // verdict would take it.
+        let dead = try Live.deadWrite(in: store, reason: "credential_refused")
+        func deadRow() async throws -> QueuedWrite? {
+            try await unkeyed.queue.all().first { $0.id == dead }
+        }
+        #expect(try await deadRow()?.verdict == .dead)
+        // Spelled as the core spells the reason on a row it blocked, or the
+        // seeded row names a reason no release reads and guards nothing.
+        #expect(try Live.reasonColumn(of: dead, in: store) == Live.reasonColumn(of: second.id, in: store))
+        let deadKey = try #require(try await deadRow()).idempotencyKey
 
         #expect(try await unkeyed.queue.release(first.id))
         #expect(try await verdict(first) == nil)
@@ -203,6 +263,15 @@ struct LiveServer {
         #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
         #expect(try await unkeyed.queue.release(reason: .credentialRefused) == 1)
         #expect(try await verdict(second) == nil)
+        #expect(try await deadRow()?.verdict == .dead, "a release by reason released a dead write")
+        #expect(
+            try await deadRow()?.idempotencyKey == deadKey,
+            "a release by reason gave a dead write a fresh key, which is half a release")
+        // The witness: the dead write is one a release takes, by its id, and
+        // it is still queued afterwards, unanswered.
+        #expect(try await unkeyed.queue.release(dead))
+        let released = try #require(try await deadRow())
+        #expect(released.verdict == nil)
     }
 
     @Test func eachWriteIsToldOnceAsTheWriteItWas() async throws {
