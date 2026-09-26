@@ -216,11 +216,13 @@ struct LiveServer {
         #expect(fields == ["body"])
     }
 
+    /// An edit said to be read from an earlier version is merged, not taken.
+    ///
     /// An editor holding a note while its copy catches up another copy's
     /// retitle saves the whole row it read, based on the version it read.
-    /// Said to be read, the save is merged against what was read: the
-    /// retitle stands and the body lands. Based on the held version instead, it would carry the title it
-    /// read over the retitle, so the core refuses an older version unsaid.
+    /// Said to be read, the retitle stands and the body lands. Based on the
+    /// held version instead, it would carry the title it read over the
+    /// retitle, so the core refuses an older version unsaid.
     @Test func anEditBasedOnAnEarlierReadIsMerged() async throws {
         let copy = try await Live.hydrated()
         let note = try await copy.items.create(Live.note("read here"))

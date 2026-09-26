@@ -200,10 +200,12 @@ public struct Items: Sendable {
         try await write { core in try core.updateItem(id: id, edit: edit.core()) }
     }
 
-    /// Queues an edit based on a version read before the one the copy holds
-    /// now, which the server merges against what was read. An editor that
-    /// held a row while the copy caught up saves this way, so what came in
-    /// meanwhile is merged rather than overwritten by the values it read.
+    /// Queues an edit based on a version read before the one the copy holds.
+    ///
+    /// The server merges it against what was read. An editor that held a row
+    /// while the copy caught up saves this way, so what came in meanwhile is
+    /// merged rather than overwritten by the values it read. Its next edit
+    /// goes on the version held, and it sends only what its person changed.
     public func updateAsRead(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
         try await write { core in try core.updateItemAsRead(id: id, edit: edit.core()) }
     }
