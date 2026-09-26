@@ -253,7 +253,7 @@ public struct Edges: Sendable {
     }
 
     /// The edges the copy holds to one item: a thread's replies, the files
-    /// attached to it.
+    /// attached to it, those still waiting to be sent included.
     public func to(_ id: String) async throws -> [Edge] {
         try await background { [core] in try core.edgesTo(id: id).map(Edge.init) }
     }
