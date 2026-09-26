@@ -887,6 +887,8 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     
     func edgesFrom(id: String) throws  -> [Edge]
     
+    func edgesTo(id: String) throws  -> [Edge]
+    
     /**
      * Holds the event stream open on a thread of its own and applies each
      * event as it arrives, telling `listener` of each change.
@@ -972,6 +974,13 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
      * Changes an item in the local copy and queues the change.
      */
     func updateItem(id: String, edit: Edit) throws  -> QueuedWrite
+    
+    /**
+     * Changes an item in the local copy and queues the change, based on a
+     * version read before the one the copy holds now, which the server
+     * merges the change against.
+     */
+    func updateItemAsRead(id: String, edit: Edit) throws  -> QueuedWrite
     
     /**
      * Writes one extension namespace, as its own write. The body is one
@@ -1211,6 +1220,15 @@ open func edgesFrom(id: String)throws  -> [Edge]  {
 })
 }
     
+open func edgesTo(id: String)throws  -> [Edge]  {
+    return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_edges_to(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
     /**
      * Holds the event stream open on a thread of its own and applies each
      * event as it arrives, telling `listener` of each change.
@@ -1437,6 +1455,21 @@ open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite  {
 open func updateItem(id: String, edit: Edit)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_marfacore_update_item(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterTypeEdit_lower(edit),$0
+    )
+})
+}
+    
+    /**
+     * Changes an item in the local copy and queues the change, based on a
+     * version read before the one the copy holds now, which the server
+     * merges the change against.
+     */
+open func updateItemAsRead(id: String, edit: Edit)throws  -> QueuedWrite  {
+    return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_update_item_as_read(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeEdit_lower(edit),$0
@@ -4768,6 +4801,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_from() != 44341) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_to() != 44283) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_follow() != 58729) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4826,6 +4862,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_item() != 16520) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_item_as_read() != 46194) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_write_extension() != 8223) {

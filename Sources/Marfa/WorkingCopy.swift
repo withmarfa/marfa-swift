@@ -194,8 +194,20 @@ public struct Items: Sendable {
         try await write { core in try core.createItem(draft: draft.core()) }
     }
 
+    /// Queues an edit based on the version the copy holds; one naming any
+    /// other version is refused.
     public func update(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
         try await write { core in try core.updateItem(id: id, edit: edit.core()) }
+    }
+
+    /// Queues an edit based on a version read before the one the copy holds.
+    ///
+    /// The server merges it against what was read. An editor that held a row
+    /// while the copy caught up saves this way, so what came in meanwhile is
+    /// merged rather than overwritten by the values it read. Its next edit
+    /// goes on the version held, and it sends only what its person changed.
+    public func updateAsRead(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
+        try await write { core in try core.updateItemAsRead(id: id, edit: edit.core()) }
     }
 
     /// Moves an item to the bin, and queues the delete.
@@ -238,6 +250,12 @@ public struct Edges: Sendable {
     /// The edges the copy holds from one item.
     public func from(_ id: String) async throws -> [Edge] {
         try await background { [core] in try core.edgesFrom(id: id).map(Edge.init) }
+    }
+
+    /// The edges the copy holds to one item: a thread's replies, the files
+    /// attached to it, those still waiting to be sent included.
+    public func to(_ id: String) async throws -> [Edge] {
+        try await background { [core] in try core.edgesTo(id: id).map(Edge.init) }
     }
 
     public func create(

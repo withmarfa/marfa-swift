@@ -216,6 +216,48 @@ struct LiveServer {
         #expect(fields == ["body"])
     }
 
+    /// An edit said to be read from an earlier version is merged, not taken.
+    ///
+    /// An editor holding a note while its copy catches up another copy's
+    /// retitle saves the body its person changed, on the version it read.
+    /// Said to be read, the retitle stands and the body lands; unsaid, the
+    /// core refuses an older version. The editor's next save goes on the
+    /// version the copy holds, and is taken on the first one's answer.
+    @Test func anEditBasedOnAnEarlierReadIsMerged() async throws {
+        let copy = try await Live.hydrated()
+        let note = try await copy.items.create(Live.note("read here"))
+        _ = try await copy.queue.drain()
+        let id = try #require(note.itemId)
+        let read = try #require(try await copy.items.get(id))
+
+        let elsewhere = try await Live.hydrated()
+        _ = try await elsewhere.items.update(
+            id, Edit(properties: ["title": "retitled elsewhere"], baseVersion: read.version))
+        _ = try await elsewhere.queue.drain()
+        _ = try await copy.catchUp()
+        let held = try #require(try await copy.items.get(id))
+        #expect(held.version > read.version, "the copy did not take in the retitle")
+
+        let edit = Edit(properties: ["body": "written here"], baseVersion: read.version)
+        await #expect {
+            _ = try await copy.items.update(id, edit)
+        } throws: { error in
+            guard case Marfa.MarfaError.invalid(let message) = error else { return false }
+            return message.contains("based on version \(read.version)")
+        }
+        let saved = try await copy.items.updateAsRead(id, edit)
+        let next = try await copy.items.update(
+            id, Edit(properties: ["body": "written here, then more"], baseVersion: held.version))
+        let report = try await copy.queue.drain()
+        // Nothing collided, so the server applies the body over the retitle
+        // and answers it as taken; `merged` names a collision it resolved.
+        #expect(report.verdicts.first { $0.id == saved.id }?.verdict == .accepted)
+        #expect(report.verdicts.first { $0.id == next.id }?.verdict == .accepted)
+        let answered = try #require(try await copy.items.get(id))
+        #expect(answered.properties["title"] == "retitled elsewhere")
+        #expect(answered.properties["body"] == "written here, then more")
+    }
+
     /// A refused key parks every write, and a release sends a write again:
     /// one by id, or every write blocked for a reason, which never takes a
     /// dead one.
@@ -345,6 +387,9 @@ struct LiveServer {
         #expect(from.map(\.id) == [edgeId])
         #expect(from.map(\.targetId) == [b])
         #expect(try await copy.edges.from(b).isEmpty)
+        let to = try await copy.edges.to(b)
+        #expect(to.map(\.id) == [edgeId])
+        #expect(try await copy.edges.to(a).isEmpty)
         // The core refuses an update based on a version it does not hold,
         // naming that version, which shows the base version reached it.
         let held = try #require(from.first).version
