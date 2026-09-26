@@ -887,6 +887,8 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     
     func edgesFrom(id: String) throws  -> [Edge]
     
+    func edgesTo(id: String) throws  -> [Edge]
+    
     /**
      * Holds the event stream open on a thread of its own and applies each
      * event as it arrives, telling `listener` of each change.
@@ -1205,6 +1207,15 @@ open func drain()throws  -> DrainReport  {
 open func edgesFrom(id: String)throws  -> [Edge]  {
     return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_marfacore_edges_from(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+open func edgesTo(id: String)throws  -> [Edge]  {
+    return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_edges_to(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -4766,6 +4777,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_from() != 44341) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_to() != 44283) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_follow() != 58729) {

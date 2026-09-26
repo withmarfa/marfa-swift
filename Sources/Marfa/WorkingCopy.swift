@@ -240,6 +240,12 @@ public struct Edges: Sendable {
         try await background { [core] in try core.edgesFrom(id: id).map(Edge.init) }
     }
 
+    /// The edges the copy holds to one item: a thread's replies, the files
+    /// attached to it.
+    public func to(_ id: String) async throws -> [Edge] {
+        try await background { [core] in try core.edgesTo(id: id).map(Edge.init) }
+    }
+
     public func create(
         from source: String, to target: String, type: String, properties: [String: JSONValue] = [:],
         id: String? = nil

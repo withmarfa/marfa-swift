@@ -345,6 +345,9 @@ struct LiveServer {
         #expect(from.map(\.id) == [edgeId])
         #expect(from.map(\.targetId) == [b])
         #expect(try await copy.edges.from(b).isEmpty)
+        let to = try await copy.edges.to(b)
+        #expect(to.map(\.id) == [edgeId])
+        #expect(try await copy.edges.to(a).isEmpty)
         // The core refuses an update based on a version it does not hold,
         // naming that version, which shows the base version reached it.
         let held = try #require(from.first).version
