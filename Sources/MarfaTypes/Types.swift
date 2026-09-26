@@ -461,7 +461,7 @@ public protocol APIProtocol: Sendable {
     ///
     /// Creates a new API key. The plaintext `key` is returned only in this response and never shown again, so store it securely.
     ///
-    /// A credential is a set of permissions and nothing else. `permissions` names the permissions the key holds; omitting it takes the creator's whole set, and anything named is clamped to what the creator holds, so a mint can narrow and can never widen. The content maps behave the same way, and a signed-in app must hold `keys.mint` to reach this route at all.
+    /// A credential is a set of permissions and nothing else. `permissions` names the permissions the key holds, and anything named beyond what the creator holds is refused, so a mint can narrow and can never widen. A body naming no map and no claimed source takes the creator's whole set, permissions and maps alike; a body naming any of them holds only what it names, so a key minted with a type map and no `permissions` holds no permission. A map entry beyond the creator's is refused the same way, and a signed-in app must hold `keys.mint` to reach this route at all.
     ///
     /// `source` is the key's own, and no other unrevoked key may hold it as its own, though keys claiming it write under it too. `sources` names the sources the key claims besides it, which a write may name so its rows are keyed by the claimed source; a working key may grant only its own `source` and what it claims itself.
     ///
@@ -472,6 +472,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /keys`.
     /// - Remark: Generated from `#/paths//keys/post(createKey)`.
     func createKey(_ input: Operations.CreateKey.Input) async throws -> Operations.CreateKey.Output
+    /// Read the calling key
+    ///
+    /// Returns the key the request bears, without plaintext: its permissions, its maps, its claimed sources and its tier. Any key may read itself, whatever it holds, so a process handed a key can check it holds what it should and no more; every other key stays behind `keys.mint`. A signed-in app's token is not a key, and is refused.
+    ///
+    /// - Remark: HTTP `GET /keys/current`.
+    /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)`.
+    func getCurrentKey(_ input: Operations.GetCurrentKey.Input) async throws -> Operations.GetCurrentKey.Output
     /// Update an API key
     ///
     /// Updates a key's label, default tier, claimed `sources` or permission maps in place. `source` is immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change it. Requires `keys.mint`. A permission map may not be widened past what the calling credential itself holds, and `sources` may name only the caller's own `source` and what it claims. The operator key is excepted, since running the instance sits outside the permission model, but an operator key holds nothing at all, so no map on one may be widened by any caller. A key created by an app is never widened at all, by any caller including the operator key: it holds what that app held, and may only be narrowed.
@@ -1542,7 +1549,7 @@ extension APIProtocol {
     ///
     /// Creates a new API key. The plaintext `key` is returned only in this response and never shown again, so store it securely.
     ///
-    /// A credential is a set of permissions and nothing else. `permissions` names the permissions the key holds; omitting it takes the creator's whole set, and anything named is clamped to what the creator holds, so a mint can narrow and can never widen. The content maps behave the same way, and a signed-in app must hold `keys.mint` to reach this route at all.
+    /// A credential is a set of permissions and nothing else. `permissions` names the permissions the key holds, and anything named beyond what the creator holds is refused, so a mint can narrow and can never widen. A body naming no map and no claimed source takes the creator's whole set, permissions and maps alike; a body naming any of them holds only what it names, so a key minted with a type map and no `permissions` holds no permission. A map entry beyond the creator's is refused the same way, and a signed-in app must hold `keys.mint` to reach this route at all.
     ///
     /// `source` is the key's own, and no other unrevoked key may hold it as its own, though keys claiming it write under it too. `sources` names the sources the key claims besides it, which a write may name so its rows are keyed by the claimed source; a working key may grant only its own `source` and what it claims itself.
     ///
@@ -1560,6 +1567,15 @@ extension APIProtocol {
             headers: headers,
             body: body
         ))
+    }
+    /// Read the calling key
+    ///
+    /// Returns the key the request bears, without plaintext: its permissions, its maps, its claimed sources and its tier. Any key may read itself, whatever it holds, so a process handed a key can check it holds what it should and no more; every other key stays behind `keys.mint`. A signed-in app's token is not a key, and is refused.
+    ///
+    /// - Remark: HTTP `GET /keys/current`.
+    /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)`.
+    public func getCurrentKey(headers: Operations.GetCurrentKey.Input.Headers = .init()) async throws -> Operations.GetCurrentKey.Output {
+        try await getCurrentKey(Operations.GetCurrentKey.Input(headers: headers))
     }
     /// Update an API key
     ///
