@@ -126,6 +126,28 @@ public struct Item: Sendable, Hashable, Identifiable {
     public let updatedAt: String
     public let tags: [String]
 
+    /// An item made by the app itself, for a preview or a test; the copy's
+    /// own items come from its reads.
+    public init(
+        id: String, type: String, properties: [String: JSONValue], state: ItemState, tier: Tier?, version: Int64,
+        schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
+        updatedAt: String, tags: [String]
+    ) {
+        self.id = id
+        self.type = type
+        self.properties = properties
+        self.state = state
+        self.tier = tier
+        self.version = version
+        self.schemaVersion = schemaVersion
+        self.source = source
+        self.sourceId = sourceId
+        self.occurredAt = occurredAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.tags = tags
+    }
+
     init(_ item: CoreItem) throws {
         id = item.id
         type = item.type
@@ -156,6 +178,21 @@ public struct Edge: Sendable, Hashable, Identifiable {
     public let version: Int64
     public let createdAt: String
     public let updatedAt: String
+
+    /// An edge made by the app itself, for a preview or a test.
+    public init(
+        id: String, sourceId: String, targetId: String, edgeType: String, properties: [String: JSONValue],
+        version: Int64, createdAt: String, updatedAt: String
+    ) {
+        self.id = id
+        self.sourceId = sourceId
+        self.targetId = targetId
+        self.edgeType = edgeType
+        self.properties = properties
+        self.version = version
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 
     init(_ edge: CoreEdge) throws {
         id = edge.id
