@@ -194,8 +194,18 @@ public struct Items: Sendable {
         try await write { core in try core.createItem(draft: draft.core()) }
     }
 
+    /// Queues an edit based on the version the copy holds; one naming any
+    /// other version is refused.
     public func update(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
         try await write { core in try core.updateItem(id: id, edit: edit.core()) }
+    }
+
+    /// Queues an edit based on a version read before the one the copy holds
+    /// now, which the server merges against what was read. An editor that
+    /// held a row while the copy caught up saves this way, so what came in
+    /// meanwhile is merged rather than overwritten by the values it read.
+    public func updateAsRead(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
+        try await write { core in try core.updateItemAsRead(id: id, edit: edit.core()) }
     }
 
     /// Moves an item to the bin, and queues the delete.

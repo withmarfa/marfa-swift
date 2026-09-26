@@ -216,6 +216,42 @@ struct LiveServer {
         #expect(fields == ["body"])
     }
 
+    /// An editor holding a note while its copy catches up another copy's
+    /// retitle saves the whole row it read, based on the version it read.
+    /// Said to be read, the save is merged against what was read: the
+    /// retitle stands and the body lands. Based on the held version instead, it would carry the title it
+    /// read over the retitle, so the core refuses an older version unsaid.
+    @Test func anEditBasedOnAnEarlierReadIsMerged() async throws {
+        let copy = try await Live.hydrated()
+        let note = try await copy.items.create(Live.note("read here"))
+        _ = try await copy.queue.drain()
+        let id = try #require(note.itemId)
+        let read = try #require(try await copy.items.get(id))
+
+        let elsewhere = try await Live.hydrated()
+        _ = try await elsewhere.items.update(
+            id, Edit(properties: ["title": "retitled elsewhere"], baseVersion: read.version))
+        _ = try await elsewhere.queue.drain()
+        _ = try await copy.catchUp()
+        let held = try #require(try await copy.items.get(id))
+        #expect(held.version > read.version, "the copy did not take in the retitle")
+
+        var properties = read.properties
+        properties["body"] = "written here"
+        let edit = Edit(properties: properties, baseVersion: read.version)
+        await #expect(throws: MarfaError.self, "an edit on an older version was queued without saying it was read") {
+            _ = try await copy.items.update(id, edit)
+        }
+        let saved = try await copy.items.updateAsRead(id, edit)
+        let report = try await copy.queue.drain()
+        // Nothing collided, so the server applies the body over the retitle
+        // and answers it as taken; `merged` names a collision it resolved.
+        #expect(report.verdicts.first { $0.id == saved.id }?.verdict == .accepted)
+        let answered = try #require(try await copy.items.get(id))
+        #expect(answered.properties["title"] == "retitled elsewhere")
+        #expect(answered.properties["body"] == "written here")
+    }
+
     /// A refused key parks every write, and a release sends a write again:
     /// one by id, or every write blocked for a reason, which never takes a
     /// dead one.
