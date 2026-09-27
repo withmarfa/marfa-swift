@@ -122,9 +122,11 @@ public final class WorkingCopy: Sendable {
     /// working copy opened anew. Ending the iteration lets the stream go.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
-        if let token = feed.add(continuation) {
-            continuation.onTermination = { [feed] _ in feed.remove(token) }
-        }
+        // Set before the stream is added: one finished in between would keep
+        // a handler set after, and with it the feed and the core.
+        let token = UUID()
+        continuation.onTermination = { [feed] _ in feed.remove(token) }
+        _ = feed.add(continuation, as: token)
         return stream
     }
 
@@ -405,11 +407,32 @@ public struct Queue: Sendable {
 
 /// Runs blocking core work on a thread of its own and hands the result back,
 /// with the core's errors as the package's.
+///
+/// The work is let go of before the caller is resumed, so a caller that then
+/// drops what the work held, a working copy whose store must be let go of,
+/// finds nothing else holding it.
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-    try await withCheckedThrowingContinuation { continuation in
+    let job = Job(work)
+    return try await withCheckedThrowingContinuation { continuation in
         DispatchQueue.global(qos: .userInitiated).async {
-            continuation.resume(with: Result { try translated(work) })
+            continuation.resume(with: job.run())
         }
+    }
+}
+
+/// Work run once, and let go of as it finishes.
+private final class Job<T: Sendable>: Sendable {
+    private let work: Mutex<(@Sendable () throws -> T)?>
+
+    init(_ work: @escaping @Sendable () throws -> T) {
+        self.work = Mutex(work)
+    }
+
+    func run() -> Result<T, any Error> {
+        guard let work = self.work.withLock({ $0.take() }) else {
+            preconditionFailure("a job runs once")
+        }
+        return Result { try translated(work) }
     }
 }
 
@@ -491,8 +514,7 @@ final class Feed: Sendable {
 
     /// Holds a stream, and starts the source where it should run and does
     /// not. `nil`, with the stream finished, once the working copy is closed.
-    func add(_ continuation: AsyncStream<Change>.Continuation) -> UUID? {
-        let token = UUID()
+    func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
         // Where this stream starts the watch, its version is read before the
         // caller goes on, so a save it makes next moves the version past this
         // one, and outside the lock, since the read can wait on the store.
@@ -587,7 +609,10 @@ final class Feed: Sendable {
 
     /// The source of `generation` ended: stopped as asked, or on its own
     /// with `error`.
-    func ended(generation: Int, error: MarfaError?) {
+    ///
+    /// Returns whoever waits for it to stop, for the caller to resume once
+    /// it no longer holds the feed.
+    func ended(generation: Int, error: MarfaError?) -> [CheckedContinuation<Void, Never>] {
         typealias Ended = (told: [AsyncStream<Change>.Continuation], waiting: [CheckedContinuation<Void, Never>])
         let ended = state.withLock { state -> Ended in
             switch state.phase {
@@ -612,7 +637,7 @@ final class Feed: Sendable {
                 continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
             }
         }
-        for continuation in ended.waiting { continuation.resume() }
+        return ended.waiting
     }
 
     private func untilStopped() async {
@@ -678,30 +703,47 @@ final class Feed: Sendable {
         } catch is CancellationError {
             return
         } catch {
-            ended(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
+            // A watch is never waited on to stop.
+            _ = ended(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
         }
     }
 }
 
 /// What the core tells of each event a held stream applies.
+///
+/// Weak on the feed, which holds the core and with it the writer's claim on
+/// the store: the core's thread holds the listener until `ended` returns.
 final class Listener: CoreChangeListener, Sendable {
-    let feed: Feed
+    private struct Weak {
+        weak var feed: Feed?
+    }
+
+    private let held: Mutex<Weak>
     let generation: Int
 
     init(feed: Feed, generation: Int) {
-        self.feed = feed
+        held = Mutex(Weak(feed: feed))
         self.generation = generation
     }
 
+    private var feed: Feed? { held.withLock { $0.feed } }
+
     func changed(change: CoreChange) {
-        feed.announce(
+        feed?.announce(
             Change(
                 origin: .server(event: change.event, cursor: change.cursor), itemId: change.itemId,
                 edgeId: change.edgeId),
             from: generation)
     }
 
+    /// Resumes whoever waits only once nothing on this thread holds the
+    /// feed, since one told may drop the working copy and open the store
+    /// again at once.
     func ended(error: CoreMarfaError?) {
-        feed.ended(generation: generation, error: error.map(MarfaError.init))
+        for continuation in stop(error) { continuation.resume() }
+    }
+
+    private func stop(_ error: CoreMarfaError?) -> [CheckedContinuation<Void, Never>] {
+        feed?.ended(generation: generation, error: error.map(MarfaError.init)) ?? []
     }
 }
