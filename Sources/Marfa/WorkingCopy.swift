@@ -468,9 +468,7 @@ final class Feed: Sendable {
         var halted = false
         var failure: MarfaError?
         var closed = false
-        /// Told once the last follow started has let go of everything it
-        /// held, which is later than its end.
-        var released: Release?
+        var waitingForStop: [CheckedContinuation<Void, Never>] = []
     }
 
     let core: Core
@@ -589,36 +587,46 @@ final class Feed: Sendable {
 
     /// The source of `generation` ended: stopped as asked, or on its own
     /// with `error`.
-    func ended(generation: Int, error: MarfaError?) {
-        let told = state.withLock { state -> [AsyncStream<Change>.Continuation] in
+    ///
+    /// Answers whoever waits for it to stop, for the caller to resume once
+    /// it no longer holds the feed.
+    func ended(generation: Int, error: MarfaError?) -> [CheckedContinuation<Void, Never>] {
+        typealias Ended = (told: [AsyncStream<Change>.Continuation], waiting: [CheckedContinuation<Void, Never>])
+        let ended = state.withLock { state -> Ended in
             switch state.phase {
             case .stopping(let current) where current == generation:
                 state.phase = .idle
+                let waiting = state.waitingForStop
+                state.waitingForStop = []
                 settle(&state)
-                return []
+                return ([], waiting)
             case .following(let current, _) where current == generation,
                 .watching(let current, _) where current == generation:
                 state.phase = .idle
                 state.halted = true
                 state.failure = error
-                return error == nil ? [] : Array(state.streams.values)
+                return (error == nil ? [] : Array(state.streams.values), [])
             default:
-                return []
+                return ([], [])
             }
         }
         if let error {
-            for continuation in told {
+            for continuation in ended.told {
                 continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
             }
         }
+        return ended.waiting
     }
 
-    /// Waits for the follow's listener to be let go rather than for its
-    /// end: the follow's thread holds the listener until `ended` returns,
-    /// and a caller that dropped the working copy on being told sooner would
-    /// find the store still claimed.
     private func untilStopped() async {
-        await state.withLock { $0.released }?.wait()
+        await withCheckedContinuation { continuation in
+            let stopped = state.withLock { state -> Bool in
+                guard case .stopping = state.phase else { return true }
+                state.waitingForStop.append(continuation)
+                return false
+            }
+            if stopped { continuation.resume() }
+        }
     }
 
     /// Starts the source or stops it, to match whether it should run: a
@@ -633,8 +641,7 @@ final class Feed: Sendable {
         switch state.phase {
         case .idle where wanted:
             state.generation += 1
-            let phase = start(&state, generation: state.generation, seen: seen)
-            state.phase = phase
+            state.phase = start(generation: state.generation, seen: seen)
         case .following(let generation, let subscription) where !wanted:
             subscription.stop()
             state.phase = .stopping(generation: generation)
@@ -646,16 +653,13 @@ final class Feed: Sendable {
         }
     }
 
-    private func start(_ state: inout State, generation: Int, seen: Result<Int64, any Error>?) -> Phase {
+    private func start(generation: Int, seen: Result<Int64, any Error>?) -> Phase {
         switch source {
         case .none:
             return .idle
         case .follow:
-            let release = Release()
-            state.released = release
             return .following(
-                generation: generation,
-                core.follow(listener: Listener(feed: self, generation: generation, release: release)))
+                generation: generation, core.follow(listener: Listener(feed: self, generation: generation)))
         case .watch:
             let seen = seen ?? Result { try translated { try core.dataVersion() } }
             return .watching(
@@ -677,27 +681,24 @@ final class Feed: Sendable {
         } catch is CancellationError {
             return
         } catch {
-            ended(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
+            // A watch is never waited on to stop.
+            _ = ended(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
         }
     }
 }
 
 /// What the core tells of each event a held stream applies.
 ///
-/// Weak on the feed, since the feed holds the core and with it the writer's
-/// claim on the store.
+/// Weak on the feed, which holds the core and with it the writer's claim on
+/// the store: the core's thread holds the listener until `ended` returns.
 final class Listener: CoreChangeListener, Sendable {
     weak let feed: Feed?
     let generation: Int
-    let release: Release
 
-    init(feed: Feed, generation: Int, release: Release) {
+    init(feed: Feed, generation: Int) {
         self.feed = feed
         self.generation = generation
-        self.release = release
     }
-
-    deinit { release.fire() }
 
     func changed(change: CoreChange) {
         feed?.announce(
@@ -707,31 +708,14 @@ final class Listener: CoreChangeListener, Sendable {
             from: generation)
     }
 
+    /// Resumes whoever waits only once nothing on this thread holds the
+    /// feed, since one told may drop the working copy and open the store
+    /// again at once.
     func ended(error: CoreMarfaError?) {
-        feed?.ended(generation: generation, error: error.map(MarfaError.init))
-    }
-}
-
-/// Resumes whoever waits on a follow once its listener is gone.
-final class Release: Sendable {
-    private let state = Mutex<(fired: Bool, waiting: [CheckedContinuation<Void, Never>])>((false, []))
-
-    func wait() async {
-        await withCheckedContinuation { continuation in
-            let fired = state.withLock { state -> Bool in
-                if !state.fired { state.waiting.append(continuation) }
-                return state.fired
-            }
-            if fired { continuation.resume() }
-        }
+        for continuation in stop(error) { continuation.resume() }
     }
 
-    func fire() {
-        let waiting = state.withLock { state in
-            state.fired = true
-            defer { state.waiting = [] }
-            return state.waiting
-        }
-        for continuation in waiting { continuation.resume() }
+    private func stop(_ error: CoreMarfaError?) -> [CheckedContinuation<Void, Never>] {
+        feed?.ended(generation: generation, error: error.map(MarfaError.init)) ?? []
     }
 }
