@@ -38,16 +38,33 @@ func bounded<T: Sendable>(
 ) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
         let answer = Answer(continuation)
-        Task {
-            do {
-                answer.resume(with: .success(try await work()))
-            } catch {
-                answer.resume(with: .failure(error))
-            }
-        }
+        let job = Job(work)
+        Task { answer.resume(with: await job.run()) }
         Task {
             try? await Task.sleep(for: .seconds(seconds))
             answer.resume(with: .failure(Unfinished(what: what)))
+        }
+    }
+}
+
+/// Work run once, and let go of before its answer is given: a caller told
+/// it finished may drop what the work held, such as a working copy that
+/// must let go of its store, and find nothing else holding it.
+private final class Job<T: Sendable>: Sendable {
+    private let work: Mutex<(@Sendable () async throws -> T)?>
+
+    init(_ work: @escaping @Sendable () async throws -> T) {
+        self.work = Mutex(work)
+    }
+
+    func run() async -> Result<T, any Error> {
+        guard let work = self.work.withLock({ $0.take() }) else {
+            preconditionFailure("a job runs once")
+        }
+        do {
+            return .success(try await work())
+        } catch {
+            return .failure(error)
         }
     }
 }

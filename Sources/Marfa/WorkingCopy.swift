@@ -683,6 +683,7 @@ final class Feed: Sendable {
 }
 
 /// What the core tells of each event a held stream applies.
+///
 /// Weak on the feed, since the feed holds the core and with it the writer's
 /// claim on the store.
 final class Listener: CoreChangeListener, Sendable {
