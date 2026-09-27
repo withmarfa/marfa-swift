@@ -250,6 +250,25 @@ struct Changes {
         withExtendedLifetime(heard) {}
     }
 
+    /// The core's follow thread holds its listener until telling it ended
+    /// has returned, and this core keeps every listener for good, so a feed
+    /// the listener held would outlive the working copy, and with it the
+    /// core and the writer's claim on the store.
+    @Test func aClosedCopyLetGoIsNotHeldByItsFollowsListener() async throws {
+        let core = FakeCore.writer()
+        weak var held: Feed?
+        try await { () async throws in
+            let copy = WorkingCopy(core: core, hasServer: true)
+            held = copy.feed
+            let heard = Heard(copy.changes())
+            #expect(core.follows.count == 1)
+            try await bounded("close") { await copy.close() }
+            withExtendedLifetime(heard) {}
+        }()
+        #expect(core.follows[0].ended)
+        try await eventually("the feed was let go") { held == nil }
+    }
+
     @Test func closingAReaderReturnsOnceItsWatchHasEnded() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
