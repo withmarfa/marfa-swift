@@ -13,17 +13,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Build + test
-    # `xcode` because the core's iOS slices and the sample need the iOS SDK,
-    # which a Command Line Tools install does not carry.
-    runs-on: [self-hosted, macOS, ARM64, xcode, withmarfa]
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
-      # Beside the workspace rather than in it, so the checkout's clean keeps
-      # it and the core is rebuilt only where the pin moved.
       CARGO_TARGET_DIR: ${{ github.workspace }}/../core-target
       MARFA_GENERATOR_BUILD: ${{ github.workspace }}/../generator-build
     steps:
@@ -33,45 +32,29 @@ jobs:
         id: pin
         run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
 
-      # The monorepo is private; MONOREPO_DEPLOY_KEY is the private half of a
-      # read-only deploy key on it.
       - name: Check out the core at the pin
         uses: actions/checkout@v7
         with:
           repository: withmarfa/marfa
           ref: ${{ steps.pin.outputs.sha }}
-          ssh-key: ${{ secrets.MONOREPO_DEPLOY_KEY }}
           path: .build/marfa
 
       # The release Xcode, never a beta beside it.
       - name: Select Xcode
         run: |
           if [[ ! -d /Applications/Xcode.app ]]; then
-            echo "::error::This runner carries the xcode label and has no /Applications/Xcode.app."
+            echo "::error::This hosted runner has no /Applications/Xcode.app."
             exit 1
           fi
           echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
 
-      - name: Require the pool's tools
-        run: |
-          for tool in xcodegen brew; do
-            if ! command -v "$tool" >/dev/null; then
-              echo "::error::$tool is not installed on this runner; the pool provides it."
-              exit 1
-            fi
-          done
+      - name: Install sample project generator
+        run: brew install xcodegen
 
       - name: Lint
         run: |
           swift format lint --strict --configuration .swift-format -r \
             Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources
-
-      # Homebrew's rustup is keg-only, so nothing it installs is on the default
-      # PATH, and cargo-swift is wherever `cargo install` put it.
-      - name: Put the Rust toolchain on PATH
-        run: |
-          echo "$(brew --prefix rustup)/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Add the iOS targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
