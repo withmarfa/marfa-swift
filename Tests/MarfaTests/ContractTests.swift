@@ -71,7 +71,8 @@ private struct ContractServer: Sendable {
             }
             listener.start(queue: .global())
         }
-        return ContractServer(url: URL(string: "http://127.0.0.1:\(port)")!, listener: listener)
+        let url = try #require(URL(string: "http://127.0.0.1:\(port)"))
+        return ContractServer(url: url, listener: listener)
     }
 
     func stop() {
