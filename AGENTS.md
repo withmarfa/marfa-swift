@@ -27,3 +27,5 @@ This repository is the Swift package `Marfa`, product `Marfa`: a thin layer over
 - Removed means gone: no shims, no aliases, no compatibility paths.
 - A comment survives only if it explains a why the code cannot.
 - Swift 6 language mode; Swift Testing, not XCTest.
+
+Independent pull requests and hosted jobs may run concurrently. Do not delay pushes or verification to ration a personal runner pool; preserve dependency order for stacked changes.
