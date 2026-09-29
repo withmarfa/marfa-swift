@@ -21,6 +21,7 @@ This repository is the Swift package `Marfa`, product `Marfa`: a thin layer over
 
 - American English in code, comments and commits. Scoped Conventional Commits (`feat(package):`, `fix(ci):`).
 - Feature branches and pull requests; never push `main`. A session merges its own pull request once every required check is green and every finding its reviewers raised is fixed: squash, branch deleted.
+- Before closing, remove the worktrees you created once their branches are merged, with `git worktree remove`, and run `git worktree prune`; if git refuses one, report it rather than forcing it.
 - This repository is public while development continues. Public visibility is not a release milestone.
 - Every Actions workflow uses standard GitHub-hosted runners, never personal self-hosted runners or paid third-party runners.
 - No personal details of any machine or person in this repository: no absolute paths, hostnames, account names or credentials.
