@@ -118,8 +118,10 @@ public final class WorkingCopy: Sendable {
     /// Where what feeds them stops with an error, each stream is told with
     /// `.stopped`, as is a stream taken while it stays stopped, and all go
     /// on hearing local writes. A writer's next hydration or catch-up starts
-    /// its event stream again; a reader's watch starts again only in a
-    /// working copy opened anew. Ending the iteration lets the stream go.
+    /// its event stream again. A reader's watch keeps trying the store, and
+    /// once it reads it again tells `.saved` with where the store stands,
+    /// since saves made meanwhile went untold. Ending the iteration lets the
+    /// stream go.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
         // Set before the stream is added: one finished in between would keep
@@ -485,10 +487,12 @@ final class Feed: Sendable {
         var generation = 0
         /// Hydrations and catch-ups under way, each holding the follow off.
         var pauses = 0
-        /// The source ended on its own, and only the next hydration or
+        /// The follow ended on its own, and only the next hydration or
         /// catch-up starts it again: a follow ends on what asking again does
         /// not clear.
         var halted = false
+        /// Why the follow halted, or why the running watch cannot read the
+        /// store.
         var failure: MarfaError?
         var closed = false
         var waitingForStop: [CheckedContinuation<Void, Never>] = []
@@ -529,7 +533,7 @@ final class Feed: Sendable {
             guard !state.closed else { return (false, nil) }
             state.streams[token] = continuation
             settle(&state, seen: seen)
-            return (true, state.halted ? state.failure : nil)
+            return (true, state.failure)
         }
         guard added else {
             continuation.finish()
@@ -622,8 +626,7 @@ final class Feed: Sendable {
                 state.waitingForStop = []
                 settle(&state)
                 return ([], waiting)
-            case .following(let current, _) where current == generation,
-                .watching(let current, _) where current == generation:
+            case .following(let current, _) where current == generation:
                 state.phase = .idle
                 state.halted = true
                 state.failure = error
@@ -670,6 +673,7 @@ final class Feed: Sendable {
         case .watching(_, let task) where !wanted:
             task.cancel()
             state.phase = .idle
+            state.failure = nil
         default:
             break
         }
@@ -690,21 +694,65 @@ final class Feed: Sendable {
         }
     }
 
-    private func watch(_ core: Core, from seen: Result<Int64, any Error>, generation: Int) async {
-        do {
-            var seen = try seen.get()
-            while true {
-                try await Task.sleep(for: .milliseconds(250))
-                let now = try await background { try core.dataVersion() }
-                guard now != seen else { continue }
+    /// How often a watch reads the store's version, and the longest it waits
+    /// between tries while the store cannot be read.
+    static let watchInterval = Duration.milliseconds(250)
+    static let longestWatchRetry = Duration.seconds(2)
+
+    /// Reads the store's version until cancelled, telling each move, and
+    /// rides out reads that fail: the first of a run of failures is told as
+    /// `.stopped`, and the read that next succeeds as `.saved`.
+    private func watch(_ core: Core, from first: Result<Int64, any Error>, generation: Int) async {
+        var read = first
+        var seen: Int64?
+        var failing = false
+        var wait = Self.watchInterval
+        while true {
+            switch read {
+            case .success(let now):
+                if failing || seen.map({ now != $0 }) == true {
+                    announce(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil), from: generation)
+                }
+                if failing { recovered(generation: generation) }
                 seen = now
-                announce(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil), from: generation)
+                failing = false
+                wait = Self.watchInterval
+            case .failure(is CancellationError):
+                return
+            case .failure(let error):
+                if !failing {
+                    failing = true
+                    failed(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
+                }
+                wait = min(wait * 2, Self.longestWatchRetry)
             }
-        } catch is CancellationError {
-            return
-        } catch {
-            // A watch is never waited on to stop.
-            _ = ended(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
+            do {
+                try await Task.sleep(for: wait)
+                read = .success(try await background { try core.dataVersion() })
+            } catch is CancellationError {
+                return
+            } catch {
+                read = .failure(error)
+            }
+        }
+    }
+
+    /// The watch of `generation` cannot read the store: tells every stream,
+    /// and each taken until it reads again.
+    private func failed(generation: Int, error: MarfaError) {
+        let streams = state.withLock { state -> [AsyncStream<Change>.Continuation] in
+            guard state.phase.runs(generation) else { return [] }
+            state.failure = error
+            return Array(state.streams.values)
+        }
+        for continuation in streams {
+            continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
+        }
+    }
+
+    private func recovered(generation: Int) {
+        state.withLock { state in
+            if state.phase.runs(generation) { state.failure = nil }
         }
     }
 }
