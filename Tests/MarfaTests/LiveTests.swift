@@ -214,7 +214,7 @@ struct LiveServer {
         let bodied = try await copy.items.create(
             Draft(type: "core.note", properties: ["title": "other", "body": "first"], tier: .feed))
         let refused = try await copy.items.create(
-            Draft(type: "system.device", properties: ["name": "not a device's to write"]))
+            Draft(type: "system.connection", properties: ["name": "not a connection's to write"]))
         var report = try await copy.queue.drain()
         #expect(report.verdicts.first { $0.id == titled.id }?.verdict == .accepted)
         #expect(report.verdicts.first { $0.id == refused.id }?.verdict == .refused(reason: "type_not_permitted"))
