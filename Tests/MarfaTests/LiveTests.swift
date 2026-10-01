@@ -456,6 +456,10 @@ struct LiveServer {
         let to = try await copy.edges.to(b)
         #expect(to.map(\.id) == [edgeId])
         #expect(try await copy.edges.to(a).isEmpty)
+        let ofType = try await copy.edges.ofType("references")
+        #expect(ofType.contains { $0.id == edgeId }, "an edge still queued was left out of its type's read")
+        #expect(ofType.allSatisfy { $0.edgeType == "references" })
+        #expect(try await copy.edges.ofType("in-thread").contains { $0.id == edgeId } == false)
         // The core refuses an update based on a version it does not hold,
         // naming that version, which shows the base version reached it.
         let held = try #require(from.first).version

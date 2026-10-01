@@ -264,6 +264,13 @@ public struct Edges: Sendable {
         try await background { [core] in try core.edgesTo(id: id).map(Edge.init) }
     }
 
+    /// Every edge of one type the copy holds, those still waiting to be sent
+    /// included, oldest first: the threads or attachments of every held item
+    /// in one read.
+    public func ofType(_ type: String) async throws -> [Edge] {
+        try await background { [core] in try core.edgesOfType(edgeType: type).map(Edge.init) }
+    }
+
     public func create(
         from source: String, to target: String, type: String, properties: [String: JSONValue] = [:],
         id: String? = nil
