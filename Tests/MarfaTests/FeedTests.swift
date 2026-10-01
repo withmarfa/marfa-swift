@@ -337,7 +337,7 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
-    @Test func aWatchThatFailsIsToldAndStaysStopped() async throws {
+    @Test func aWatchThatFailsIsToldAndResumesOnItsOwn() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
         let first = Heard(copy.changes())
@@ -345,15 +345,40 @@ struct Changes {
         core.state.withLock { $0.readsFail = .Store(message: "gone") }
         let failed = stopped(.store(message: "gone"))
         try await eventually("the failure was told") { first.all == [failed] }
-        try await bounded("the watch's end") { await watch.value }
         let second = Heard(copy.changes())
-        try await eventually("a stream taken after was told at once") { second.all == [failed] }
-        #expect(copy.feed.watchTask == nil, "a new stream started the failed watch again")
-        // The store reads again, so a watch started now would run on.
+        try await eventually("a stream taken while failing was told at once") { second.all == [failed] }
+        #expect(copy.feed.watchTask == watch, "the failed watch was replaced rather than kept trying")
+        core.state.withLock { state in
+            state.readsFail = nil
+            state.dataVersion = 3
+        }
+        try await eventually("the store reading again was told") { first.all == [failed, saved(3)] }
+        try await eventually("the store reading again was told to the later stream") {
+            second.all == [failed, saved(3)]
+        }
+        core.save()
+        try await eventually("a later save was told") { first.all == [failed, saved(3), saved(4)] }
+        let third = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(third.all.isEmpty, "a stream taken after the watch read again was told it had stopped")
+        #expect(first.all == [failed, saved(3), saved(4)], "a failure told once was told again")
+        try await bounded("close") { await copy.close() }
+    }
+
+    /// A watch that fails and is let go starts afresh with the next stream.
+    @Test func aFailingWatchLetGoStartsAfresh() async throws {
+        let core = FakeCore.reader()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let first = Heard(copy.changes())
+        core.state.withLock { $0.readsFail = .Store(message: "gone") }
+        try await eventually("the failure was told") { first.all == [stopped(.store(message: "gone"))] }
+        first.stop()
+        try await eventually("the stream was let go") { copy.feed.count == 0 }
         core.state.withLock { $0.readsFail = nil }
-        _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
-        _ = try await bounded("the catch-up") { try await copy.catchUp() }
-        #expect(copy.feed.watchTask == nil, "a hydration or catch-up started a reader's failed watch again")
+        let second = Heard(copy.changes())
+        #expect(copy.feed.watchTask != nil)
+        core.save()
+        try await eventually("a save was told") { second.all == [saved(1)] }
         try await bounded("close") { await copy.close() }
     }
 
