@@ -710,15 +710,15 @@ final class Feed: Sendable {
         while true {
             switch read {
             case .success(let now):
-                if failing || seen.map({ now != $0 }) == true {
-                    announce(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil), from: generation)
+                let saved = Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil)
+                if failing {
+                    recovered(generation: generation, telling: saved)
+                } else if seen.map({ now != $0 }) == true {
+                    announce(saved, from: generation)
                 }
-                if failing { recovered(generation: generation) }
                 seen = now
                 failing = false
                 wait = Self.watchInterval
-            case .failure(is CancellationError):
-                return
             case .failure(let error):
                 if !failing {
                     failing = true
@@ -750,10 +750,18 @@ final class Feed: Sendable {
         }
     }
 
-    private func recovered(generation: Int) {
-        state.withLock { state in
-            if state.phase.runs(generation) { state.failure = nil }
+    /// The watch of `generation` reads the store again.
+    ///
+    /// The failure is cleared under the same lock that takes the streams to
+    /// tell, so a stream added between the two is not left told only
+    /// `.stopped`.
+    private func recovered(generation: Int, telling change: Change) {
+        let streams = state.withLock { state -> [AsyncStream<Change>.Continuation] in
+            guard state.phase.runs(generation) else { return [] }
+            state.failure = nil
+            return Array(state.streams.values)
         }
+        for continuation in streams { continuation.yield(change) }
     }
 }
 
