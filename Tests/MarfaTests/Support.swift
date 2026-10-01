@@ -203,7 +203,7 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func hydrate(types: [String], tier: CoreTier) throws -> CoreHydrateReport {
         try refreshing()
-        return CoreHydrateReport(types: types, tier: tier, items: 0, edges: 0, pages: 1, cursor: "1")
+        return CoreHydrateReport(types: types, tier: tier, edgeTypes: [], items: 0, edges: 0, pages: 1, cursor: "1")
     }
 
     override func catchUp() throws -> CoreCatchUpReport {

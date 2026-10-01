@@ -60,7 +60,7 @@ mkdir -p "${types}"
 # The contract the types describe, which the document states as a whole
 # number in info.version.
 contract="$(plutil -extract info.version raw -o - "${src}/openapi.json")"
-if [[ ! "${contract}" =~ ^[1-9][0-9]*$ ]]; then
+if [[ ! "${contract}" =~ ^(0|[1-9][0-9]*)$ ]]; then
   echo "core.sh: openapi.json states the contract as '${contract}', not a whole number" >&2
   exit 1
 fi

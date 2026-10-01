@@ -89,6 +89,14 @@ extension Components {
             public var createdAt: Swift.String
             /// - Remark: Generated from `#/components/schemas/Item/updated_at`.
             public var updatedAt: Swift.String
+            /// Always `true` where present: on an item a trash took into the bin through a cascading edge such as `parent-of`, for as long as the item stays in the bin, even once the item that trash named is purged, to any caller that may read the item. Absent on a row trashed on its own and on every row out of the bin. A connector reads it to tell a trash the person made from one a cascade made.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/trashed_by_cascade`.
+            public var trashedByCascade: Swift.Bool?
+            /// The item whose trash took this one into the bin, beside `trashed_by_cascade`, whatever became of that item since. Answered only to a caller that may read that item's type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/trashed_with`.
+            public var trashedWith: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Item/edges`.
             public struct EdgesPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -164,6 +172,8 @@ extension Components {
             ///   - occurredAt:
             ///   - createdAt:
             ///   - updatedAt:
+            ///   - trashedByCascade: Always `true` where present: on an item a trash took into the bin through a cascading edge such as `parent-of`, for as long as the item stays in the bin, even once the item that trash named is purged, to any caller that may read the item. Absent on a row trashed on its own and on every row out of the bin. A connector reads it to tell a trash the person made from one a cascade made.
+            ///   - trashedWith: The item whose trash took this one into the bin, beside `trashed_by_cascade`, whatever became of that item since. Answered only to a caller that may read that item's type.
             ///   - edges:
             ///   - extensions:
             public init(
@@ -181,6 +191,8 @@ extension Components {
                 occurredAt: Swift.String,
                 createdAt: Swift.String,
                 updatedAt: Swift.String,
+                trashedByCascade: Swift.Bool? = nil,
+                trashedWith: Swift.String? = nil,
                 edges: Components.Schemas.Item.EdgesPayload? = nil,
                 extensions: Components.Schemas.Item.ExtensionsPayload? = nil
             ) {
@@ -198,6 +210,8 @@ extension Components {
                 self.occurredAt = occurredAt
                 self.createdAt = createdAt
                 self.updatedAt = updatedAt
+                self.trashedByCascade = trashedByCascade
+                self.trashedWith = trashedWith
                 self.edges = edges
                 self.extensions = extensions
             }
@@ -216,6 +230,8 @@ extension Components {
                 case occurredAt = "occurred_at"
                 case createdAt = "created_at"
                 case updatedAt = "updated_at"
+                case trashedByCascade = "trashed_by_cascade"
+                case trashedWith = "trashed_with"
                 case edges
                 case extensions
             }
@@ -587,6 +603,73 @@ extension Components {
                 case error
             }
         }
+        /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct EdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeTypeNotFound = "edge_type_not_found"
+                    case itemNotFound = "item_not_found"
+                }
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeTypeNotFoundOrItemNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/ItemVersionConflict`.
         public struct ItemVersionConflict: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ItemVersionConflict/error`.
@@ -872,21 +955,22 @@ extension Components {
                 case message
             }
         }
-        /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal`.
-        public struct ConflictOrIdReusedOrTypeMismatchRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal`.
+        public struct ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case conflict = "conflict"
                     case idReused = "id_reused"
+                    case linkTaken = "link_taken"
                     case typeMismatch = "type_mismatch"
                 }
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error/code`.
-                public var code: Components.Schemas.ConflictOrIdReusedOrTypeMismatchRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/code`.
+                public var code: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -904,8 +988,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error/details`.
-                public var details: Components.Schemas.ConflictOrIdReusedOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/details`.
+                public var details: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -913,9 +997,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.ConflictOrIdReusedOrTypeMismatchRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ConflictOrIdReusedOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -927,13 +1011,13 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrTypeMismatchRefusal/error`.
-            public var error: Components.Schemas.ConflictOrIdReusedOrTypeMismatchRefusal._ErrorPayload
-            /// Creates a new `ConflictOrIdReusedOrTypeMismatchRefusal`.
+            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error`.
+            public var error: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload
+            /// Creates a new `ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.ConflictOrIdReusedOrTypeMismatchRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -1130,6 +1214,73 @@ extension Components {
             /// - Parameters:
             ///   - error:
             public init(error: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal`.
+        public struct EdgePermissionDeniedOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgePermissionDenied = "edge_permission_denied"
+                    case typeNotPermitted = "type_not_permitted"
+                }
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
+                public var code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
+                public var details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
+            public var error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload
+            /// Creates a new `EdgePermissionDeniedOrTypeNotPermittedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -1494,73 +1645,6 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal`.
-        public struct EdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgeTypeNotFound = "edge_type_not_found"
-                    case itemNotFound = "item_not_found"
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
-                public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
-                public init(
-                    code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
-            public var error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
-            /// Creates a new `EdgeTypeNotFoundOrItemNotFoundRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error:
-            public init(error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
         /// - Remark: Generated from `#/components/schemas/ItemStaleVersion`.
         public struct ItemStaleVersion: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ItemStaleVersion/error`.
@@ -1584,20 +1668,21 @@ extension Components {
                 case current
             }
         }
-        /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal`.
-        public struct SourceIdConflictOrTypeMismatchRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal`.
+        public struct LinkTakenOrSourceIdConflictOrTypeMismatchRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case linkTaken = "link_taken"
                     case sourceIdConflict = "source_id_conflict"
                     case typeMismatch = "type_mismatch"
                 }
-                /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error/code`.
-                public var code: Components.Schemas.SourceIdConflictOrTypeMismatchRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/code`.
+                public var code: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -1615,8 +1700,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error/details`.
-                public var details: Components.Schemas.SourceIdConflictOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/details`.
+                public var details: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -1624,9 +1709,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.SourceIdConflictOrTypeMismatchRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.SourceIdConflictOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -1638,20 +1723,20 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/SourceIdConflictOrTypeMismatchRefusal/error`.
-            public var error: Components.Schemas.SourceIdConflictOrTypeMismatchRefusal._ErrorPayload
-            /// Creates a new `SourceIdConflictOrTypeMismatchRefusal`.
+            /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error`.
+            public var error: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload
+            /// Creates a new `LinkTakenOrSourceIdConflictOrTypeMismatchRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.SourceIdConflictOrTypeMismatchRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
                 case error
             }
         }
-        /// Who resolves a version conflict. `auto` resolves it here, in this write's transaction, by the type's merge policy: a `last_writer_wins` field takes this write's value, a `keep_both_copies` field leaves the server's value on the item and the losing value lands on a sibling tagged `conflicted-copy`. `manual` and `callback` return the 409 envelope for the caller to resolve. Omitted means `manual`.
+        /// Who resolves a version conflict. `auto` resolves it here, in this write's transaction, by the type's merge policy: a `last_writer_wins` field takes this write's value, a `keep_both_copies` field leaves the server's value on the item and the losing value lands on a sibling tagged `conflicted-copy` beside the original's tags, with a copy of the edges that are the original's own, those its own file would write, that a second item may hold and the writer could have made. The sibling carries neither the item's natural key nor its link, so where the type requires its `link_field`, itself or through a parent, nothing is resolved and the write answers the 409 envelope. `manual` and `callback` return the 409 envelope for the caller to resolve. Omitted means `manual`.
         ///
         /// - Remark: Generated from `#/components/schemas/ConflictMode`.
         @frozen public enum ConflictMode: String, Codable, Hashable, Sendable, CaseIterable {
@@ -1674,19 +1759,21 @@ extension Components {
                 case ok
             }
         }
-        /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
-        public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal`.
+        public struct EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeConstraintViolation = "edge_constraint_violation"
+                    case invalidId = "invalid_id"
                     case validationError = "validation_error"
                 }
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -1704,8 +1791,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -1713,9 +1800,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -1727,33 +1814,34 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
-            public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
-            /// Creates a new `ValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal`.
-        public struct InvalidTransitionOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal`.
+        public struct InvalidIdOrInvalidTransitionOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
                     case invalidTransition = "invalid_transition"
                     case validationError = "validation_error"
                 }
-                /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.InvalidTransitionOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -1771,8 +1859,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.InvalidTransitionOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -1780,9 +1868,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.InvalidTransitionOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.InvalidTransitionOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -1794,13 +1882,13 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/InvalidTransitionOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.InvalidTransitionOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `InvalidTransitionOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidTransitionOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.InvalidTransitionOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -2559,19 +2647,20 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal`.
-        public struct ForbiddenRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal`.
+        public struct EdgePermissionDeniedOrForbiddenRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgePermissionDenied = "edge_permission_denied"
                     case forbidden = "forbidden"
                 }
-                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/code`.
-                public var code: Components.Schemas.ForbiddenRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/code`.
+                public var code: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -2589,8 +2678,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/details`.
-                public var details: Components.Schemas.ForbiddenRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/details`.
+                public var details: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -2598,9 +2687,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.ForbiddenRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ForbiddenRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -2612,13 +2701,13 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error`.
-            public var error: Components.Schemas.ForbiddenRefusal._ErrorPayload
-            /// Creates a new `ForbiddenRefusal`.
+            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error`.
+            public var error: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload
+            /// Creates a new `EdgePermissionDeniedOrForbiddenRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.ForbiddenRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -2716,6 +2805,72 @@ extension Components {
                 case filter
             }
         }
+        /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal`.
+        public struct ForbiddenRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case forbidden = "forbidden"
+                }
+                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/code`.
+                public var code: Components.Schemas.ForbiddenRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/details`.
+                public var details: Components.Schemas.ForbiddenRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.ForbiddenRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ForbiddenRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error`.
+            public var error: Components.Schemas.ForbiddenRefusal._ErrorPayload
+            /// Creates a new `ForbiddenRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.ForbiddenRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal`.
         public struct BulkJobNotFoundRefusal: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error`.
@@ -2780,6 +2935,161 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Tombstone`.
+        public struct Tombstone: Codable, Hashable, Sendable {
+            /// The link value, or the natural key's `source_id`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Tombstone/key`.
+            public var key: Swift.String
+            /// When the row holding the key was purged.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Tombstone/purged_at`.
+            public var purgedAt: Swift.String
+            /// The purge time, or the later time of the vendor's own change a connector made in carrying the purge out, moved by `POST /items/tombstones`; a vendor change after it is a new row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Tombstone/settled_at`.
+            public var settledAt: Swift.String
+            /// Creates a new `Tombstone`.
+            ///
+            /// - Parameters:
+            ///   - key: The link value, or the natural key's `source_id`.
+            ///   - purgedAt: When the row holding the key was purged.
+            ///   - settledAt: The purge time, or the later time of the vendor's own change a connector made in carrying the purge out, moved by `POST /items/tombstones`; a vendor change after it is a new row.
+            public init(
+                key: Swift.String,
+                purgedAt: Swift.String,
+                settledAt: Swift.String
+            ) {
+                self.key = key
+                self.purgedAt = purgedAt
+                self.settledAt = settledAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case key
+                case purgedAt = "purged_at"
+                case settledAt = "settled_at"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+        public struct InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
+                    case missingRequiredField = "missing_required_field"
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ExtensionsResponse`.
+        public struct ExtensionsResponse: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions`.
+            public struct ExtensionsPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions/additionalProperties`.
+                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `AdditionalPropertiesPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.ExtensionsResponse.ExtensionsPayload.AdditionalPropertiesPayload]
+                /// Creates a new `ExtensionsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.ExtensionsResponse.ExtensionsPayload.AdditionalPropertiesPayload] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions`.
+            public var extensions: Components.Schemas.ExtensionsResponse.ExtensionsPayload
+            /// Creates a new `ExtensionsResponse`.
+            ///
+            /// - Parameters:
+            ///   - extensions:
+            public init(extensions: Components.Schemas.ExtensionsResponse.ExtensionsPayload) {
+                self.extensions = extensions
+            }
+            public enum CodingKeys: String, CodingKey {
+                case extensions
             }
         }
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal`.
@@ -2849,15 +3159,23 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/ExtensionsResponse`.
-        public struct ExtensionsResponse: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions`.
-            public struct ExtensionsPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions/additionalProperties`.
-                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
+        public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case validationError = "validation_error"
+                }
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `AdditionalPropertiesPayload`.
+                    /// Creates a new `DetailsPayload`.
                     ///
                     /// - Parameters:
                     ///   - additionalProperties: A container of undocumented properties.
@@ -2871,33 +3189,40 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.ExtensionsResponse.ExtensionsPayload.AdditionalPropertiesPayload]
-                /// Creates a new `ExtensionsPayload`.
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.ExtensionsResponse.ExtensionsPayload.AdditionalPropertiesPayload] = .init()) {
-                    self.additionalProperties = additionalProperties
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
                 }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions`.
-            public var extensions: Components.Schemas.ExtensionsResponse.ExtensionsPayload
-            /// Creates a new `ExtensionsResponse`.
+            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+            public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
+            /// Creates a new `ValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - extensions:
-            public init(extensions: Components.Schemas.ExtensionsResponse.ExtensionsPayload) {
-                self.extensions = extensions
+            ///   - error:
+            public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
+                self.error = error
             }
             public enum CodingKeys: String, CodingKey {
-                case extensions
+                case error
             }
         }
         /// - Remark: Generated from `#/components/schemas/EdgeResponse`.
@@ -2979,73 +3304,6 @@ extension Components {
             /// - Parameters:
             ///   - error:
             public init(error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal`.
-        public struct EdgePermissionDeniedOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgePermissionDenied = "edge_permission_denied"
-                    case typeNotPermitted = "type_not_permitted"
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
-                public var code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/message`.
-                public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
-                public var details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
-                public init(
-                    code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
-            public var error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload
-            /// Creates a new `EdgePermissionDeniedOrTypeNotPermittedRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error:
-            public init(error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -3184,20 +3442,21 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
-        public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case missingRequiredField = "missing_required_field"
-                    case validationError = "validation_error"
+                    case edgeNotFound = "edge_not_found"
+                    case edgeTypeNotFound = "edge_type_not_found"
+                    case itemNotFound = "item_not_found"
                 }
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -3215,8 +3474,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -3224,9 +3483,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -3238,13 +3497,13 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -3392,6 +3651,15 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public var propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
+            /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_name`.
+            public var reverseName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
+            @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case source = "source"
+                case target = "target"
+            }
+            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
+            public var writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
             /// Creates a new `EdgeType`.
             ///
             /// - Parameters:
@@ -3403,6 +3671,8 @@ extension Components {
             ///   - targetTypeConstraints:
             ///   - cascadeOnDelete:
             ///   - propertySchema:
+            ///   - reverseName:
+            ///   - writtenAt:
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
@@ -3411,7 +3681,9 @@ extension Components {
                 sourceTypeConstraints: [Swift.String],
                 targetTypeConstraints: [Swift.String],
                 cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload,
-                propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
+                propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload,
+                reverseName: Swift.String? = nil,
+                writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
             ) {
                 self.id = id
                 self.label = label
@@ -3421,6 +3693,8 @@ extension Components {
                 self.targetTypeConstraints = targetTypeConstraints
                 self.cascadeOnDelete = cascadeOnDelete
                 self.propertySchema = propertySchema
+                self.reverseName = reverseName
+                self.writtenAt = writtenAt
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3431,6 +3705,75 @@ extension Components {
                 case targetTypeConstraints = "target_type_constraints"
                 case cascadeOnDelete = "cascade_on_delete"
                 case propertySchema = "property_schema"
+                case reverseName = "reverse_name"
+                case writtenAt = "written_at"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
+        public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case missingRequiredField = "missing_required_field"
+                    case validationError = "validation_error"
+                }
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// - Remark: Generated from `#/components/schemas/ConflictRefusal`.
@@ -3601,6 +3944,21 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
             public var propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload?
+            /// The name the edge goes by read from its target, such as `child-of` for `parent-of`. It takes the edge-type identifier grammar, and no other edge type may hold it as an id or a reverse name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/reverse_name`.
+            public var reverseName: Swift.String?
+            /// The end whose file writes an edge of this type, `source` unless named. Where the file at that end cannot carry frontmatter, the other end writes it under the name read from there. `target` needs a `reverse_name`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/written_at`.
+            @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case source = "source"
+                case target = "target"
+            }
+            /// The end whose file writes an edge of this type, `source` unless named. Where the file at that end cannot carry frontmatter, the other end writes it under the name read from there. `target` needs a `reverse_name`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/written_at`.
+            public var writtenAt: Components.Schemas.EdgeTypeRequest.WrittenAtPayload?
             /// Creates a new `EdgeTypeRequest`.
             ///
             /// - Parameters:
@@ -3612,6 +3970,8 @@ extension Components {
             ///   - targetTypeConstraints:
             ///   - cascadeOnDelete:
             ///   - propertySchema:
+            ///   - reverseName: The name the edge goes by read from its target, such as `child-of` for `parent-of`. It takes the edge-type identifier grammar, and no other edge type may hold it as an id or a reverse name.
+            ///   - writtenAt: The end whose file writes an edge of this type, `source` unless named. Where the file at that end cannot carry frontmatter, the other end writes it under the name read from there. `target` needs a `reverse_name`.
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
@@ -3620,7 +3980,9 @@ extension Components {
                 sourceTypeConstraints: [Swift.String]? = nil,
                 targetTypeConstraints: [Swift.String]? = nil,
                 cascadeOnDelete: Components.Schemas.EdgeTypeRequest.CascadeOnDeletePayload? = nil,
-                propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload? = nil
+                propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload? = nil,
+                reverseName: Swift.String? = nil,
+                writtenAt: Components.Schemas.EdgeTypeRequest.WrittenAtPayload? = nil
             ) {
                 self.id = id
                 self.label = label
@@ -3630,6 +3992,8 @@ extension Components {
                 self.targetTypeConstraints = targetTypeConstraints
                 self.cascadeOnDelete = cascadeOnDelete
                 self.propertySchema = propertySchema
+                self.reverseName = reverseName
+                self.writtenAt = writtenAt
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3640,6 +4004,8 @@ extension Components {
                 case targetTypeConstraints = "target_type_constraints"
                 case cascadeOnDelete = "cascade_on_delete"
                 case propertySchema = "property_schema"
+                case reverseName = "reverse_name"
+                case writtenAt = "written_at"
             }
         }
         /// - Remark: Generated from `#/components/schemas/EdgeTypePage`.
@@ -3862,6 +4228,10 @@ extension Components {
             public var version: Swift.Double
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
+            /// The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/link_field`.
+            public var linkField: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version_policy`.
             public var versionPolicy: Components.Schemas.VersionPolicy?
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy`.
@@ -3878,6 +4248,7 @@ extension Components {
             ///   - fields:
             ///   - version:
             ///   - displayHints:
+            ///   - linkField: The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
             ///   - versionPolicy:
             ///   - mergePolicy:
             public init(
@@ -3890,6 +4261,7 @@ extension Components {
                 fields: Components.Schemas.TypeDefinition.FieldsPayload,
                 version: Swift.Double,
                 displayHints: Components.Schemas.DisplayHints? = nil,
+                linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil
             ) {
@@ -3902,6 +4274,7 @@ extension Components {
                 self.fields = fields
                 self.version = version
                 self.displayHints = displayHints
+                self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
             }
@@ -3915,6 +4288,7 @@ extension Components {
                 case fields
                 case version
                 case displayHints = "display_hints"
+                case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
             }
@@ -4248,19 +4622,20 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal`.
-        public struct TypeAlreadyExistsRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal`.
+        public struct LinkTakenOrTypeAlreadyExistsRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case linkTaken = "link_taken"
                     case typeAlreadyExists = "type_already_exists"
                 }
-                /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error/code`.
-                public var code: Components.Schemas.TypeAlreadyExistsRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
+                public var code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -4278,8 +4653,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error/details`.
-                public var details: Components.Schemas.TypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
+                public var details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -4287,9 +4662,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.TypeAlreadyExistsRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.TypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -4301,13 +4676,13 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/TypeAlreadyExistsRefusal/error`.
-            public var error: Components.Schemas.TypeAlreadyExistsRefusal._ErrorPayload
-            /// Creates a new `TypeAlreadyExistsRefusal`.
+            /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
+            public var error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload
+            /// Creates a new `LinkTakenOrTypeAlreadyExistsRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.TypeAlreadyExistsRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -4402,7 +4777,7 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/fields`.
             public var fields: Components.Schemas.TypeDefinitionInput.FieldsPayload
-            /// Omit it to default to 1. A replacement carries the version it moves to.
+            /// Omit it to default to 0. A replacement keeps the version it is given.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/version`.
             public var version: Swift.Int?
@@ -4475,6 +4850,10 @@ extension Components {
             public var compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
+            /// The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/link_field`.
+            public var linkField: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/version_policy`.
             public var versionPolicy: Components.Schemas.VersionPolicy?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/merge_policy`.
@@ -4487,7 +4866,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - fields:
-            ///   - version: Omit it to default to 1. A replacement carries the version it moves to.
+            ///   - version: Omit it to default to 0. A replacement keeps the version it is given.
             ///   - parent:
             ///   - label:
             ///   - description:
@@ -4495,6 +4874,7 @@ extension Components {
             ///   - required: Field names this type requires, the alternative to `required: true` on each field. Both forms are taken and mean the same thing.
             ///   - compatibleWith: Sibling types this one asserts a structural superset of. A bare string names one.
             ///   - displayHints:
+            ///   - linkField: The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
             ///   - versionPolicy:
             ///   - mergePolicy:
             ///   - id:
@@ -4509,6 +4889,7 @@ extension Components {
                 required: [Swift.String]? = nil,
                 compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload? = nil,
                 displayHints: Components.Schemas.DisplayHints? = nil,
+                linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
                 id: Swift.String,
@@ -4523,6 +4904,7 @@ extension Components {
                 self.required = required
                 self.compatibleWith = compatibleWith
                 self.displayHints = displayHints
+                self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
                 self.id = id
@@ -4538,6 +4920,7 @@ extension Components {
                 case required
                 case compatibleWith = "compatible_with"
                 case displayHints = "display_hints"
+                case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
                 case id
@@ -4580,6 +4963,10 @@ extension Components {
                     Components.Schemas.DisplayHints.self,
                     forKey: .displayHints
                 )
+                self.linkField = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .linkField
+                )
                 self.versionPolicy = try container.decodeIfPresent(
                     Components.Schemas.VersionPolicy.self,
                     forKey: .versionPolicy
@@ -4602,6 +4989,7 @@ extension Components {
                     "required",
                     "compatible_with",
                     "display_hints",
+                    "link_field",
                     "version_policy",
                     "merge_policy",
                     "id"
@@ -4644,6 +5032,10 @@ extension Components {
                 try container.encodeIfPresent(
                     self.displayHints,
                     forKey: .displayHints
+                )
+                try container.encodeIfPresent(
+                    self.linkField,
+                    forKey: .linkField
                 )
                 try container.encodeIfPresent(
                     self.versionPolicy,
@@ -4988,19 +5380,19 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal`.
-        public struct VersionBumpMismatchRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal`.
+        public struct LinkTakenRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case versionBumpMismatch = "version_bump_mismatch"
+                    case linkTaken = "link_taken"
                 }
-                /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error/code`.
-                public var code: Components.Schemas.VersionBumpMismatchRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/code`.
+                public var code: Components.Schemas.LinkTakenRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -5018,8 +5410,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error/details`.
-                public var details: Components.Schemas.VersionBumpMismatchRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/details`.
+                public var details: Components.Schemas.LinkTakenRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -5027,9 +5419,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.VersionBumpMismatchRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.LinkTakenRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.VersionBumpMismatchRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.LinkTakenRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -5041,13 +5433,13 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/VersionBumpMismatchRefusal/error`.
-            public var error: Components.Schemas.VersionBumpMismatchRefusal._ErrorPayload
-            /// Creates a new `VersionBumpMismatchRefusal`.
+            /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error`.
+            public var error: Components.Schemas.LinkTakenRefusal._ErrorPayload
+            /// Creates a new `LinkTakenRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.VersionBumpMismatchRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.LinkTakenRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -5076,7 +5468,7 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/fields`.
             public var fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload
-            /// Omit it to default to 1. A replacement carries the version it moves to.
+            /// Omit it to default to 0. A replacement keeps the version it is given.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/version`.
             public var version: Swift.Int?
@@ -5149,6 +5541,10 @@ extension Components {
             public var compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
+            /// The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/link_field`.
+            public var linkField: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/version_policy`.
             public var versionPolicy: Components.Schemas.VersionPolicy?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy`.
@@ -5159,7 +5555,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - fields:
-            ///   - version: Omit it to default to 1. A replacement carries the version it moves to.
+            ///   - version: Omit it to default to 0. A replacement keeps the version it is given.
             ///   - parent:
             ///   - label:
             ///   - description:
@@ -5167,6 +5563,7 @@ extension Components {
             ///   - required: Field names this type requires, the alternative to `required: true` on each field. Both forms are taken and mean the same thing.
             ///   - compatibleWith: Sibling types this one asserts a structural superset of. A bare string names one.
             ///   - displayHints:
+            ///   - linkField: The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
             ///   - versionPolicy:
             ///   - mergePolicy:
             ///   - additionalProperties: A container of undocumented properties.
@@ -5180,6 +5577,7 @@ extension Components {
                 required: [Swift.String]? = nil,
                 compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload? = nil,
                 displayHints: Components.Schemas.DisplayHints? = nil,
+                linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
@@ -5193,6 +5591,7 @@ extension Components {
                 self.required = required
                 self.compatibleWith = compatibleWith
                 self.displayHints = displayHints
+                self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
                 self.additionalProperties = additionalProperties
@@ -5207,6 +5606,7 @@ extension Components {
                 case required
                 case compatibleWith = "compatible_with"
                 case displayHints = "display_hints"
+                case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
             }
@@ -5248,6 +5648,10 @@ extension Components {
                     Components.Schemas.DisplayHints.self,
                     forKey: .displayHints
                 )
+                self.linkField = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .linkField
+                )
                 self.versionPolicy = try container.decodeIfPresent(
                     Components.Schemas.VersionPolicy.self,
                     forKey: .versionPolicy
@@ -5266,6 +5670,7 @@ extension Components {
                     "required",
                     "compatible_with",
                     "display_hints",
+                    "link_field",
                     "version_policy",
                     "merge_policy"
                 ])
@@ -5307,6 +5712,10 @@ extension Components {
                 try container.encodeIfPresent(
                     self.displayHints,
                     forKey: .displayHints
+                )
+                try container.encodeIfPresent(
+                    self.linkField,
+                    forKey: .linkField
                 )
                 try container.encodeIfPresent(
                     self.versionPolicy,
@@ -5444,73 +5853,6 @@ extension Components {
                 case metadata
                 case relevanceScore = "relevance_score"
                 case snippetHtml = "snippet_html"
-            }
-        }
-        /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal`.
-        public struct UnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case unknownType = "unknown_type"
-                    case validationError = "validation_error"
-                }
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
-                public init(
-                    code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `UnknownTypeOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error:
-            public init(error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
             }
         }
         /// - Remark: Generated from `#/components/schemas/OccurrencePage`.
@@ -6549,6 +6891,10 @@ extension Components {
             public var updatedAt: Swift.String
             /// - Remark: Generated from `#/components/schemas/Connector/last_heartbeat_at`.
             public var lastHeartbeatAt: Swift.String?
+            /// When the hold a process took at `POST /connectors/{id}/hold` lapses; `null` when no process holds the registration or its hold has lapsed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connector/hold_expires_at`.
+            public var holdExpiresAt: Swift.String?
             /// Creates a new `Connector`.
             ///
             /// - Parameters:
@@ -6560,6 +6906,7 @@ extension Components {
             ///   - registeredAt:
             ///   - updatedAt:
             ///   - lastHeartbeatAt:
+            ///   - holdExpiresAt: When the hold a process took at `POST /connectors/{id}/hold` lapses; `null` when no process holds the registration or its hold has lapsed.
             public init(
                 id: Swift.String,
                 keyId: Swift.String,
@@ -6568,7 +6915,8 @@ extension Components {
                 description: Swift.String? = nil,
                 registeredAt: Swift.String,
                 updatedAt: Swift.String,
-                lastHeartbeatAt: Swift.String? = nil
+                lastHeartbeatAt: Swift.String? = nil,
+                holdExpiresAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.keyId = keyId
@@ -6578,6 +6926,7 @@ extension Components {
                 self.registeredAt = registeredAt
                 self.updatedAt = updatedAt
                 self.lastHeartbeatAt = lastHeartbeatAt
+                self.holdExpiresAt = holdExpiresAt
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -6588,6 +6937,7 @@ extension Components {
                 case registeredAt = "registered_at"
                 case updatedAt = "updated_at"
                 case lastHeartbeatAt = "last_heartbeat_at"
+                case holdExpiresAt = "hold_expires_at"
             }
         }
         /// - Remark: Generated from `#/components/schemas/ConnectorRun`.
@@ -6768,6 +7118,968 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case data
                 case nextCursor = "next_cursor"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InboundEndpoint`.
+        public struct InboundEndpoint: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/connector_id`.
+            public var connectorId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/label`.
+            public var label: Swift.String?
+            /// Lowercased. A delivery repeating this header's value is marked a repeat of the first that carried it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/duplicate_header`.
+            public var duplicateHeader: Swift.String?
+            /// The address, under the instance's own: in full only in the answer that made it, redacted to its last four characters after.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/path`.
+            public var path: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/created_at`.
+            public var createdAt: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundEndpoint/retired_at`.
+            public var retiredAt: Swift.String?
+            /// Creates a new `InboundEndpoint`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - connectorId:
+            ///   - label:
+            ///   - duplicateHeader: Lowercased. A delivery repeating this header's value is marked a repeat of the first that carried it.
+            ///   - path: The address, under the instance's own: in full only in the answer that made it, redacted to its last four characters after.
+            ///   - createdAt:
+            ///   - retiredAt:
+            public init(
+                id: Swift.String,
+                connectorId: Swift.String,
+                label: Swift.String? = nil,
+                duplicateHeader: Swift.String? = nil,
+                path: Swift.String,
+                createdAt: Swift.String,
+                retiredAt: Swift.String? = nil
+            ) {
+                self.id = id
+                self.connectorId = connectorId
+                self.label = label
+                self.duplicateHeader = duplicateHeader
+                self.path = path
+                self.createdAt = createdAt
+                self.retiredAt = retiredAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case connectorId = "connector_id"
+                case label
+                case duplicateHeader = "duplicate_header"
+                case path
+                case createdAt = "created_at"
+                case retiredAt = "retired_at"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InboundEndpointPage`.
+        public struct InboundEndpointPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InboundEndpointPage/data`.
+            public var data: [Components.Schemas.InboundEndpoint]
+            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InboundEndpointPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `InboundEndpointPage`.
+            ///
+            /// - Parameters:
+            ///   - data:
+            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            public init(
+                data: [Components.Schemas.InboundEndpoint],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal`.
+        public struct ConnectorNotFoundOrEndpointNotFoundRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorNotFound = "connector_not_found"
+                    case endpointNotFound = "endpoint_not_found"
+                }
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error`.
+            public var error: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload
+            /// Creates a new `ConnectorNotFoundOrEndpointNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InboundDeliveryPage`.
+        public struct InboundDeliveryPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InboundDeliveryPage/data`.
+            public var data: [Components.Schemas.InboundDelivery]
+            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InboundDeliveryPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `InboundDeliveryPage`.
+            ///
+            /// - Parameters:
+            ///   - data:
+            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            public init(
+                data: [Components.Schemas.InboundDelivery],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InboundDelivery`.
+        public struct InboundDelivery: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/id`.
+            public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/endpoint_id`.
+            public var endpointId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/received_at`.
+            public var receivedAt: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/method`.
+            public var method: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/query`.
+            public var query: Swift.String
+            /// `[name, value]` pairs in the order and case they arrived.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/headers`.
+            public var headers: [OpenAPIRuntime.OpenAPIArrayContainer]
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/size`.
+            public var size: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/sha256`.
+            public var sha256: Swift.String
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of`.
+            public struct DuplicateOfPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of/id`.
+                public var id: Swift.String
+                /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of/outcome`.
+                @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case processed = "processed"
+                    case duplicate = "duplicate"
+                    case rejected = "rejected"
+                    case _empty_ = ""
+                }
+                /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of/outcome`.
+                public var outcome: Components.Schemas.InboundDelivery.DuplicateOfPayload.OutcomePayload?
+                /// Creates a new `DuplicateOfPayload`.
+                ///
+                /// - Parameters:
+                ///   - id:
+                ///   - outcome:
+                public init(
+                    id: Swift.String,
+                    outcome: Components.Schemas.InboundDelivery.DuplicateOfPayload.OutcomePayload? = nil
+                ) {
+                    self.id = id
+                    self.outcome = outcome
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case outcome
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of`.
+            public var duplicateOf: Components.Schemas.InboundDelivery.DuplicateOfPayload?
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/handled_at`.
+            public var handledAt: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/outcome`.
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case processed = "processed"
+                case duplicate = "duplicate"
+                case rejected = "rejected"
+                case _empty_ = ""
+            }
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/outcome`.
+            public var outcome: Components.Schemas.InboundDelivery.OutcomePayload?
+            /// Creates a new `InboundDelivery`.
+            ///
+            /// - Parameters:
+            ///   - id:
+            ///   - endpointId:
+            ///   - receivedAt:
+            ///   - method:
+            ///   - query:
+            ///   - headers: `[name, value]` pairs in the order and case they arrived.
+            ///   - size:
+            ///   - sha256:
+            ///   - duplicateOf:
+            ///   - handledAt:
+            ///   - outcome:
+            public init(
+                id: Swift.String,
+                endpointId: Swift.String,
+                receivedAt: Swift.String,
+                method: Swift.String,
+                query: Swift.String,
+                headers: [OpenAPIRuntime.OpenAPIArrayContainer],
+                size: Swift.Int,
+                sha256: Swift.String,
+                duplicateOf: Components.Schemas.InboundDelivery.DuplicateOfPayload? = nil,
+                handledAt: Swift.String? = nil,
+                outcome: Components.Schemas.InboundDelivery.OutcomePayload? = nil
+            ) {
+                self.id = id
+                self.endpointId = endpointId
+                self.receivedAt = receivedAt
+                self.method = method
+                self.query = query
+                self.headers = headers
+                self.size = size
+                self.sha256 = sha256
+                self.duplicateOf = duplicateOf
+                self.handledAt = handledAt
+                self.outcome = outcome
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case endpointId = "endpoint_id"
+                case receivedAt = "received_at"
+                case method
+                case query
+                case headers
+                case size
+                case sha256
+                case duplicateOf = "duplicate_of"
+                case handledAt = "handled_at"
+                case outcome
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal`.
+        public struct ConnectorNotFoundOrDeliveryNotFoundRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorNotFound = "connector_not_found"
+                    case deliveryNotFound = "delivery_not_found"
+                }
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error`.
+            public var error: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload
+            /// Creates a new `ConnectorNotFoundOrDeliveryNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal`.
+        public struct ConnectorHeldRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorHeld = "connector_held"
+                }
+                /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error`.
+            public var error: Components.Schemas.ConnectorHeldRefusal._ErrorPayload
+            /// Creates a new `ConnectorHeldRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.ConnectorHeldRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectorState`.
+        public struct ConnectorState: Codable, Hashable, Sendable {
+            /// The document as last written; `{}` when none was.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorState/state`.
+            public struct StatePayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `StatePayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The document as last written; `{}` when none was.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorState/state`.
+            public var state: Components.Schemas.ConnectorState.StatePayload
+            /// When it was last written; `null` when it never was.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorState/updated_at`.
+            public var updatedAt: Swift.String?
+            /// Creates a new `ConnectorState`.
+            ///
+            /// - Parameters:
+            ///   - state: The document as last written; `{}` when none was.
+            ///   - updatedAt: When it was last written; `null` when it never was.
+            public init(
+                state: Components.Schemas.ConnectorState.StatePayload,
+                updatedAt: Swift.String? = nil
+            ) {
+                self.state = state
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case updatedAt = "updated_at"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectorAgreement`.
+        public struct ConnectorAgreement: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreement/item_id`.
+            public var itemId: Swift.String
+            /// Whether a change to the row waits to be carried to the vendor.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreement/waiting`.
+            public var waiting: Swift.Bool
+            /// The connector's own record of the row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreement/record`.
+            public struct RecordPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `RecordPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The connector's own record of the row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreement/record`.
+            public var record: Components.Schemas.ConnectorAgreement.RecordPayload
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreement/updated_at`.
+            public var updatedAt: Swift.String
+            /// Creates a new `ConnectorAgreement`.
+            ///
+            /// - Parameters:
+            ///   - itemId:
+            ///   - waiting: Whether a change to the row waits to be carried to the vendor.
+            ///   - record: The connector's own record of the row.
+            ///   - updatedAt:
+            public init(
+                itemId: Swift.String,
+                waiting: Swift.Bool,
+                record: Components.Schemas.ConnectorAgreement.RecordPayload,
+                updatedAt: Swift.String
+            ) {
+                self.itemId = itemId
+                self.waiting = waiting
+                self.record = record
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case itemId = "item_id"
+                case waiting
+                case record
+                case updatedAt = "updated_at"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConnectorAgreementPage`.
+        public struct ConnectorAgreementPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreementPage/data`.
+            public var data: [Components.Schemas.ConnectorAgreement]
+            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorAgreementPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `ConnectorAgreementPage`.
+            ///
+            /// - Parameters:
+            ///   - data:
+            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            public init(
+                data: [Components.Schemas.ConnectorAgreement],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// Which items the folder holds.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderSearch`.
+        public struct FolderSearch: Codable, Hashable, Sendable {
+            /// Type identifiers, each with its subtypes. Empty or absent holds every type the folder's key reads.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/types`.
+            public var types: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/tier`.
+            public struct TierPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/FolderSearch/tier/value1`.
+                public var value1: Components.Schemas.Tier
+                /// The one tier the folder holds; absent is `library`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderSearch/tier/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `TierPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The one tier the folder holds; absent is `library`.
+                public init(
+                    value1: Components.Schemas.Tier,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try decoder.decodeFromSingleValueContainer()
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeToSingleValueContainer(self.value1)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/tier`.
+            public var tier: Components.Schemas.FolderSearch.TierPayload?
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/StatePayload`.
+            @frozen public enum StatePayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case active = "active"
+                case archived = "archived"
+            }
+            /// The states the folder holds; absent is both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/state`.
+            public typealias StatePayload = [Components.Schemas.FolderSearch.StatePayloadPayload]
+            /// The states the folder holds; absent is both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/state`.
+            public var state: Components.Schemas.FolderSearch.StatePayload?
+            /// An expression in the listing grammar's `filter`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/filter`.
+            public var filter: Swift.String?
+            /// An item id: that item and everything under it by `parent-of`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderSearch/beneath`.
+            public var beneath: Swift.String?
+            /// Creates a new `FolderSearch`.
+            ///
+            /// - Parameters:
+            ///   - types: Type identifiers, each with its subtypes. Empty or absent holds every type the folder's key reads.
+            ///   - tier:
+            ///   - state: The states the folder holds; absent is both.
+            ///   - filter: An expression in the listing grammar's `filter`.
+            ///   - beneath: An item id: that item and everything under it by `parent-of`.
+            public init(
+                types: [Swift.String]? = nil,
+                tier: Components.Schemas.FolderSearch.TierPayload? = nil,
+                state: Components.Schemas.FolderSearch.StatePayload? = nil,
+                filter: Swift.String? = nil,
+                beneath: Swift.String? = nil
+            ) {
+                self.types = types
+                self.tier = tier
+                self.state = state
+                self.filter = filter
+                self.beneath = beneath
+            }
+            public enum CodingKeys: String, CodingKey {
+                case types
+                case tier
+                case state
+                case filter
+                case beneath
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.types = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .types
+                )
+                self.tier = try container.decodeIfPresent(
+                    Components.Schemas.FolderSearch.TierPayload.self,
+                    forKey: .tier
+                )
+                self.state = try container.decodeIfPresent(
+                    Components.Schemas.FolderSearch.StatePayload.self,
+                    forKey: .state
+                )
+                self.filter = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .filter
+                )
+                self.beneath = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .beneath
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "types",
+                    "tier",
+                    "state",
+                    "filter",
+                    "beneath"
+                ])
+            }
+        }
+        /// What a new file takes where its frontmatter leaves a blank.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderDefaults`.
+        public struct FolderDefaults: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/type`.
+            public var _type: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/tier`.
+            public var tier: Components.Schemas.Tier?
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/properties`.
+            public struct PropertiesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `PropertiesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/properties`.
+            public var properties: Components.Schemas.FolderDefaults.PropertiesPayload?
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/tags`.
+            public var tags: [Swift.String]?
+            /// A map from edge type to the item ids a new file takes an edge with: at most 100 edge types, each with at most 100 ids. Each edge runs from the new file to the item named, except `parent-of`, which runs from the item named to the new file, making the new file its child.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/edges`.
+            public struct EdgesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: [Swift.String]]
+                /// Creates a new `EdgesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: [Swift.String]] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// A map from edge type to the item ids a new file takes an edge with: at most 100 edge types, each with at most 100 ids. Each edge runs from the new file to the item named, except `parent-of`, which runs from the item named to the new file, making the new file its child.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/edges`.
+            public var edges: Components.Schemas.FolderDefaults.EdgesPayload?
+            /// Creates a new `FolderDefaults`.
+            ///
+            /// - Parameters:
+            ///   - _type:
+            ///   - tier:
+            ///   - properties:
+            ///   - tags:
+            ///   - edges: A map from edge type to the item ids a new file takes an edge with: at most 100 edge types, each with at most 100 ids. Each edge runs from the new file to the item named, except `parent-of`, which runs from the item named to the new file, making the new file its child.
+            public init(
+                _type: Swift.String? = nil,
+                tier: Components.Schemas.Tier? = nil,
+                properties: Components.Schemas.FolderDefaults.PropertiesPayload? = nil,
+                tags: [Swift.String]? = nil,
+                edges: Components.Schemas.FolderDefaults.EdgesPayload? = nil
+            ) {
+                self._type = _type
+                self.tier = tier
+                self.properties = properties
+                self.tags = tags
+                self.edges = edges
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case tier
+                case properties
+                case tags
+                case edges
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.tier = try container.decodeIfPresent(
+                    Components.Schemas.Tier.self,
+                    forKey: .tier
+                )
+                self.properties = try container.decodeIfPresent(
+                    Components.Schemas.FolderDefaults.PropertiesPayload.self,
+                    forKey: .properties
+                )
+                self.tags = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .tags
+                )
+                self.edges = try container.decodeIfPresent(
+                    Components.Schemas.FolderDefaults.EdgesPayload.self,
+                    forKey: .edges
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "type",
+                    "tier",
+                    "properties",
+                    "tags",
+                    "edges"
+                ])
+            }
+        }
+        /// A removal pauses when it is more than `files` files and more than `fraction` of the folder; absent members are 10 and 0.25.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold`.
+        public struct FolderRemovalThreshold: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/files`.
+            public var files: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/fraction`.
+            public var fraction: Swift.Double?
+            /// Creates a new `FolderRemovalThreshold`.
+            ///
+            /// - Parameters:
+            ///   - files:
+            ///   - fraction:
+            public init(
+                files: Swift.Int? = nil,
+                fraction: Swift.Double? = nil
+            ) {
+                self.files = files
+                self.fraction = fraction
+            }
+            public enum CodingKeys: String, CodingKey {
+                case files
+                case fraction
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.files = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .files
+                )
+                self.fraction = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .fraction
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "files",
+                    "fraction"
+                ])
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+        public struct InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
+                    case invalidTransition = "invalid_transition"
+                    case missingRequiredField = "missing_required_field"
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal`.
+        public struct InvalidIdOrInvalidTransitionRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
+                    case invalidTransition = "invalid_transition"
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidTransitionRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// - Remark: Generated from `#/components/schemas/KeyResponse`.
@@ -7500,6 +8812,140 @@ extension Components {
                 ])
             }
         }
+        /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal`.
+        public struct InvalidPropertiesOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidProperties = "invalid_properties"
+                    case validationError = "validation_error"
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidPropertiesOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal`.
+        public struct ConflictOrLinkTakenRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case conflict = "conflict"
+                    case linkTaken = "link_taken"
+                }
+                /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/code`.
+                public var code: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/details`.
+                public var details: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error`.
+            public var error: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload
+            /// Creates a new `ConflictOrLinkTakenRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/DriftedPlatformTypePage`.
         public struct DriftedPlatformTypePage: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformTypePage/data`.
@@ -7790,6 +9236,73 @@ extension Components {
             /// - Parameters:
             ///   - error:
             public init(error: Components.Schemas.OwnerExistsRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal`.
+        public struct UnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
+                }
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `UnknownTypeOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
