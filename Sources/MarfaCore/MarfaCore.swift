@@ -911,12 +911,23 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     
     func hydrate(types: [String], tier: Tier) throws  -> HydrateReport
     
+    /**
+     * A hydration that also holds every edge of `edge_types` the key reads,
+     * whichever ends the copy holds.
+     */
+    func hydrateWith(types: [String], tier: Tier, edgeTypes: [String]) throws  -> HydrateReport
+    
     func list(filters: ListFilters, sort: Sort) throws  -> [Item]
     
     /**
      * Adds the named tags, leaving the rest.
      */
     func mergeMetadata(id: String, tags: [String]) throws  -> QueuedWrite
+    
+    /**
+     * Holds one row by id whatever the slice says of it, read now.
+     */
+    func pin(id: String) throws  -> PinReport
     
     /**
      * Holds a file's bytes beside the store and queues their upload.
@@ -967,6 +978,12 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
      * Moves an item to another lifecycle state.
      */
     func transitionItem(id: String, state: ItemState) throws  -> QueuedWrite
+    
+    /**
+     * Stops holding a row by id; one the slice does not take goes, unless
+     * writes to it still wait.
+     */
+    func unpin(id: String) throws  -> PinReport
     
     func updateEdge(id: String, edit: EdgeEdit) throws  -> QueuedWrite
     
@@ -1285,6 +1302,21 @@ open func hydrate(types: [String], tier: Tier)throws  -> HydrateReport  {
 })
 }
     
+    /**
+     * A hydration that also holds every edge of `edge_types` the key reads,
+     * whichever ends the copy holds.
+     */
+open func hydrateWith(types: [String], tier: Tier, edgeTypes: [String])throws  -> HydrateReport  {
+    return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_hydrate_with(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(types),
+        FfiConverterTypeTier_lower(tier),
+        FfiConverterSequenceString.lower(edgeTypes),$0
+    )
+})
+}
+    
 open func list(filters: ListFilters, sort: Sort)throws  -> [Item]  {
     return try  FfiConverterSequenceTypeItem.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_marfacore_list(
@@ -1304,6 +1336,18 @@ open func mergeMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterSequenceString.lower(tags),$0
+    )
+})
+}
+    
+    /**
+     * Holds one row by id whatever the slice says of it, read now.
+     */
+open func pin(id: String)throws  -> PinReport  {
+    return try  FfiConverterTypePinReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_pin(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
     )
 })
 }
@@ -1435,6 +1479,19 @@ open func transitionItem(id: String, state: ItemState)throws  -> QueuedWrite  {
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeItemState_lower(state),$0
+    )
+})
+}
+    
+    /**
+     * Stops holding a row by id; one the slice does not take goes, unless
+     * writes to it still wait.
+     */
+open func unpin(id: String)throws  -> PinReport  {
+    return try  FfiConverterTypePinReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_unpin(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
     )
 })
 }
@@ -2481,6 +2538,7 @@ public func FfiConverterTypeEdit_lower(_ value: Edit) -> RustBuffer {
 public struct HydrateReport: Equatable, Hashable {
     public var types: [String]
     public var tier: Tier
+    public var edgeTypes: [String]
     public var items: UInt64
     public var edges: UInt64
     public var pages: UInt64
@@ -2488,9 +2546,10 @@ public struct HydrateReport: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(types: [String], tier: Tier, items: UInt64, edges: UInt64, pages: UInt64, cursor: String) {
+    public init(types: [String], tier: Tier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64, cursor: String) {
         self.types = types
         self.tier = tier
+        self.edgeTypes = edgeTypes
         self.items = items
         self.edges = edges
         self.pages = pages
@@ -2515,6 +2574,7 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
             try HydrateReport(
                 types: FfiConverterSequenceString.read(from: &buf), 
                 tier: FfiConverterTypeTier.read(from: &buf), 
+                edgeTypes: FfiConverterSequenceString.read(from: &buf), 
                 items: FfiConverterUInt64.read(from: &buf), 
                 edges: FfiConverterUInt64.read(from: &buf), 
                 pages: FfiConverterUInt64.read(from: &buf), 
@@ -2525,6 +2585,7 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
     public static func write(_ value: HydrateReport, into buf: inout [UInt8]) {
         FfiConverterSequenceString.write(value.types, into: &buf)
         FfiConverterTypeTier.write(value.tier, into: &buf)
+        FfiConverterSequenceString.write(value.edgeTypes, into: &buf)
         FfiConverterUInt64.write(value.items, into: &buf)
         FfiConverterUInt64.write(value.edges, into: &buf)
         FfiConverterUInt64.write(value.pages, into: &buf)
@@ -2664,12 +2725,32 @@ public struct ListFilters: Equatable, Hashable {
     public var tags: [String]
     public var occurredAfter: String?
     public var occurredBefore: String?
+    /**
+     * An expression in the server's listing grammar, answered as the server
+     * answers `filter` and refused `validation_error` where it refuses it.
+     * A `backref` condition is refused `invalid`.
+     */
+    public var filter: String?
+    /**
+     * An item id: that item and every item it reaches along `parent-of`
+     * edges, as far as the copy holds them.
+     */
+    public var beneath: String?
     public var limit: UInt32?
     public var offset: UInt32?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil) {
+    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil, 
+        /**
+         * An expression in the server's listing grammar, answered as the server
+         * answers `filter` and refused `validation_error` where it refuses it.
+         * A `backref` condition is refused `invalid`.
+         */filter: String? = nil, 
+        /**
+         * An item id: that item and every item it reaches along `parent-of`
+         * edges, as far as the copy holds them.
+         */beneath: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil) {
         self.type = type
         self.state = state
         self.allStates = allStates
@@ -2677,6 +2758,8 @@ public struct ListFilters: Equatable, Hashable {
         self.tags = tags
         self.occurredAfter = occurredAfter
         self.occurredBefore = occurredBefore
+        self.filter = filter
+        self.beneath = beneath
         self.limit = limit
         self.offset = offset
     }
@@ -2704,6 +2787,8 @@ public struct FfiConverterTypeListFilters: FfiConverterRustBuffer {
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 occurredAfter: FfiConverterOptionString.read(from: &buf), 
                 occurredBefore: FfiConverterOptionString.read(from: &buf), 
+                filter: FfiConverterOptionString.read(from: &buf), 
+                beneath: FfiConverterOptionString.read(from: &buf), 
                 limit: FfiConverterOptionUInt32.read(from: &buf), 
                 offset: FfiConverterOptionUInt32.read(from: &buf)
         )
@@ -2717,6 +2802,8 @@ public struct FfiConverterTypeListFilters: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionString.write(value.occurredAfter, into: &buf)
         FfiConverterOptionString.write(value.occurredBefore, into: &buf)
+        FfiConverterOptionString.write(value.filter, into: &buf)
+        FfiConverterOptionString.write(value.beneath, into: &buf)
         FfiConverterOptionUInt32.write(value.limit, into: &buf)
         FfiConverterOptionUInt32.write(value.offset, into: &buf)
     }
@@ -2735,6 +2822,75 @@ public func FfiConverterTypeListFilters_lift(_ buf: RustBuffer) throws -> ListFi
 #endif
 public func FfiConverterTypeListFilters_lower(_ value: ListFilters) -> RustBuffer {
     return FfiConverterTypeListFilters.lower(value)
+}
+
+
+/**
+ * What a pin or an unpin answers.
+ */
+public struct PinReport: Equatable, Hashable {
+    /**
+     * Whether the row is pinned now.
+     */
+    public var pinned: Bool
+    /**
+     * Whether it was pinned before the call.
+     */
+    public var wasPinned: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Whether the row is pinned now.
+         */pinned: Bool, 
+        /**
+         * Whether it was pinned before the call.
+         */wasPinned: Bool) {
+        self.pinned = pinned
+        self.wasPinned = wasPinned
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PinReport: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePinReport: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PinReport {
+        return
+            try PinReport(
+                pinned: FfiConverterBool.read(from: &buf), 
+                wasPinned: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PinReport, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.pinned, into: &buf)
+        FfiConverterBool.write(value.wasPinned, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePinReport_lift(_ buf: RustBuffer) throws -> PinReport {
+    return try FfiConverterTypePinReport.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePinReport_lower(_ value: PinReport) -> RustBuffer {
+    return FfiConverterTypePinReport.lower(value)
 }
 
 
@@ -2883,21 +3039,44 @@ public func FfiConverterTypeQueuedWrite_lower(_ value: QueuedWrite) -> RustBuffe
 
 /**
  * Narrowing for a search: the state rule a list takes, a type with its
- * subtree, and tags, each read as the list reads it.
+ * subtree, tags, a listing-grammar expression and `beneath`, each read as
+ * the list reads it.
  */
 public struct SearchFilters: Equatable, Hashable {
     public var state: ItemState?
     public var allStates: Bool
     public var type: String?
     public var tags: [String]
+    /**
+     * An expression in the server's listing grammar, answered as the server
+     * answers `filter` and refused `validation_error` where it refuses it.
+     * A `backref` condition is refused `invalid`.
+     */
+    public var filter: String?
+    /**
+     * An item id: that item and every item it reaches along `parent-of`
+     * edges, as far as the copy holds them.
+     */
+    public var beneath: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(state: ItemState? = nil, allStates: Bool = false, type: String? = nil, tags: [String] = []) {
+    public init(state: ItemState? = nil, allStates: Bool = false, type: String? = nil, tags: [String] = [], 
+        /**
+         * An expression in the server's listing grammar, answered as the server
+         * answers `filter` and refused `validation_error` where it refuses it.
+         * A `backref` condition is refused `invalid`.
+         */filter: String? = nil, 
+        /**
+         * An item id: that item and every item it reaches along `parent-of`
+         * edges, as far as the copy holds them.
+         */beneath: String? = nil) {
         self.state = state
         self.allStates = allStates
         self.type = type
         self.tags = tags
+        self.filter = filter
+        self.beneath = beneath
     }
 
     
@@ -2919,7 +3098,9 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
                 state: FfiConverterOptionTypeItemState.read(from: &buf), 
                 allStates: FfiConverterBool.read(from: &buf), 
                 type: FfiConverterOptionString.read(from: &buf), 
-                tags: FfiConverterSequenceString.read(from: &buf)
+                tags: FfiConverterSequenceString.read(from: &buf), 
+                filter: FfiConverterOptionString.read(from: &buf), 
+                beneath: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2928,6 +3109,8 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
         FfiConverterBool.write(value.allStates, into: &buf)
         FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
+        FfiConverterOptionString.write(value.filter, into: &buf)
+        FfiConverterOptionString.write(value.beneath, into: &buf)
     }
 }
 
@@ -3069,6 +3252,8 @@ public struct Status: Equatable, Hashable {
     public var serverOrigin: String?
     public var sliceTypes: [String]
     public var sliceTier: Tier?
+    public var sliceEdgeTypes: [String]
+    public var pinned: [String]
     public var eventCursor: String?
     public var hydration: Hydration
     public var items: UInt64
@@ -3076,10 +3261,12 @@ public struct Status: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(serverOrigin: String?, sliceTypes: [String], sliceTier: Tier?, eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64) {
+    public init(serverOrigin: String?, sliceTypes: [String], sliceTier: Tier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64) {
         self.serverOrigin = serverOrigin
         self.sliceTypes = sliceTypes
         self.sliceTier = sliceTier
+        self.sliceEdgeTypes = sliceEdgeTypes
+        self.pinned = pinned
         self.eventCursor = eventCursor
         self.hydration = hydration
         self.items = items
@@ -3105,6 +3292,8 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
                 serverOrigin: FfiConverterOptionString.read(from: &buf), 
                 sliceTypes: FfiConverterSequenceString.read(from: &buf), 
                 sliceTier: FfiConverterOptionTypeTier.read(from: &buf), 
+                sliceEdgeTypes: FfiConverterSequenceString.read(from: &buf), 
+                pinned: FfiConverterSequenceString.read(from: &buf), 
                 eventCursor: FfiConverterOptionString.read(from: &buf), 
                 hydration: FfiConverterTypeHydration.read(from: &buf), 
                 items: FfiConverterUInt64.read(from: &buf), 
@@ -3116,6 +3305,8 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.serverOrigin, into: &buf)
         FfiConverterSequenceString.write(value.sliceTypes, into: &buf)
         FfiConverterOptionTypeTier.write(value.sliceTier, into: &buf)
+        FfiConverterSequenceString.write(value.sliceEdgeTypes, into: &buf)
+        FfiConverterSequenceString.write(value.pinned, into: &buf)
         FfiConverterOptionString.write(value.eventCursor, into: &buf)
         FfiConverterTypeHydration.write(value.hydration, into: &buf)
         FfiConverterUInt64.write(value.items, into: &buf)
@@ -4819,10 +5010,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_hydrate() != 29603) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_hydrate_with() != 8055) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_list() != 50227) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_merge_metadata() != 63766) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_pin() != 2902) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_put_blob() != 30480) {
@@ -4856,6 +5053,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_transition_item() != 15207) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_unpin() != 44346) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_edge() != 11632) {

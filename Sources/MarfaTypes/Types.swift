@@ -34,9 +34,9 @@ public protocol APIProtocol: Sendable {
     func getItemStats(_ input: Operations.GetItemStats.Input) async throws -> Operations.GetItemStats.Output
     /// Get an item
     ///
-    /// Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. A row that is not stored answers 404. A row whose type the credential's type map does not reach answers `403 type_not_permitted`, which is read after the row, so the two are distinguishable.
+    /// Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. A row that is not stored answers 404, and so does a row whose type the credential's type map does not reach, with the same code and message, so the answer says nothing of whether the row exists or what type it is. A credential whose map reaches no type at all is refused `403 type_not_permitted`, whatever the id names.
     ///
-    /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots newest-first. Tokens are comma-separated and compose.
+    /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots, oldest first. Tokens are comma-separated and compose.
     ///
     /// Every edge carried on a response is held to the two permissions `GET /edges/{id}` asks for: read on the source item's type, and read on the edge type. A block whose edges all fail is left out rather than returned empty, so a response can carry fewer kinds of relationship than the item has.
     ///
@@ -52,28 +52,28 @@ public protocol APIProtocol: Sendable {
     func updateItem(_ input: Operations.UpdateItem.Input) async throws -> Operations.UpdateItem.Output
     /// Soft delete an item
     ///
-    /// Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    /// Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. Every row a cascading edge such as `parent-of` takes into the bin with it carries `trashed_by_cascade`, and `trashed_with` naming this item to a caller that may read its type, and its `item.deleted` frame says so too. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
     ///
     /// - Remark: HTTP `DELETE /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)`.
     func deleteItem(_ input: Operations.DeleteItem.Input) async throws -> Operations.DeleteItem.Output
     /// Restore a trashed item
     ///
-    /// Restores a trashed item to active. Trashed items are auto-purged after the retention window, so a restore only succeeds while the row still exists.
+    /// Restores a trashed item to active, and with it every row its trash took through a cascading edge such as `parent-of`, each announced `item.restored` with `restored_with` naming this item to a subscriber that may read its type; a row that was already in the bin when it was trashed stays there. Trashed items are auto-purged after the retention window, so a restore only succeeds while the row still exists.
     ///
     /// - Remark: HTTP `POST /items/{id}/restore`.
     /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)`.
     func restoreItem(_ input: Operations.RestoreItem.Input) async throws -> Operations.RestoreItem.Output
     /// Transition item state
     ///
-    /// Moves the item to the supplied lifecycle state. Going straight from trashed to archived is rejected — restore to active first.
+    /// Moves the item to the supplied lifecycle state. Going straight from trashed to archived is rejected — restore to active first. A move from trashed to active brings back every row the item's trash took through a cascading edge, as a restore does, each announced `item.restored` with `restored_with` naming this item to a subscriber that may read its type.
     ///
     /// - Remark: HTTP `POST /items/{id}/transition`.
     /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)`.
     func transitionItem(_ input: Operations.TransitionItem.Input) async throws -> Operations.TransitionItem.Output
     /// List item versions
     ///
-    /// Returns the version-snapshot history for one item, newest first. Older snapshots are thinned on a rolling schedule and the most recent is never dropped, so the history is not guaranteed to be contiguous.
+    /// Returns the version-snapshot history for one item, oldest first. Older snapshots are thinned on a rolling schedule and the most recent is never dropped, so the history is not guaranteed to be contiguous.
     ///
     /// - Remark: HTTP `GET /items/{id}/versions`.
     /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)`.
@@ -108,7 +108,9 @@ public protocol APIProtocol: Sendable {
     func addItemTags(_ input: Operations.AddItemTags.Input) async throws -> Operations.AddItemTags.Output
     /// Permanently delete an item
     ///
-    /// Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible, and requires `items.purge`. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    /// Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible, and requires `items.purge` and write on the item's type. Each edge it takes is announced `edge.deleted` with `purged_with` naming this item. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    ///
+    /// The purge leaves tombstones under the item's type: its link, where the type names a `link_field` and the row held a value there, and its natural key, where it had one, each with the purge time as `purged_at` and `settled_at`. `POST /items/lookup` reads them and `POST /items/tombstones` moves `settled_at` later; an item that later holds the same link in the type, or the same natural key in any type, removes the one it matches. Nothing else sweeps them but deleting the type.
     ///
     /// - Remark: HTTP `DELETE /items/{id}/purge`.
     /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)`.
@@ -128,6 +130,8 @@ public protocol APIProtocol: Sendable {
     ///
     /// An ordinary update is validated too, against the row's own type and on the properties the write would leave on it rather than on the body alone, so a patch removing a required field is refused even though it names no invalid value. A refusal is an `errored` entry under `invalid_properties`; with the default `atomic` it rolls the page back instead, carrying that code in `details.code`. An entry may also carry the `version` it was based on, which makes its upsert conditional and is refused the same two ways.
     ///
+    /// Where the entry's type names a `link_field`, an entry that would give its row a value another item of the type holds, in any state, is refused `link_taken` with `details.existing_id` naming the holder, on a create and an update alike, and the same two ways.
+    ///
     /// Where the instance's strict-mode lever names the type, a property the type does not declare is refused `400 invalid_properties` with `details.code` `unknown_property`, judged on the properties this request carries. It is asked of every entry, on the rows this call creates and the rows it updates alike, and `details.index` names the entry it came from.
     ///
     /// - Remark: HTTP `POST /items/bulk`.
@@ -135,7 +139,7 @@ public protocol APIProtocol: Sendable {
     func bulkUpsertItems(_ input: Operations.BulkUpsertItems.Input) async throws -> Operations.BulkUpsertItems.Output
     /// Apply a bulk action
     ///
-    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error.
+    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item.
     ///
     /// Unrecognized fields are refused with `400` rather than ignored, in the request body and inside `filter` alike: a dropped filter field is not a narrower match set but every item, and a dropped `dry_run` is the action running for real. A field of your own must start with `_`, which is always ignored.
     ///
@@ -158,37 +162,57 @@ public protocol APIProtocol: Sendable {
     func cancelBulkActionJob(_ input: Operations.CancelBulkActionJob.Input) async throws -> Operations.CancelBulkActionJob.Output
     /// Bulk get items by id
     ///
-    /// Reads up to 100 items by id in one round-trip, permission-filtered exactly like the single-item GET: ids the caller cannot read (type not permitted, trashed, or missing) are silently omitted rather than erroring the whole request. Optional `include` takes the same tokens as GET /items: `edges`, `metadata` and `extensions` hydrate an extra inline, while `system` widens the result to include `system.*` items, which are omitted by default.
+    /// Reads up to 100 items by id in one round-trip, permission-filtered exactly like the single-item GET: ids the caller cannot read (type not permitted, trashed, or missing) are silently omitted rather than erroring the whole request, and the rest come back in the order the request named them, each once. Optional `include` takes the same tokens as GET /items: `edges`, `metadata` and `extensions` hydrate an extra inline, while `system` widens the result to include `system.*` items, which are omitted by default.
     ///
     /// Every edge carried on a response is held to the two permissions `GET /edges/{id}` asks for: read on the source item's type, and read on the edge type. A block whose edges all fail is left out rather than returned empty, so a response can carry fewer kinds of relationship than the item has.
     ///
     /// - Remark: HTTP `POST /items/bulk-get`.
     /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)`.
     func bulkGetItems(_ input: Operations.BulkGetItems.Input) async throws -> Operations.BulkGetItems.Output
+    /// Look items up by link, natural key or id
+    ///
+    /// Finds rows by one selector, in every state, the bin included, and answers the tombstones purges left for the keys it names. Name exactly one of `links`, `source` with `source_ids`, or `ids`, at most 500 values.
+    ///
+    /// - `links`: the rows of `type` holding those values in the type's `link_field`, which `type` must name. Rows of a subtype are not among them; a subtype names its own link.
+    /// - `source` and `source_ids`: the rows holding those natural keys, whatever their type, so a row retyped since it was written is found.
+    /// - `ids`: the rows with those ids, whatever their type.
+    ///
+    /// A row whose type the credential may not read is left out, as are `system.*` rows. `tombstones` answers, for each link or natural key named, what the purge of the row holding it recorded under `type`, and is empty by `ids` and to a credential that may not read `type`. A key held by a row again has no tombstone. A read: nothing is announced or audited.
+    ///
+    /// - Remark: HTTP `POST /items/lookup`.
+    /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)`.
+    func lookupItems(_ input: Operations.LookupItems.Input) async throws -> Operations.LookupItems.Output
+    /// Move tombstones' settled time later
+    ///
+    /// Moves the `settled_at` of the tombstones purges left under `type` to `settled_at`, for each named link or natural key whose tombstone holds an earlier time; a later one stands, so the time only ever moves later. An entry from the vendor naming a purged key comes back as a new row only if the vendor changed it after `settled_at`. A connector whose own carrying of the purge changed the vendor's copy, closing an issue it cannot delete say, moves the time to that change, so its own close does not bring the row back. Name exactly one of `links` or `source` with `source_ids`, at most 500 values. Needs write on `type`, and `source` is held as an item write holds it: the credential's own, or one its key claims.
+    ///
+    /// - Remark: HTTP `POST /items/tombstones`.
+    /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)`.
+    func settleTombstones(_ input: Operations.SettleTombstones.Input) async throws -> Operations.SettleTombstones.Output
     /// List extension namespaces for an item
     ///
-    /// Returns every extension namespace attached to the item that the caller has permission to read. Namespaces the credential doesn't declare in its `extension_permissions` map are silently filtered out.
+    /// Returns every extension namespace attached to the item that the caller has permission to read. Requires read on the item's type: an item of a type the caller may not read answers `404 item_not_found`, as `GET /items/{id}` answers it. Namespaces the credential doesn't declare in its `extension_permissions` map are silently filtered out.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)`.
     func listItemExtensions(_ input: Operations.ListItemExtensions.Input) async throws -> Operations.ListItemExtensions.Output
     /// Get an extension namespace
     ///
-    /// Returns the JSON payload for one extension namespace on the item. Missing `read` permission on the namespace returns `403 forbidden`, regardless of the caller's type access to the parent item.
+    /// Returns the JSON payload for one extension namespace on the item. Two gates, in order: read on the item's type, where an item of a type the caller may not read answers `404 item_not_found` as `GET /items/{id}` answers it, and then read on the namespace, refused `403 forbidden` whatever the caller holds on the type.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
     func getItemExtension(_ input: Operations.GetItemExtension.Input) async throws -> Operations.GetItemExtension.Output
     /// Replace an extension namespace
     ///
-    /// Replaces the JSON payload for one extension namespace on the item, requiring `write` on that namespace. The body is capped at 100KB, and the reserved namespaces `core`, `marfa` and `system` are refused to every credential. A successful write publishes `metadata.changed` carrying the item and its whole metadata row, so realtime subscribers and webhooks hear it as they do a tag change. No namespace is exempt from the announcement.
+    /// Replaces the JSON payload for one extension namespace on the item, requiring write on the item's type, refused `403 type_not_permitted` as `PATCH /items/{id}` refuses it where the caller may read the type, while an item of a type it may not read answers `404 item_not_found` as a missing one, and then `write` on that namespace, refused `403 forbidden`. The body is capped at 100KB, and the reserved namespaces `core`, `marfa` and `system` are refused to every credential. A successful write publishes `metadata.changed` carrying the item and its whole metadata row, so realtime subscribers and webhooks hear it as they do a tag change. No namespace is exempt from the announcement.
     ///
     /// - Remark: HTTP `PUT /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)`.
     func replaceItemExtension(_ input: Operations.ReplaceItemExtension.Input) async throws -> Operations.ReplaceItemExtension.Output
     /// Delete an extension namespace
     ///
-    /// Removes one extension namespace from the item, requiring `write` on that namespace. Idempotent — deleting a namespace that doesn't exist returns 200 with the unchanged extensions response. Every call publishes `metadata.changed` carrying the item and its whole metadata row, including one that removes nothing, exactly as a tag write that changes nothing still publishes. No namespace is exempt from the announcement.
+    /// Removes one extension namespace from the item, requiring write on the item's type, refused `403 type_not_permitted` as `PATCH /items/{id}` refuses it where the caller may read the type, while an item of a type it may not read answers `404 item_not_found` as a missing one, and then `write` on that namespace, refused `403 forbidden`. Idempotent — deleting a namespace that doesn't exist returns 200 with the unchanged extensions response. Every call publishes `metadata.changed` carrying the item and its whole metadata row, including one that removes nothing, exactly as a tag write that changes nothing still publishes. No namespace is exempt from the announcement.
     ///
     /// - Remark: HTTP `DELETE /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)`.
@@ -215,7 +239,7 @@ public protocol APIProtocol: Sendable {
     ///
     /// Edges carry no lifecycle state of their own and are never hidden by the state of the items they join, so this listing has no `state` parameter and needs none: an edge whose endpoints are in the bin is returned like any other. That is deliberate — a client reconciling its copy has to see those edges rather than watch them disappear.
     ///
-    /// Removals are a different question and this read cannot answer it. A deleted edge leaves no row and no tombstone, so nothing here distinguishes one that was removed from one that never existed. The event stream carries the deletions; a client that reconciles completely needs both channels.
+    /// Removals are a different question and this read cannot answer it. A deleted edge leaves no row and no record of itself, so nothing here distinguishes one that was removed from one that never existed. The event stream carries the deletions; a client that reconciles completely needs both channels.
     ///
     /// Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
@@ -224,21 +248,25 @@ public protocol APIProtocol: Sendable {
     func listEdges(_ input: Operations.ListEdges.Input) async throws -> Operations.ListEdges.Output
     /// Create an edge
     ///
-    /// Creates a single typed edge between two existing items. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time. A caller may supply the edge `id`, as `POST /items` allows for an item, so a client that mints ids locally keeps its own identifier for the row; omit it and the server mints one. An `id` already naming this exact edge is treated as a repeat of a create the server already performed: nothing is written, no event is published, and the stored edge comes back with `acknowledged: true` and status 200. An `id` naming a different edge is refused with 409 `conflict`.
+    /// Creates a single typed edge between two existing items. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time. A source or a target whose type the caller may not read is answered exactly as a missing one, `404 item_not_found`, before any gate or constraint reads it, so the answer says nothing of whether it exists or what type it is. A caller may supply the edge `id`, as `POST /items` allows for an item, so a client that mints ids locally keeps its own identifier for the row; omit it and the server mints one. An `id` already naming this exact edge is treated as a repeat of a create the server already performed: nothing is written, no event is published, and the stored edge comes back with `acknowledged: true` and status 200. An `id` naming a different edge is refused with 409 `id_reused`, and one naming an edge the caller may not read says the id is taken and nothing of that edge.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
     func createEdge(_ input: Operations.CreateEdge.Input) async throws -> Operations.CreateEdge.Output
     /// Get an edge
     ///
-    /// Returns one edge by its id. The other ways to read an edge all need something the caller may not have: every edge filtered by type, or the outbound and inbound listings on an item, which require knowing an endpoint. A client holding only an edge id -- one whose queued update was refused, or whose event arrived before its endpoints did -- could otherwise only scan.
+    /// Returns one edge by its id; an edge whose edge type or source item the caller may not read answers `404 edge_not_found`, exactly as a missing one. The other ways to read an edge all need something the caller may not have: every edge filtered by type, or the outbound and inbound listings on an item, which require knowing an endpoint. A client holding only an edge id -- one whose queued update was refused, or whose event arrived before its endpoints did -- could otherwise only scan.
     ///
     /// - Remark: HTTP `GET /edges/{id}`.
     /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)`.
     func getEdge(_ input: Operations.GetEdge.Input) async throws -> Operations.GetEdge.Output
     /// Update an edge
     ///
-    /// Updates an edge's properties. Properties merge shallowly with what the edge already holds, as they do on items, so a call naming one property leaves the others standing; there is no replace mode and no way to remove a single property: sending `null` stores a null rather than clearing the key, and deleting the edge to recreate it restarts its version at 1 and emits a delete and a create rather than an update. An edge's property set can therefore only grow. The identity fields (edge type, source, and target) are immutable, so re-pointing an edge means deleting it and creating a new one. `version` is required: a stale value returns 409 carrying the edge as it now stands, and the client re-applies its change over that, and a write naming none is refused 400 `missing_required_field`. The version moves on with every accepted write, and on every update applied rather than only on one that changes the properties — so a bulk upsert that rewrites identical properties still invalidates a version another client is holding.
+    /// Updates an edge's properties, or moves one of its ends, under the version the caller read. Properties merge shallowly with what the edge already holds, as they do on items, so a call naming one property leaves the others standing; there is no replace mode and no way to remove a single property: sending `null` stores a null rather than clearing the key. An edge's property set can therefore only grow.
+    ///
+    /// **Moving an end.** `target_id` moves the edge to another target where its type lets a source hold one edge (`one-to-one`, `many-to-one`), and `source_id` moves it to another source where its type lets a target hold one (`one-to-one`, `one-to-many`): the end that stays holds one edge of the type, and this replaces it. The edge keeps its id and its properties, takes any named here, and moves in one write, so no reader ever sees that end with no edge or with two. The edge as it would stand is judged as a create is: the ends exist, a new source's type is one the caller may write, a target the caller may not read answers exactly as a missing one, `404 item_not_found`, and the type constraints, cardinality at the new end, duplicates and cycles hold. One `edge.updated` announces the move, carrying the edge as it now stands. A type that holds more than one at the end that stays, or a body moving both ends, is refused `400 validation_error`; the edge type never changes.
+    ///
+    /// `version` is required: a stale value returns 409 carrying the edge as it now stands, and the client re-applies its change over that, and a write naming none is refused 400 `missing_required_field`. The version moves on with every accepted write, and on every update applied rather than only on one that changes the properties — so a bulk upsert that rewrites identical properties still invalidates a version another client is holding.
     ///
     /// - Remark: HTTP `PATCH /edges/{id}`.
     /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)`.
@@ -252,21 +280,21 @@ public protocol APIProtocol: Sendable {
     func deleteEdge(_ input: Operations.DeleteEdge.Input) async throws -> Operations.DeleteEdge.Output
     /// Bulk upsert edges
     ///
-    /// Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. An entry that matches an existing row merges its properties over that row's, as `PATCH /edges/{id}` does, so an upsert naming one property leaves the others standing. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and to the edge type.
+    /// Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. An entry that matches an existing row merges its properties over that row's, as `PATCH /edges/{id}` does, so an upsert naming one property leaves the others standing. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and to the edge type. A source or a target whose type the caller may not read is answered as a missing one, as `POST /edges` answers it.
     ///
     /// - Remark: HTTP `POST /edges/bulk`.
     /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)`.
     func bulkUpsertEdges(_ input: Operations.BulkUpsertEdges.Input) async throws -> Operations.BulkUpsertEdges.Output
     /// List edge types
     ///
-    /// Returns every edge type this instance resolves — the eight core types plus any registered through `POST /edge-types` — each with its cardinality, cascade behavior, and source/target type constraints.
+    /// Returns every edge type this instance resolves — the shipped types plus any registered through `POST /edge-types` — each with its cardinality, cascade behavior, source/target type constraints, and the reverse name it declares, if any.
     ///
     /// - Remark: HTTP `GET /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)`.
     func listEdgeTypes(_ input: Operations.ListEdgeTypes.Input) async throws -> Operations.ListEdgeTypes.Output
     /// Register an edge type
     ///
-    /// Registers an edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`. The eight core edge-type names are reserved and reject with a conflict, and a registered edge type is flat with no inheritance.
+    /// Registers an edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`. The shipped edge-type names are reserved and reject with a conflict, as does an id or a `reverse_name` another edge type already holds as either, and a registered edge type is flat with no inheritance.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)`.
@@ -287,7 +315,7 @@ public protocol APIProtocol: Sendable {
     func listTypes(_ input: Operations.ListTypes.Input) async throws -> Operations.ListTypes.Output
     /// Register a type
     ///
-    /// Registers a type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; a reserved root rejects with `403 forbidden`, and ancestor-field redefinitions and property names shadowing first-class `Item` fields reject with `400`. Every credential needs the `metadata.types:write` scope, which is off by default. The operator key is no exception: this door reads the map like any other.
+    /// Registers a type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; a reserved root rejects with `403 forbidden`, and ancestor-field redefinitions and property names shadowing first-class `Item` fields reject with `400`, as does a `link_field` naming anything but a string field the type declares or inherits, or one whose name holds a double quote or a backslash (`invalid_schema`). A type registered under an identifier starts with no tombstones, even those the purge of a row a forced delete left under it recorded. Every credential needs the `metadata.types:write` scope, which is off by default. The operator key is no exception: this door reads the map like any other.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -303,7 +331,7 @@ public protocol APIProtocol: Sendable {
     func getType(_ input: Operations.GetType.Input) async throws -> Operations.GetType.Output
     /// Update a registered type
     ///
-    /// Replaces a registered type's schema, re-running the registration-time correctness rails. Requires `schema.write` — core types are immutable and return 403; the structural diff between versions sets the required version bump, and a mismatch rejects with `422 version_bump_mismatch`.
+    /// Replaces a registered type's schema, re-running the registration-time correctness rails. Requires `schema.write` — core types are immutable and return 403. The replacement keeps whatever `version` it is given, 0 when it names none, and demands no bump. When it names, changes or withdraws a `link_field`, the type's rows in every state are held to the new link at once: two holding one value refuse the replacement `409 link_taken`. The old link's tombstones go with it, since they hold another field's values. A change that would leave a type inheriting from this one linking by a field it no longer declares or inherits, or by one no longer a string, is refused `400 invalid_schema`.
     ///
     /// - Remark: HTTP `PUT /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/put(updateType)`.
@@ -315,6 +343,8 @@ public protocol APIProtocol: Sendable {
     /// Rejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.
     ///
     /// Rejected with `409 type_in_use` if any item of the type still exists in any lifecycle state, the bin included, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 unknown_type`).
+    ///
+    /// The tombstones purges left under the type go with it.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -405,14 +435,14 @@ public protocol APIProtocol: Sendable {
     func runHousekeeping(_ input: Operations.RunHousekeeping.Input) async throws -> Operations.RunHousekeeping.Output
     /// List the registered connectors
     ///
-    /// Every registration, newest first, each with when it last heartbeated and its last run. Any key.
+    /// Every registration, newest first, each with when it last heartbeated, its last run, and until when a process holds it. Any key.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
     func listConnectors(_ input: Operations.ListConnectors.Input) async throws -> Operations.ListConnectors.Output
     /// Register the caller's key as a connector
     ///
-    /// Registers the key this request carries as a connector, with a name and a description, and answers `201`. The key is the identity, one registration per key: the same key registering again updates the name and the description and answers `200` with the same `id`. A session token an app holds is not a key and is refused `403 forbidden`: it is renewed on every refresh, and a registration keyed to one would be orphaned by the next. Nothing runs here; a registration is a name for a process outside the server that heartbeats and reports its runs.
+    /// Registers the key this request carries as a connector, with a name and a description, and answers `201`. The key is the identity, one registration per key: the same key registering again updates the name and the description and answers `200` with the same `id`. A session token an app holds is not a key and is refused `403 forbidden`: it is renewed on every refresh, and a registration keyed to one would be orphaned by the next. The operator key is refused `403 forbidden` too: it runs the instance and never acts as a connector. Nothing runs here; a registration is a name for a process outside the server that heartbeats and reports its runs.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -424,7 +454,7 @@ public protocol APIProtocol: Sendable {
     func getConnector(_ input: Operations.GetConnector.Input) async throws -> Operations.GetConnector.Output
     /// Remove a registration and its runs
     ///
-    /// Removes the registration and every run it reported. The connector's own key or the operator key; another key is refused `403 forbidden`.
+    /// Removes the registration, every run it reported, its hold, and its inbound webhook endpoints with every delivery they stored. The state and the agreements it kept stay with its source, for a later key with the same source. The connector's own key or the operator key; another key is refused `403 forbidden`.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
@@ -450,6 +480,125 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)`.
     func reportConnectorRun(_ input: Operations.ReportConnectorRun.Input) async throws -> Operations.ReportConnectorRun.Output
+    /// List a connector's inbound webhook endpoints
+    ///
+    /// Newest first, retired ones included, each address redacted. The connector's own key or the operator key.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
+    func listInboundEndpoints(_ input: Operations.ListInboundEndpoints.Input) async throws -> Operations.ListInboundEndpoints.Output
+    /// Make an inbound webhook endpoint
+    ///
+    /// Makes an address a sender posts to without a credential, and answers it in full this once; later reads show its last four characters. The connector's own key or the operator key. A registration holds at most 10 live endpoints, and one more is refused `409 conflict`.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
+    func createInboundEndpoint(_ input: Operations.CreateInboundEndpoint.Input) async throws -> Operations.CreateInboundEndpoint.Output
+    /// Retire an inbound webhook endpoint
+    ///
+    /// Its address answers `404` from now on, and it stays listed with `retired_at`. Deliveries it already stored stay readable until they age out. The connector's own key or the operator key.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
+    func retireInboundEndpoint(_ input: Operations.RetireInboundEndpoint.Input) async throws -> Operations.RetireInboundEndpoint.Output
+    /// List a connector's inbound deliveries
+    ///
+    /// Oldest first, the ones not yet handled unless `state` says otherwise, without their bodies. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/deliveries`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)`.
+    func listInboundDeliveries(_ input: Operations.ListInboundDeliveries.Input) async throws -> Operations.ListInboundDeliveries.Output
+    /// Read an inbound delivery's body
+    ///
+    /// The bytes exactly as they arrived, as `application/octet-stream` whatever the sender declared. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/deliveries/{delivery_id}/body`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)`.
+    func getInboundDeliveryBody(_ input: Operations.GetInboundDeliveryBody.Input) async throws -> Operations.GetInboundDeliveryBody.Output
+    /// Mark inbound deliveries handled
+    ///
+    /// Marks each delivery `processed`, `duplicate` or `rejected` and answers them in the order named. The first mark stands, so a repeat answers it again. An id that is not this connector's refuses the whole request and marks nothing. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/deliveries/handled`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)`.
+    func markInboundDeliveriesHandled(_ input: Operations.MarkInboundDeliveriesHandled.Input) async throws -> Operations.MarkInboundDeliveriesHandled.Output
+    /// Take or renew the hold on a registration
+    ///
+    /// Holds the registration for `process` until the server's clock plus the instance's hold window, three minutes unless it names another, and answers until when and whether this renewed a hold the process still held. The process holding it renews it the same way; while another process holds it and its hold has not lapsed, this answers `409 connector_held` and nothing moves. Only the process holding a live hold writes the state and the agreements. A hold is a lock the process takes and gives up: nothing watches it, and a process that stops renewing simply loses it, so one answered `renewed: false` while it believed it held the registration re-reads the state and the agreements before writing again. A top-level field the body does not declare is refused. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/hold`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)`.
+    func holdConnector(_ input: Operations.HoldConnector.Input) async throws -> Operations.HoldConnector.Output
+    /// Release the hold on a registration
+    ///
+    /// Releases the hold if `process` holds it, so another process may take it at once. Answers the same whether or not it did, and leaves another process's hold standing. The connector's own key only.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/hold`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)`.
+    func releaseConnectorHold(_ input: Operations.ReleaseConnectorHold.Input) async throws -> Operations.ReleaseConnectorHold.Output
+    /// Read what a connector keeps on the instance
+    ///
+    /// The state document of the registration's source, which a later key with the same source reads too. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)`.
+    func getConnectorState(_ input: Operations.GetConnectorState.Input) async throws -> Operations.GetConnectorState.Output
+    /// Replace what a connector keeps on the instance
+    ///
+    /// Replaces the state document of the registration's source whole. At most 512 KiB serialized. Taken only from the `process` holding a live hold on the registration; from any other this answers `409 connector_held` and writes nothing, naming the other process's `expires_at` in `details` when one holds it. A top-level field the body does not declare is refused. The connector's own key only.
+    ///
+    /// - Remark: HTTP `PUT /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)`.
+    func replaceConnectorState(_ input: Operations.ReplaceConnectorState.Input) async throws -> Operations.ReplaceConnectorState.Output
+    /// Clear what a connector keeps on the instance
+    ///
+    /// Removes the state document and every agreement of the registration's source, which every registration of that source reads, and writes an audit row against the registration named. No hold fences it. The connector's own key or the operator key.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(clearConnectorState)`.
+    func clearConnectorState(_ input: Operations.ClearConnectorState.Input) async throws -> Operations.ClearConnectorState.Output
+    /// List a connector's agreements
+    ///
+    /// The agreements of the registration's source, the longest unchanged first. A row whose type the key's type map does not read is left out, so a page can be short with a cursor still to follow. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/agreements`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
+    func listConnectorAgreements(_ input: Operations.ListConnectorAgreements.Input) async throws -> Operations.ListConnectorAgreements.Output
+    /// Write a connector's agreements about rows
+    ///
+    /// Writes and removes the connector's records of what it and its vendor last agreed about rows, one per row for the registration's source: at most 500 in each list, each record at most 16 KiB serialized, and no row named twice. A row that is not stored, or whose type the key's type map does not read, is skipped and named in `skipped`; a trashed row is stored. A top-level field the body does not declare is refused. A record announces nothing and leaves the row, its `updated_at` and its version as they were. Taken only from the `process` holding a live hold on the registration; from any other this answers `409 connector_held` and writes nothing, naming the other process's `expires_at` in `details` when one holds it. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/agreements`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)`.
+    func writeConnectorAgreements(_ input: Operations.WriteConnectorAgreements.Input) async throws -> Operations.WriteConnectorAgreements.Output
+    /// Read a connector's agreements about named rows
+    ///
+    /// The agreements of the rows named that have one, each row once, in the order first named; at most 500 ids. A row whose type the key's type map does not read is left out. A top-level field the body does not declare is refused. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/agreements/find`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/agreements/find/post(findConnectorAgreements)`.
+    func findConnectorAgreements(_ input: Operations.FindConnectorAgreements.Input) async throws -> Operations.FindConnectorAgreements.Output
+    /// Create a folder
+    ///
+    /// Creates a `system.folder` item holding a folder's settings and publishes it as `item.created`. Needs write on `system.folder` in the credential's type map; the item doors refuse every `system.*` write whatever the credential holds. Each setting is validated before the write, and a refusal names it.
+    ///
+    /// - Remark: HTTP `POST /folders`.
+    /// - Remark: Generated from `#/paths//folders/post(createFolder)`.
+    func createFolder(_ input: Operations.CreateFolder.Input) async throws -> Operations.CreateFolder.Output
+    /// Change a folder's settings
+    ///
+    /// Changes the settings named in the body, each replaced whole, and publishes the folder as `item.updated`. `version` is required: at a stale version a change to a setting nobody changed since merges, and one to a setting changed since answers `409 version_conflict` with `conflicting_fields` naming it. This door takes no `conflict` parameter, so a stale change to the same setting is refused whatever the query says. A revoked folder does not change.
+    ///
+    /// - Remark: HTTP `PATCH /folders/{id}`.
+    /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
+    func updateFolder(_ input: Operations.UpdateFolder.Input) async throws -> Operations.UpdateFolder.Output
+    /// Revoke a folder
+    ///
+    /// Moves the folder to `revoked`, its terminal state, stamps `revoked_at`, and publishes it as `item.state_changed`. Items placed in it keep their `in-folder` edges.
+    ///
+    /// - Remark: HTTP `POST /folders/{id}/revoke`.
+    /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)`.
+    func revokeFolder(_ input: Operations.RevokeFolder.Input) async throws -> Operations.RevokeFolder.Output
     /// List API keys
     ///
     /// Returns every API key without plaintext, which is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.
@@ -509,7 +658,7 @@ public protocol APIProtocol: Sendable {
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
     /// Restore types, items, edges, metadata, and blobs from an archive
     ///
-    /// Ingests a `marfa-archive-v2.tar.gz` produced by `GET /export?format=archive`. The archive's type and edge-type registrations are validated and registered first, so a restore into an empty instance can write the items that use them; a registration the instance already holds identically is skipped, and one it holds differently fails the whole restore with `409` naming every clashing id. Item ids are preserved so restored edges resolve; an id or natural-key collision counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Version *history* — the per-version snapshots behind `GET /items/{id}?include=versions` — and row timestamps are re-stamped, not carried.
+    /// Ingests a `marfa-archive-v0.tar.gz` produced by `GET /export?format=archive`. The archive's type and edge-type registrations are validated and registered first, so a restore into an empty instance can write the items that use them; a registration the instance already holds identically is skipped, and one it holds differently fails the whole restore with `409` naming every clashing id. Item ids are preserved so restored edges resolve; an id or natural-key collision, or a link another item of the row's type holds, counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Version *history* — the per-version snapshots behind `GET /items/{id}?include=versions` — and row timestamps are re-stamped, not carried.
     ///
     /// - Remark: HTTP `POST /admin/restore-archive`.
     /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)`.
@@ -544,7 +693,7 @@ public protocol APIProtocol: Sendable {
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
     /// Export data
     ///
-    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v2.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and blob bytes that `POST /admin/restore-archive` can ingest. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
+    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and blob bytes that `POST /admin/restore-archive` can ingest. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
@@ -617,6 +766,8 @@ public protocol APIProtocol: Sendable {
     ///
     /// The cursor is a position in one ascending sequence, and `type` and `edges` select a subset of that sequence rather than reordering it, so a cursor taken under one filter can be replayed under another without skipping or repeating a row.
     ///
+    /// An item frame carries `type` and `item`, and an edge frame `type` and `edge`. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
+    ///
     /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame — `{ "type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }` — and closes. `reason` says which of a failed catch-up, an overflowing catch-up buffer, or a failed item or edge subscription ended it. Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
     ///
     /// - Remark: HTTP `GET /events`.
@@ -680,9 +831,9 @@ extension APIProtocol {
     }
     /// Get an item
     ///
-    /// Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. A row that is not stored answers 404. A row whose type the credential's type map does not reach answers `403 type_not_permitted`, which is read after the row, so the two are distinguishable.
+    /// Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. A row that is not stored answers 404, and so does a row whose type the credential's type map does not reach, with the same code and message, so the answer says nothing of whether the row exists or what type it is. A credential whose map reaches no type at all is refused `403 type_not_permitted`, whatever the id names.
     ///
-    /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots newest-first. Tokens are comma-separated and compose.
+    /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots, oldest first. Tokens are comma-separated and compose.
     ///
     /// Every edge carried on a response is held to the two permissions `GET /edges/{id}` asks for: read on the source item's type, and read on the edge type. A block whose edges all fail is left out rather than returned empty, so a response can carry fewer kinds of relationship than the item has.
     ///
@@ -720,7 +871,7 @@ extension APIProtocol {
     }
     /// Soft delete an item
     ///
-    /// Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    /// Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. Every row a cascading edge such as `parent-of` takes into the bin with it carries `trashed_by_cascade`, and `trashed_with` naming this item to a caller that may read its type, and its `item.deleted` frame says so too. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
     ///
     /// - Remark: HTTP `DELETE /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)`.
@@ -735,7 +886,7 @@ extension APIProtocol {
     }
     /// Restore a trashed item
     ///
-    /// Restores a trashed item to active. Trashed items are auto-purged after the retention window, so a restore only succeeds while the row still exists.
+    /// Restores a trashed item to active, and with it every row its trash took through a cascading edge such as `parent-of`, each announced `item.restored` with `restored_with` naming this item to a subscriber that may read its type; a row that was already in the bin when it was trashed stays there. Trashed items are auto-purged after the retention window, so a restore only succeeds while the row still exists.
     ///
     /// - Remark: HTTP `POST /items/{id}/restore`.
     /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)`.
@@ -750,7 +901,7 @@ extension APIProtocol {
     }
     /// Transition item state
     ///
-    /// Moves the item to the supplied lifecycle state. Going straight from trashed to archived is rejected — restore to active first.
+    /// Moves the item to the supplied lifecycle state. Going straight from trashed to archived is rejected — restore to active first. A move from trashed to active brings back every row the item's trash took through a cascading edge, as a restore does, each announced `item.restored` with `restored_with` naming this item to a subscriber that may read its type.
     ///
     /// - Remark: HTTP `POST /items/{id}/transition`.
     /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)`.
@@ -767,7 +918,7 @@ extension APIProtocol {
     }
     /// List item versions
     ///
-    /// Returns the version-snapshot history for one item, newest first. Older snapshots are thinned on a rolling schedule and the most recent is never dropped, so the history is not guaranteed to be contiguous.
+    /// Returns the version-snapshot history for one item, oldest first. Older snapshots are thinned on a rolling schedule and the most recent is never dropped, so the history is not guaranteed to be contiguous.
     ///
     /// - Remark: HTTP `GET /items/{id}/versions`.
     /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)`.
@@ -848,7 +999,9 @@ extension APIProtocol {
     }
     /// Permanently delete an item
     ///
-    /// Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible, and requires `items.purge`. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    /// Hard-deletes the item and its edges, metadata, extensions, and attachment references — irreversible, and requires `items.purge` and write on the item's type. Each edge it takes is announced `edge.deleted` with `purged_with` naming this item. Content-addressed blob bytes are retained if other items still reference them; most clients want the soft-delete endpoint instead. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    ///
+    /// The purge leaves tombstones under the item's type: its link, where the type names a `link_field` and the row held a value there, and its natural key, where it had one, each with the purge time as `purged_at` and `settled_at`. `POST /items/lookup` reads them and `POST /items/tombstones` moves `settled_at` later; an item that later holds the same link in the type, or the same natural key in any type, removes the one it matches. Nothing else sweeps them but deleting the type.
     ///
     /// - Remark: HTTP `DELETE /items/{id}/purge`.
     /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)`.
@@ -884,6 +1037,8 @@ extension APIProtocol {
     ///
     /// An ordinary update is validated too, against the row's own type and on the properties the write would leave on it rather than on the body alone, so a patch removing a required field is refused even though it names no invalid value. A refusal is an `errored` entry under `invalid_properties`; with the default `atomic` it rolls the page back instead, carrying that code in `details.code`. An entry may also carry the `version` it was based on, which makes its upsert conditional and is refused the same two ways.
     ///
+    /// Where the entry's type names a `link_field`, an entry that would give its row a value another item of the type holds, in any state, is refused `link_taken` with `details.existing_id` naming the holder, on a create and an update alike, and the same two ways.
+    ///
     /// Where the instance's strict-mode lever names the type, a property the type does not declare is refused `400 invalid_properties` with `details.code` `unknown_property`, judged on the properties this request carries. It is asked of every entry, on the rows this call creates and the rows it updates alike, and `details.index` names the entry it came from.
     ///
     /// - Remark: HTTP `POST /items/bulk`.
@@ -899,7 +1054,7 @@ extension APIProtocol {
     }
     /// Apply a bulk action
     ///
-    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error.
+    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item.
     ///
     /// Unrecognized fields are refused with `400` rather than ignored, in the request body and inside `filter` alike: a dropped filter field is not a narrower match set but every item, and a dropped `dry_run` is the action running for real. A field of your own must start with `_`, which is always ignored.
     ///
@@ -946,7 +1101,7 @@ extension APIProtocol {
     }
     /// Bulk get items by id
     ///
-    /// Reads up to 100 items by id in one round-trip, permission-filtered exactly like the single-item GET: ids the caller cannot read (type not permitted, trashed, or missing) are silently omitted rather than erroring the whole request. Optional `include` takes the same tokens as GET /items: `edges`, `metadata` and `extensions` hydrate an extra inline, while `system` widens the result to include `system.*` items, which are omitted by default.
+    /// Reads up to 100 items by id in one round-trip, permission-filtered exactly like the single-item GET: ids the caller cannot read (type not permitted, trashed, or missing) are silently omitted rather than erroring the whole request, and the rest come back in the order the request named them, each once. Optional `include` takes the same tokens as GET /items: `edges`, `metadata` and `extensions` hydrate an extra inline, while `system` widens the result to include `system.*` items, which are omitted by default.
     ///
     /// Every edge carried on a response is held to the two permissions `GET /edges/{id}` asks for: read on the source item's type, and read on the edge type. A block whose edges all fail is left out rather than returned empty, so a response can carry fewer kinds of relationship than the item has.
     ///
@@ -961,9 +1116,45 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// Look items up by link, natural key or id
+    ///
+    /// Finds rows by one selector, in every state, the bin included, and answers the tombstones purges left for the keys it names. Name exactly one of `links`, `source` with `source_ids`, or `ids`, at most 500 values.
+    ///
+    /// - `links`: the rows of `type` holding those values in the type's `link_field`, which `type` must name. Rows of a subtype are not among them; a subtype names its own link.
+    /// - `source` and `source_ids`: the rows holding those natural keys, whatever their type, so a row retyped since it was written is found.
+    /// - `ids`: the rows with those ids, whatever their type.
+    ///
+    /// A row whose type the credential may not read is left out, as are `system.*` rows. `tombstones` answers, for each link or natural key named, what the purge of the row holding it recorded under `type`, and is empty by `ids` and to a credential that may not read `type`. A key held by a row again has no tombstone. A read: nothing is announced or audited.
+    ///
+    /// - Remark: HTTP `POST /items/lookup`.
+    /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)`.
+    public func lookupItems(
+        headers: Operations.LookupItems.Input.Headers = .init(),
+        body: Operations.LookupItems.Input.Body? = nil
+    ) async throws -> Operations.LookupItems.Output {
+        try await lookupItems(Operations.LookupItems.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Move tombstones' settled time later
+    ///
+    /// Moves the `settled_at` of the tombstones purges left under `type` to `settled_at`, for each named link or natural key whose tombstone holds an earlier time; a later one stands, so the time only ever moves later. An entry from the vendor naming a purged key comes back as a new row only if the vendor changed it after `settled_at`. A connector whose own carrying of the purge changed the vendor's copy, closing an issue it cannot delete say, moves the time to that change, so its own close does not bring the row back. Name exactly one of `links` or `source` with `source_ids`, at most 500 values. Needs write on `type`, and `source` is held as an item write holds it: the credential's own, or one its key claims.
+    ///
+    /// - Remark: HTTP `POST /items/tombstones`.
+    /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)`.
+    public func settleTombstones(
+        headers: Operations.SettleTombstones.Input.Headers = .init(),
+        body: Operations.SettleTombstones.Input.Body? = nil
+    ) async throws -> Operations.SettleTombstones.Output {
+        try await settleTombstones(Operations.SettleTombstones.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// List extension namespaces for an item
     ///
-    /// Returns every extension namespace attached to the item that the caller has permission to read. Namespaces the credential doesn't declare in its `extension_permissions` map are silently filtered out.
+    /// Returns every extension namespace attached to the item that the caller has permission to read. Requires read on the item's type: an item of a type the caller may not read answers `404 item_not_found`, as `GET /items/{id}` answers it. Namespaces the credential doesn't declare in its `extension_permissions` map are silently filtered out.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)`.
@@ -978,7 +1169,7 @@ extension APIProtocol {
     }
     /// Get an extension namespace
     ///
-    /// Returns the JSON payload for one extension namespace on the item. Missing `read` permission on the namespace returns `403 forbidden`, regardless of the caller's type access to the parent item.
+    /// Returns the JSON payload for one extension namespace on the item. Two gates, in order: read on the item's type, where an item of a type the caller may not read answers `404 item_not_found` as `GET /items/{id}` answers it, and then read on the namespace, refused `403 forbidden` whatever the caller holds on the type.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
@@ -993,7 +1184,7 @@ extension APIProtocol {
     }
     /// Replace an extension namespace
     ///
-    /// Replaces the JSON payload for one extension namespace on the item, requiring `write` on that namespace. The body is capped at 100KB, and the reserved namespaces `core`, `marfa` and `system` are refused to every credential. A successful write publishes `metadata.changed` carrying the item and its whole metadata row, so realtime subscribers and webhooks hear it as they do a tag change. No namespace is exempt from the announcement.
+    /// Replaces the JSON payload for one extension namespace on the item, requiring write on the item's type, refused `403 type_not_permitted` as `PATCH /items/{id}` refuses it where the caller may read the type, while an item of a type it may not read answers `404 item_not_found` as a missing one, and then `write` on that namespace, refused `403 forbidden`. The body is capped at 100KB, and the reserved namespaces `core`, `marfa` and `system` are refused to every credential. A successful write publishes `metadata.changed` carrying the item and its whole metadata row, so realtime subscribers and webhooks hear it as they do a tag change. No namespace is exempt from the announcement.
     ///
     /// - Remark: HTTP `PUT /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)`.
@@ -1010,7 +1201,7 @@ extension APIProtocol {
     }
     /// Delete an extension namespace
     ///
-    /// Removes one extension namespace from the item, requiring `write` on that namespace. Idempotent — deleting a namespace that doesn't exist returns 200 with the unchanged extensions response. Every call publishes `metadata.changed` carrying the item and its whole metadata row, including one that removes nothing, exactly as a tag write that changes nothing still publishes. No namespace is exempt from the announcement.
+    /// Removes one extension namespace from the item, requiring write on the item's type, refused `403 type_not_permitted` as `PATCH /items/{id}` refuses it where the caller may read the type, while an item of a type it may not read answers `404 item_not_found` as a missing one, and then `write` on that namespace, refused `403 forbidden`. Idempotent — deleting a namespace that doesn't exist returns 200 with the unchanged extensions response. Every call publishes `metadata.changed` carrying the item and its whole metadata row, including one that removes nothing, exactly as a tag write that changes nothing still publishes. No namespace is exempt from the announcement.
     ///
     /// - Remark: HTTP `DELETE /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)`.
@@ -1065,7 +1256,7 @@ extension APIProtocol {
     ///
     /// Edges carry no lifecycle state of their own and are never hidden by the state of the items they join, so this listing has no `state` parameter and needs none: an edge whose endpoints are in the bin is returned like any other. That is deliberate — a client reconciling its copy has to see those edges rather than watch them disappear.
     ///
-    /// Removals are a different question and this read cannot answer it. A deleted edge leaves no row and no tombstone, so nothing here distinguishes one that was removed from one that never existed. The event stream carries the deletions; a client that reconciles completely needs both channels.
+    /// Removals are a different question and this read cannot answer it. A deleted edge leaves no row and no record of itself, so nothing here distinguishes one that was removed from one that never existed. The event stream carries the deletions; a client that reconciles completely needs both channels.
     ///
     /// Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
@@ -1082,7 +1273,7 @@ extension APIProtocol {
     }
     /// Create an edge
     ///
-    /// Creates a single typed edge between two existing items. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time. A caller may supply the edge `id`, as `POST /items` allows for an item, so a client that mints ids locally keeps its own identifier for the row; omit it and the server mints one. An `id` already naming this exact edge is treated as a repeat of a create the server already performed: nothing is written, no event is published, and the stored edge comes back with `acknowledged: true` and status 200. An `id` naming a different edge is refused with 409 `conflict`.
+    /// Creates a single typed edge between two existing items. Writes are dual-gated, requiring write permission on both the source item's type and the edge type, and edge-type constraints and cycle rules are enforced at create time. A source or a target whose type the caller may not read is answered exactly as a missing one, `404 item_not_found`, before any gate or constraint reads it, so the answer says nothing of whether it exists or what type it is. A caller may supply the edge `id`, as `POST /items` allows for an item, so a client that mints ids locally keeps its own identifier for the row; omit it and the server mints one. An `id` already naming this exact edge is treated as a repeat of a create the server already performed: nothing is written, no event is published, and the stored edge comes back with `acknowledged: true` and status 200. An `id` naming a different edge is refused with 409 `id_reused`, and one naming an edge the caller may not read says the id is taken and nothing of that edge.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
@@ -1097,7 +1288,7 @@ extension APIProtocol {
     }
     /// Get an edge
     ///
-    /// Returns one edge by its id. The other ways to read an edge all need something the caller may not have: every edge filtered by type, or the outbound and inbound listings on an item, which require knowing an endpoint. A client holding only an edge id -- one whose queued update was refused, or whose event arrived before its endpoints did -- could otherwise only scan.
+    /// Returns one edge by its id; an edge whose edge type or source item the caller may not read answers `404 edge_not_found`, exactly as a missing one. The other ways to read an edge all need something the caller may not have: every edge filtered by type, or the outbound and inbound listings on an item, which require knowing an endpoint. A client holding only an edge id -- one whose queued update was refused, or whose event arrived before its endpoints did -- could otherwise only scan.
     ///
     /// - Remark: HTTP `GET /edges/{id}`.
     /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)`.
@@ -1112,7 +1303,11 @@ extension APIProtocol {
     }
     /// Update an edge
     ///
-    /// Updates an edge's properties. Properties merge shallowly with what the edge already holds, as they do on items, so a call naming one property leaves the others standing; there is no replace mode and no way to remove a single property: sending `null` stores a null rather than clearing the key, and deleting the edge to recreate it restarts its version at 1 and emits a delete and a create rather than an update. An edge's property set can therefore only grow. The identity fields (edge type, source, and target) are immutable, so re-pointing an edge means deleting it and creating a new one. `version` is required: a stale value returns 409 carrying the edge as it now stands, and the client re-applies its change over that, and a write naming none is refused 400 `missing_required_field`. The version moves on with every accepted write, and on every update applied rather than only on one that changes the properties — so a bulk upsert that rewrites identical properties still invalidates a version another client is holding.
+    /// Updates an edge's properties, or moves one of its ends, under the version the caller read. Properties merge shallowly with what the edge already holds, as they do on items, so a call naming one property leaves the others standing; there is no replace mode and no way to remove a single property: sending `null` stores a null rather than clearing the key. An edge's property set can therefore only grow.
+    ///
+    /// **Moving an end.** `target_id` moves the edge to another target where its type lets a source hold one edge (`one-to-one`, `many-to-one`), and `source_id` moves it to another source where its type lets a target hold one (`one-to-one`, `one-to-many`): the end that stays holds one edge of the type, and this replaces it. The edge keeps its id and its properties, takes any named here, and moves in one write, so no reader ever sees that end with no edge or with two. The edge as it would stand is judged as a create is: the ends exist, a new source's type is one the caller may write, a target the caller may not read answers exactly as a missing one, `404 item_not_found`, and the type constraints, cardinality at the new end, duplicates and cycles hold. One `edge.updated` announces the move, carrying the edge as it now stands. A type that holds more than one at the end that stays, or a body moving both ends, is refused `400 validation_error`; the edge type never changes.
+    ///
+    /// `version` is required: a stale value returns 409 carrying the edge as it now stands, and the client re-applies its change over that, and a write naming none is refused 400 `missing_required_field`. The version moves on with every accepted write, and on every update applied rather than only on one that changes the properties — so a bulk upsert that rewrites identical properties still invalidates a version another client is holding.
     ///
     /// - Remark: HTTP `PATCH /edges/{id}`.
     /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)`.
@@ -1144,7 +1339,7 @@ extension APIProtocol {
     }
     /// Bulk upsert edges
     ///
-    /// Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. An entry that matches an existing row merges its properties over that row's, as `PATCH /edges/{id}` does, so an upsert naming one property leaves the others standing. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and to the edge type.
+    /// Creates or upserts up to 5000 edges in one call, matching existing rows on `(source_id, target_id, edge_type)`. An entry that matches an existing row merges its properties over that row's, as `PATCH /edges/{id}` does, so an upsert naming one property leaves the others standing. Atomic by default; the items being wired together must already exist. Requires write access to each edge's source-item type and to the edge type. A source or a target whose type the caller may not read is answered as a missing one, as `POST /edges` answers it.
     ///
     /// - Remark: HTTP `POST /edges/bulk`.
     /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)`.
@@ -1159,7 +1354,7 @@ extension APIProtocol {
     }
     /// List edge types
     ///
-    /// Returns every edge type this instance resolves — the eight core types plus any registered through `POST /edge-types` — each with its cardinality, cascade behavior, and source/target type constraints.
+    /// Returns every edge type this instance resolves — the shipped types plus any registered through `POST /edge-types` — each with its cardinality, cascade behavior, source/target type constraints, and the reverse name it declares, if any.
     ///
     /// - Remark: HTTP `GET /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)`.
@@ -1168,7 +1363,7 @@ extension APIProtocol {
     }
     /// Register an edge type
     ///
-    /// Registers an edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`. The eight core edge-type names are reserved and reject with a conflict, and a registered edge type is flat with no inheritance.
+    /// Registers an edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`. The shipped edge-type names are reserved and reject with a conflict, as does an id or a `reverse_name` another edge type already holds as either, and a registered edge type is flat with no inheritance.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)`.
@@ -1209,7 +1404,7 @@ extension APIProtocol {
     }
     /// Register a type
     ///
-    /// Registers a type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; a reserved root rejects with `403 forbidden`, and ancestor-field redefinitions and property names shadowing first-class `Item` fields reject with `400`. Every credential needs the `metadata.types:write` scope, which is off by default. The operator key is no exception: this door reads the map like any other.
+    /// Registers a type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; a reserved root rejects with `403 forbidden`, and ancestor-field redefinitions and property names shadowing first-class `Item` fields reject with `400`, as does a `link_field` naming anything but a string field the type declares or inherits, or one whose name holds a double quote or a backslash (`invalid_schema`). A type registered under an identifier starts with no tombstones, even those the purge of a row a forced delete left under it recorded. Every credential needs the `metadata.types:write` scope, which is off by default. The operator key is no exception: this door reads the map like any other.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -1241,7 +1436,7 @@ extension APIProtocol {
     }
     /// Update a registered type
     ///
-    /// Replaces a registered type's schema, re-running the registration-time correctness rails. Requires `schema.write` — core types are immutable and return 403; the structural diff between versions sets the required version bump, and a mismatch rejects with `422 version_bump_mismatch`.
+    /// Replaces a registered type's schema, re-running the registration-time correctness rails. Requires `schema.write` — core types are immutable and return 403. The replacement keeps whatever `version` it is given, 0 when it names none, and demands no bump. When it names, changes or withdraws a `link_field`, the type's rows in every state are held to the new link at once: two holding one value refuse the replacement `409 link_taken`. The old link's tombstones go with it, since they hold another field's values. A change that would leave a type inheriting from this one linking by a field it no longer declares or inherits, or by one no longer a string, is refused `400 invalid_schema`.
     ///
     /// - Remark: HTTP `PUT /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/put(updateType)`.
@@ -1263,6 +1458,8 @@ extension APIProtocol {
     /// Rejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.
     ///
     /// Rejected with `409 type_in_use` if any item of the type still exists in any lifecycle state, the bin included, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 unknown_type`).
+    ///
+    /// The tombstones purges left under the type go with it.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -1437,7 +1634,7 @@ extension APIProtocol {
     }
     /// List the registered connectors
     ///
-    /// Every registration, newest first, each with when it last heartbeated and its last run. Any key.
+    /// Every registration, newest first, each with when it last heartbeated, its last run, and until when a process holds it. Any key.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -1446,7 +1643,7 @@ extension APIProtocol {
     }
     /// Register the caller's key as a connector
     ///
-    /// Registers the key this request carries as a connector, with a name and a description, and answers `201`. The key is the identity, one registration per key: the same key registering again updates the name and the description and answers `200` with the same `id`. A session token an app holds is not a key and is refused `403 forbidden`: it is renewed on every refresh, and a registration keyed to one would be orphaned by the next. Nothing runs here; a registration is a name for a process outside the server that heartbeats and reports its runs.
+    /// Registers the key this request carries as a connector, with a name and a description, and answers `201`. The key is the identity, one registration per key: the same key registering again updates the name and the description and answers `200` with the same `id`. A session token an app holds is not a key and is refused `403 forbidden`: it is renewed on every refresh, and a registration keyed to one would be orphaned by the next. The operator key is refused `403 forbidden` too: it runs the instance and never acts as a connector. Nothing runs here; a registration is a name for a process outside the server that heartbeats and reports its runs.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -1474,7 +1671,7 @@ extension APIProtocol {
     }
     /// Remove a registration and its runs
     ///
-    /// Removes the registration and every run it reported. The connector's own key or the operator key; another key is refused `403 forbidden`.
+    /// Removes the registration, every run it reported, its hold, and its inbound webhook endpoints with every delivery they stored. The state and the agreements it kept stay with its source, for a later key with the same source. The connector's own key or the operator key; another key is refused `403 forbidden`.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
@@ -1534,6 +1731,281 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// List a connector's inbound webhook endpoints
+    ///
+    /// Newest first, retired ones included, each address redacted. The connector's own key or the operator key.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
+    public func listInboundEndpoints(
+        path: Operations.ListInboundEndpoints.Input.Path,
+        headers: Operations.ListInboundEndpoints.Input.Headers = .init()
+    ) async throws -> Operations.ListInboundEndpoints.Output {
+        try await listInboundEndpoints(Operations.ListInboundEndpoints.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Make an inbound webhook endpoint
+    ///
+    /// Makes an address a sender posts to without a credential, and answers it in full this once; later reads show its last four characters. The connector's own key or the operator key. A registration holds at most 10 live endpoints, and one more is refused `409 conflict`.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
+    public func createInboundEndpoint(
+        path: Operations.CreateInboundEndpoint.Input.Path,
+        headers: Operations.CreateInboundEndpoint.Input.Headers = .init(),
+        body: Operations.CreateInboundEndpoint.Input.Body? = nil
+    ) async throws -> Operations.CreateInboundEndpoint.Output {
+        try await createInboundEndpoint(Operations.CreateInboundEndpoint.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Retire an inbound webhook endpoint
+    ///
+    /// Its address answers `404` from now on, and it stays listed with `retired_at`. Deliveries it already stored stay readable until they age out. The connector's own key or the operator key.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
+    public func retireInboundEndpoint(
+        path: Operations.RetireInboundEndpoint.Input.Path,
+        headers: Operations.RetireInboundEndpoint.Input.Headers = .init()
+    ) async throws -> Operations.RetireInboundEndpoint.Output {
+        try await retireInboundEndpoint(Operations.RetireInboundEndpoint.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List a connector's inbound deliveries
+    ///
+    /// Oldest first, the ones not yet handled unless `state` says otherwise, without their bodies. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/deliveries`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)`.
+    public func listInboundDeliveries(
+        path: Operations.ListInboundDeliveries.Input.Path,
+        query: Operations.ListInboundDeliveries.Input.Query = .init(),
+        headers: Operations.ListInboundDeliveries.Input.Headers = .init()
+    ) async throws -> Operations.ListInboundDeliveries.Output {
+        try await listInboundDeliveries(Operations.ListInboundDeliveries.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Read an inbound delivery's body
+    ///
+    /// The bytes exactly as they arrived, as `application/octet-stream` whatever the sender declared. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/deliveries/{delivery_id}/body`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)`.
+    public func getInboundDeliveryBody(
+        path: Operations.GetInboundDeliveryBody.Input.Path,
+        headers: Operations.GetInboundDeliveryBody.Input.Headers = .init()
+    ) async throws -> Operations.GetInboundDeliveryBody.Output {
+        try await getInboundDeliveryBody(Operations.GetInboundDeliveryBody.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Mark inbound deliveries handled
+    ///
+    /// Marks each delivery `processed`, `duplicate` or `rejected` and answers them in the order named. The first mark stands, so a repeat answers it again. An id that is not this connector's refuses the whole request and marks nothing. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/deliveries/handled`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)`.
+    public func markInboundDeliveriesHandled(
+        path: Operations.MarkInboundDeliveriesHandled.Input.Path,
+        headers: Operations.MarkInboundDeliveriesHandled.Input.Headers = .init(),
+        body: Operations.MarkInboundDeliveriesHandled.Input.Body? = nil
+    ) async throws -> Operations.MarkInboundDeliveriesHandled.Output {
+        try await markInboundDeliveriesHandled(Operations.MarkInboundDeliveriesHandled.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Take or renew the hold on a registration
+    ///
+    /// Holds the registration for `process` until the server's clock plus the instance's hold window, three minutes unless it names another, and answers until when and whether this renewed a hold the process still held. The process holding it renews it the same way; while another process holds it and its hold has not lapsed, this answers `409 connector_held` and nothing moves. Only the process holding a live hold writes the state and the agreements. A hold is a lock the process takes and gives up: nothing watches it, and a process that stops renewing simply loses it, so one answered `renewed: false` while it believed it held the registration re-reads the state and the agreements before writing again. A top-level field the body does not declare is refused. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/hold`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)`.
+    public func holdConnector(
+        path: Operations.HoldConnector.Input.Path,
+        headers: Operations.HoldConnector.Input.Headers = .init(),
+        body: Operations.HoldConnector.Input.Body? = nil
+    ) async throws -> Operations.HoldConnector.Output {
+        try await holdConnector(Operations.HoldConnector.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Release the hold on a registration
+    ///
+    /// Releases the hold if `process` holds it, so another process may take it at once. Answers the same whether or not it did, and leaves another process's hold standing. The connector's own key only.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/hold`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)`.
+    public func releaseConnectorHold(
+        path: Operations.ReleaseConnectorHold.Input.Path,
+        query: Operations.ReleaseConnectorHold.Input.Query,
+        headers: Operations.ReleaseConnectorHold.Input.Headers = .init()
+    ) async throws -> Operations.ReleaseConnectorHold.Output {
+        try await releaseConnectorHold(Operations.ReleaseConnectorHold.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Read what a connector keeps on the instance
+    ///
+    /// The state document of the registration's source, which a later key with the same source reads too. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)`.
+    public func getConnectorState(
+        path: Operations.GetConnectorState.Input.Path,
+        headers: Operations.GetConnectorState.Input.Headers = .init()
+    ) async throws -> Operations.GetConnectorState.Output {
+        try await getConnectorState(Operations.GetConnectorState.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Replace what a connector keeps on the instance
+    ///
+    /// Replaces the state document of the registration's source whole. At most 512 KiB serialized. Taken only from the `process` holding a live hold on the registration; from any other this answers `409 connector_held` and writes nothing, naming the other process's `expires_at` in `details` when one holds it. A top-level field the body does not declare is refused. The connector's own key only.
+    ///
+    /// - Remark: HTTP `PUT /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)`.
+    public func replaceConnectorState(
+        path: Operations.ReplaceConnectorState.Input.Path,
+        headers: Operations.ReplaceConnectorState.Input.Headers = .init(),
+        body: Operations.ReplaceConnectorState.Input.Body? = nil
+    ) async throws -> Operations.ReplaceConnectorState.Output {
+        try await replaceConnectorState(Operations.ReplaceConnectorState.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Clear what a connector keeps on the instance
+    ///
+    /// Removes the state document and every agreement of the registration's source, which every registration of that source reads, and writes an audit row against the registration named. No hold fences it. The connector's own key or the operator key.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(clearConnectorState)`.
+    public func clearConnectorState(
+        path: Operations.ClearConnectorState.Input.Path,
+        headers: Operations.ClearConnectorState.Input.Headers = .init()
+    ) async throws -> Operations.ClearConnectorState.Output {
+        try await clearConnectorState(Operations.ClearConnectorState.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List a connector's agreements
+    ///
+    /// The agreements of the registration's source, the longest unchanged first. A row whose type the key's type map does not read is left out, so a page can be short with a cursor still to follow. The connector's own key only.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/agreements`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
+    public func listConnectorAgreements(
+        path: Operations.ListConnectorAgreements.Input.Path,
+        query: Operations.ListConnectorAgreements.Input.Query = .init(),
+        headers: Operations.ListConnectorAgreements.Input.Headers = .init()
+    ) async throws -> Operations.ListConnectorAgreements.Output {
+        try await listConnectorAgreements(Operations.ListConnectorAgreements.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Write a connector's agreements about rows
+    ///
+    /// Writes and removes the connector's records of what it and its vendor last agreed about rows, one per row for the registration's source: at most 500 in each list, each record at most 16 KiB serialized, and no row named twice. A row that is not stored, or whose type the key's type map does not read, is skipped and named in `skipped`; a trashed row is stored. A top-level field the body does not declare is refused. A record announces nothing and leaves the row, its `updated_at` and its version as they were. Taken only from the `process` holding a live hold on the registration; from any other this answers `409 connector_held` and writes nothing, naming the other process's `expires_at` in `details` when one holds it. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/agreements`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)`.
+    public func writeConnectorAgreements(
+        path: Operations.WriteConnectorAgreements.Input.Path,
+        headers: Operations.WriteConnectorAgreements.Input.Headers = .init(),
+        body: Operations.WriteConnectorAgreements.Input.Body? = nil
+    ) async throws -> Operations.WriteConnectorAgreements.Output {
+        try await writeConnectorAgreements(Operations.WriteConnectorAgreements.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Read a connector's agreements about named rows
+    ///
+    /// The agreements of the rows named that have one, each row once, in the order first named; at most 500 ids. A row whose type the key's type map does not read is left out. A top-level field the body does not declare is refused. The connector's own key only.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/agreements/find`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/agreements/find/post(findConnectorAgreements)`.
+    public func findConnectorAgreements(
+        path: Operations.FindConnectorAgreements.Input.Path,
+        headers: Operations.FindConnectorAgreements.Input.Headers = .init(),
+        body: Operations.FindConnectorAgreements.Input.Body? = nil
+    ) async throws -> Operations.FindConnectorAgreements.Output {
+        try await findConnectorAgreements(Operations.FindConnectorAgreements.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Create a folder
+    ///
+    /// Creates a `system.folder` item holding a folder's settings and publishes it as `item.created`. Needs write on `system.folder` in the credential's type map; the item doors refuse every `system.*` write whatever the credential holds. Each setting is validated before the write, and a refusal names it.
+    ///
+    /// - Remark: HTTP `POST /folders`.
+    /// - Remark: Generated from `#/paths//folders/post(createFolder)`.
+    public func createFolder(
+        headers: Operations.CreateFolder.Input.Headers = .init(),
+        body: Operations.CreateFolder.Input.Body? = nil
+    ) async throws -> Operations.CreateFolder.Output {
+        try await createFolder(Operations.CreateFolder.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Change a folder's settings
+    ///
+    /// Changes the settings named in the body, each replaced whole, and publishes the folder as `item.updated`. `version` is required: at a stale version a change to a setting nobody changed since merges, and one to a setting changed since answers `409 version_conflict` with `conflicting_fields` naming it. This door takes no `conflict` parameter, so a stale change to the same setting is refused whatever the query says. A revoked folder does not change.
+    ///
+    /// - Remark: HTTP `PATCH /folders/{id}`.
+    /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
+    public func updateFolder(
+        path: Operations.UpdateFolder.Input.Path,
+        headers: Operations.UpdateFolder.Input.Headers = .init(),
+        body: Operations.UpdateFolder.Input.Body? = nil
+    ) async throws -> Operations.UpdateFolder.Output {
+        try await updateFolder(Operations.UpdateFolder.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Revoke a folder
+    ///
+    /// Moves the folder to `revoked`, its terminal state, stamps `revoked_at`, and publishes it as `item.state_changed`. Items placed in it keep their `in-folder` edges.
+    ///
+    /// - Remark: HTTP `POST /folders/{id}/revoke`.
+    /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)`.
+    public func revokeFolder(
+        path: Operations.RevokeFolder.Input.Path,
+        headers: Operations.RevokeFolder.Input.Headers = .init()
+    ) async throws -> Operations.RevokeFolder.Output {
+        try await revokeFolder(Operations.RevokeFolder.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// List API keys
@@ -1635,7 +2107,7 @@ extension APIProtocol {
     }
     /// Restore types, items, edges, metadata, and blobs from an archive
     ///
-    /// Ingests a `marfa-archive-v2.tar.gz` produced by `GET /export?format=archive`. The archive's type and edge-type registrations are validated and registered first, so a restore into an empty instance can write the items that use them; a registration the instance already holds identically is skipped, and one it holds differently fails the whole restore with `409` naming every clashing id. Item ids are preserved so restored edges resolve; an id or natural-key collision counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Version *history* — the per-version snapshots behind `GET /items/{id}?include=versions` — and row timestamps are re-stamped, not carried.
+    /// Ingests a `marfa-archive-v0.tar.gz` produced by `GET /export?format=archive`. The archive's type and edge-type registrations are validated and registered first, so a restore into an empty instance can write the items that use them; a registration the instance already holds identically is skipped, and one it holds differently fails the whole restore with `409` naming every clashing id. Item ids are preserved so restored edges resolve; an id or natural-key collision, or a link another item of the row's type holds, counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Version *history* — the per-version snapshots behind `GET /items/{id}?include=versions` — and row timestamps are re-stamped, not carried.
     ///
     /// - Remark: HTTP `POST /admin/restore-archive`.
     /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)`.
@@ -1698,7 +2170,7 @@ extension APIProtocol {
     }
     /// Export data
     ///
-    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v2.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and blob bytes that `POST /admin/restore-archive` can ingest. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
+    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and blob bytes that `POST /admin/restore-archive` can ingest. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
@@ -1834,6 +2306,8 @@ extension APIProtocol {
     /// Once the replay is done, and the live frames held while it ran are drained, the stream sends a `stream_live` frame, carrying `{ "type": "stream_live", "cursor": "<event id>" | null }` and no SSE `id:`. It says the prologue is over: everything up to `cursor` has been sent or withheld, and what follows is live. A frame the `type` filter or the credential withholds is not written at all, so a client cannot otherwise tell that it has caught up, and its cursor is one a client may resume from without being sent again what the replay covered. It is null only where no position is known: a head read that outran its budget with nothing to replay. A stream that ends short never sends it.
     ///
     /// The cursor is a position in one ascending sequence, and `type` and `edges` select a subset of that sequence rather than reordering it, so a cursor taken under one filter can be replayed under another without skipping or repeating a row.
+    ///
+    /// An item frame carries `type` and `item`, and an edge frame `type` and `edge`. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
     ///
     /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame — `{ "type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }` — and closes. `reason` says which of a failed catch-up, an overflowing catch-up buffer, or a failed item or edge subscription ended it. Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
     ///
