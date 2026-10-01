@@ -49,8 +49,9 @@ enum Live {
     /// Marks a queued write as sent and blocked for `reason`, as the drain
     /// leaves a write the server refused that way.
     ///
-    /// A live server answers neither reason on cue: one needs a server that
-    /// prunes versions, the other one that will not resolve a conflict.
+    /// Neither reason can be had on cue through the package: one needs a
+    /// server that prunes versions, the other a retype, which `Edit` cannot
+    /// send.
     static func block(_ id: String, in store: URL, reason: String) throws {
         var db: OpaquePointer?
         try #require(sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
@@ -354,24 +355,27 @@ struct LiveServer {
                 Edit(
                     properties: ["title": "never sent"], baseVersion: try #require(try await copy.items.get(id)).version
                 ))
+            let heard = Heard(copy.changes())
+            let told = Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil)
             #expect(try await copy.queue.withdraw(edit.id) == false, "a write that may yet land was withdrawn")
+            try Live.block(edit.id, in: store, reason: "key_spent")
+            #expect(try await copy.queue.withdraw(edit.id) == false, "a write a release can send was withdrawn")
             try Live.block(edit.id, in: store, reason: reason)
             // The witness: a blocked write is laid over its row, so the copy
             // shows the edit until something takes it away.
             #expect(try await copy.items.get(id)?.properties["title"] == "never sent")
+            #expect(!heard.all.contains(told), "a withdraw that took nothing was told")
 
-            let heard = Heard(copy.changes())
             #expect(try await copy.queue.withdraw(edit.id), "a write blocked \(reason) was not withdrawn")
             #expect(try await copy.queue.all().contains { $0.id == edit.id } == false)
             #expect(try await copy.items.get(id)?.properties["title"] == "as the server holds it")
-            try await eventually("the withdraw was told") {
-                heard.all.contains(Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil))
-            }
+            try await eventually("the withdraw was told") { heard.all.contains(told) }
             await #expect {
                 _ = try await copy.queue.withdraw("not-a-queued-write")
             } throws: { error in
                 if case Marfa.MarfaError.notFound = error { true } else { false }
             }
+            try await bounded("close") { await copy.close() }
         }
     }
 
