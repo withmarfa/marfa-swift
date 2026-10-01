@@ -46,6 +46,33 @@ enum Live {
         return id
     }
 
+    /// Marks a queued write as sent and blocked for `reason`, as the drain
+    /// leaves a write the server refused that way.
+    ///
+    /// A live server answers neither reason on cue: one needs a server that
+    /// prunes versions, the other one that will not resolve a conflict.
+    static func block(_ id: String, in store: URL, reason: String) throws {
+        var db: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5_000)
+        let update = """
+            UPDATE queue SET verdict = 'blocked', reason = ?2, refusals = 1, sent = 1,
+                             answered_at = '2026-01-01T00:00:01Z'
+            WHERE id = ?1
+            """
+        var statement: OpaquePointer?
+        try #require(
+            sqlite3_prepare_v2(db, update, -1, &statement, nil) == SQLITE_OK,
+            "\(String(cString: sqlite3_errmsg(db)))")
+        defer { sqlite3_finalize(statement) }
+        let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        sqlite3_bind_text(statement, 1, id, -1, transient)
+        sqlite3_bind_text(statement, 2, reason, -1, transient)
+        try #require(sqlite3_step(statement) == SQLITE_DONE, "\(String(cString: sqlite3_errmsg(db)))")
+        try #require(sqlite3_changes(db) == 1, "no queued write \(id)")
+    }
+
     /// The reason column of one queued write, as the store holds it.
     static func reasonColumn(of id: String, in store: URL) throws -> String? {
         var db: OpaquePointer?
@@ -311,6 +338,41 @@ struct LiveServer {
         #expect(try await unkeyed.queue.release(dead))
         let released = try #require(try await deadRow())
         #expect(released.verdict == nil)
+    }
+
+    /// A write that can never be sent is withdrawn, and the copy shows the
+    /// note as the server holds it; any other write is not.
+    @Test func aWriteThatCanNeverBeSentIsWithdrawn() async throws {
+        for reason in ["ancestor_unavailable", "conflict_unresolved"] {
+            let store = Live.store()
+            let copy = try await Live.hydrated(store)
+            let note = try await copy.items.create(Live.note("as the server holds it"))
+            _ = try await copy.queue.drain()
+            let id = try #require(note.itemId)
+            let edit = try await copy.items.update(
+                id,
+                Edit(
+                    properties: ["title": "never sent"], baseVersion: try #require(try await copy.items.get(id)).version
+                ))
+            #expect(try await copy.queue.withdraw(edit.id) == false, "a write that may yet land was withdrawn")
+            try Live.block(edit.id, in: store, reason: reason)
+            // The witness: a blocked write is laid over its row, so the copy
+            // shows the edit until something takes it away.
+            #expect(try await copy.items.get(id)?.properties["title"] == "never sent")
+
+            let heard = Heard(copy.changes())
+            #expect(try await copy.queue.withdraw(edit.id), "a write blocked \(reason) was not withdrawn")
+            #expect(try await copy.queue.all().contains { $0.id == edit.id } == false)
+            #expect(try await copy.items.get(id)?.properties["title"] == "as the server holds it")
+            try await eventually("the withdraw was told") {
+                heard.all.contains(Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil))
+            }
+            await #expect {
+                _ = try await copy.queue.withdraw("not-a-queued-write")
+            } throws: { error in
+                if case Marfa.MarfaError.notFound = error { true } else { false }
+            }
+        }
     }
 
     @Test func eachWriteIsToldOnceAsTheWriteItWas() async throws {

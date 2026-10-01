@@ -163,6 +163,7 @@ public struct Change: Sendable, Hashable {
         case hydrated
         case caughtUp
         case drained
+        case withdrawn
     }
 
     public let origin: Origin
@@ -399,6 +400,22 @@ public struct Queue: Sendable {
     /// Releases every write blocked for one reason, and says how many.
     public func release(reason: BlockedReason) async throws -> UInt64 {
         try await background { [core] in try core.releaseReason(reason: reason) }
+    }
+
+    /// Takes a write that can never be sent out of the queue, and puts the
+    /// copy back to what the server holds.
+    ///
+    /// Only a write blocked `ancestorUnavailable` or `conflictUnresolved`
+    /// is taken, and `false` says the write was another. A write held for
+    /// the one withdrawn is refused unsent and never released. The row is
+    /// read back from the server first, so a withdraw that cannot reach it
+    /// changes nothing and throws.
+    public func withdraw(_ id: String) async throws -> Bool {
+        let withdrawn = try await background { [core] in try core.withdraw(id: id) }
+        if withdrawn {
+            feed.announce(Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil))
+        }
+        return withdrawn
     }
 
     /// Clears the writes the server has answered, and says how many went.
