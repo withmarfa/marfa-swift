@@ -887,6 +887,8 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     
     func edgesFrom(id: String) throws  -> [Edge]
     
+    func edgesOfType(edgeType: String) throws  -> [Edge]
+    
     func edgesTo(id: String) throws  -> [Edge]
     
     /**
@@ -998,6 +1000,14 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
      * merges the change against.
      */
     func updateItemAsRead(id: String, edit: Edit) throws  -> QueuedWrite
+    
+    /**
+     * Takes a write blocked `ancestor_unavailable` or `conflict_unresolved`
+     * out of the queue, and puts the copy back to what the server holds;
+     * each write held for it is refused unsent. Answers whether the row was
+     * one a withdraw takes.
+     */
+    func withdraw(id: String) throws  -> Bool
     
     /**
      * Writes one extension namespace, as its own write. The body is one
@@ -1233,6 +1243,15 @@ open func edgesFrom(id: String)throws  -> [Edge]  {
     uniffi_marfa_core_ffi_fn_method_marfacore_edges_from(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+open func edgesOfType(edgeType: String)throws  -> [Edge]  {
+    return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_edges_of_type(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(edgeType),$0
     )
 })
 }
@@ -1530,6 +1549,21 @@ open func updateItemAsRead(id: String, edit: Edit)throws  -> QueuedWrite  {
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeEdit_lower(edit),$0
+    )
+})
+}
+    
+    /**
+     * Takes a write blocked `ancestor_unavailable` or `conflict_unresolved`
+     * out of the queue, and puts the copy back to what the server holds;
+     * each write held for it is refused unsent. Answers whether the row was
+     * one a withdraw takes.
+     */
+open func withdraw(id: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_withdraw(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
     )
 })
 }
@@ -4992,6 +5026,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_from() != 44341) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_of_type() != 4381) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_to() != 44283) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5065,6 +5102,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_item_as_read() != 46194) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_withdraw() != 9729) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_write_extension() != 8223) {

@@ -358,13 +358,31 @@ extension Components {
             public var tags: [Swift.String]
             /// - Remark: Generated from `#/components/schemas/Metadata/extensions`.
             public struct ExtensionsPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/Metadata/extensions/additionalProperties`.
+                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `AdditionalPropertiesPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
                 /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                public var additionalProperties: [String: Components.Schemas.Metadata.ExtensionsPayload.AdditionalPropertiesPayload]
                 /// Creates a new `ExtensionsPayload`.
                 ///
                 /// - Parameters:
                 ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                public init(additionalProperties: [String: Components.Schemas.Metadata.ExtensionsPayload.AdditionalPropertiesPayload] = .init()) {
                     self.additionalProperties = additionalProperties
                 }
                 public init(from decoder: any Swift.Decoder) throws {
@@ -1024,19 +1042,20 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal`.
-        public struct TypeNotPermittedRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error`.
+        /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal`.
+        public struct UnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case typeNotPermitted = "type_not_permitted"
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
                 }
-                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/code`.
-                public var code: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -1054,8 +1073,8 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
-                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/details`.
-                public var details: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -1063,9 +1082,9 @@ extension Components {
                 ///   - message:
                 ///   - details:
                 public init(
-                    code: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -1077,13 +1096,80 @@ extension Components {
                     case details
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error`.
-            public var error: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload
-            /// Creates a new `TypeNotPermittedRefusal`.
+            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `UnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error:
-            public init(error: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal`.
+        public struct EdgePermissionDeniedOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgePermissionDenied = "edge_permission_denied"
+                    case typeNotPermitted = "type_not_permitted"
+                }
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
+                public var code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
+                public var details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
+            public var error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload
+            /// Creates a new `EdgePermissionDeniedOrTypeNotPermittedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -1214,73 +1300,6 @@ extension Components {
             /// - Parameters:
             ///   - error:
             public init(error: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal`.
-        public struct EdgePermissionDeniedOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgePermissionDenied = "edge_permission_denied"
-                    case typeNotPermitted = "type_not_permitted"
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
-                public var code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/message`.
-                public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
-                public var details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
-                public init(
-                    code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
-            public var error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload
-            /// Creates a new `EdgePermissionDeniedOrTypeNotPermittedRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error:
-            public init(error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -1508,6 +1527,72 @@ extension Components {
                 case error
             }
         }
+        /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal`.
+        public struct TypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case typeNotPermitted = "type_not_permitted"
+                }
+                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/code`.
+                public var code: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/message`.
+                public var message: Swift.String
+                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/details`.
+                public var details: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code:
+                ///   - message:
+                ///   - details:
+                public init(
+                    code: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error`.
+            public var error: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload
+            /// Creates a new `TypeNotPermittedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error:
+            public init(error: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal`.
         public struct ItemNotFoundRefusal: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error`.
@@ -1568,77 +1653,6 @@ extension Components {
             /// - Parameters:
             ///   - error:
             public init(error: Components.Schemas.ItemNotFoundRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
-        public struct EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgeConstraintViolation = "edge_constraint_violation"
-                    case edgeCycle = "edge_cycle"
-                    case invalidId = "invalid_id"
-                    case invalidProperties = "invalid_properties"
-                    case missingRequiredField = "missing_required_field"
-                    case validationError = "validation_error"
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
-                public init(
-                    code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error:
-            public init(error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -3634,12 +3648,12 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                public var additionalProperties: [String: Components.Schemas.EdgePropertyDefinition]
                 /// Creates a new `PropertySchemaPayload`.
                 ///
                 /// - Parameters:
                 ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                public init(additionalProperties: [String: Components.Schemas.EdgePropertyDefinition] = .init()) {
                     self.additionalProperties = additionalProperties
                 }
                 public init(from decoder: any Swift.Decoder) throws {
@@ -3707,6 +3721,59 @@ extension Components {
                 case propertySchema = "property_schema"
                 case reverseName = "reverse_name"
                 case writtenAt = "written_at"
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition`.
+        public struct EdgePropertyDefinition: Codable, Hashable, Sendable {
+            /// A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/type`.
+            public var _type: Swift.String
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/required`.
+            public var required: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/enum_values`.
+            public var enumValues: [Swift.String]?
+            /// A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
+            public var itemsType: Swift.String?
+            /// A refinement of a string property, stored as given, and never `thumbnail`: an edge carries no thumbnail.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
+            public var format: Swift.String?
+            /// Creates a new `EdgePropertyDefinition`.
+            ///
+            /// - Parameters:
+            ///   - _type: A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
+            ///   - description:
+            ///   - required:
+            ///   - enumValues:
+            ///   - itemsType: A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
+            ///   - format: A refinement of a string property, stored as given, and never `thumbnail`: an edge carries no thumbnail.
+            public init(
+                _type: Swift.String,
+                description: Swift.String? = nil,
+                required: Swift.Bool? = nil,
+                enumValues: [Swift.String]? = nil,
+                itemsType: Swift.String? = nil,
+                format: Swift.String? = nil
+            ) {
+                self._type = _type
+                self.description = description
+                self.required = required
+                self.enumValues = enumValues
+                self.itemsType = itemsType
+                self.format = format
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case description
+                case required
+                case enumValues = "enum_values"
+                case itemsType = "items_type"
+                case format
             }
         }
         /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
@@ -3873,66 +3940,13 @@ extension Components {
             public var cascadeOnDelete: Components.Schemas.EdgeTypeRequest.CascadeOnDeletePayload?
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties`.
-                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
-                    /// A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
-                    ///
-                    /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties/type`.
-                    public var _type: Swift.String
-                    /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties/description`.
-                    public var description: Swift.String?
-                    /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties/required`.
-                    public var required: Swift.Bool?
-                    /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties/enum_values`.
-                    public var enumValues: [Swift.String]?
-                    /// A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
-                    ///
-                    /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties/items_type`.
-                    public var itemsType: Swift.String?
-                    /// A refinement of a string property, stored as given, and never `thumbnail`: an edge carries no thumbnail.
-                    ///
-                    /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema/additionalProperties/format`.
-                    public var format: Swift.String?
-                    /// Creates a new `AdditionalPropertiesPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - _type: A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
-                    ///   - description:
-                    ///   - required:
-                    ///   - enumValues:
-                    ///   - itemsType: A field type's name, stored as given rather than checked against the ones a type's `fields` take, and never `thumbnail`: an edge carries no thumbnail.
-                    ///   - format: A refinement of a string property, stored as given, and never `thumbnail`: an edge carries no thumbnail.
-                    public init(
-                        _type: Swift.String,
-                        description: Swift.String? = nil,
-                        required: Swift.Bool? = nil,
-                        enumValues: [Swift.String]? = nil,
-                        itemsType: Swift.String? = nil,
-                        format: Swift.String? = nil
-                    ) {
-                        self._type = _type
-                        self.description = description
-                        self.required = required
-                        self.enumValues = enumValues
-                        self.itemsType = itemsType
-                        self.format = format
-                    }
-                    public enum CodingKeys: String, CodingKey {
-                        case _type = "type"
-                        case description
-                        case required
-                        case enumValues = "enum_values"
-                        case itemsType = "items_type"
-                        case format
-                    }
-                }
                 /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload.AdditionalPropertiesPayload]
+                public var additionalProperties: [String: Components.Schemas.EdgePropertyDefinition]
                 /// Creates a new `PropertySchemaPayload`.
                 ///
                 /// - Parameters:
                 ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload.AdditionalPropertiesPayload] = .init()) {
+                public init(additionalProperties: [String: Components.Schemas.EdgePropertyDefinition] = .init()) {
                     self.additionalProperties = additionalProperties
                 }
                 public init(from decoder: any Swift.Decoder) throws {
@@ -4207,12 +4221,12 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
             public struct FieldsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                public var additionalProperties: [String: Components.Schemas.FieldDefinition]
                 /// Creates a new `FieldsPayload`.
                 ///
                 /// - Parameters:
                 ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                public init(additionalProperties: [String: Components.Schemas.FieldDefinition] = .init()) {
                     self.additionalProperties = additionalProperties
                 }
                 public init(from decoder: any Swift.Decoder) throws {
@@ -4296,6 +4310,199 @@ extension Components {
         /// - Remark: Generated from `#/components/schemas/TypeRole`.
         @frozen public enum TypeRole: String, Codable, Hashable, Sendable, CaseIterable {
             case container = "container"
+        }
+        /// - Remark: Generated from `#/components/schemas/FieldDefinition`.
+        public struct FieldDefinition: Codable, Hashable, Sendable {
+            /// `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
+            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case string = "string"
+                case number = "number"
+                case integer = "integer"
+                case boolean = "boolean"
+                case url = "url"
+                case email = "email"
+                case datetime = "datetime"
+                case date = "date"
+                case _enum = "enum"
+                case array = "array"
+                case object = "object"
+                case thumbnail = "thumbnail"
+            }
+            /// `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
+            public var _type: Components.Schemas.FieldDefinition._TypePayload
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/description`.
+            public var description: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/required`.
+            public var required: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/enum_values`.
+            public var enumValues: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_type`.
+            public var itemsType: Swift.String?
+            /// Semantic refinement of a `string` field. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
+            @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case url = "url"
+                case email = "email"
+                case datetime = "datetime"
+                case date = "date"
+                case thumbnail = "thumbnail"
+                case bcp47 = "bcp47"
+                case iso3166 = "iso3166"
+            }
+            /// Semantic refinement of a `string` field. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
+            public var format: Components.Schemas.FieldDefinition.FormatPayload?
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/searchable`.
+            public var searchable: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxLength`.
+            public var maxLength: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxItems`.
+            public var maxItems: Swift.Int?
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+            /// Creates a new `FieldDefinition`.
+            ///
+            /// - Parameters:
+            ///   - _type: `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
+            ///   - description:
+            ///   - required:
+            ///   - enumValues:
+            ///   - itemsType:
+            ///   - format: Semantic refinement of a `string` field. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`.
+            ///   - searchable:
+            ///   - maxLength:
+            ///   - maxItems:
+            ///   - additionalProperties: A container of undocumented properties.
+            public init(
+                _type: Components.Schemas.FieldDefinition._TypePayload,
+                description: Swift.String? = nil,
+                required: Swift.Bool? = nil,
+                enumValues: [Swift.String]? = nil,
+                itemsType: Swift.String? = nil,
+                format: Components.Schemas.FieldDefinition.FormatPayload? = nil,
+                searchable: Swift.Bool? = nil,
+                maxLength: Swift.Int? = nil,
+                maxItems: Swift.Int? = nil,
+                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+            ) {
+                self._type = _type
+                self.description = description
+                self.required = required
+                self.enumValues = enumValues
+                self.itemsType = itemsType
+                self.format = format
+                self.searchable = searchable
+                self.maxLength = maxLength
+                self.maxItems = maxItems
+                self.additionalProperties = additionalProperties
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case description
+                case required
+                case enumValues = "enum_values"
+                case itemsType = "items_type"
+                case format
+                case searchable
+                case maxLength
+                case maxItems
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decode(
+                    Components.Schemas.FieldDefinition._TypePayload.self,
+                    forKey: ._type
+                )
+                self.description = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.required = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                self.enumValues = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .enumValues
+                )
+                self.itemsType = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .itemsType
+                )
+                self.format = try container.decodeIfPresent(
+                    Components.Schemas.FieldDefinition.FormatPayload.self,
+                    forKey: .format
+                )
+                self.searchable = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .searchable
+                )
+                self.maxLength = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .maxLength
+                )
+                self.maxItems = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .maxItems
+                )
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                    "type",
+                    "description",
+                    "required",
+                    "enum_values",
+                    "items_type",
+                    "format",
+                    "searchable",
+                    "maxLength",
+                    "maxItems"
+                ])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(
+                    self._type,
+                    forKey: ._type
+                )
+                try container.encodeIfPresent(
+                    self.description,
+                    forKey: .description
+                )
+                try container.encodeIfPresent(
+                    self.required,
+                    forKey: .required
+                )
+                try container.encodeIfPresent(
+                    self.enumValues,
+                    forKey: .enumValues
+                )
+                try container.encodeIfPresent(
+                    self.itemsType,
+                    forKey: .itemsType
+                )
+                try container.encodeIfPresent(
+                    self.format,
+                    forKey: .format
+                )
+                try container.encodeIfPresent(
+                    self.searchable,
+                    forKey: .searchable
+                )
+                try container.encodeIfPresent(
+                    self.maxLength,
+                    forKey: .maxLength
+                )
+                try container.encodeIfPresent(
+                    self.maxItems,
+                    forKey: .maxItems
+                )
+                try encoder.encodeAdditionalProperties(additionalProperties)
+            }
         }
         /// - Remark: Generated from `#/components/schemas/DisplayHints`.
         public struct DisplayHints: Codable, Hashable, Sendable {
@@ -5048,199 +5255,6 @@ extension Components {
                 try container.encode(
                     self.id,
                     forKey: .id
-                )
-                try encoder.encodeAdditionalProperties(additionalProperties)
-            }
-        }
-        /// - Remark: Generated from `#/components/schemas/FieldDefinition`.
-        public struct FieldDefinition: Codable, Hashable, Sendable {
-            /// `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
-            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case string = "string"
-                case number = "number"
-                case integer = "integer"
-                case boolean = "boolean"
-                case url = "url"
-                case email = "email"
-                case datetime = "datetime"
-                case date = "date"
-                case _enum = "enum"
-                case array = "array"
-                case object = "object"
-                case thumbnail = "thumbnail"
-            }
-            /// `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
-            public var _type: Components.Schemas.FieldDefinition._TypePayload
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/description`.
-            public var description: Swift.String?
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/required`.
-            public var required: Swift.Bool?
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/enum_values`.
-            public var enumValues: [Swift.String]?
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_type`.
-            public var itemsType: Swift.String?
-            /// Semantic refinement of a `string` field. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
-            @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case url = "url"
-                case email = "email"
-                case datetime = "datetime"
-                case date = "date"
-                case thumbnail = "thumbnail"
-                case bcp47 = "bcp47"
-                case iso3166 = "iso3166"
-            }
-            /// Semantic refinement of a `string` field. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
-            public var format: Components.Schemas.FieldDefinition.FormatPayload?
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/searchable`.
-            public var searchable: Swift.Bool?
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxLength`.
-            public var maxLength: Swift.Int?
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxItems`.
-            public var maxItems: Swift.Int?
-            /// A container of undocumented properties.
-            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-            /// Creates a new `FieldDefinition`.
-            ///
-            /// - Parameters:
-            ///   - _type: `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
-            ///   - description:
-            ///   - required:
-            ///   - enumValues:
-            ///   - itemsType:
-            ///   - format: Semantic refinement of a `string` field. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`.
-            ///   - searchable:
-            ///   - maxLength:
-            ///   - maxItems:
-            ///   - additionalProperties: A container of undocumented properties.
-            public init(
-                _type: Components.Schemas.FieldDefinition._TypePayload,
-                description: Swift.String? = nil,
-                required: Swift.Bool? = nil,
-                enumValues: [Swift.String]? = nil,
-                itemsType: Swift.String? = nil,
-                format: Components.Schemas.FieldDefinition.FormatPayload? = nil,
-                searchable: Swift.Bool? = nil,
-                maxLength: Swift.Int? = nil,
-                maxItems: Swift.Int? = nil,
-                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
-            ) {
-                self._type = _type
-                self.description = description
-                self.required = required
-                self.enumValues = enumValues
-                self.itemsType = itemsType
-                self.format = format
-                self.searchable = searchable
-                self.maxLength = maxLength
-                self.maxItems = maxItems
-                self.additionalProperties = additionalProperties
-            }
-            public enum CodingKeys: String, CodingKey {
-                case _type = "type"
-                case description
-                case required
-                case enumValues = "enum_values"
-                case itemsType = "items_type"
-                case format
-                case searchable
-                case maxLength
-                case maxItems
-            }
-            public init(from decoder: any Swift.Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                self._type = try container.decode(
-                    Components.Schemas.FieldDefinition._TypePayload.self,
-                    forKey: ._type
-                )
-                self.description = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .description
-                )
-                self.required = try container.decodeIfPresent(
-                    Swift.Bool.self,
-                    forKey: .required
-                )
-                self.enumValues = try container.decodeIfPresent(
-                    [Swift.String].self,
-                    forKey: .enumValues
-                )
-                self.itemsType = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .itemsType
-                )
-                self.format = try container.decodeIfPresent(
-                    Components.Schemas.FieldDefinition.FormatPayload.self,
-                    forKey: .format
-                )
-                self.searchable = try container.decodeIfPresent(
-                    Swift.Bool.self,
-                    forKey: .searchable
-                )
-                self.maxLength = try container.decodeIfPresent(
-                    Swift.Int.self,
-                    forKey: .maxLength
-                )
-                self.maxItems = try container.decodeIfPresent(
-                    Swift.Int.self,
-                    forKey: .maxItems
-                )
-                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
-                    "type",
-                    "description",
-                    "required",
-                    "enum_values",
-                    "items_type",
-                    "format",
-                    "searchable",
-                    "maxLength",
-                    "maxItems"
-                ])
-            }
-            public func encode(to encoder: any Swift.Encoder) throws {
-                var container = encoder.container(keyedBy: CodingKeys.self)
-                try container.encode(
-                    self._type,
-                    forKey: ._type
-                )
-                try container.encodeIfPresent(
-                    self.description,
-                    forKey: .description
-                )
-                try container.encodeIfPresent(
-                    self.required,
-                    forKey: .required
-                )
-                try container.encodeIfPresent(
-                    self.enumValues,
-                    forKey: .enumValues
-                )
-                try container.encodeIfPresent(
-                    self.itemsType,
-                    forKey: .itemsType
-                )
-                try container.encodeIfPresent(
-                    self.format,
-                    forKey: .format
-                )
-                try container.encodeIfPresent(
-                    self.searchable,
-                    forKey: .searchable
-                )
-                try container.encodeIfPresent(
-                    self.maxLength,
-                    forKey: .maxLength
-                )
-                try container.encodeIfPresent(
-                    self.maxItems,
-                    forKey: .maxItems
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
@@ -8095,9 +8109,9 @@ extension Components {
             /// The sources a write by this key may name besides its own `source`. Empty on a key that claims nothing.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/sources`.
-            public var sources: [Swift.String]?
+            public var sources: [Swift.String]
             /// - Remark: Generated from `#/components/schemas/KeyResponse/permissions`.
-            public var permissions: [Components.Schemas.Permission]?
+            public var permissions: [Components.Schemas.Permission]
             /// - Remark: Generated from `#/components/schemas/KeyResponse/oauth_client_id`.
             public var oauthClientId: Swift.String?
             /// - Remark: Generated from `#/components/schemas/KeyResponse/default_tier`.
@@ -8143,7 +8157,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/KeyResponse/extension_permissions`.
-            public var extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload?
+            public var extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload
             /// - Remark: Generated from `#/components/schemas/KeyResponse/edge_permissions`.
             public struct EdgePermissionsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -8163,7 +8177,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/KeyResponse/edge_permissions`.
-            public var edgePermissions: Components.Schemas.KeyResponse.EdgePermissionsPayload?
+            public var edgePermissions: Components.Schemas.KeyResponse.EdgePermissionsPayload
             /// - Remark: Generated from `#/components/schemas/KeyResponse/metadata_permissions`.
             public struct MetadataPermissionsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -8183,7 +8197,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/KeyResponse/metadata_permissions`.
-            public var metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload?
+            public var metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload
             /// - Remark: Generated from `#/components/schemas/KeyResponse/profile_permissions`.
             public struct ProfilePermissionsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -8203,7 +8217,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/KeyResponse/profile_permissions`.
-            public var profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload?
+            public var profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload
             /// - Remark: Generated from `#/components/schemas/KeyResponse/enforcement_override`.
             public var enforcementOverride: Components.Schemas.EnforcementOverride?
             /// - Remark: Generated from `#/components/schemas/KeyResponse/created_at`.
@@ -8235,16 +8249,16 @@ extension Components {
                 key: Swift.String,
                 label: Swift.String,
                 source: Swift.String,
-                sources: [Swift.String]? = nil,
-                permissions: [Components.Schemas.Permission]? = nil,
+                sources: [Swift.String],
+                permissions: [Components.Schemas.Permission],
                 oauthClientId: Swift.String? = nil,
                 defaultTier: Components.Schemas.Tier,
                 isOperator: Swift.Bool,
                 typePermissions: Components.Schemas.KeyResponse.TypePermissionsPayload,
-                extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload? = nil,
-                edgePermissions: Components.Schemas.KeyResponse.EdgePermissionsPayload? = nil,
-                metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload? = nil,
-                profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload? = nil,
+                extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload,
+                edgePermissions: Components.Schemas.KeyResponse.EdgePermissionsPayload,
+                metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload,
+                profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
                 lastUsedAt: Swift.String? = nil
@@ -8413,11 +8427,11 @@ extension Components {
             /// The sources a write by this key may name besides its own `source`. Empty on a key that claims nothing.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/sources`.
-            public var sources: [Swift.String]?
-            /// The permissions this credential holds, as the literals themselves. Omitted on a create request that names no map and no claimed source, it takes the creator's whole set; omitted beside a map or a claimed source, the key holds none. Anything named beyond what the creator holds is refused.
+            public var sources: [Swift.String]
+            /// The permissions this credential holds, as the literals themselves. Empty on a key that holds none.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/permissions`.
-            public var permissions: [Components.Schemas.Permission]?
+            public var permissions: [Components.Schemas.Permission]
             /// The registered client that minted this key, when a signed-in app did. Absent on a key a person or another key created directly.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/oauth_client_id`.
@@ -8465,7 +8479,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/ApiKey/extension_permissions`.
-            public var extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload?
+            public var extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload
             /// - Remark: Generated from `#/components/schemas/ApiKey/edge_permissions`.
             public struct EdgePermissionsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -8485,7 +8499,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/ApiKey/edge_permissions`.
-            public var edgePermissions: Components.Schemas.ApiKey.EdgePermissionsPayload?
+            public var edgePermissions: Components.Schemas.ApiKey.EdgePermissionsPayload
             /// - Remark: Generated from `#/components/schemas/ApiKey/metadata_permissions`.
             public struct MetadataPermissionsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -8505,7 +8519,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/ApiKey/metadata_permissions`.
-            public var metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload?
+            public var metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload
             /// - Remark: Generated from `#/components/schemas/ApiKey/profile_permissions`.
             public struct ProfilePermissionsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -8525,7 +8539,7 @@ extension Components {
                 }
             }
             /// - Remark: Generated from `#/components/schemas/ApiKey/profile_permissions`.
-            public var profilePermissions: Components.Schemas.ApiKey.ProfilePermissionsPayload?
+            public var profilePermissions: Components.Schemas.ApiKey.ProfilePermissionsPayload
             /// - Remark: Generated from `#/components/schemas/ApiKey/enforcement_override`.
             public var enforcementOverride: Components.Schemas.EnforcementOverride?
             /// - Remark: Generated from `#/components/schemas/ApiKey/created_at`.
@@ -8543,7 +8557,7 @@ extension Components {
             ///   - label:
             ///   - source:
             ///   - sources: The sources a write by this key may name besides its own `source`. Empty on a key that claims nothing.
-            ///   - permissions: The permissions this credential holds, as the literals themselves. Omitted on a create request that names no map and no claimed source, it takes the creator's whole set; omitted beside a map or a claimed source, the key holds none. Anything named beyond what the creator holds is refused.
+            ///   - permissions: The permissions this credential holds, as the literals themselves. Empty on a key that holds none.
             ///   - oauthClientId: The registered client that minted this key, when a signed-in app did. Absent on a key a person or another key created directly.
             ///   - defaultTier:
             ///   - isOperator:
@@ -8560,16 +8574,16 @@ extension Components {
                 id: Swift.String,
                 label: Swift.String,
                 source: Swift.String,
-                sources: [Swift.String]? = nil,
-                permissions: [Components.Schemas.Permission]? = nil,
+                sources: [Swift.String],
+                permissions: [Components.Schemas.Permission],
                 oauthClientId: Swift.String? = nil,
                 defaultTier: Components.Schemas.Tier,
                 isOperator: Swift.Bool,
                 typePermissions: Components.Schemas.ApiKey.TypePermissionsPayload,
-                extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload? = nil,
-                edgePermissions: Components.Schemas.ApiKey.EdgePermissionsPayload? = nil,
-                metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload? = nil,
-                profilePermissions: Components.Schemas.ApiKey.ProfilePermissionsPayload? = nil,
+                extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload,
+                edgePermissions: Components.Schemas.ApiKey.EdgePermissionsPayload,
+                metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload,
+                profilePermissions: Components.Schemas.ApiKey.ProfilePermissionsPayload,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
                 expiresAt: Swift.String? = nil,
@@ -9236,73 +9250,6 @@ extension Components {
             /// - Parameters:
             ///   - error:
             public init(error: Components.Schemas.OwnerExistsRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal`.
-        public struct UnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case unknownType = "unknown_type"
-                    case validationError = "validation_error"
-                }
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
-                public init(
-                    code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `UnknownTypeOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error:
-            public init(error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {

@@ -106,8 +106,9 @@ public final class WorkingCopy: Sendable {
     /// Each write this working copy makes, told once by the call that made
     /// it; for a writer with a server, each event its held event stream
     /// applies; for a reader, each save the writer makes once this has
-    /// returned; and a hydration, a catch-up that applied events or a drain
-    /// that recorded verdicts, after which many rows may differ. One event
+    /// returned; and a hydration, a catch-up that applied events, a drain
+    /// that recorded verdicts or a withdraw that took a write, after which
+    /// many rows may differ. One event
     /// stream, or one watch on the store, feeds every stream held, and stops
     /// once none is.
     ///
@@ -163,6 +164,7 @@ public struct Change: Sendable, Hashable {
         case hydrated
         case caughtUp
         case drained
+        case withdrawn
     }
 
     public let origin: Origin
@@ -399,6 +401,25 @@ public struct Queue: Sendable {
     /// Releases every write blocked for one reason, and says how many.
     public func release(reason: BlockedReason) async throws -> UInt64 {
         try await background { [core] in try core.releaseReason(reason: reason) }
+    }
+
+    /// Takes a write that can never be sent out of the queue, and puts its
+    /// row back to what the server holds, with every write still waiting
+    /// laid over it.
+    ///
+    /// Only a write blocked `ancestorUnavailable` or `conflictUnresolved`
+    /// is taken; `false` says the write was another, or was released or
+    /// answered meanwhile. A write held for the one withdrawn is refused
+    /// unsent and never released. An id the queue does not hold throws
+    /// `notFound`. The row is read back from the server first, so a withdraw
+    /// that cannot reach it changes nothing and throws, and one whose copy
+    /// kept moving under the read throws `invalid`, to be asked again.
+    public func withdraw(_ id: String) async throws -> Bool {
+        let withdrawn = try await background { [core] in try core.withdraw(id: id) }
+        if withdrawn {
+            feed.announce(Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil))
+        }
+        return withdrawn
     }
 
     /// Clears the writes the server has answered, and says how many went.

@@ -2401,7 +2401,7 @@ public enum Operations {
     }
     /// Get item counts
     ///
-    /// Returns a count of items, grouped on one axis. `by=state` (the default) counts per lifecycle state; `by=type` names the types actually in use, which is otherwise unanswerable without paging every row. Both groupings cover the same rows, so their totals agree. The counts are scoped to the caller's type permissions, so a credential sees only the types it can read.
+    /// Returns a count of items, grouped on one axis. `by=state` (the default) counts per lifecycle state; `by=type` names the types actually in use, which is otherwise unanswerable without paging every row. Both groupings cover the same rows, so their totals agree. The counts are scoped to the caller's type permissions, so a credential sees only the types it can read. The door takes every filter `GET /items` takes, with the same meaning, and counts the rows that listing would walk: the `edge[<type>]` and `backref[<type>]` shorthands among them, and `include=system` to count `system.*` items, which are left out by default as they are from the listing. One default differs: naming no `state` counts every state, so the listing's own count for the same filters is the `active` bucket of `by=state`, or the bucket of the state it names. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -2421,12 +2421,105 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/by`.
                 public var by: Operations.GetItemStats.Input.Query.ByPayload?
+                /// Type identifier; matches subtypes via inheritance. A concrete identifier this instance does not know is refused with 400 `unknown_type`; a wildcard over nothing answers an empty page.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/type`.
+                public var _type: Swift.String?
+                /// Count only this lifecycle state. Omitting the parameter counts every state, as does `any`.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/state`.
+                public var state: Swift.String?
+                /// Narrow to rows stamped with this `source`.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/source`.
+                public var source: Swift.String?
+                /// Tier slice; omit or `all` returns both
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/tier`.
+                @frozen public enum TierPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case library = "library"
+                    case feed = "feed"
+                    case all = "all"
+                }
+                /// Tier slice; omit or `all` returns both
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/tier`.
+                public var tier: Operations.GetItemStats.Input.Query.TierPayload?
+                /// Comma-separated tags; items must carry all of them
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/tags`.
+                public var tags: Swift.String?
+                /// Filter expression in the query grammar. A term naming an edge type — `edge[<type>]` or `backref[<type>]`, in this parameter or as the `edge[<type>]=<id>` shorthand — asks about a relationship, so it is held to the edge read permission: one naming a type the credential may not read is refused `403 edge_permission_denied`. A `backref` term counts only edges whose source the credential may read, so one anchored on an item it may not read matches as one anchored on an id no row holds; an `edge` term matches every edge it may read, one to an item it may not read included.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/filter`.
+                public var filter: Swift.String?
+                /// Lower bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive). An RFC 3339 instant in any valid spelling; it is normalized before the comparison. Not the modification time; for that use `updated_after`.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/occurred_after`.
+                public var occurredAfter: Swift.String?
+                /// Upper bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive).
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/occurred_before`.
+                public var occurredBefore: Swift.String?
+                /// Lower bound on `updated_at`, when the row last changed (inclusive). The catch-up filter: pass the cursor you hold to get everything that changed since. Forces `(updated_at, id)` ascending order, so `sort` and `direction` cannot also be given, and a cursor issued under one ordering is refused under the other. Inclusive because `updated_at` ties across a bulk write, so deduplicate by id — and note that a high-water mark landing on an instant a large bulk write shares means that whole group is re-sent on every reconnect, which terminates but is not free. This read reports changes, never removals: a purge leaves no row behind, so pruning a local copy needs the event stream as well.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/updated_after`.
+                public var updatedAfter: Swift.String?
+                /// Upper bound on `updated_at` (exclusive), closing the window its lower twin opens. Exclusive where `updated_after` is inclusive, because this is an end point the caller chooses rather than a resume point that must not drop a tie. It does not change the ordering, so it may be given under any sort.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/updated_before`.
+                public var updatedBefore: Swift.String?
+                /// `system` counts `system.*` items too, which are left out by default. A `type` filter in the `system.` namespace opts in on its own.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/include`.
+                @frozen public enum IncludePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case system = "system"
+                }
+                /// `system` counts `system.*` items too, which are left out by default. A `type` filter in the `system.` namespace opts in on its own.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/include`.
+                public var include: Operations.GetItemStats.Input.Query.IncludePayload?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - by: Grouping axis. Defaults to `state`.
-                public init(by: Operations.GetItemStats.Input.Query.ByPayload? = nil) {
+                ///   - _type: Type identifier; matches subtypes via inheritance. A concrete identifier this instance does not know is refused with 400 `unknown_type`; a wildcard over nothing answers an empty page.
+                ///   - state: Count only this lifecycle state. Omitting the parameter counts every state, as does `any`.
+                ///   - source: Narrow to rows stamped with this `source`.
+                ///   - tier: Tier slice; omit or `all` returns both
+                ///   - tags: Comma-separated tags; items must carry all of them
+                ///   - filter: Filter expression in the query grammar. A term naming an edge type — `edge[<type>]` or `backref[<type>]`, in this parameter or as the `edge[<type>]=<id>` shorthand — asks about a relationship, so it is held to the edge read permission: one naming a type the credential may not read is refused `403 edge_permission_denied`. A `backref` term counts only edges whose source the credential may read, so one anchored on an item it may not read matches as one anchored on an id no row holds; an `edge` term matches every edge it may read, one to an item it may not read included.
+                ///   - occurredAfter: Lower bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive). An RFC 3339 instant in any valid spelling; it is normalized before the comparison. Not the modification time; for that use `updated_after`.
+                ///   - occurredBefore: Upper bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive).
+                ///   - updatedAfter: Lower bound on `updated_at`, when the row last changed (inclusive). The catch-up filter: pass the cursor you hold to get everything that changed since. Forces `(updated_at, id)` ascending order, so `sort` and `direction` cannot also be given, and a cursor issued under one ordering is refused under the other. Inclusive because `updated_at` ties across a bulk write, so deduplicate by id — and note that a high-water mark landing on an instant a large bulk write shares means that whole group is re-sent on every reconnect, which terminates but is not free. This read reports changes, never removals: a purge leaves no row behind, so pruning a local copy needs the event stream as well.
+                ///   - updatedBefore: Upper bound on `updated_at` (exclusive), closing the window its lower twin opens. Exclusive where `updated_after` is inclusive, because this is an end point the caller chooses rather than a resume point that must not drop a tie. It does not change the ordering, so it may be given under any sort.
+                ///   - include: `system` counts `system.*` items too, which are left out by default. A `type` filter in the `system.` namespace opts in on its own.
+                public init(
+                    by: Operations.GetItemStats.Input.Query.ByPayload? = nil,
+                    _type: Swift.String? = nil,
+                    state: Swift.String? = nil,
+                    source: Swift.String? = nil,
+                    tier: Operations.GetItemStats.Input.Query.TierPayload? = nil,
+                    tags: Swift.String? = nil,
+                    filter: Swift.String? = nil,
+                    occurredAfter: Swift.String? = nil,
+                    occurredBefore: Swift.String? = nil,
+                    updatedAfter: Swift.String? = nil,
+                    updatedBefore: Swift.String? = nil,
+                    include: Operations.GetItemStats.Input.Query.IncludePayload? = nil
+                ) {
                     self.by = by
+                    self._type = _type
+                    self.state = state
+                    self.source = source
+                    self.tier = tier
+                    self.tags = tags
+                    self.filter = filter
+                    self.occurredAfter = occurredAfter
+                    self.occurredBefore = occurredBefore
+                    self.updatedAfter = updatedAfter
+                    self.updatedBefore = updatedBefore
+                    self.include = include
                 }
             }
             public var query: Operations.GetItemStats.Input.Query
@@ -2553,7 +2646,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Item counts by state
+            /// Item counts on the chosen axis
             ///
             /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)/responses/200`.
             ///
@@ -2571,6 +2664,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct BadRequest: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetItemStats.Output.BadRequest.Headers
+                /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/stats/GET/responses/400/content/application\/json`.
+                    case json(Components.Schemas.UnknownTypeOrValidationErrorRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.UnknownTypeOrValidationErrorRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetItemStats.Output.BadRequest.Body
+                /// Creates a new `BadRequest`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetItemStats.Output.BadRequest.Headers = .init(),
+                    body: Operations.GetItemStats.Output.BadRequest.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// A query parameter the door does not declare, a grouping it does not have, or a filter the listing would refuse: `unknown_type` for a concrete type this instance does not know, `validation_error` for the rest.
+            ///
+            /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Operations.GetItemStats.Output.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Operations.GetItemStats.Output.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
                             response: self
                         )
                     }
@@ -2742,12 +2944,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/stats/GET/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/stats/GET/responses/403/content/application\/json`.
-                    case json(Components.Schemas.TypeNotPermittedRefusal)
+                    case json(Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.TypeNotPermittedRefusal {
+                    public var json: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -2771,7 +2973,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential's type permissions reach no type, so there is nothing on the data plane it may read. A credential that reaches some types reads this door narrowed to them rather than being refused.
+            /// `type_not_permitted` when the credential's type permissions reach no type, so there is nothing on the data plane it may read. A credential that reaches some types reads this door narrowed to them rather than being refused. `edge_permission_denied` when an `edge` or `backref` term names an edge type the credential may not read.
             ///
             /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)/responses/403`.
             ///
@@ -3918,7 +4120,7 @@ public enum Operations {
     }
     /// Update an item
     ///
-    /// Updates an item's properties, tier, own time, edges, or natural key. Properties merge shallowly with existing values by default; when `properties_mode` is `replace` the body is the whole of the caller's properties, so a field it leaves out is cleared. `version` is required, and a write naming none is refused 400 `missing_required_field`. At the current version the write lands as sent. At a stale one the caller's genuine changes, a cleared field included, merge over the row where nothing collides, and a collision on a property, `tier`, `occurred_at` or `source_id` answers 409 with the conflict context to resolve, or is resolved by the type's merge policy under `?conflict=auto`. An item's `type` is not updatable here by default: sending one that matches the item is accepted and ignored, and sending a different one is refused with 409 `type_mismatch` rather than silently dropped. Passing `retype: true` alongside a different `type` moves the item to it, with or without `properties`, and at a stale version as at the current one where nothing collides; the properties the row ends up with are held to the type it enters, `400 invalid_properties` where they fall short, and a colliding stale move answers 409 whatever `?conflict` asks, a move onto a row another writer moved since colliding on `type`; that requires write on the type being entered as well as the one being left. `retype` naming the type the row already has changes nothing and takes no version step. Where the instance's strict-mode lever names the type, a property the type does not declare is refused `400 invalid_properties` with `details.code` `unknown_property`, judged on the properties this request carries.
+    /// Updates an item's properties, tier, own time, edges, or natural key. Properties merge shallowly with existing values by default; when `properties_mode` is `replace` the body is the whole of the caller's properties, so a field it leaves out is cleared. `version` is required, and a write naming none is refused 400 `missing_required_field`. At the current version the write lands as sent. At a stale one the caller's genuine changes, a cleared field included, merge over the row where nothing collides, and a collision on a property, `tier`, `occurred_at` or `source_id` answers 409 with the conflict context to resolve, or is resolved by the type's merge policy under `?conflict=auto`. An item's `type` is not updatable here by default: sending one that matches the item is accepted and ignored, and sending a different one is refused with 409 `type_mismatch` rather than silently dropped. Passing `retype: true` alongside a different `type` moves the item to it, with or without `properties`, and at a stale version as at the current one where nothing collides; a type nothing registered is refused `400 unknown_type` as a create refuses it, the properties the row ends up with are held to the type it enters, `400 invalid_properties` where they fall short, and a colliding stale move answers 409 whatever `?conflict` asks, a move onto a row another writer moved since colliding on `type`; that requires write on the type being entered as well as the one being left. `retype` naming the type the row already has changes nothing and takes no version step. Where the instance's strict-mode lever names the type, a property the type does not declare is refused `400 invalid_properties` with `details.code` `unknown_property`, judged on the properties this request carries.
     ///
     /// - Remark: HTTP `PATCH /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)`.
@@ -4434,12 +4636,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/400/content/application\/json`.
-                    case json(Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -13811,6 +14013,8 @@ public enum Operations {
     ///
     /// The purge leaves tombstones under the item's type: its link, where the type names a `link_field` and the row held a value there, and its natural key, where it had one, each with the purge time as `purged_at` and `settled_at`. `POST /items/lookup` reads them and `POST /items/tombstones` moves `settled_at` later; an item that later holds the same link in the type, or the same natural key in any type, removes the one it matches. Nothing else sweeps them but deleting the type.
     ///
+    /// `version` makes the purge conditional on the row being where the caller read it: at any other version it answers `409 version_conflict` with the row as it now stands under `current`, and deletes nothing. Without it the purge applies to the row as it is. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
+    ///
     /// - Remark: HTTP `DELETE /items/{id}/purge`.
     /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)`.
     public enum PurgeItem {
@@ -13831,6 +14035,21 @@ public enum Operations {
                 }
             }
             public var path: Operations.PurgeItem.Input.Path
+            /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// The version the caller read. Where given and the row has moved since, the purge is refused `409 version_conflict` and nothing is deleted. Trashing does not move a row's version, so the version read before the trash is the one to send.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/query/version`.
+                public var version: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - version: The version the caller read. Where given and the row has moved since, the purge is refused `409 version_conflict` and nothing is deleted. Trashing does not move a row's version, so the version read before the trash is the one to send.
+                public init(version: Swift.Int? = nil) {
+                    self.version = version
+                }
+            }
+            public var query: Operations.PurgeItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/header`.
             public struct Headers: Sendable, Hashable {
                 /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
@@ -13856,12 +14075,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.PurgeItem.Input.Path,
+                query: Operations.PurgeItem.Input.Query = .init(),
                 headers: Operations.PurgeItem.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -14076,7 +14298,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `invalid_id` for a malformed id. `invalid_transition` when the item is not soft-deleted: purging is the hard delete behind a soft one, and the same code the restore door beside it answers for the same class of mistake. `validation_error` when the item is a live `system.connection` — revoke the app grant through `DELETE /auth/grants/{id}` first, because removing the row here would leave the app's tokens and stored consent behind with nothing naming their owner.
+            /// `invalid_id` for a malformed id. `invalid_transition` when the item is not soft-deleted: purging is the hard delete behind a soft one, and the same code the restore door beside it answers for the same class of mistake. `validation_error` when the item is a live `system.connection` — revoke the app grant through `DELETE /auth/grants/{id}` first, because removing the row here would leave the app's tokens and stored consent behind with nothing naming their owner; or for a `version` that is not a positive whole number, or an unrecognized query parameter.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)/responses/400`.
             ///
@@ -14504,13 +14726,58 @@ public enum Operations {
                 public var headers: Operations.PurgeItem.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ItemStaleVersion?
+                        /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ItemStaleVersion? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.PurgeItem.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.PurgeItem.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -14534,7 +14801,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// A request carrying this `Idempotency-Key` is still being processed. Nothing was written; retry.
+            /// `version_conflict`: the request named a `version` and the row is no longer at it. `current` carries the row as it stands; nothing was purged. `idempotency_key_in_flight`: a request carrying this `Idempotency-Key` is still being processed; nothing was purged, retry.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)/responses/409`.
             ///
@@ -16973,7 +17240,7 @@ public enum Operations {
     }
     /// Apply a bulk action
     ///
-    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item.
+    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item. A purge takes only rows in the trash when the job reaches them: any other match, live or restored since the job was queued, is left untouched and reported in the job's `errors` with `invalid_transition`. A purge may carry `expected_ids`, the ids its dry run returned, and then takes only the rows in that list the filter still matches: a row the filter has come to match since the dry run is left untouched, and `max_items` caps the rows the purge takes rather than the filter's whole match.
     ///
     /// Unrecognized fields are refused with `400` rather than ignored, in the request body and inside `filter` alike: a dropped filter field is not a narrower match set but every item, and a dropped `dry_run` is the action running for real. A field of your own must start with `_`, which is always ignored.
     ///
@@ -17079,6 +17346,10 @@ public enum Operations {
                         }
                         /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case2/confirm`.
                         public var confirm: Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload.ConfirmPayload?
+                        /// The ids a dry run of this purge returned. Where given, the purge takes only rows that are both in this list and matched by the filter now: a row the filter has come to match since is left untouched, and a listed id the filter no longer matches is not purged. `matched` counts what the purge will take, and `max_items` caps that rather than what the filter reaches. An empty list is refused, since it names nothing to purge. Taken by `purge` alone.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case2/expected_ids`.
+                        public var expectedIds: [Swift.String]?
                         /// Creates a new `Case2Payload`.
                         ///
                         /// - Parameters:
@@ -17088,13 +17359,15 @@ public enum Operations {
                         ///   - enableFanout:
                         ///   - action:
                         ///   - confirm:
+                        ///   - expectedIds: The ids a dry run of this purge returned. Where given, the purge takes only rows that are both in this list and matched by the filter now: a row the filter has come to match since is left untouched, and a listed id the filter no longer matches is not purged. `matched` counts what the purge will take, and `max_items` caps that rather than what the filter reaches. An empty list is refused, since it names nothing to purge. Taken by `purge` alone.
                         public init(
                             filter: Components.Schemas.BulkActionFilter? = nil,
                             dryRun: Swift.Bool? = nil,
                             maxItems: Swift.Int? = nil,
                             enableFanout: Swift.Bool? = nil,
                             action: Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload.ActionPayload,
-                            confirm: Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload.ConfirmPayload? = nil
+                            confirm: Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload.ConfirmPayload? = nil,
+                            expectedIds: [Swift.String]? = nil
                         ) {
                             self.filter = filter
                             self.dryRun = dryRun
@@ -17102,6 +17375,7 @@ public enum Operations {
                             self.enableFanout = enableFanout
                             self.action = action
                             self.confirm = confirm
+                            self.expectedIds = expectedIds
                         }
                         public enum CodingKeys: String, CodingKey {
                             case filter
@@ -17110,6 +17384,7 @@ public enum Operations {
                             case enableFanout = "enable_fanout"
                             case action
                             case confirm
+                            case expectedIds = "expected_ids"
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case2`.
@@ -19041,7 +19316,7 @@ public enum Operations {
     }
     /// Cancel a bulk-action job
     ///
-    /// Cancels a bulk-action job. A job still queued or running is set to `canceled` and the answer carries that state; a job already terminal is left as it is and answers its final state unchanged.
+    /// Cancels a bulk-action job. A job still queued or running is set to `canceled` and the answer carries that state; a job already terminal is left as it is and answers its final state unchanged. A canceled job stays canceled, and rows already processed stay processed.
     ///
     /// - Remark: HTTP `DELETE /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/delete(cancelBulkActionJob)`.
@@ -73466,7 +73741,7 @@ public enum Operations {
                     public var label: Swift.String
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/source`.
                     public var source: Swift.String
-                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` or `connector:` is refused.
+                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -73583,7 +73858,7 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label:
                     ///   - source:
-                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` or `connector:` is refused.
+                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///   - permissions:
                     ///   - defaultTier:
                     ///   - isOperator:
@@ -75250,7 +75525,7 @@ public enum Operations {
                     public var label: Swift.String?
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/default_tier`.
                     public var defaultTier: Components.Schemas.Tier?
-                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` or `connector:` is refused.
+                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -75365,7 +75640,7 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label:
                     ///   - defaultTier:
-                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` or `connector:` is refused.
+                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///   - typePermissions:
                     ///   - extensionPermissions:
                     ///   - edgePermissions:
@@ -91105,6 +91380,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "tooManyRequests",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ServiceUnavailable: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RegisterOAuthClient.Output.ServiceUnavailable.Headers
+                /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/503/content/application\/json`.
+                    case json(Components.Schemas.WriteContentionRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WriteContentionRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RegisterOAuthClient.Output.ServiceUnavailable.Body
+                /// Creates a new `ServiceUnavailable`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RegisterOAuthClient.Output.ServiceUnavailable.Headers = .init(),
+                    body: Operations.RegisterOAuthClient.Output.ServiceUnavailable.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            ///
+            /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Operations.RegisterOAuthClient.Output.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Operations.RegisterOAuthClient.Output.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
                             response: self
                         )
                     }
