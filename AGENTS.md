@@ -15,7 +15,7 @@ This repository is the Swift package `Marfa`, product `Marfa`: a thin layer over
 
 - **Every version is the previous one plus 0.0.1, whatever the size of the change.** The first version is 0.0.1.
 - A commit's type (`feat`, `fix`, a breaking change) never decides a version.
-- A version exists only as a git tag on the monorepo, and tags are the maintainer's. Nothing publishes this package yet, so nothing can depend on it by URL; this repository has no release workflow, and agents never add one, create a tag, or write a version into a file.
+- A version exists only as a git tag on the monorepo, created only when a release is called for. Nothing publishes this package yet, so nothing can depend on it by URL; this repository has no release workflow, and agents never add one, create a tag, or write a version into a file.
 
 ## In force
 
