@@ -6,19 +6,47 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# A pull request's next push supersedes the run before it. On `main` every
-# merge keeps its own run, because a shared group would drop commits that land
-# close together.
+# A newer push to the same branch, `main` included, supersedes the run before
+# it: the newest commit's run validates everything that came before it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # A pull request that touches only top-level documentation skips the macOS
+  # job. A skipped job satisfies a required check; a workflow filtered out by
+  # `paths` would leave it pending, which is why this is a job and not a
+  # filter. An unreadable diff runs everything.
+  changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: classify
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          code=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ] && paths="$(git diff --name-only --no-renames "$BASE...$HEAD")"; then
+            if [ -n "$paths" ] && ! grep -qvE '^([^/]+\.md|LICENSE)$' <<<"$paths"; then
+              code=false
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   validate:
     name: Build + test
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code != 'false') }}
     runs-on: macos-26
     timeout-minutes: 60
     env:
@@ -59,6 +87,26 @@ jobs:
       - name: Add the iOS targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
+      # The core's build is fixed by the pin, so the pin keys it; the
+      # generator's by its resolved packages. A miss builds from nothing, as
+      # before.
+      - name: Cache the core's build
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/cargo-swift
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ${{ github.workspace }}/../core-target
+          key: core-${{ runner.os }}-${{ hashFiles('core.pin') }}
+          restore-keys: core-${{ runner.os }}-
+      - name: Cache the generator's build
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/../generator-build
+          key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
+
       # Both generated sources are held to the pin: the glue and the wire
       # types. Their directories are emptied here as well as by core.sh, so a
       # committed file the pinned commit does not generate shows as deleted
@@ -80,6 +128,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: pnpm
+          cache-dependency-path: .build/marfa/pnpm-lock.yaml
 
       # server-up.sh runs the server through tsx, which resolves
       # @withmarfa/shared through its dist.
