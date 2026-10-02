@@ -138,6 +138,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var gate: DispatchSemaphore?
         var gated = false
         var readsFail: CoreMarfaError?
+        var withdrawable: Set<String> = []
     }
 
     let state = Mutex(State())
@@ -197,6 +198,10 @@ final class FakeCore: Core, @unchecked Sendable {
     override func catchUp() throws -> CoreCatchUpReport {
         try refreshing()
         return state.withLock { $0.caughtUp }
+    }
+
+    override func withdraw(id: String) throws -> Bool {
+        state.withLock { $0.withdrawable.remove(id) != nil }
     }
 
     override func drain() throws -> CoreDrainReport {

@@ -230,6 +230,20 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
+    @Test func aWithdrawThatTookAWriteIsToldOnce() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let heard = Heard(copy.changes())
+        core.state.withLock { $0.withdrawable = ["q"] }
+        #expect(try await copy.queue.withdraw("other") == false)
+        #expect(try await copy.queue.withdraw("q"))
+        #expect(try await copy.queue.withdraw("q") == false)
+        try await eventually("the withdraw was told") { heard.all == [refreshed(.withdrawn)] }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(heard.all == [refreshed(.withdrawn)])
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func closingReturnsOnceTheFollowHasEnded() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(core: core, hasServer: true)

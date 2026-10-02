@@ -7,9 +7,10 @@ import Synchronization
 /// for that server.
 ///
 /// Nothing runs on its own: the app decides when to hydrate, catch up,
-/// drain and `forgetAnswered()`. Every call runs the core off the caller's
-/// thread except a reader's first `changes()`, which reads the store before
-/// it returns and so can wait behind the copy's other reads.
+/// drain and `forgetAnswered()`. Every call that can wait on the store or the
+/// network runs off the caller's thread, except a reader's first
+/// `changes()`, which reads the store before it returns and so can wait
+/// behind the copy's other reads.
 public final class WorkingCopy: Sendable {
     let core: Core
     let feed: Feed
@@ -165,7 +166,7 @@ public struct Items: Sendable {
         try await background { [core] in try core.list(filters: filters.core, sort: sort).map(Item.init) }
     }
 
-    /// `nil` for an item in the bin.
+    /// `nil` for an item in the bin or not held.
     public func get(_ id: String) async throws -> Item? {
         try await background { [core] in try core.get(id: id).map(Item.init) }
     }
@@ -242,7 +243,7 @@ public struct Edges: Sendable {
     }
 
     /// Every edge of one type the copy holds, unsent ones included, oldest
-    /// first, with the same limit as `to(_:)`.
+    /// first: only edges going out from held items, as with `to(_:)`.
     public func ofType(_ type: String) async throws -> [Edge] {
         try await background { [core] in try core.edgesOfType(edgeType: type).map(Edge.init) }
     }
@@ -342,6 +343,9 @@ public struct Blobs: Sendable {
     }
 
     /// Where a blob's bytes are held, fetching them first when they are not.
+    ///
+    /// A reader, or a copy without a server, throws `bytesAbsent` instead of
+    /// fetching.
     public func get(_ hash: String) async throws -> URL {
         URL(fileURLWithPath: try await background { [core] in try core.blob(hash: hash) })
     }
@@ -370,7 +374,8 @@ public struct Queue: Sendable {
         return report
     }
 
-    /// Sends a blocked or dead write again, under a fresh key.
+    /// Queues a blocked or dead write to go again, under a fresh key, on the
+    /// next drain.
     public func release(_ id: String) async throws -> Bool {
         try await background { [core] in try core.release(id: id) }
     }
@@ -394,8 +399,11 @@ public struct Queue: Sendable {
         return withdrawn
     }
 
-    /// Answered writes stay in the queue, with the server's answer, until
-    /// this clears them.
+    /// Clears answered writes, which otherwise stay in the queue with the
+    /// server's answer.
+    ///
+    /// Blocked and dead writes stay until released or withdrawn, as does an
+    /// answered write a waiting write depends on.
     public func forgetAnswered() async throws -> UInt64 {
         try await background { [core] in try core.forgetAnswered() }
     }
@@ -646,6 +654,8 @@ final class Feed: Sendable {
             return .following(
                 generation: generation, core.follow(listener: Listener(feed: self, generation: generation)))
         case .watch:
+            // Read under the lock where the watch stopped between `add`'s look
+            // and this call.
             let seen = seen ?? Result { try translated { try core.dataVersion() } }
             return .watching(
                 generation: generation,
