@@ -578,21 +578,34 @@ final class Feed: Sendable {
         /// Streams added while a key change held the feed off: a reader's
         /// baseline cannot be read until the new core is held.
         var addedWhileSuspended: Set<UUID> = []
+        /// Told once the lock is let go.
+        var told: [(AsyncStream<Change>.Continuation, Change)] = []
         var waitingForStop: [CheckedContinuation<Void, Never>] = []
     }
 
     let holder: CoreHolder
     private let state: Mutex<State>
 
+    /// Runs `body` under the lock, then tells what it queued to stream
+    /// continuations, outside the lock.
+    private func locked<T: Sendable>(_ body: (inout State) throws -> T) rethrows -> T {
+        let (result, told) = try state.withLock { state -> (T, [(AsyncStream<Change>.Continuation, Change)]) in
+            let result = try body(&state)
+            return (result, state.told.drain())
+        }
+        for (continuation, change) in told { continuation.yield(change) }
+        return result
+    }
+
     init(holder: CoreHolder, source: Source) {
         self.holder = holder
         state = Mutex(State(source: source))
     }
 
-    var count: Int { state.withLock { $0.streams.count } }
+    var count: Int { locked { $0.streams.count } }
 
     var watchTask: Task<Void, Never>? {
-        state.withLock { state in
+        locked { state in
             if case .watching(_, let task) = state.phase { task } else { nil }
         }
     }
@@ -600,12 +613,12 @@ final class Feed: Sendable {
     func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
         // Read before the caller goes on, so a save it makes next is told, and
         // outside the lock, since the read can wait on the store.
-        let starts = state.withLock { state in
+        let starts = locked { state in
             guard state.source == .watch, case .idle = state.phase else { return false }
             return !state.closed && !state.halted && state.suspends == 0
         }
         let seen = starts ? Result { try holder.with { try $0.dataVersion() } } : nil
-        let (added, failure) = state.withLock { state -> (Bool, MarfaError?) in
+        let (added, failure) = locked { state -> (Bool, MarfaError?) in
             guard !state.closed else { return (false, nil) }
             state.streams[token] = continuation
             if state.suspends > 0 { state.addedWhileSuspended.insert(token) }
@@ -623,7 +636,7 @@ final class Feed: Sendable {
     }
 
     func remove(_ token: UUID) {
-        state.withLock { state in
+        locked { state in
             state.streams.removeValue(forKey: token)
             state.addedWhileSuspended.remove(token)
             settle(&state)
@@ -632,7 +645,7 @@ final class Feed: Sendable {
 
     /// A watch moves no cursor, so a pause leaves it running.
     func pause() async {
-        state.withLock { state in
+        locked { state in
             state.pauses += 1
             settle(&state)
         }
@@ -640,7 +653,7 @@ final class Feed: Sendable {
     }
 
     func unpause() {
-        state.withLock { state in
+        locked { state in
             state.pauses -= 1
             if state.source == .follow {
                 state.halted = false
@@ -654,7 +667,7 @@ final class Feed: Sendable {
     ///
     /// The streams stay held. Throws `closed` once the feed is.
     func suspend() async throws {
-        let refused = state.withLock { state -> Bool in
+        let refused = locked { state -> Bool in
             guard !state.closed else { return true }
             state.suspends += 1
             settle(&state)
@@ -665,8 +678,9 @@ final class Feed: Sendable {
     }
 
     func resume() {
-        state.withLock { state in
+        locked { state in
             state.suspends -= 1
+            if state.suspends == 0 { state.addedWhileSuspended = [] }
             if state.source == .follow {
                 state.halted = false
                 state.failure = nil
@@ -680,7 +694,7 @@ final class Feed: Sendable {
     /// A reader's stream added meanwhile could take no baseline, and a save
     /// since may have gone unseen, so each is told one `.saved` to read again.
     func retarget(_ source: Source) {
-        let late = state.withLock { state -> [AsyncStream<Change>.Continuation] in
+        let late = locked { state -> [AsyncStream<Change>.Continuation] in
             state.source = source
             state.halted = false
             state.failure = nil
@@ -696,7 +710,7 @@ final class Feed: Sendable {
     }
 
     func close() async {
-        let (streams, watch) = state.withLock { state in
+        let (streams, watch) = locked { state in
             state.closed = true
             var watch: Task<Void, Never>?
             if case .watching(_, let task) = state.phase { watch = task }
@@ -715,13 +729,13 @@ final class Feed: Sendable {
     }
 
     func announce(_ change: Change) {
-        for continuation in state.withLock({ Array($0.streams.values) }) {
+        for continuation in locked({ Array($0.streams.values) }) {
             continuation.yield(change)
         }
     }
 
     func announce(_ change: Change, from generation: Int) {
-        let streams = state.withLock { state in
+        let streams = locked { state in
             state.phase.runs(generation) ? Array(state.streams.values) : []
         }
         for continuation in streams { continuation.yield(change) }
@@ -730,7 +744,7 @@ final class Feed: Sendable {
     /// Returns the waiters for the caller to resume outside the lock.
     func ended(generation: Int, error: MarfaError?) -> [CheckedContinuation<Void, Never>] {
         typealias Ended = (told: [AsyncStream<Change>.Continuation], waiting: [CheckedContinuation<Void, Never>])
-        let ended = state.withLock { state -> Ended in
+        let ended = locked { state -> Ended in
             switch state.phase {
             case .stopping(let current) where current == generation:
                 state.phase = .idle
@@ -767,7 +781,7 @@ final class Feed: Sendable {
 
     private func untilStopped() async {
         await withCheckedContinuation { continuation in
-            let stopped = state.withLock { state -> Bool in
+            let stopped = locked { state -> Bool in
                 guard case .stopping = state.phase else { return true }
                 state.waitingForStop.append(continuation)
                 return false
@@ -791,9 +805,8 @@ final class Feed: Sendable {
                 let error = error as? MarfaError ?? .store(message: "\(error)")
                 state.halted = true
                 state.failure = error
-                for continuation in state.streams.values {
-                    continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
-                }
+                let stopped = Change(origin: .stopped(error), itemId: nil, edgeId: nil)
+                state.told += state.streams.values.map { ($0, stopped) }
             }
         case .following(let generation, let subscription) where !wanted:
             subscription.stop()
@@ -865,7 +878,7 @@ final class Feed: Sendable {
     }
 
     private func failed(generation: Int, error: MarfaError) {
-        let streams = state.withLock { state -> [AsyncStream<Change>.Continuation] in
+        let streams = locked { state -> [AsyncStream<Change>.Continuation] in
             guard state.phase.runs(generation) else { return [] }
             state.failure = error
             return Array(state.streams.values)
@@ -878,7 +891,7 @@ final class Feed: Sendable {
     /// Clears the failure under the lock that takes the streams, so a stream
     /// added in between is not left told only `.stopped`.
     private func recovered(generation: Int, telling change: Change) {
-        let streams = state.withLock { state -> [AsyncStream<Change>.Continuation] in
+        let streams = locked { state -> [AsyncStream<Change>.Continuation] in
             guard state.phase.runs(generation) else { return [] }
             state.failure = nil
             return Array(state.streams.values)

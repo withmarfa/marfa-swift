@@ -80,7 +80,7 @@ final class CoreHolder: Sendable {
             return elect(&state)
         }
         if elected {
-            releaseNow()
+            await releaseOffThread()
             return
         }
         await withCheckedContinuation { continuation in
@@ -138,9 +138,9 @@ final class CoreHolder: Sendable {
             state.phase = .dropping
             return (true, state.closing)
         }
-        if elected { releaseNow() }
-        if case .failure(let error) = reopened { throw error }
+        if elected { await releaseOffThread() }
         if closedMeanwhile { throw MarfaError.closed(message: Self.closedMessage) }
+        if case .failure(let error) = reopened { throw error }
     }
 
     static let closedMessage = "this working copy is closed"
@@ -184,6 +184,11 @@ final class CoreHolder: Sendable {
         return true
     }
 
+    /// Releasing a store can block, so the cooperative pool is left free.
+    private func releaseOffThread() async {
+        _ = try? await background { [self] in releaseNow() }
+    }
+
     /// Drops the core, and only then tells the closers waiting for the store.
     private func releaseNow() {
         var core = state.withLock { $0.core.take() }
@@ -197,7 +202,7 @@ final class CoreHolder: Sendable {
 }
 
 extension Array {
-    fileprivate mutating func drain() -> [Element] {
+    mutating func drain() -> [Element] {
         defer { self = [] }
         return self
     }

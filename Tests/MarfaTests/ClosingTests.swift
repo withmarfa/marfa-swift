@@ -397,4 +397,29 @@ struct ChangingTheKey {
         }
         #expect(isClosed(error))
     }
+
+    @Test func aCloseDuringAFailingReopenMakesUseKeyThrowClosed() async throws {
+        let reopening = DropProbe()
+        let copy = WorkingCopy(
+            holder: CoreHolder(
+                FakeCore.writer(),
+                reopen: { _ in
+                    reopening.begin()
+                    reopening.gate.wait()
+                    throw CoreMarfaError.Store(message: "cannot open")
+                }),
+            hasServer: true)
+        let changing = Task { try await copy.useKey("k") }
+        try await eventually("the store is being reopened") { reopening.hasStarted }
+        let closing = Task { await copy.close() }
+        try await Task.sleep(for: .milliseconds(100))
+        reopening.gate.signal()
+        await closing.value
+        do {
+            try await bounded("useKey") { try await changing.value }
+            Issue.record("useKey reported success")
+        } catch {
+            #expect(isClosed(error), "\(error)")
+        }
+    }
 }
