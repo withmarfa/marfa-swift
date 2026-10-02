@@ -16,7 +16,7 @@ The Swift package `Marfa`: Swift types, `async` calls, change streams and errors
 ## Versions
 
 - A version is a tag on this repository, which is where SwiftPM reads versions from, created only when a release is called for, each the previous plus 0.0.1 whatever the change, as `v0.0.1`, `v0.0.2` and so on. No one writes a version into a file.
-- `.github/workflows/release.yml`, run from `main`, makes a release. With `dry_run`, the default, it builds the core at the pin and an app on the archived framework without Rust. Without it, it also tags the next version on a commit on top of `main` that only points the binary target at the release's archive and checksum, publishes the release, and builds an app on it by URL.
+- `.github/workflows/release.yml`, run from `main`, makes a release. With `dry_run`, the default, it builds the core at the pin and an app on the archived framework without Rust. Without it, it also tags the next version on a commit on top of `main` that only points the binary target at the release's archive and checksum, publishes the release from the `release` environment, which only `main` can deploy to, and builds an app on it by URL.
 
 ## Working here
 

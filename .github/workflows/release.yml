@@ -23,7 +23,6 @@ permissions:
 jobs:
   build:
     name: Build the core
-    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: macos-26
     timeout-minutes: 60
     outputs:
@@ -31,6 +30,13 @@ jobs:
       checksum: ${{ steps.archive.outputs.checksum }}
       pin: ${{ steps.pin.outputs.sha }}
     steps:
+      - name: Refuse any branch but main
+        run: |
+          if [[ "${GITHUB_REF}" != refs/heads/main ]]; then
+            echo "::error::A release is made from main only, and this run is on ${GITHUB_REF}."
+            exit 1
+          fi
+
       # Every tag, to name the next version.
       - uses: actions/checkout@v7
         with:
@@ -77,13 +83,15 @@ jobs:
             Frameworks/MarfaCoreFFI.xcframework "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip"
           echo "checksum=$(swift package compute-checksum "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip")" >> "$GITHUB_OUTPUT"
 
-      # The package as the tag will hold it, with the framework from the archive.
+      # The package with its binary target at the archive itself, so SwiftPM
+      # unpacks the zip a release would publish.
       - name: Build an app on the archive, without Rust
         run: |
           copy="${RUNNER_TEMP}/archived/marfa-swift"
-          mkdir -p "${copy}/Frameworks"
+          mkdir -p "${copy}"
           git archive HEAD | tar -x -C "${copy}"
-          ditto -x -k "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip" "${copy}/Frameworks"
+          cp "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip" "${copy}/"
+          (cd "${copy}" && "${GITHUB_WORKSPACE}/scripts/release.sh" archive MarfaCoreFFI.xcframework.zip)
           scripts/release.sh consumer ".package(path: \"${copy}\")"
 
       - uses: actions/upload-artifact@v7
@@ -107,6 +115,8 @@ jobs:
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Only main can deploy to this environment.
+    environment: release
     permissions:
       contents: write
     env:
@@ -146,11 +156,28 @@ jobs:
             commit -q -m "chore(release): point the binary target at ${VERSION}" -- Package.swift
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Refuse a release that already has this tag name
+        run: |
+          taken="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+            --jq ".[] | select(.tag_name == \"${VERSION}\") | .html_url")"
+          if [[ -n "${taken}" ]]; then
+            echo "::error::A release named ${VERSION} already exists: ${taken}"
+            exit 1
+          fi
+
       # A draft first, so the asset is in place before any tag can name it.
       - name: Draft the release with the archive
+        id: draft
         run: |
-          gh release create "${VERSION}" "${RUNNER_TEMP}/framework/${ASSET}" --draft \
-            --title "${VERSION}" --notes "Carries MarfaCore built from withmarfa/marfa@${PIN}."
+          url="$(gh release create "${VERSION}" "${RUNNER_TEMP}/framework/${ASSET}" --draft \
+            --title "${VERSION}" --notes "Carries MarfaCore built from withmarfa/marfa@${PIN}.")"
+          id="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+            --jq ".[] | select(.html_url == \"${url}\") | .id")"
+          if [[ ! "${id}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not find the draft gh made at ${url}."
+            exit 1
+          fi
+          echo "id=${id}" >> "$GITHUB_OUTPUT"
 
       - name: Tag the release commit
         env:
@@ -158,16 +185,22 @@ jobs:
         run: git push origin "${SHA}:refs/tags/${VERSION}"
 
       - name: Publish the release
-        run: gh release edit "${VERSION}" --draft=false
+        env:
+          ID: ${{ steps.draft.outputs.id }}
+        run: gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${ID}" -F draft=false --silent
 
-      - name: Remove a draft no tag names
-        if: ${{ failure() }}
+      - name: Remove this run's draft unless its tag is pushed
+        if: ${{ (failure() || cancelled()) && steps.draft.outputs.id != '' }}
+        env:
+          ID: ${{ steps.draft.outputs.id }}
+          SHA: ${{ steps.commit.outputs.sha }}
         run: |
-          if [[ -n "$(git ls-remote --tags origin "refs/tags/${VERSION}")" ]]; then
-            echo "::error::${VERSION} is tagged but its release is a draft. Publish it with: gh release edit ${VERSION} --draft=false"
-          else
-            gh release delete "${VERSION}" --yes || true
+          tagged="$(git ls-remote origin "refs/tags/${VERSION}" | cut -f1)"
+          if [[ -n "${SHA}" && "${tagged}" == "${SHA}" ]]; then
+            echo "::error::${VERSION} is tagged at this run's commit but its release is a draft. Publish it with: gh api -X PATCH repos/${GITHUB_REPOSITORY}/releases/${ID} -F draft=false"
+            exit 1
           fi
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${ID}"
 
   verify:
     name: Build an app on the release, without Rust

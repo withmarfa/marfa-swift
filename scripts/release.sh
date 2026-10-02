@@ -3,10 +3,11 @@
 #
 #   scripts/release.sh version                    # the next tag: the latest v<x>.<y>.<z> plus 0.0.1
 #   scripts/release.sh manifest <url> <checksum>  # points Package.swift's binary target at a release
+#   scripts/release.sh archive <zip>              # points it at a zip in the package instead
 #   scripts/release.sh consumer <dependency>      # builds and runs an app on the package, without Rust
 #
 # Each acts on the repository in the current directory.
-# `scripts/release.test.sh` pins the first two.
+# `scripts/release.test.sh` pins all but `consumer`.
 set -euo pipefail
 
 version() {
@@ -23,16 +24,8 @@ version() {
   echo "v${major}.${minor}.$((patch + 1))"
 }
 
-manifest() {
-  local url="$1" checksum="$2" file=Package.swift
-  if [[ ! "${url}" =~ ^https://[^[:space:]\"]+\.zip$ ]]; then
-    echo "release.sh: '${url}' is not an https URL of a zip" >&2
-    exit 1
-  fi
-  if [[ ! "${checksum}" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "release.sh: '${checksum}' is not a SHA-256 checksum" >&2
-    exit 1
-  fi
+retarget() {
+  local replacement="$1" file=Package.swift
   local local_target='.binaryTarget(name: "MarfaCoreFFI", path: "Frameworks/MarfaCoreFFI.xcframework"),'
   local count
   count="$(grep -cF "${local_target}" "${file}" || true)"
@@ -42,18 +35,35 @@ manifest() {
   fi
   local rewritten
   rewritten="$(mktemp)"
-  awk -v from="${local_target}" \
-    -v to=".binaryTarget(name: \"MarfaCoreFFI\", url: \"${url}\", checksum: \"${checksum}\")," '
+  awk -v from="${local_target}" -v to="${replacement}" '
     { i = index($0, from) }
     i { $0 = substr($0, 1, i - 1) to substr($0, i + length(from)) }
     { print }' "${file}" >"${rewritten}"
   mv "${rewritten}" "${file}"
 }
 
-# Builds a package that depends on Marfa through <dependency>, such as
-# `.package(url: "https://github.com/withmarfa/marfa-swift", exact: "0.0.1")`,
-# for macOS and the iOS simulator, and runs it on the Mac, with no Rust
-# toolchain on the PATH.
+manifest() {
+  local url="$1" checksum="$2"
+  if [[ ! "${url}" =~ ^https://[^[:space:]\"]+\.zip$ ]]; then
+    echo "release.sh: '${url}' is not an https URL of a zip" >&2
+    exit 1
+  fi
+  if [[ ! "${checksum}" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "release.sh: '${checksum}' is not a SHA-256 checksum" >&2
+    exit 1
+  fi
+  retarget ".binaryTarget(name: \"MarfaCoreFFI\", url: \"${url}\", checksum: \"${checksum}\"),"
+}
+
+archive() {
+  local zip="$1"
+  if [[ ! "${zip}" =~ ^[^/[:space:]\"][^[:space:]\"]*\.zip$ || ! -f "${zip}" ]]; then
+    echo "release.sh: '${zip}' is not a zip inside the package" >&2
+    exit 1
+  fi
+  retarget ".binaryTarget(name: \"MarfaCoreFFI\", path: \"${zip}\"),"
+}
+
 consumer() {
   local dependency="$1" dir path="" entry
   dir="$(mktemp -d)"
@@ -124,9 +134,10 @@ SWIFT
 case "${1:-}" in
   version) version ;;
   manifest) manifest "$2" "$3" ;;
+  archive) archive "$2" ;;
   consumer) consumer "$2" ;;
   *)
-    echo "usage: scripts/release.sh version | manifest <url> <checksum> | consumer <dependency>" >&2
+    echo "usage: scripts/release.sh version | manifest <url> <checksum> | archive <zip> | consumer <dependency>" >&2
     exit 2
     ;;
 esac

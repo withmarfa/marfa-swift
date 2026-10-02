@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Pins scripts/release.sh: the next version from the tags, and the manifest a
-# release tags.
+# Pins scripts/release.sh: the next version from the tags, the manifest a
+# release tags, and the one a dry run builds on.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -56,5 +56,17 @@ check "the binary target names the release asset and its checksum" \
 check "only the binary target changes" \
   "$(git -C "${repo}" diff --numstat -- Package.swift)" "$(printf '1\t1\tPackage.swift')"
 check "a manifest already rewritten is refused" "$(rewrite "${url}" "${checksum}")" refused
+
+git -C "${repo}" checkout -q -- Package.swift
+zip=MarfaCoreFFI.xcframework.zip
+local_zip() { (cd "${repo}" && "${release}" archive "$1" 2>/dev/null) && echo rewrote || echo refused; }
+check "a zip that is not there is refused" "$(local_zip "${zip}")" refused
+touch "${repo}/${zip}"
+check "a zip outside the package is refused" "$(local_zip "${repo}/${zip}")" refused
+check "a zip in the package rewrites the manifest" "$(local_zip "${zip}")" rewrote
+check "the binary target names the zip" \
+  "$(grep -F '.binaryTarget(' "${repo}/Package.swift")" "        .binaryTarget(name: \"MarfaCoreFFI\", path: \"${zip}\"),"
+check "only the binary target changes for a zip" \
+  "$(git -C "${repo}" diff --numstat -- Package.swift)" "$(printf '1\t1\tPackage.swift')"
 
 exit "${failed}"
