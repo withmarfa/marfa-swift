@@ -29,20 +29,51 @@ enum Live {
             occurredAt: occurredAt)
     }
 
-    /// The working copy cannot register a type.
-    static func register(_ type: [String: Any]) async throws {
+    /// The working copy cannot register a type or an edge type.
+    static func register(_ definition: [String: Any], at path: String = "types") async throws {
         guard let server else {
             Issue.record("no server to register a type on")
             return
         }
-        var request = URLRequest(url: server.url.appending(path: "types"))
+        var request = URLRequest(url: server.url.appending(path: path))
         request.httpMethod = "POST"
         request.setValue("Bearer \(server.key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: type)
+        request.httpBody = try JSONSerialization.data(withJSONObject: definition)
         let (body, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode
-        #expect(status == 201, "registering a type answered \(status ?? 0): \(String(decoding: body, as: UTF8.self))")
+        #expect(
+            status == 201, "registering at \(path) answered \(status ?? 0): \(String(decoding: body, as: UTF8.self))")
+    }
+
+    /// What the server answers, read past the working copy.
+    static func read(_ path: String, query: [URLQueryItem] = []) async throws -> [String: JSONValue] {
+        let server = try #require(server)
+        var request = URLRequest(url: server.url.appending(path: path).appending(queryItems: query))
+        request.setValue("Bearer \(server.key)", forHTTPHeaderField: "Authorization")
+        let (body, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode
+        try #require(status == 200, "reading \(path) answered \(status ?? 0): \(String(decoding: body, as: UTF8.self))")
+        return try JSONDecoder().decode([String: JSONValue].self, from: body)
+    }
+
+    /// Every edge type the server lists, by id.
+    static func edgeTypes() async throws -> [String: [String: JSONValue]] {
+        var listed: [String: [String: JSONValue]] = [:]
+        var cursor: String?
+        repeat {
+            let page = try await read(
+                "edge-types", query: cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? [])
+            guard case .array(let rows) = page["data"] else {
+                Issue.record("the edge type listing held no data: \(page)")
+                return listed
+            }
+            for case .object(let edgeType) in rows {
+                if let id = edgeType["id"]?.string { listed[id] = edgeType }
+            }
+            cursor = page["next_cursor"]?.string
+        } while cursor != nil
+        return listed
     }
 }
 
@@ -512,6 +543,141 @@ struct LiveServer {
             }()
             #expect(try await WorkingCopy.open(store: store).handle == .writer)
         }
+    }
+}
+
+@Suite(
+    .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
+    .timeLimit(.minutes(2)))
+struct LiveCatalog {
+    @Test func aCustomTypeAndAnEdgeTypeReachTheAppAsTheServerHoldsThem() async throws {
+        let suffix = UUID().uuidString.prefix(8).lowercased()
+        let dish = "user.dish\(suffix)"
+        let recipe = "user.recipe\(suffix)"
+        let inspired = "user.inspired-by-\(suffix)"
+        try await Live.register([
+            "id": dish, "label": "Dish",
+            "fields": ["serves": ["type": "integer", "description": "How many it feeds", "required": true]],
+        ])
+        try await Live.register([
+            "id": recipe, "label": "Recipe", "parent": dish,
+            "fields": ["title": ["type": "string"], "method": ["type": "string"]],
+            "display_hints": ["title_field": "title", "body_field": "method"],
+        ])
+        try await Live.register(
+            [
+                "id": inspired, "label": "Inspired by", "cardinality": "many-to-one",
+                "reverse_name": "user.inspired-\(suffix)", "written_at": "target",
+                "property_schema": ["since": ["type": "string"]],
+            ], at: "edge-types")
+        let store = Live.store()
+        let copy = try await Live.hydrated(store)
+        // A reader names no server, so it answers from the store alone.
+        let offline = try await WorkingCopy.openReader(store: store)
+
+        for catalog in [copy.catalog, offline.catalog] {
+            let type = try await catalog.itemType(recipe)
+            #expect(type.label == "Recipe")
+            #expect(type.parent == dish)
+            #expect(type.titleField == "title")
+            #expect(type.bodyField == "method")
+            let declaredBy = Dictionary(uniqueKeysWithValues: type.fields.map { ($0.name, $0.declaredBy) })
+            #expect(declaredBy == ["serves": dish, "title": recipe, "method": recipe])
+            let serves = try #require(type.fields.first { $0.name == "serves" })
+            #expect(serves.type == "integer")
+            #expect(serves.required)
+            #expect(serves.description == "How many it feeds")
+
+            let answered = try await Live.read("types/\(recipe)")
+            guard case .object(let fields) = answered["fields"] else {
+                Issue.record("the server answered no fields for \(recipe): \(answered)")
+                return
+            }
+            #expect(answered["label"] == .string("Recipe"))
+            #expect(answered["parent"] == .string(dish))
+            #expect(
+                Dictionary(uniqueKeysWithValues: type.fields.map { ($0.name, JSONValue.object($0.definition)) })
+                    == fields)
+
+            let listed = try await catalog.itemTypes()
+            #expect(listed.map(\.id) == listed.map(\.id).sorted())
+            #expect(listed.first { $0.id == recipe } == type)
+            #expect(listed.contains { $0.id == dish })
+            #expect(listed.contains { $0.id == "core.note" })
+
+            let edgeType = try await catalog.edgeType(inspired)
+            let server = try #require(try await Live.edgeTypes()[inspired])
+            #expect(edgeType.reverseName == "user.inspired-\(suffix)")
+            #expect(server["reverse_name"] == .string("user.inspired-\(suffix)"))
+            #expect(edgeType.writtenAt == .target)
+            #expect(server["written_at"] == "target")
+            #expect(edgeType.label == "Inspired by")
+            #expect(server["cardinality"] == .string(edgeType.cardinality))
+            #expect(server["cascade_on_delete"] == .string(edgeType.cascadeOnDelete))
+            #expect(server["source_type_constraints"] == .array(edgeType.sourceTypeConstraints.map(JSONValue.string)))
+            #expect(server["target_type_constraints"] == .array(edgeType.targetTypeConstraints.map(JSONValue.string)))
+            #expect(server["shipped"] == .bool(edgeType.shipped))
+            #expect(!edgeType.shipped)
+            #expect(
+                server["property_schema"]
+                    == .object(
+                        Dictionary(
+                            uniqueKeysWithValues: edgeType.properties.map { ($0.name, JSONValue.object($0.definition)) }
+                        )))
+            #expect(edgeType.properties.map(\.declaredBy) == [inspired])
+            let edgeTypes = try await catalog.edgeTypes()
+            #expect(edgeTypes.contains { $0.id == inspired })
+            #expect(edgeTypes.contains { $0.id == "references" && $0.shipped })
+        }
+
+        await #expect {
+            _ = try await copy.catalog.itemType("user.never\(suffix)")
+        } throws: { error in
+            guard case Marfa.MarfaError.notFound(let code, _) = error else { return false }
+            return code == "type_not_found"
+        }
+        await #expect {
+            _ = try await copy.catalog.edgeType("user.never-\(suffix)")
+        } throws: { error in
+            guard case Marfa.MarfaError.notFound(let code, _) = error else { return false }
+            return code == "edge_type_not_found"
+        }
+    }
+
+    /// The witness: the same copy answers once it has hydrated.
+    @Test func aCopyWithAServerThatNeverHydratedSaysItHoldsNoCatalog() async throws {
+        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+        #expect(try await copy.status().catalogVersion == nil)
+        await #expect {
+            _ = try await copy.catalog.itemTypes()
+        } throws: { error in
+            if case Marfa.MarfaError.noCatalog = error { true } else { false }
+        }
+        await #expect {
+            _ = try await copy.catalog.edgeTypes()
+        } throws: { error in
+            if case Marfa.MarfaError.noCatalog = error { true } else { false }
+        }
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        #expect(try await copy.status().catalogVersion != nil)
+        #expect(try await !copy.catalog.itemTypes().isEmpty)
+        #expect(try await !copy.catalog.edgeTypes().isEmpty)
+    }
+
+    @Test func aTypeRegisteredAfterTheHydrationIsToldAndRead() async throws {
+        let copy = try await Live.hydrated()
+        let before = try #require(try await copy.status().catalogVersion)
+        let late = "user.late\(UUID().uuidString.prefix(8).lowercased())"
+        try await Live.register(["id": late, "label": "Late", "fields": ["title": ["type": "string"]]])
+        let heard = Heard(copy.changes())
+        _ = try await copy.catchUp()
+        try await eventually("the catalog change was told", within: 10) {
+            heard.all.contains(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+        }
+        let after = try #require(try await copy.status().catalogVersion)
+        #expect(after > before)
+        #expect(try await copy.catalog.itemType(late).label == "Late")
+        try await bounded("close") { await copy.close() }
     }
 }
 

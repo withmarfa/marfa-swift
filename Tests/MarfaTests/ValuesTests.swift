@@ -73,6 +73,7 @@ struct Errors {
         (.NoServer(message: "m"), .noServer(message: "m")),
         (.NoCursor(message: "m"), .noCursor(message: "m")),
         (.HydrationIncomplete(message: "m"), .hydrationIncomplete(message: "m")),
+        (.NoCatalog(message: "m"), .noCatalog(message: "m")),
         (
             .WrongSchema(expected: "8", found: "7", path: "p", message: "m"),
             .wrongSchema(expected: "8", found: "7", path: "p", message: "m")
@@ -161,6 +162,7 @@ struct OwnValueTypes {
         for hydration in Hydration.allCases { #expect(Hydration(hydration.core) == hydration) }
         for field in SortField.allCases { #expect(SortField(field.core) == field) }
         for direction in SortDirection.allCases { #expect(SortDirection(direction.core) == direction) }
+        for end in EdgeEnd.allCases { #expect(EdgeEnd(end.core) == end) }
     }
 
     @Test func everyVerdictCrossesToTheGlueAndBack() {
@@ -190,9 +192,101 @@ struct OwnValueTypes {
         #expect(CatchUpReport(caught.core) == caught)
         let status = Status(
             serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],
-            eventCursor: "c", hydration: .inProgress, items: 1, edges: 2)
+            eventCursor: "c", hydration: .inProgress, items: 1, edges: 2, catalogVersion: 5)
         #expect(Status(status.core) == status)
+        let unheld = Status(hydration: .never)
+        #expect(Status(unheld.core).catalogVersion == nil)
         let sort = Sort(field: .occurredAt, direction: .descending)
         #expect(Sort(sort.core) == sort)
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct CatalogTypes {
+    static func field(_ name: String, declaredBy: String, json: String) -> CoreTypeField {
+        CoreTypeField(
+            name: name, fieldType: "string", required: true, description: "d", declaredBy: declaredBy,
+            definitionJson: json)
+    }
+
+    @Test func anItemTypeArrivesWithEachFieldAndWhereItIsDeclared() throws {
+        let core = CoreItemType(
+            id: "user.recipe", label: "Recipe", description: "A dish", parent: "user.dish", version: 3,
+            fields: [
+                Self.field("serves", declaredBy: "user.dish", json: #"{"type":"string","required":true,"x":[1,2]}"#),
+                Self.field("title", declaredBy: "user.recipe", json: #"{"type":"string"}"#),
+            ],
+            titleField: "title", bodyField: "method", linkField: "vendor_id", roles: ["container"],
+            compatibleWith: ["user.meal"])
+        let type = try ItemType(core)
+        #expect(
+            type
+                == ItemType(
+                    id: "user.recipe", label: "Recipe", description: "A dish", parent: "user.dish", version: 3,
+                    fields: [
+                        TypeField(
+                            name: "serves", type: "string", required: true, description: "d",
+                            declaredBy: "user.dish", definition: ["type": "string", "required": true, "x": [1, 2]]),
+                        TypeField(
+                            name: "title", type: "string", required: true, description: "d",
+                            declaredBy: "user.recipe", definition: ["type": "string"]),
+                    ],
+                    titleField: "title", bodyField: "method", linkField: "vendor_id", roles: ["container"],
+                    compatibleWith: ["user.meal"]))
+    }
+
+    @Test func anEdgeTypeArrivesWithItsReverseNameAndTheEndThatWritesIt() throws {
+        let core = CoreEdgeType(
+            id: "mentor-of", label: "Mentor of", description: nil, cardinality: "one-to-many",
+            reverseName: "mentored-by", writtenAt: .target, sourceTypeConstraints: ["core.person"],
+            targetTypeConstraints: ["*"], cascadeOnDelete: "block",
+            properties: [Self.field("since", declaredBy: "mentor-of", json: #"{"type":"string"}"#)], shipped: false)
+        let type = try EdgeType(core)
+        #expect(
+            type
+                == EdgeType(
+                    id: "mentor-of", label: "Mentor of", cardinality: "one-to-many", reverseName: "mentored-by",
+                    writtenAt: .target, sourceTypeConstraints: ["core.person"], targetTypeConstraints: ["*"],
+                    cascadeOnDelete: "block",
+                    properties: [
+                        TypeField(
+                            name: "since", type: "string", required: true, description: "d",
+                            declaredBy: "mentor-of", definition: ["type": "string"])
+                    ]))
+    }
+
+    @Test func aDefinitionThatIsNoObjectIsRefusedRatherThanEmptied() {
+        let core = CoreItemType(
+            id: "t", label: nil, description: nil, parent: nil, version: 0,
+            fields: [Self.field("f", declaredBy: "t", json: "[1]")], titleField: nil, bodyField: nil,
+            linkField: nil, roles: [], compatibleWith: [])
+        #expect {
+            try translated { try ItemType(core) }
+        } throws: { error in
+            if case Marfa.MarfaError.decoding = error { true } else { false }
+        }
+    }
+
+    /// An empty list would read as an instance with no types at all.
+    @Test func aCopyThatNeverHeldACatalogSaysSoForEveryRead() async throws {
+        let copy = try await WorkingCopy.open(store: temporaryStore())
+        #expect(try await copy.status().catalogVersion == nil)
+        let reads: [(String, @Sendable () async throws -> Void)] = [
+            ("item types", { _ = try await copy.catalog.itemTypes() }),
+            ("item type", { _ = try await copy.catalog.itemType("core.note") }),
+            ("edge types", { _ = try await copy.catalog.edgeTypes() }),
+            ("edge type", { _ = try await copy.catalog.edgeType("references") }),
+        ]
+        for (name, read) in reads {
+            await #expect {
+                try await read()
+            } throws: { error in
+                guard case Marfa.MarfaError.noCatalog = error else {
+                    Issue.record("\(name) threw \(error)")
+                    return false
+                }
+                return true
+            }
+        }
     }
 }

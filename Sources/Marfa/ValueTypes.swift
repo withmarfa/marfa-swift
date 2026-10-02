@@ -481,11 +481,14 @@ public struct Status: Sendable, Hashable {
     public var hydration: Hydration
     public var items: UInt64
     public var edges: UInt64
+    /// Moves each time a refresh changes the item type or edge type catalog,
+    /// and at no other time; `nil` until the copy first holds a catalog.
+    public var catalogVersion: UInt64?
 
     public init(
         serverOrigin: String? = nil, sliceTypes: [String] = [], sliceTier: Tier? = nil,
         sliceEdgeTypes: [String] = [], pinned: [String] = [], eventCursor: String? = nil,
-        hydration: Hydration = .never, items: UInt64 = 0, edges: UInt64 = 0
+        hydration: Hydration = .never, items: UInt64 = 0, edges: UInt64 = 0, catalogVersion: UInt64? = nil
     ) {
         self.serverOrigin = serverOrigin
         self.sliceTypes = sliceTypes
@@ -496,20 +499,22 @@ public struct Status: Sendable, Hashable {
         self.hydration = hydration
         self.items = items
         self.edges = edges
+        self.catalogVersion = catalogVersion
     }
 
     init(_ core: CoreStatus) {
         self.init(
             serverOrigin: core.serverOrigin, sliceTypes: core.sliceTypes, sliceTier: core.sliceTier.map(Tier.init),
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
-            hydration: Hydration(core.hydration), items: core.items, edges: core.edges)
+            hydration: Hydration(core.hydration), items: core.items, edges: core.edges,
+            catalogVersion: core.catalogVersion)
     }
 
     var core: CoreStatus {
         CoreStatus(
             serverOrigin: serverOrigin, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
             sliceEdgeTypes: sliceEdgeTypes, pinned: pinned, eventCursor: eventCursor, hydration: hydration.core,
-            items: items, edges: edges)
+            items: items, edges: edges, catalogVersion: catalogVersion)
     }
 }
 

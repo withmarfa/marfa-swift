@@ -37,3 +37,7 @@ public typealias CoreMarfaError = MarfaError
 public typealias CoreSubscription = Subscription
 public typealias CoreChangeListener = ChangeListener
 public typealias CoreThumbnail = Thumbnail
+public typealias CoreItemType = ItemType
+public typealias CoreEdgeType = EdgeType
+public typealias CoreTypeField = TypeField
+public typealias CoreEdgeEnd = EdgeEnd

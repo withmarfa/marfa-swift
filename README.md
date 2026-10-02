@@ -43,6 +43,8 @@ Set the tier on each `Draft`. Without one, the key's default tier decides, and a
 
 Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does, and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events; if it stops with an error, the next hydration or catch-up starts it again.
 
+`copy.catalog` reads the instance's item types, with the fields each inherits, and its edge types, with their reverse names, custom ones included. It answers from the copy alone, so it works offline. The first hydration brings the catalog; before it, every read throws `noCatalog` rather than answering no types. `Status.catalogVersion` moves whenever a hydration, a catch-up or a held stream changes the catalog, and a held `changes()` stream is told `.refreshed(.catalog)`, or `.refreshed(.hydrated)` for a hydration.
+
 `MarfaTypes`, a second product, holds the server's wire types, generated from the pinned `openapi.json`, for reading answers the working copy does not hold.
 
 ## Keys

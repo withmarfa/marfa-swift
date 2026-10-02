@@ -139,6 +139,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var gated = false
         var readsFail: CoreMarfaError?
         var withdrawable: Set<String> = []
+        var catalogVersion: UInt64? = 1
+        var catchUpChangesCatalog = false
     }
 
     let state = Mutex(State())
@@ -197,7 +199,16 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func catchUp() throws -> CoreCatchUpReport {
         try refreshing()
-        return state.withLock { $0.caughtUp }
+        return state.withLock { state in
+            if state.catchUpChangesCatalog { state.catalogVersion = (state.catalogVersion ?? 0) + 1 }
+            return state.caughtUp
+        }
+    }
+
+    override func status() throws -> CoreStatus {
+        CoreStatus(
+            serverOrigin: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [], eventCursor: nil,
+            hydration: .complete, items: 0, edges: 0, catalogVersion: state.withLock { $0.catalogVersion })
     }
 
     override func withdraw(id: String) throws -> Bool {

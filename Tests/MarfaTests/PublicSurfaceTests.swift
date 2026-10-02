@@ -54,5 +54,12 @@ import Testing
         #expect(ListFilters(state: .archived, tier: .feed).state == .archived)
         #expect(SearchFilters(state: .trashed).state == .trashed)
         #expect(Draft(type: "core.note", tier: .library).tier == .library)
+        let field = TypeField(name: "title", type: "string", declaredBy: "core.note")
+        #expect(ItemType(id: "core.note", fields: [field]).fields.map(\.id) == ["title"])
+        let edgeType = EdgeType(
+            id: "parent-of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target)
+        #expect(edgeType.writtenAt == .target)
+        #expect(Status(catalogVersion: 2).catalogVersion == 2)
+        #expect(Change.Refresh.catalog != .hydrated)
     }
 }

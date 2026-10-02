@@ -18,6 +18,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case noServer(message: String)
     case noCursor(message: String)
     case hydrationIncomplete(message: String)
+    /// The copy has never held the server's type catalog; a hydration reads
+    /// it.
+    case noCatalog(message: String)
     /// The store at `path` was made by another build; discard it and hydrate.
     case wrongSchema(expected: String, found: String, path: String, message: String)
     case readingHandle(message: String)
@@ -40,7 +43,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
             .validation(_, let message), .unknownType(let message), .rateLimited(_, let message, _),
             .server(_, _, let message), .network(let message), .decoding(let message), .store(let message),
-            .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message),
+            .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .catchUpTooOld(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .contractMismatch(_, _, _, _, let message), .invalid(let message):
@@ -66,6 +69,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .NoServer(let message): self = .noServer(message: message)
         case .NoCursor(let message): self = .noCursor(message: message)
         case .HydrationIncomplete(let message): self = .hydrationIncomplete(message: message)
+        case .NoCatalog(let message): self = .noCatalog(message: message)
         case .WrongSchema(let expected, let found, let path, let message):
             self = .wrongSchema(expected: expected, found: found, path: path, message: message)
         case .ReadingHandle(let message): self = .readingHandle(message: message)

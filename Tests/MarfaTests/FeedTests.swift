@@ -113,6 +113,18 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
+    @Test func aStreamThatReadAChangedCatalogIsToldAsACatalogRefresh() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(core: core, hasServer: true)
+        let heard = Heard(copy.changes())
+        core.change(0, CoreChange(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9"))
+        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10"))
+        let item = Marfa.Change(origin: .server(event: "item.created", cursor: "10"), itemId: "n1", edgeId: nil)
+        try await eventually("both changes were told") { heard.all.count == 2 }
+        #expect(heard.all == [refreshed(.catalog), item])
+        try await bounded("close") { await copy.close() }
+    }
+
     /// The core refuses a follow started before the last one has ended.
     @Test func aNewFollowStartsOnlyOnceTheLastHasEnded() async throws {
         let core = FakeCore.writer()
@@ -205,6 +217,23 @@ struct Changes {
         try await eventually("the hydration and the catch-up that applied events were told") {
             heard.all == [refreshed(.hydrated), refreshed(.caughtUp)]
         }
+        try await bounded("close") { await copy.close() }
+    }
+
+    /// A catch-up reads the catalog before it applies anything, and may
+    /// change it while applying no event.
+    @Test func aCatchUpThatChangedTheCatalogIsToldSo() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let heard = Heard(copy.changes())
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        core.state.withLock { $0.catchUpChangesCatalog = true }
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        core.state.withLock { $0.caughtUp.applied = 1 }
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        try await eventually("each catch-up that changed the catalog was told") { heard.all.count == 3 }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all == [refreshed(.catalog), refreshed(.catalog), refreshed(.caughtUp)])
         try await bounded("close") { await copy.close() }
     }
 

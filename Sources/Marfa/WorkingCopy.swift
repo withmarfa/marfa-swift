@@ -22,6 +22,7 @@ public final class WorkingCopy: Sendable {
     public let extensions: Extensions
     public let blobs: Blobs
     public let queue: Queue
+    public let catalog: Catalog
 
     init(core: Core, hasServer: Bool) {
         self.core = core
@@ -35,6 +36,7 @@ public final class WorkingCopy: Sendable {
         extensions = Extensions(core: core, feed: feed)
         blobs = Blobs(core: core, feed: feed)
         queue = Queue(core: core, feed: feed)
+        catalog = Catalog(core: core)
     }
 
     /// Opens the store at `store`, making it when absent.
@@ -78,11 +80,19 @@ public final class WorkingCopy: Sendable {
         return report
     }
 
-    /// Applies every event since the last hydration or catch-up.
+    /// Reads the type catalog again, then applies every event since the
+    /// last hydration or catch-up.
     public func catchUp() async throws -> CatchUpReport {
         await feed.pause()
         defer { feed.unpause() }
-        let report = CatchUpReport(try await background { [core] in try core.catchUp() })
+        let (report, catalogChanged) = try await background { [core] in
+            let before = try core.status().catalogVersion
+            let report = CatchUpReport(try core.catchUp())
+            return (report, try core.status().catalogVersion != before)
+        }
+        if catalogChanged {
+            feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+        }
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -99,6 +109,11 @@ public final class WorkingCopy: Sendable {
     }
 
     /// What changes in the copy while the stream is held, to read again by.
+    ///
+    /// A server event the copy applied arrives as `.server`, naming the
+    /// event's type and the item or edge it was about. A catch-up or a held
+    /// stream that read a changed type catalog arrives as
+    /// `.refreshed(.catalog)`, naming neither.
     ///
     /// A writer with a server follows the server's events only while at least
     /// one stream is held, and pauses the follow during a hydration or
@@ -144,10 +159,15 @@ public struct Change: Sendable, Hashable {
     }
 
     public enum Refresh: Sendable, Hashable {
+        /// Everything may have changed, the type catalog included.
         case hydrated
         case caughtUp
         case drained
         case withdrawn
+        /// A catch-up or a held stream read an item type or edge type
+        /// catalog that differs from the one the copy held; read `catalog`
+        /// again.
+        case catalog
     }
 
     public let origin: Origin
@@ -746,12 +766,15 @@ final class Listener: CoreChangeListener, Sendable {
     private var feed: Feed? { held.withLock { $0.feed } }
 
     func changed(change: CoreChange) {
-        feed?.announce(
-            Change(
-                origin: .server(event: change.event, cursor: change.cursor), itemId: change.itemId,
-                edgeId: change.edgeId),
-            from: generation)
+        let origin: Change.Origin =
+            change.event == Self.catalogChanged
+            ? .refreshed(.catalog) : .server(event: change.event, cursor: change.cursor)
+        feed?.announce(Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId), from: generation)
     }
+
+    /// What the core names a stream that read a changed catalog, in place of
+    /// an event's type.
+    static let catalogChanged = "catalog.changed"
 
     /// Resumes waiters only once nothing on this thread holds the feed, since
     /// one may drop the working copy and open the store again at once.
