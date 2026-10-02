@@ -2,8 +2,6 @@ import Foundation
 import MarfaTypes
 import Testing
 
-/// A row of an item page reads as the generated item, its snake-case names
-/// reaching their Swift spellings.
 @Test func aPageOfItemsReadsEachRow() throws {
     let item =
         #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","schema_version":1}"#
@@ -16,13 +14,11 @@ import Testing
     #expect(row.id == "i1")
     #expect(row.schemaVersion == 1)
     #expect(page.nextCursor == nil)
-    // The witness that the cursor's name is read at all.
     let next = try JSONDecoder().decode(
         Components.Schemas.ItemPage.self, from: Data(#"{"data":[],"next_cursor":"c1"}"#.utf8))
     #expect(next.nextCursor == "c1")
 }
 
-/// The server a live test reads, named by `MARFA_API_URL` and `MARFA_API_KEY`.
 private let live: (url: URL, key: String)? = {
     let environment = ProcessInfo.processInfo.environment
     // The same reading as `Server.fromEnvironment`, which this target cannot import.
@@ -38,9 +34,6 @@ func theLiveTestHasAServerWhereItIsRequired() {
     #expect(live != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_API_URL or MARFA_API_KEY is not")
 }
 
-/// The pinned server's own answers read as the types generated from its
-/// document: the root names the contract they were generated for, and a
-/// page holding a note this test sends reads it as an item.
 @Test(.enabled(if: live != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"))
 func thePinnedServerAnswersInTheseTypes() async throws {
     let (url, key) = try #require(live)

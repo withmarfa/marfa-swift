@@ -2,9 +2,7 @@ import Foundation
 import Marfa
 import Testing
 
-/// What an app can reach with a plain import, as an app's previews and tests
-/// do: the core's vocabulary has to be constructible without the package's
-/// testing access.
+/// A plain import, without `@testable`, as an app's previews and tests use.
 @Suite struct PublicSurface {
     @Test func anAppMakesItsOwnItemsAndEdges() {
         let item = Item(
