@@ -2,8 +2,8 @@ name: MarfaSample
 options:
   bundleIdPrefix: com.withmarfa
   deploymentTarget:
-    iOS: "18.0"
-    macOS: "15.0"
+    iOS: "27.0"
+    macOS: "27.0"
 packages:
   Marfa:
     path: ../..

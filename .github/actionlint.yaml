@@ -1,0 +1,5 @@
+# GitHub's hosted `xcode-27` image is newer than actionlint's list of hosted
+# labels. It is not a self-hosted runner; this key is the only way to name it.
+self-hosted-runner:
+  labels:
+    - xcode-27

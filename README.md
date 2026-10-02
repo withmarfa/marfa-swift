@@ -1,6 +1,6 @@
 # marfa-swift
 
-The Swift package `Marfa`, for iOS and macOS on Apple silicon. It embeds `MarfaCore`, the Rust engine from `withmarfa/marfa`, which holds a working copy of a slice of one Marfa server, queues writes for it with their verdicts, follows its events and keeps blobs. This package gives the core Swift types, `async` calls, change streams and typed errors.
+The Swift package `Marfa`, for iOS 27 and macOS 27 on Apple silicon, built with Xcode 27 or later. It embeds `MarfaCore`, the Rust engine from `withmarfa/marfa`, which holds a working copy of a slice of one Marfa server, queues writes for it with their verdicts, follows its events and keeps blobs. This package gives the core Swift types, `async` calls, change streams and typed errors.
 
 ## Installing
 
