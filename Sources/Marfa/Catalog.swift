@@ -17,24 +17,24 @@ import MarfaCoreNames
 /// never an empty list. An id the catalog does not hold throws `notFound`,
 /// with the code `type_not_found` or `edge_type_not_found`.
 public struct Catalog: Sendable {
-    let core: Core
+    let holder: CoreHolder
 
     /// By id.
     public func itemTypes() async throws -> [ItemType] {
-        try await background { [core] in try core.itemTypes().map(ItemType.init) }
+        try await holder.run { core in try core.itemTypes().map(ItemType.init) }
     }
 
     public func itemType(_ id: String) async throws -> ItemType {
-        try await background { [core] in try ItemType(core.itemType(id: id)) }
+        try await holder.run { core in try ItemType(core.itemType(id: id)) }
     }
 
     /// By id.
     public func edgeTypes() async throws -> [EdgeType] {
-        try await background { [core] in try core.edgeTypes().map(EdgeType.init) }
+        try await holder.run { core in try core.edgeTypes().map(EdgeType.init) }
     }
 
     public func edgeType(_ id: String) async throws -> EdgeType {
-        try await background { [core] in try EdgeType(core.edgeType(id: id)) }
+        try await holder.run { core in try EdgeType(core.edgeType(id: id)) }
     }
 }
 

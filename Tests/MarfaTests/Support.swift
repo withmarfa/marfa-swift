@@ -143,6 +143,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
         var catchUpFails: CoreMarfaError?
+        var probe: DropProbe?
     }
 
     let state = Mutex(State())
@@ -155,6 +156,20 @@ final class FakeCore: Core, @unchecked Sendable {
 
     static func writer() -> FakeCore {
         FakeCore(noHandle: .init())
+    }
+
+    /// A writer whose drop waits on `probe`, to hold a close in the middle of
+    /// releasing the store.
+    static func writer(probe: DropProbe) -> FakeCore {
+        let core = FakeCore(noHandle: .init())
+        core.state.withLock { $0.probe = probe }
+        return core
+    }
+
+    deinit {
+        guard let probe = state.withLock({ $0.probe }) else { return }
+        probe.begin()
+        probe.gate.wait()
     }
 
     var follows: [Follow] { state.withLock { $0.follows } }
@@ -272,6 +287,18 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 }
 
+/// Lets a test see a core being dropped and hold the drop.
+final class DropProbe: Sendable {
+    private let started = Mutex(false)
+    let gate = DispatchSemaphore(value: 0)
+
+    var hasStarted: Bool { started.withLock { $0 } }
+
+    func begin() {
+        started.withLock { $0 = true }
+    }
+}
+
 final class FakeSubscription: CoreSubscription, @unchecked Sendable {
     private let onStop: @Sendable () -> Void
 
@@ -304,6 +331,13 @@ struct LocalServer: Sendable {
 
     let url: URL
     let listener: NWListener
+    /// The head of each request received, in order.
+    let log: RequestLog
+
+    final class RequestLog: Sendable {
+        let heads = Mutex<[String]>([])
+        var all: [String] { heads.withLock { $0 } }
+    }
 
     static func emptyPage(_ method: String, _ path: String) -> Answer {
         (200, "application/json", #"{"data":[],"next_cursor":null}"#)
@@ -315,10 +349,13 @@ struct LocalServer: Sendable {
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         let listener = try NWListener(using: parameters)
+        let log = RequestLog()
         listener.newConnectionHandler = { connection in
             connection.start(queue: .global())
             connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
-                let line = String(decoding: data ?? Data(), as: UTF8.self).prefix { $0 != "\r" }.split(separator: " ")
+                let head = String(decoding: data ?? Data(), as: UTF8.self)
+                log.heads.withLock { $0.append(head) }
+                let line = head.prefix { $0 != "\r" }.split(separator: " ")
                 let method = line.first.map(String.init) ?? ""
                 let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
                 let (status, type, body) = answer(method, path)
@@ -343,7 +380,7 @@ struct LocalServer: Sendable {
             listener.start(queue: .global())
         }
         let url = try #require(URL(string: "http://127.0.0.1:\(port)"))
-        return LocalServer(url: url, listener: listener)
+        return LocalServer(url: url, listener: listener, log: log)
     }
 
     func stop() {

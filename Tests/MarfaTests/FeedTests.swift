@@ -19,7 +19,7 @@ private func saved(_ version: Int64) -> Marfa.Change {
 @Suite(.timeLimit(.minutes(1)))
 struct Changes {
     @Test func aWriteIsToldToEveryStreamHeldAndNoneAfterItIsLetGo() async throws {
-        let feed = Feed(core: FakeCore.writer(), source: .none)
+        let feed = Feed(holder: CoreHolder(FakeCore.writer()), source: .none)
         let (first, firstContinuation) = AsyncStream<Marfa.Change>.makeStream()
         let (second, secondContinuation) = AsyncStream<Marfa.Change>.makeStream()
         let firstToken = try #require(feed.add(firstContinuation))
@@ -41,7 +41,7 @@ struct Changes {
     }
 
     @Test func aLocalChangeNamesTheWritesEdgeNotItsTarget() async throws {
-        let feed = Feed(core: FakeCore.writer(), source: .none)
+        let feed = Feed(holder: CoreHolder(FakeCore.writer()), source: .none)
         let (stream, continuation) = AsyncStream<Marfa.Change>.makeStream()
         _ = try #require(feed.add(continuation))
         var heard = stream.makeAsyncIterator()
@@ -88,7 +88,7 @@ struct Changes {
 
     @Test func oneFollowFeedsEveryStream() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
         #expect(core.follows.count == 1)
@@ -100,7 +100,7 @@ struct Changes {
 
     @Test func aServerChangeCarriesItsCursorAndEdge() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.change(0, CoreChange(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42"))
         let told = Marfa.Change(origin: .server(event: "edge.created", cursor: "42"), itemId: "a", edgeId: "e1")
@@ -110,7 +110,7 @@ struct Changes {
 
     @Test func aStreamThatReadAChangedCatalogIsToldAsACatalogRefresh() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.change(0, CoreChange(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9"))
         core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10"))
@@ -123,7 +123,7 @@ struct Changes {
     /// The core refuses a follow started before the last one has ended.
     @Test func aNewFollowStartsOnlyOnceTheLastHasEnded() async throws {
         let core = FakeCore.writer()
-        let feed = Feed(core: core, source: .follow)
+        let feed = Feed(holder: CoreHolder(core), source: .follow)
         let (_, first) = AsyncStream<Marfa.Change>.makeStream()
         feed.remove(try #require(feed.add(first)))
         let (stream, second) = AsyncStream<Marfa.Change>.makeStream()
@@ -142,7 +142,7 @@ struct Changes {
 
     @Test func whatAnEarlierFollowSaysLateIsIgnored() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         Heard(copy.changes()).stop()
         try await eventually("the first follow ended") { core.follows.first?.ended == true }
         let heard = Heard(copy.changes())
@@ -159,7 +159,7 @@ struct Changes {
 
     @Test func anErrorFromAFollowAlreadyStoppedIsNotTold() async throws {
         let core = FakeCore.writer()
-        let feed = Feed(core: core, source: .follow)
+        let feed = Feed(holder: CoreHolder(core), source: .follow)
         let (_, first) = AsyncStream<Marfa.Change>.makeStream()
         feed.remove(try #require(feed.add(first)))
         let (stream, second) = AsyncStream<Marfa.Change>.makeStream()
@@ -179,7 +179,7 @@ struct Changes {
     @Test func aStoreWithNoHydrationLetsItsStreamsWaitForOne() async throws {
         for error: CoreMarfaError in [.HydrationIncomplete(message: "m"), .NoCursor(message: "m")] {
             let core = FakeCore.writer()
-            let copy = WorkingCopy(core: core, hasServer: true)
+            let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
             let first = Heard(copy.changes())
             core.fail(0, with: error)
             try await eventually("the follow ended") { core.follows[0].ended }
@@ -197,7 +197,7 @@ struct Changes {
 
     @Test func aFollowThatFailedStartsAgainOnlyOnAHydrationOrACatchUp() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let first = Heard(copy.changes())
         core.fail(0, with: .Unauthorized(code: "invalid_key", message: "refused"))
         let refused = stopped(.unauthorized(code: "invalid_key", message: "refused"))
@@ -220,7 +220,7 @@ struct Changes {
     /// stream, so either one run across a follow fails here.
     @Test func aHydrationAndACatchUpRunWithNoFollowAndStartItAgain() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
         #expect(core.follows.count == 2)
@@ -240,7 +240,7 @@ struct Changes {
     /// change it while applying no event.
     @Test func aCatchUpThatChangedTheCatalogIsToldSo() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
         core.state.withLock { $0.catchUpChangesCatalog = true }
@@ -256,7 +256,7 @@ struct Changes {
     /// The catalog is read and kept before a catch-up applies anything.
     @Test func aCatchUpThatChangedTheCatalogAndThenFailedIsToldBoth() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         core.state.withLock {
             $0.catchUpChangesCatalog = true
@@ -271,7 +271,7 @@ struct Changes {
 
     @Test func aDrainThatRecordedVerdictsIsToldAndStartsNothing() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.fail(0, with: .Network(message: "gone"))
         _ = try await copy.queue.drain()
@@ -311,7 +311,7 @@ struct Changes {
 
     @Test func aWithdrawThatTookAWriteIsToldOnce() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         core.state.withLock { $0.withdrawable = ["q"] }
         #expect(try await copy.queue.withdraw("other") == false)
@@ -325,7 +325,7 @@ struct Changes {
 
     @Test func closingReturnsOnceTheFollowHasEnded() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(core: core, hasServer: true)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         #expect(core.follows.count == 1)
         try await bounded("close") { await copy.close() }
@@ -339,7 +339,7 @@ struct Changes {
         let core = FakeCore.writer()
         weak var held: Feed?
         try await { () async throws in
-            let copy = WorkingCopy(core: core, hasServer: true)
+            let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
             held = copy.feed
             let heard = Heard(copy.changes())
             #expect(core.follows.count == 1)
@@ -352,7 +352,7 @@ struct Changes {
 
     @Test func closingAReaderReturnsOnceItsWatchHasEnded() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         let gate = core.holdNextRead()
         try await eventually("the watch is reading") { core.aReadWasHeld }
@@ -370,7 +370,7 @@ struct Changes {
 
     @Test func lettingGoOfTheLastStreamStopsTheWatch() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         let watch = try #require(copy.feed.watchTask)
         #expect(!watch.isCancelled)
@@ -383,7 +383,7 @@ struct Changes {
 
     @Test func aReaderListeningWhileTheStoreIsBusyHoldsNothingElse() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let gate = core.holdNextRead()
         let listening = Task.detached { Heard(copy.changes()) }
         try await eventually("the first read is held") { core.aReadWasHeld }
@@ -397,7 +397,7 @@ struct Changes {
 
     @Test func aSaveMadeAsSoonAsAReaderListensIsTold() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         core.save()
         try await eventually("the save was told", within: 1) { !heard.all.isEmpty }
@@ -407,7 +407,7 @@ struct Changes {
 
     @Test func aReaderWhoseFirstReadFailsIsToldTheCase() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         core.state.withLock { $0.readsFail = .Invalid(message: "gone") }
         let heard = Heard(copy.changes())
         try await eventually("the failure was told") { heard.all == [stopped(.invalid(message: "gone"))] }
@@ -416,7 +416,7 @@ struct Changes {
 
     @Test func aWatchThatFailsIsToldAndResumesOnItsOwn() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let first = Heard(copy.changes())
         let watch = try #require(copy.feed.watchTask)
         core.state.withLock { $0.readsFail = .Store(message: "gone") }
@@ -444,7 +444,7 @@ struct Changes {
 
     @Test func aFailingWatchLetGoStartsAfresh() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let first = Heard(copy.changes())
         core.state.withLock { $0.readsFail = .Store(message: "gone") }
         try await eventually("the failure was told") { first.all == [stopped(.store(message: "gone"))] }
@@ -460,7 +460,7 @@ struct Changes {
 
     @Test func aReadersWatchRunsOnThroughAHydrationAndACatchUp() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         let watch = try #require(copy.feed.watchTask)
         _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
@@ -473,7 +473,7 @@ struct Changes {
 
     @Test func aWatchStoppedMidReadTellsNothing() async throws {
         let core = FakeCore.reader()
-        let copy = WorkingCopy(core: core, hasServer: false)
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let first = Heard(copy.changes())
         let gate = core.holdNextRead()
         try await eventually("the first watch is reading") { core.aReadWasHeld }

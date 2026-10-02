@@ -36,6 +36,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// under its idempotency key once the app speaks the server's contract.
     case contractMismatch(served: String?, expected: UInt64, status: UInt16, writeSent: Bool, message: String)
     case invalid(message: String)
+    /// The working copy was closed, or failed to reopen its store with a new
+    /// key; it is gone for good, and the app opens the store again.
+    case closed(message: String)
 
     /// Fit to show a person.
     public var message: String {
@@ -46,7 +49,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .catchUpTooOld(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
-            .contractMismatch(_, _, _, _, let message), .invalid(let message):
+            .contractMismatch(_, _, _, _, let message), .invalid(let message), .closed(let message):
             message
         }
     }
