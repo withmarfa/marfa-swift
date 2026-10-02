@@ -1,9 +1,6 @@
 import Foundation
 
-/// Where a working copy's slice comes from: a server, and the key that reaches it.
-///
-/// A working copy holds the key in memory and never writes it to its store;
-/// `Keychain` keeps it between launches, where the caller chooses to.
+/// A working copy holds the key in memory and never writes it to its store.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var url: URL
     public var key: String
@@ -13,8 +10,6 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
         self.key = key
     }
 
-    /// Why the environment's server could not be taken.
-    ///
     /// Neither case repeats a value, which could be a key.
     public enum EnvironmentError: Error, Hashable, CustomStringConvertible {
         /// One of `MARFA_API_URL` and `MARFA_API_KEY` is set and the other is missing or empty.
@@ -31,12 +26,10 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
         }
     }
 
-    /// The server `MARFA_API_URL` and `MARFA_API_KEY` name, where both are set, and nothing where neither is.
+    /// The server `MARFA_API_URL` and `MARFA_API_KEY` name, or `nil` when neither is set.
     ///
-    /// A server named here takes the place of one kept in the Keychain, which a client then neither reads nor
-    /// writes: this is how an agent or a test runs a client with nobody at the keyboard. One name without the
-    /// other, or an address that names no server, is refused rather than passed over, so a run meant to be
-    /// unattended never falls back to the Keychain and waits on a person there.
+    /// One without the other, or an address that names no server, throws rather than answering `nil`, so an
+    /// app that falls back to the keychain on `nil` never does so in a run meant to be unattended.
     public static func fromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws(EnvironmentError) -> Server? {
@@ -54,10 +47,8 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
         }
     }
 
-    /// The server, never the key, so a log that prints one leaks nothing.
+    /// Never shows the key.
     public var description: String { "Server(\(url.absoluteString))" }
     public var debugDescription: String { description }
-    /// The server alone, so `dump` and whatever else reflects on it leak
-    /// nothing either.
     public var customMirror: Mirror { Mirror(self, children: ["url": url]) }
 }

@@ -1,12 +1,10 @@
 import Foundation
 import Marfa
 
-/// The sample run unattended, one phase per launch, printing each step and
-/// checking what it expects: `hydrate` with the server up, which also sends
-/// one note so the server has given it a version; `write` with the server
-/// stopped, which edits that note twice and searches what it wrote; `drain`
-/// once it is back, which searches again; and `catch-up`, which makes a note
-/// through a second working copy and reads it back through this one.
+/// One phase per launch.
+///
+/// CI stops the server between `hydrate` and `write` and starts it again for
+/// `drain`.
 enum Scenario {
     static func run(_ phase: String, configuration: Configuration) async -> Bool {
         var passed = true
@@ -48,10 +46,8 @@ enum Scenario {
                 let file = FileManager.default.temporaryDirectory.appending(path: "sample-attachment.txt")
                 try Data("attached offline\n".utf8).write(to: file)
                 _ = try await copy.items.attach(to: firstId, file: file)
-                // Two edits of one property of a note the server has given a
-                // version, one after the other: each is based on the version
-                // the copy holds, which the first does not move while it is
-                // unanswered.
+                // The first edit does not move the held version while it is
+                // unanswered, so both are based on the same one.
                 let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
                 guard let kept = notes.first(where: { $0.title == "Sample kept" }) else {
                     expect(false, "the note sent online is not held")
@@ -69,16 +65,12 @@ enum Scenario {
                 let queued = try await copy.queue.all()
                 print("queued \(queued.count) write(s)")
                 for write in queued { print("  \(write.kind)  \(describe(write.verdict))") }
-                // Two creates, the edit, the tag, the link, the three writes
-                // an attachment is, and the two edits of the kept note.
                 expect(queued.count == 10, "queued \(queued.count) writes, not 10")
                 let offline = try await copy.queue.drain()
                 let answered = offline.verdicts.filter { $0.verdict != nil }.count
                 print("drain with the server away: sent \(offline.sent), answered \(answered)")
                 expect(offline.sent > 0, "a drain with the server away tried nothing")
                 expect(answered == 0, "a drain with the server away answered a write")
-                // A write that waits on one still unanswered is held for it,
-                // which is the only verdict a drain reaches with no server.
                 let after = try await copy.queue.all()
                 let waiting = after.filter { $0.verdict == .blocked(reason: .awaitingDependency) }.count
                 print("held for an earlier write: \(waiting)")
@@ -105,8 +97,6 @@ enum Scenario {
                 print("links from the first note: \(links.map(\.targetId))")
                 expect(links.map(\.targetId) == [second.id], "the link does not run from the first note to the second")
                 try await checkAttachment(on: first, in: copy, expect)
-                // Both edits of the kept note landed, the second over the
-                // first, and neither made a copy of the note.
                 let kept = notes.filter { $0.title == "Sample kept" }
                 print("the kept note: \(kept.map { "\($0.properties["body"]?.string ?? "-") v\($0.version)" })")
                 expect(
@@ -136,8 +126,6 @@ enum Scenario {
         return passed
     }
 
-    /// The file the write phase attached to `note`: held, attached to it,
-    /// and its bytes the ones written.
     static func checkAttachment(
         on note: Item, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
@@ -155,9 +143,6 @@ enum Scenario {
         expect(bytes == Data("attached offline\n".utf8), "the file's bytes are not the ones attached")
     }
 
-    /// A search for a word the bodies of both `first` and `kept` hold: over
-    /// every note it finds both, and narrowed to the favorite tag, which only
-    /// `first` carries, it finds `first` alone.
     static func checkSearch(
         first: String, kept: String, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
@@ -169,8 +154,6 @@ enum Scenario {
         expect(favorites.map(\.item.id) == [first], "a search narrowed to favorites did not find the first note alone")
     }
 
-    /// A note made through a working copy of its own beside this one's
-    /// store, and sent.
     static func makeElsewhere(_ title: String, configuration: Configuration) async throws {
         let store = configuration.store.deletingLastPathComponent().appending(path: "elsewhere-\(UUID()).sqlite")
         let elsewhere = try await WorkingCopy.open(store: store, server: configuration.server)

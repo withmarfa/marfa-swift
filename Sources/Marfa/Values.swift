@@ -2,10 +2,6 @@ import Foundation
 import MarfaCore
 import MarfaCoreNames
 
-// The core's own values, under the package's names. Each already says what
-// the package would: a closed set, or a record whose fields the package
-// passes on as they are, `QueuedWrite.answer` being the server's answer as
-// the JSON text it arrived as.
 public typealias Tier = CoreTier
 public typealias ItemState = CoreItemState
 public typealias WriteKind = CoreWriteKind
@@ -26,10 +22,8 @@ public typealias Attachment = CoreAttachment
 public typealias Attached = CoreAttached
 public typealias Thumbnail = CoreThumbnail
 
-/// Every way the core refuses or fails.
-///
-/// Each case carries the core's own sentence as `message`, and the server's
-/// `code` where the server answered.
+/// Every way the core refuses or fails. `code` is the server's, where the
+/// server answered.
 public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case notFound(code: String, message: String)
     case unauthorized(code: String, message: String)
@@ -60,7 +54,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case contractMismatch(served: String?, expected: UInt64, status: UInt16, writeSent: Bool, message: String)
     case invalid(message: String)
 
-    /// The core's sentence, fit to show a person.
+    /// Fit to show a person.
     public var message: String {
         switch self {
         case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
@@ -110,7 +104,6 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     }
 }
 
-/// An item as the working copy holds it.
 public struct Item: Sendable, Hashable, Identifiable {
     public let id: String
     public let type: String
@@ -126,8 +119,7 @@ public struct Item: Sendable, Hashable, Identifiable {
     public let updatedAt: String
     public let tags: [String]
 
-    /// An item made by the app itself, for a preview or a test; the copy's
-    /// own items come from its reads.
+    /// For an app's previews and tests.
     public init(
         id: String, type: String, properties: [String: JSONValue], state: ItemState, tier: Tier?, version: Int64,
         schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
@@ -164,11 +156,9 @@ public struct Item: Sendable, Hashable, Identifiable {
         tags = item.tags
     }
 
-    /// The `title` property, where it is text.
     public var title: String? { properties["title"]?.string }
 }
 
-/// An edge as the working copy holds it.
 public struct Edge: Sendable, Hashable, Identifiable {
     public let id: String
     public let sourceId: String
@@ -179,7 +169,7 @@ public struct Edge: Sendable, Hashable, Identifiable {
     public let createdAt: String
     public let updatedAt: String
 
-    /// An edge made by the app itself, for a preview or a test.
+    /// For an app's previews and tests.
     public init(
         id: String, sourceId: String, targetId: String, edgeType: String, properties: [String: JSONValue],
         version: Int64, createdAt: String, updatedAt: String
@@ -206,8 +196,6 @@ public struct Edge: Sendable, Hashable, Identifiable {
     }
 }
 
-/// A search result: the item, how well it matched, and the text around the
-/// match.
 public struct SearchHit: Sendable, Hashable {
     public let item: Item
     public let score: Double
@@ -224,7 +212,9 @@ public struct SearchHit: Sendable, Hashable {
 ///
 /// The tags are queued as writes of their own. Where `sourceId` names a row
 /// the server already holds, the create lands on it, and `baseVersion` makes
-/// that conditional on the version it was read at.
+/// that conditional on the version it was read at. With no `tier`, the key's
+/// default tier decides, which may be outside the copy's slice: the copy
+/// then drops the item once the server's event for it arrives.
 public struct Draft: Sendable, Hashable {
     public var type: String
     public var properties: [String: JSONValue]
@@ -259,8 +249,7 @@ public struct Draft: Sendable, Hashable {
     }
 }
 
-/// A change to an item: whole property values, the version it was read at, and
-/// a new `sourceId` where the item moves.
+/// Each property given replaces its whole value.
 public struct Edit: Sendable, Hashable {
     public var properties: [String: JSONValue]
     public var baseVersion: Int64
@@ -277,10 +266,8 @@ public struct Edit: Sendable, Hashable {
     }
 }
 
-/// Narrowing for a list.
-///
-/// Leaving `state` unset answers the active state, as the server does;
-/// `allStates` lifts that, and a named state wins.
+/// With `state` unset, a list answers active items only; `allStates` lifts
+/// that, and a named `state` wins over both.
 public struct ListFilters: Sendable, Hashable {
     public var type: String?
     public var state: ItemState?
@@ -315,8 +302,8 @@ public struct ListFilters: Sendable, Hashable {
     }
 }
 
-/// Narrowing for a search: a list's state rule, a type with its subtree,
-/// and every tag given.
+/// `state` and `allStates` work as in `ListFilters`. `type` includes its
+/// subtree, and every tag given must be present.
 public struct SearchFilters: Sendable, Hashable {
     public var type: String?
     public var state: ItemState?

@@ -1,12 +1,9 @@
-# Types only: the models, the operation inputs and outputs, and nothing that
-# sends a request. The working copy talks through the core's own transport.
 generate:
   - types
 accessModifier: public
 namingStrategy: idiomatic
-# The generator cannot express a map whose values are any of several scalars
-# or null (the version `Package.swift` here pins emits a payload that does not
-# compile), so the report is read as the free-form object it is.
+# The pinned generator emits code that does not compile for a map whose
+# values are any of several scalars or null.
 typeOverrides:
   schemas:
     HousekeepingReport: OpenAPIRuntime.OpenAPIObjectContainer

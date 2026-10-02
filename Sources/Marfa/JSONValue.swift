@@ -1,13 +1,11 @@
 import Foundation
 
-/// A JSON value: an item's properties and an extension's body are made of
-/// these, whole values rather than anything the package interprets.
 public enum JSONValue: Sendable, Hashable {
     case null
     case bool(Bool)
-    /// A number whose value is an integer `Int64` holds, kept exact: a
-    /// `Double` holds integers exactly only up to 2^53. `1.0` and `1e2` read
-    /// as integers; an integer beyond `Int64` reads as an inexact `number`.
+    /// Kept exact, where a `Double` holds integers exactly only up to 2^53.
+    /// `1.0` and `1e2` read as integers; an integer beyond `Int64` reads as an
+    /// inexact `number`.
     case integer(Int64)
     case number(Double)
     case string(String)
@@ -18,7 +16,7 @@ public enum JSONValue: Sendable, Hashable {
         if case .string(let value) = self { value } else { nil }
     }
 
-    /// Either kind of number, as a `Double`.
+    /// Either kind of number.
     public var number: Double? {
         switch self {
         case .number(let value): value
@@ -85,7 +83,6 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, Expre
     }
 }
 
-/// The text of an object of properties, as the core takes it, and back.
 enum Properties {
     static func text(_ properties: [String: JSONValue]) throws -> String {
         String(decoding: try JSONEncoder().encode(properties), as: UTF8.self)

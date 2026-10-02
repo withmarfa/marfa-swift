@@ -100,7 +100,6 @@ struct NoteRow: View {
     }
 }
 
-/// A verdict in words: the six, or none yet.
 func describe(_ verdict: Verdict?) -> String {
     switch verdict {
     case nil: "unanswered"

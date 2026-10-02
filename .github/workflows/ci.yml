@@ -6,8 +6,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# A newer push to the same branch, `main` included, supersedes the run before
-# it: the newest commit's run validates everything that came before it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,10 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  # A pull request that touches only top-level documentation skips the macOS
-  # job. A skipped job satisfies a required check; a workflow filtered out by
-  # `paths` would leave it pending, which is why this is a job and not a
-  # filter. An unreadable diff runs everything.
+  # A job rather than a `paths` filter: a skipped job satisfies a required
+  # check, and a workflow filtered out would leave it pending.
   changes:
     name: Classify changes
     runs-on: ubuntu-latest
@@ -67,7 +63,7 @@ jobs:
           ref: ${{ steps.pin.outputs.sha }}
           path: .build/marfa
 
-      # The release Xcode, never a beta beside it.
+      # Never a beta beside it.
       - name: Select Xcode
         run: |
           if [[ ! -d /Applications/Xcode.app ]]; then
@@ -87,9 +83,6 @@ jobs:
       - name: Add the iOS targets
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-      # The core's build is fixed by the pin, so the pin keys it; the
-      # generator's by its resolved packages. A miss builds from nothing, as
-      # before.
       - name: Cache the core's build
         uses: actions/cache@v5
         with:
@@ -107,10 +100,8 @@ jobs:
           path: ${{ github.workspace }}/../generator-build
           key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
 
-      # Both generated sources are held to the pin: the glue and the wire
-      # types. Their directories are emptied here as well as by core.sh, so a
-      # committed file the pinned commit does not generate shows as deleted
-      # whatever core.sh leaves.
+      # Emptied here too, so a committed file the pin does not generate shows
+      # as deleted whatever core.sh leaves.
       - name: Build the core and check what it generates
         run: |
           rm -rf Sources/MarfaCore Sources/MarfaTypes
@@ -144,25 +135,19 @@ jobs:
           MARFA_LIVE_REQUIRED: '1'
         run: |
           set -euo pipefail
-          # The trap goes in before the boot: a boot that fails partway has
-          # already started a server, and a later trap would never stop it.
+          # Before the boot: one that fails partway has already started a server.
           export MARFA_SERVER_ENV="${RUNNER_TEMP}/marfa-swift-live.env"
           trap '"${MARFA_MONOREPO}/core/scripts/server-down.sh" "${MARFA_SERVER_ENV}" || true' EXIT
-          # Assigned before it is evaluated, because `eval` of an empty string
-          # succeeds and would hide a failed boot.
+          # Assigned first, because `eval` of an empty string would hide a failed boot.
           server_env="$("${MARFA_MONOREPO}/core/scripts/server-up.sh")"
           eval "${server_env}"
           export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
           swift build
-          # The tests keep keys in keychains of their own; the login keychain
-          # is the person's and holds after the suite what it held before it,
-          # under the service the tests use, read from them so the two cannot
-          # name different services.
+          # The service is read from the tests, so the two cannot differ.
           service="$(sed -n 's/^ *let service = "\(.*\)"$/\1/p' Tests/MarfaTests/CredentialTests.swift)"
           [[ "${service}" =~ ^[a-z.-]+$ ]] || { echo "::error::CredentialTests.swift names no one service"; exit 1; }
           scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-before"
-          # Compared whether the suite passed or not, since a failing run is
-          # as able to leave an item behind.
+          # Compared whether the suite passed or not.
           tested=0
           swift test || tested=$?
           scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-after"
@@ -182,9 +167,6 @@ jobs:
               -derivedDataPath "${RUNNER_TEMP}/marfa-sample" build
           done
 
-      # The sample offline and back: hydrate, write with the server stopped,
-      # drain once it is back on the same origin with the same data, and catch
-      # up a note made through another working copy.
       - name: Run the sample's scenario offline and back
         run: |
           set -euo pipefail

@@ -1,6 +1,6 @@
 // swift-tools-version: 6.0
-// The generator of the wire types, pinned, as a package of its own so the
-// package itself depends only on the runtime the generated code needs.
+// A package of its own, so Marfa depends only on the runtime the generated
+// code needs.
 import PackageDescription
 
 let package = Package(
