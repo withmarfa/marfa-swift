@@ -2,9 +2,19 @@
 
 The Swift package `Marfa`, for iOS and macOS on Apple silicon. It embeds `MarfaCore`, the Rust engine from `withmarfa/marfa`, which holds a working copy of a slice of one Marfa server, queues writes for it with their verdicts, follows its events and keeps blobs. This package gives the core Swift types, `async` calls, change streams and typed errors.
 
-**Nothing is published, so nothing can depend on this package by URL yet.** Its binary target is built locally and not committed.
+## Installing
+
+Add the package by URL in Xcode, or in a `Package.swift`:
+
+```swift
+.package(url: "https://github.com/withmarfa/marfa-swift", from: "0.0.1")
+```
+
+and depend on the `Marfa` product, plus `MarfaTypes` for the wire types. Each release carries the core prebuilt, so an app needs no Rust toolchain. The core is built for arm64 only, so an app's simulator builds set `EXCLUDED_ARCHS[sdk=iphonesimulator*]` to `x86_64`.
 
 ## Building
+
+Working on the package itself builds the core from source:
 
 ```sh
 scripts/core.sh   # builds the core at core.pin and copies it in; needs the Rust toolchain

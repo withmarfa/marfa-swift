@@ -49,6 +49,9 @@ jobs:
       - name: Test which changes run this job
         run: scripts/ci-changes.test.sh
 
+      - name: Test the release steps
+        run: scripts/release.test.sh
+
       - name: Read the pin
         id: pin
         run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
