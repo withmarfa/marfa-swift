@@ -1,0 +1,85 @@
+name: CodeQL
+
+# A pull request that changes only documentation or agent settings starts no
+# run. CodeQL is not a required check, so a run that never starts leaves no
+# check pending. Every push to `main` and a weekly run analyze the whole tree.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - LICENSE
+      - ".claude/**"
+  schedule:
+    - cron: "41 4 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  actions:
+    name: Analyze (actions)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: actions
+          build-mode: none
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:actions
+
+  # CodeQL reads Swift from a build it watches, and the package builds only
+  # beside the core's framework: the one `ci.yml` keeps for this pin, or one
+  # built here when that has gone.
+  swift:
+    name: Analyze (swift)
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
+
+      # The paths and the key are `ci.yml`'s, since both make one cache's name.
+      - name: Restore what the pin generates
+        id: core
+        uses: actions/cache@v5
+        with:
+          path: |
+            Frameworks/MarfaCoreFFI.xcframework
+            Sources/MarfaCore
+            Sources/MarfaTypes
+          key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
+      - name: Build the core at the pin
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        run: |
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          scripts/core.sh
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: swift
+          build-mode: manual
+      # The library targets alone. Dependencies resolve outside the checkout,
+      # so their sources are not reported as this repository's.
+      - name: Build the package
+        run: swift build --scratch-path "${RUNNER_TEMP}/swift-build"
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:swift
