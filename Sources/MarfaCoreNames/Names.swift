@@ -1,9 +1,8 @@
 import MarfaCore
 
-// The glue's class shares its module's name, so a module that declares an
-// `Item` of its own cannot write `MarfaCore.Item`: the qualifier finds the
-// class. This module declares no records, so its unqualified names reach the
-// glue's, and it gives each one a name the package can use.
+// The glue's class shares its module's name, so `MarfaCore.Item` finds the
+// class, not the record. This module declares no records of its own, so its
+// unqualified names reach the glue's.
 
 public typealias CoreDraft = Draft
 public typealias CoreEdge = Edge

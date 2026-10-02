@@ -5,9 +5,6 @@ import Testing
 
 @testable import Marfa
 
-/// The core and the wire types are built from one pinned document, so the
-/// contract the working copy holds a server to is the one the types
-/// describe.
 @Suite(.timeLimit(.minutes(1)))
 struct ContractTests {
     @Test func aServerOnTheNextContractIsRefusedNamingTheOneTheTypesDescribe() async throws {
@@ -23,9 +20,8 @@ struct ContractTests {
         }
     }
 
-    /// The witness: the same server on the contract the types describe is
-    /// read past the check, as far as the empty page it answers, which names
-    /// no event cursor.
+    /// The empty page names no event cursor, so `noCursor` shows the
+    /// contract check passed.
     @Test func aServerOnTheContractTheTypesDescribeIsReadPastTheCheck() async throws {
         let server = try await ContractServer.start(contract: marfaContractVersion)
         defer { server.stop() }
@@ -37,8 +33,6 @@ struct ContractTests {
     }
 }
 
-/// A server that answers every request with an empty page and names
-/// `contract` on the answer, as an instance does.
 private struct ContractServer: Sendable {
     let url: URL
     let listener: NWListener

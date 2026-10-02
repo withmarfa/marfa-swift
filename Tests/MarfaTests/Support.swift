@@ -9,8 +9,6 @@ func temporaryStore() -> URL {
     FileManager.default.temporaryDirectory.appending(path: "marfa-\(UUID()).sqlite")
 }
 
-/// Waits for `condition`, polling, and records an issue once `seconds` pass
-/// without it.
 func eventually(_ what: String, within seconds: Double = 5, _ condition: () async throws -> Bool) async throws {
     let deadline = Date.now.addingTimeInterval(seconds)
     while try await !condition() {
@@ -22,14 +20,11 @@ func eventually(_ what: String, within seconds: Double = 5, _ condition: () asyn
     }
 }
 
-/// A wait that did not finish in time.
 struct Unfinished: Error, CustomStringConvertible {
     let what: String
     var description: String { "\(what) did not finish" }
 }
 
-/// Runs `work`, and gives up on it once `seconds` pass.
-///
 /// A suite's time limit cancels a test, and cancellation cannot end an
 /// await that ignores it, such as a task's value or a continuation nobody
 /// resumes: a test waiting on one would hang past its limit.
@@ -47,9 +42,8 @@ func bounded<T: Sendable>(
     }
 }
 
-/// Work run once, and let go of before its answer is given: a caller told
-/// it finished may drop what the work held, such as a working copy that
-/// must let go of its store, and find nothing else holding it.
+/// Releases the work before answering, so a caller that then drops a working
+/// copy finds nothing else holding its store.
 private final class Job<T: Sendable>: Sendable {
     private let work: Mutex<(@Sendable () async throws -> T)?>
 
@@ -69,7 +63,6 @@ private final class Job<T: Sendable>: Sendable {
     }
 }
 
-/// A continuation resumed by whichever answer comes first.
 private final class Answer<T: Sendable>: Sendable {
     private let waiting: Mutex<CheckedContinuation<T, any Error>?>
 
@@ -82,7 +75,6 @@ private final class Answer<T: Sendable>: Sendable {
     }
 }
 
-/// Every change a stream tells, gathered as it arrives, with when.
 final class Heard: Sendable {
     private final class Log: Sendable {
         let entries = Mutex<[(at: Date, change: Marfa.Change)]>([])
@@ -116,18 +108,17 @@ final class Heard: Sendable {
         all.filter { if case .stopped = $0.origin { true } else { false } }
     }
 
-    /// Stops listening, which lets the stream go.
     func stop() {
         listening.cancel()
     }
 }
 
-/// A core that answers from memory, for what a real one cannot be made to do
-/// on cue: a follow that ends late, fails, or speaks after it was replaced.
+/// For what a real core cannot be made to do on cue.
 ///
-/// Its follows keep the core's rules: one stream at a time, let go only as
-/// the follow ends, and `ended` told a moment after `stop`. Its hydration
-/// and catch-up refuse while a follow holds the stream, as the core's do.
+/// A follow that ends late, fails, or speaks after it was replaced. It keeps
+/// the core's rules: one stream at a time, let go only as the follow ends,
+/// `ended` told a moment after `stop`, and hydration and catch-up refused
+/// while a follow holds the stream.
 final class FakeCore: Core, @unchecked Sendable {
     struct Follow {
         let listener: any CoreChangeListener
@@ -147,6 +138,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var gate: DispatchSemaphore?
         var gated = false
         var readsFail: CoreMarfaError?
+        var withdrawable: Set<String> = []
     }
 
     let state = Mutex(State())
@@ -185,14 +177,11 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
-    /// Ends follow `index` on its own, as a stream that failed does.
     func fail(_ index: Int, with error: CoreMarfaError) {
         end(index, with: error)
     }
 
-    /// Tells the listener of follow `index` that it ended, again.
-    ///
-    /// No core does; the feed must hear a stale end as nothing.
+    /// No real core ends a follow twice; the feed must ignore it.
     func endAgain(_ index: Int, with error: CoreMarfaError?) {
         state.withLock { $0.follows[index].listener }.ended(error: error)
     }
@@ -209,6 +198,10 @@ final class FakeCore: Core, @unchecked Sendable {
     override func catchUp() throws -> CoreCatchUpReport {
         try refreshing()
         return state.withLock { $0.caughtUp }
+    }
+
+    override func withdraw(id: String) throws -> Bool {
+        state.withLock { $0.withdrawable.remove(id) != nil }
     }
 
     override func drain() throws -> CoreDrainReport {
@@ -228,12 +221,10 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
-    /// Another process saved.
     func save() {
         state.withLock { $0.dataVersion += 1 }
     }
 
-    /// Holds the next read of the data version until the gate is signaled.
     func holdNextRead() -> DispatchSemaphore {
         let gate = DispatchSemaphore(value: 0)
         state.withLock { $0.gate = gate }
@@ -242,8 +233,6 @@ final class FakeCore: Core, @unchecked Sendable {
 
     var aReadWasHeld: Bool { state.withLock { $0.gated } }
 
-    /// The core's refusal while another hydration, catch-up or follow holds
-    /// the stream.
     static let refusal =
         "this working copy is already hydrating, catching up or following; one at a time moves its cursor"
 

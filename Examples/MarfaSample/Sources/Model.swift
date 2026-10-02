@@ -2,8 +2,6 @@ import Foundation
 import Marfa
 import Observation
 
-/// The notes one working copy holds, the queue behind them, and what the
-/// person last did.
 @MainActor @Observable
 final class Model {
     let configuration: Configuration
@@ -19,7 +17,6 @@ final class Model {
         self.configuration = configuration
     }
 
-    /// Opens the working copy, once however often the view appears.
     func open() async {
         guard copy == nil, configuration.scenario == nil else { return }
         do {
@@ -29,8 +26,6 @@ final class Model {
         }
     }
 
-    /// Hydrates the copy where it is not, then reads again on each change
-    /// until the view that called it goes away.
     func listen() async {
         guard let copy else { return }
         await hydrate(copy)
@@ -43,8 +38,8 @@ final class Model {
         }
     }
 
-    /// Tries until a hydration lands, since a first launch with the server
-    /// away has nothing to show until one does.
+    /// A first launch with the server away has nothing to show until a
+    /// hydration lands.
     private func hydrate(_ copy: WorkingCopy) async {
         guard configuration.server != nil else { return }
         while !Task.isCancelled {

@@ -25,17 +25,11 @@ struct SampleApp: App {
     }
 }
 
-/// Where the sample's store is, the server it talks to, and whether it runs
-/// a scenario rather than waiting for a person.
-///
-/// The server comes from `--server URL --key KEY` or `MARFA_API_URL` and
-/// `MARFA_API_KEY`; without one the sample works offline and queues.
 struct Configuration: Sendable {
     var store: URL
     var server: Server?
     var scenario: String?
 
-    /// The environment's server; an address that names none is said on stderr, and the sample works offline.
     private static func environmentServer() -> Server? {
         do {
             return try Server.fromEnvironment()

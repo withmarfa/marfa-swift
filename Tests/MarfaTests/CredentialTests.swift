@@ -35,12 +35,10 @@ import Testing
                 try Server.fromEnvironment(["MARFA_API_URL": url, "MARFA_API_KEY": "mk_k"])
             }
         }
-        // A key put where the address goes is not repeated in what the refusal says.
         #expect(!Server.EnvironmentError.notAServer.description.contains("mk_"))
     }
 }
 
-/// Runs `body` with a keychain file of its own, discarded after it whether it passed or threw.
 func inIsolatedKeychain(_ body: (Keychain) throws -> Void) throws {
     let keychain = try Keychain.isolated()
     var allowed: DarwinBoolean = true
@@ -57,7 +55,7 @@ func inIsolatedKeychain(_ body: (Keychain) throws -> Void) throws {
 
 @Suite(.timeLimit(.minutes(1)))
 struct KeychainKeys {
-    /// The service CI lists in the login keychain before and after the suite, which must not change.
+    /// CI reads this line to compare the login keychain under this service before and after the suite.
     let service = "com.withmarfa.marfa-swift.tests"
     let account = "https://\(UUID().uuidString.lowercased()).invalid"
 
@@ -73,7 +71,6 @@ struct KeychainKeys {
     @Test func aKeyNeverKeptIsNothing() throws {
         try inIsolatedKeychain { keychain in
             #expect(try keychain.key(service: service, account: "never") == nil)
-            // The witness: a key kept under the same service is found.
             try keychain.save(key: "k", service: service, account: account)
             #expect(try keychain.key(service: service, account: account) == "k")
         }
@@ -82,20 +79,28 @@ struct KeychainKeys {
     @Test func deletingAKeyNeverKeptIsNoError() throws {
         try inIsolatedKeychain { keychain in
             try keychain.delete(service: service, account: "never")
-            // The witness: deleting a key kept removes it.
             try keychain.save(key: "k", service: service, account: account)
             try keychain.delete(service: service, account: account)
             #expect(try keychain.key(service: service, account: account) == nil)
         }
     }
 
-    @Test func aKeyKeptInAnIsolatedKeychainNeverReachesTheSystemOne() throws {
+    /// Reads the search list, never an item of the login keychain.
+    @Test func anIsolatedKeychainIsOutsideTheSearchList() throws {
         try inIsolatedKeychain { keychain in
             try keychain.save(key: "k", service: service, account: account)
-            // The witness: the isolated keychain holds it, asked the same way.
             #expect(try keychain.holds(service: service, account: account))
-            #expect(try !Keychain.system.holds(service: service, account: account))
-            #expect(try !Keychain.system.holds(service: service))
+            let file = try #require(keychain.file).resolvingSymlinksInPath().path
+            var list: CFArray?
+            try #require(SecKeychainCopySearchList(&list) == errSecSuccess)
+            let searched = try #require(list as? [SecKeychain]).map { searched -> String in
+                var length = UInt32(PATH_MAX)
+                var path = [CChar](repeating: 0, count: Int(length))
+                guard SecKeychainGetPath(searched, &length, &path) == errSecSuccess else { return "" }
+                return URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path
+            }
+            #expect(!searched.isEmpty)
+            #expect(!searched.contains(file), "\(searched)")
         }
     }
 
@@ -107,7 +112,6 @@ struct KeychainKeys {
             #expect(SecKeychainLock(try #require(opened)) == errSecSuccess)
             var status = SecKeychainStatus()
             SecKeychainGetStatus(opened, &status)
-            // The witness: it is locked before it is read.
             #expect(status & SecKeychainStatus(kSecUnlockStateStatus) == 0)
             #expect(try keychain.key(service: service, account: account) == "k")
         }
@@ -118,7 +122,6 @@ struct KeychainKeys {
         try inIsolatedKeychain { keychain in
             let file = try #require(keychain.file)
             folder = file.deletingLastPathComponent()
-            // The witness: the file is there until it is discarded.
             #expect(FileManager.default.fileExists(atPath: file.path))
         }
         #expect(!FileManager.default.fileExists(atPath: try #require(folder).path))

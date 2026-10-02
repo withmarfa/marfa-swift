@@ -72,9 +72,6 @@ struct Changes {
         #expect(copy.feed.count == 0)
     }
 
-    /// A follow the core refuses, here for want of a hydration, is told to
-    /// every stream and to one taken after, and local writes go on being
-    /// told.
     @Test func aFollowThatStopsIsToldAndLocalWritesGoOn() async throws {
         let copy = try await WorkingCopy.open(
             store: temporaryStore(), server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "k"))
@@ -116,8 +113,7 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
-    /// The core lets go of its stream only as a follow ends, so a follow
-    /// started before then is refused.
+    /// The core refuses a follow started before the last one has ended.
     @Test func aNewFollowStartsOnlyOnceTheLastHasEnded() async throws {
         let core = FakeCore.writer()
         let feed = Feed(core: core, source: .follow)
@@ -132,7 +128,6 @@ struct Changes {
         #expect(core.follows[1].holdsStream)
         try await Task.sleep(for: .milliseconds(200))
         #expect(heard.stops.isEmpty)
-        // The witness: a follow that fails on its own is told.
         core.fail(1, with: .Network(message: "gone"))
         try await eventually("the failure was told") { heard.stops == [stopped(.network(message: "gone"))] }
         try await bounded("close") { await feed.close() }
@@ -151,7 +146,6 @@ struct Changes {
         core.change(1, CoreChange(event: "item.created", itemId: "current", edgeId: nil, cursor: "2"))
         try await eventually("the running follow's change was told") { !heard.all.isEmpty }
         #expect(heard.all.map(\.itemId) == ["current"])
-        // Still the running follow: letting the stream go stops it.
         heard.stop()
         try await eventually("the running follow was stopped") { core.follows[1].stopped }
     }
@@ -168,7 +162,6 @@ struct Changes {
         try await eventually("the next follow started") { core.follows.count == 2 }
         try await Task.sleep(for: .milliseconds(100))
         #expect(heard.stops.isEmpty, "a follow already stopped told its error")
-        // The witness: a follow that fails on its own is told.
         core.fail(1, with: .Network(message: "on its own"))
         try await eventually("the failure was told") { heard.stops == [stopped(.network(message: "on its own"))] }
         try await bounded("close") { await feed.close() }
@@ -209,7 +202,6 @@ struct Changes {
         core.state.withLock { $0.caughtUp.applied = 2 }
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
         #expect(core.follows.count == 4)
-        // The catch-up that applied nothing was not told.
         try await eventually("the hydration and the catch-up that applied events were told") {
             heard.all == [refreshed(.hydrated), refreshed(.caughtUp)]
         }
@@ -229,14 +221,26 @@ struct Changes {
             ]
         }
         _ = try await copy.queue.drain()
-        // The drain that recorded nothing was not told.
         try await eventually("the drain that recorded a verdict was told") {
             heard.all == [stopped(.network(message: "gone")), refreshed(.drained)]
         }
         #expect(core.follows.count == 1, "a drain started the failed follow again")
-        // The witness: a catch-up does start it again.
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
         try await eventually("a catch-up started the follow again") { core.follows.count == 2 }
+        try await bounded("close") { await copy.close() }
+    }
+
+    @Test func aWithdrawThatTookAWriteIsToldOnce() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let heard = Heard(copy.changes())
+        core.state.withLock { $0.withdrawable = ["q"] }
+        #expect(try await copy.queue.withdraw("other") == false)
+        #expect(try await copy.queue.withdraw("q"))
+        #expect(try await copy.queue.withdraw("q") == false)
+        try await eventually("the withdraw was told") { heard.all == [refreshed(.withdrawn)] }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(heard.all == [refreshed(.withdrawn)])
         try await bounded("close") { await copy.close() }
     }
 
@@ -250,10 +254,8 @@ struct Changes {
         withExtendedLifetime(heard) {}
     }
 
-    /// The core's follow thread holds its listener until telling it ended
-    /// has returned, and this core keeps every listener for good, so a feed
-    /// the listener held would outlive the working copy, and with it the
-    /// core and the writer's claim on the store.
+    /// This fake keeps every listener for good, so a listener holding its
+    /// feed strongly would keep the core, and the store, past the copy.
     @Test func aClosedCopyLetGoIsNotHeldByItsFollowsListener() async throws {
         let core = FakeCore.writer()
         weak var held: Feed?
@@ -300,8 +302,6 @@ struct Changes {
         #expect(copy.feed.watchTask == nil)
     }
 
-    /// The version a reader's first `changes()` reads can wait on the store,
-    /// and holds nothing else of the copy while it does.
     @Test func aReaderListeningWhileTheStoreIsBusyHoldsNothingElse() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
@@ -326,8 +326,6 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
-    /// A first read that fails is told as the case the core threw, not as a
-    /// store failure around it.
     @Test func aReaderWhoseFirstReadFailsIsToldTheCase() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
@@ -365,7 +363,6 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
-    /// A watch that fails and is let go starts afresh with the next stream.
     @Test func aFailingWatchLetGoStartsAfresh() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
@@ -382,7 +379,6 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
-    /// A watch moves no cursor, so a hydration or catch-up leaves it running.
     @Test func aReadersWatchRunsOnThroughAHydrationAndACatchUp() async throws {
         let core = FakeCore.reader()
         let copy = WorkingCopy(core: core, hasServer: false)
@@ -409,7 +405,6 @@ struct Changes {
         gate.signal()
         try await Task.sleep(for: .milliseconds(600))
         #expect(second.all.isEmpty, "the stopped watch told what it read after it was stopped")
-        // The witness: the running watch tells the next save.
         core.save()
         try await eventually("the running watch told the next save") { !second.all.isEmpty }
         #expect(second.all == [saved(2)])

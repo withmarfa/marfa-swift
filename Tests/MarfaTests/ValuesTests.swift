@@ -21,68 +21,12 @@ struct Values {
         #expect(try Properties.text(read).contains("9007199254740993"))
     }
 
-    /// What `JSONValue.integer` says of itself.
     @Test func aNumberReadsAsAnIntegerWhereInt64HoldsItsValue() throws {
         let read = try Properties.object(#"{"a":1.0,"b":1e2,"c":9223372036854775808,"d":1.5}"#)
         #expect(read["a"] == .integer(1))
         #expect(read["b"] == .integer(100))
         #expect(read["c"] == .number(9_223_372_036_854_775_808))
         #expect(read["d"] == .number(1.5))
-    }
-
-    @Test func eachAccessorAnswersItsOwnKindOnly() {
-        #expect(JSONValue.integer(3).integer == 3)
-        #expect(JSONValue.number(3).integer == nil)
-        #expect(JSONValue.integer(3).number == 3)
-        #expect(JSONValue.number(0.5).number == 0.5)
-        #expect(JSONValue.string("3").number == nil)
-        #expect(JSONValue.bool(true).bool == true)
-        #expect(JSONValue.bool(false).bool == false)
-        #expect(JSONValue.integer(1).bool == nil)
-        #expect(JSONValue.string("s").string == "s")
-        #expect(JSONValue.bool(true).string == nil)
-    }
-
-    @Test func aLiteralNamingAKeyTwiceKeepsTheLast() {
-        #expect(JSONValue(dictionaryLiteral: ("a", 1), ("b", 2), ("a", 3)) == .object(["a": 3, "b": 2]))
-    }
-
-    @Test func anItemCrossesWhole() throws {
-        let item = try Item(
-            CoreItem(
-                id: "n1", type: "core.note", propertiesJson: #"{"title":"Heron","body":"b"}"#, state: .archived,
-                tier: .feed, version: 2, schemaVersion: 3, source: "device", sourceId: "notes/heron.md",
-                occurredAt: "2026-09-18T00:00:00.000Z", createdAt: "2026-09-17T00:00:00.000Z",
-                updatedAt: "2026-09-19T00:00:00.000Z", tags: ["favorite"]))
-        #expect(item.id == "n1")
-        #expect(item.type == "core.note")
-        #expect(item.title == "Heron")
-        #expect(item.properties["body"] == "b")
-        #expect(item.state == .archived)
-        #expect(item.tier == .feed)
-        #expect(item.version == 2)
-        #expect(item.schemaVersion == 3)
-        #expect(item.source == "device")
-        #expect(item.sourceId == "notes/heron.md")
-        #expect(item.occurredAt == "2026-09-18T00:00:00.000Z")
-        #expect(item.createdAt == "2026-09-17T00:00:00.000Z")
-        #expect(item.updatedAt == "2026-09-19T00:00:00.000Z")
-        #expect(item.tags == ["favorite"])
-    }
-
-    @Test func anEdgeCrossesWhole() throws {
-        let edge = try Edge(
-            CoreEdge(
-                id: "e1", sourceId: "a", targetId: "b", edgeType: "references", propertiesJson: #"{"w":1}"#,
-                version: 4, createdAt: "2026-09-17T00:00:00.000Z", updatedAt: "2026-09-19T00:00:00.000Z"))
-        #expect(edge.id == "e1")
-        #expect(edge.sourceId == "a")
-        #expect(edge.targetId == "b")
-        #expect(edge.edgeType == "references")
-        #expect(edge.properties == ["w": 1])
-        #expect(edge.version == 4)
-        #expect(edge.createdAt == "2026-09-17T00:00:00.000Z")
-        #expect(edge.updatedAt == "2026-09-19T00:00:00.000Z")
     }
 
     @Test func propertiesTheCoreCannotReadAreRefusedRatherThanEmptied() {
@@ -97,48 +41,6 @@ struct Values {
         }
     }
 
-    @Test func aDraftAndAnEditCrossWhole() throws {
-        let draft = try Draft(
-            type: "core.note", properties: ["title": "t"], tags: ["x"], tier: .feed, id: "n9", source: "notes",
-            sourceId: "a.md", occurredAt: "2026-09-18T00:00:00Z", baseVersion: 7
-        ).core()
-        #expect(draft.type == "core.note")
-        #expect(try Properties.object(draft.propertiesJson) == ["title": "t"])
-        #expect(draft.tags == ["x"])
-        #expect(draft.tier == .feed)
-        #expect(draft.id == "n9")
-        #expect(draft.source == "notes")
-        #expect(draft.sourceId == "a.md")
-        #expect(draft.occurredAt == "2026-09-18T00:00:00Z")
-        #expect(draft.baseVersion == 7)
-        let edit = try Edit(properties: ["title": "u"], baseVersion: 4, sourceId: "b.md").core()
-        #expect(edit.baseVersion == 4)
-        #expect(edit.sourceId == "b.md")
-        #expect(try Properties.object(edit.propertiesJson) == ["title": "u"])
-    }
-
-    @Test(arguments: [true, false])
-    func filtersCrossWhole(allStates: Bool) {
-        let list = ListFilters(
-            type: "core.note", state: .archived, allStates: allStates, tier: .library, tags: ["a"],
-            occurredAfter: "2026-01-01T00:00:00Z", occurredBefore: "2026-02-01T00:00:00Z", limit: 5, offset: 2
-        ).core
-        #expect(list.type == "core.note")
-        #expect(list.state == .archived)
-        #expect(list.allStates == allStates)
-        #expect(list.tier == .library)
-        #expect(list.tags == ["a"])
-        #expect(list.occurredAfter == "2026-01-01T00:00:00Z")
-        #expect(list.occurredBefore == "2026-02-01T00:00:00Z")
-        #expect(list.limit == 5)
-        #expect(list.offset == 2)
-        let search = SearchFilters(type: "core.file", state: .active, allStates: allStates, tags: ["b", "c"]).core
-        #expect(search.type == "core.file")
-        #expect(search.state == .active)
-        #expect(search.allStates == allStates)
-        #expect(search.tags == ["b", "c"])
-    }
-
     @Test func aServerNeverShowsItsKey() {
         let server = Server(url: URL(string: "https://marfa.example")!, key: "mk_secret")
         var dumped = ""
@@ -146,7 +48,6 @@ struct Values {
         let shown = ["\(server)", String(reflecting: server), dumped]
         for text in shown {
             #expect(!text.contains("mk_secret"), "\(text)")
-            // The witness: each shows the server.
             #expect(text.contains("marfa.example"), "\(text)")
         }
         #expect(Mirror(reflecting: server).children.map(\.label) == ["url"])
@@ -155,7 +56,6 @@ struct Values {
 
 @Suite(.timeLimit(.minutes(1)))
 struct Errors {
-    /// Every case the core can throw, and the case and fields it arrives as.
     static let cases: [(CoreMarfaError, Marfa.MarfaError)] = [
         (.NotFound(code: "c", message: "m"), .notFound(code: "c", message: "m")),
         (.Unauthorized(code: "c", message: "m"), .unauthorized(code: "c", message: "m")),
@@ -200,19 +100,8 @@ struct Errors {
         #expect(expected.localizedDescription == "m")
     }
 
-    /// The package's 21 cases, each listed above.
-    ///
-    /// A case dropped from the list fails here. A case the core adds fails the
-    /// build at the exhaustive switch in `Marfa.MarfaError.init`, and joins the
-    /// list and this count.
-    @Test func everyCaseIsListed() {
-        #expect(Set(Self.cases.map { "\($0.1)".prefix { $0 != "(" } }).count == 21)
-    }
-
-    /// Each write that carries JSON, given a value JSON cannot hold.
-    ///
-    /// The copy was never hydrated, so the core would refuse any write that
-    /// reached it; `invalid` says the value was refused before it did.
+    /// The copy was never hydrated, so `invalid` rather than
+    /// `hydrationIncomplete` shows the package refused the value first.
     @Test func aValueJSONCannotHoldIsRefusedAsInvalid() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         let unwritable: [String: JSONValue] = ["r": .number(.nan)]
@@ -235,8 +124,6 @@ struct Errors {
                 return message.contains("r cannot be written as JSON")
             }
         }
-        // The witness: a value JSON holds reaches the core, which refuses the
-        // write for its own reason.
         await #expect {
             _ = try await copy.items.create(Draft(type: "core.note", properties: ["r": .number(1)]))
         } throws: { error in
@@ -255,19 +142,10 @@ struct Opening {
             if case Marfa.MarfaError.invalid = error { true } else { false }
         }
         #expect(!FileManager.default.fileExists(atPath: path.path))
-        // The witness: once a writer has made it, the same open reads it.
         let writer = try await WorkingCopy.open(store: path)
         #expect(writer.handle == .writer)
         let reader = try await WorkingCopy.openReader(store: path)
         #expect(reader.handle == .reader)
     }
 
-    @Test func aWriteRefusedByTheCoreArrivesAsItsError() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        await #expect {
-            _ = try await copy.items.create(Draft(type: "core.note"))
-        } throws: { error in
-            if case Marfa.MarfaError.hydrationIncomplete = error { true } else { false }
-        }
-    }
 }

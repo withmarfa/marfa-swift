@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
-# Lists the login keychain's generic passwords under one service, one line
-# each: account, creation and modification time. Read from the items'
-# attributes alone, never a secret, so listing never asks a person for
-# anything.
+# Lists the login keychain's generic passwords under one service: account,
+# creation and modification time. Attributes only, never a secret, so it
+# never prompts.
 #
-#   scripts/login-keychain.sh SERVICE > before
-#   ...
-#   scripts/login-keychain.sh SERVICE | diff before -
-#
-# A listing that parsed no generic password at all is refused rather than
-# answered empty: a login keychain always holds some, so none means the
-# dump's format moved under the parser and an empty answer would compare
-# equal to anything.
+# Parsing no generic password at all fails: a login keychain always holds
+# some, so none means the dump's format moved, and an empty listing would
+# compare equal to anything.
 set -euo pipefail
 
 service="${1:?usage: login-keychain.sh SERVICE}"
