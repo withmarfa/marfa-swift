@@ -25,6 +25,7 @@ struct Waiting {
     /// create unanswered, and the edit behind it waits.
     @Test func aWriteBehindAnUnansweredCreateWaitsWithNoVerdict() async throws {
         let server = try await LocalServer.start(contract: marfaContractVersion, answer: Self.hydrating)
+        defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         server.stop()
@@ -43,5 +44,6 @@ struct Waiting {
         #expect(edit.verdict == nil, "a waiting write was given a verdict")
         #expect(edit.waiting)
         #expect(edit.follows == created.id || edit.dependsOn.contains(created.id))
+        await copy.close()
     }
 }
