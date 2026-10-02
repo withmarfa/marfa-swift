@@ -120,7 +120,10 @@ public final class WorkingCopy: Sendable {
     /// catch-up. A reader is told each save the writer makes.
     ///
     /// When the follow stops with an error, every stream is told `.stopped`
-    /// and it stays stopped until the app's next hydration or catch-up. A
+    /// and it stays stopped until the app's next hydration or catch-up. On a
+    /// store that holds no completed hydration there is nothing to follow:
+    /// the streams are told nothing, and the follow starts with the next
+    /// hydration. `status().hydration` says which. A
     /// reader's watch keeps retrying, and tells `.saved` once it reads the
     /// store again.
     public func changes() -> AsyncStream<Change> {
@@ -149,6 +152,10 @@ public struct Change: Sendable, Hashable {
     public enum Origin: Sendable, Hashable {
         case local(WriteKind)
         case server(event: String, cursor: String)
+        /// A drain answered this write; `itemId` and `edgeId` name what it
+        /// wrote. Told for each write with a verdict, before the drain's
+        /// `.refreshed(.drained)`.
+        case answered(DrainVerdict)
         /// The writer saved; a reader should read again.
         case saved(dataVersion: Int64)
         /// Many rows may have changed at once.
@@ -231,7 +238,7 @@ public struct Items: Sendable {
     /// naming the bytes, and an `attached-to` edge from the file to the item.
     public func attach(to id: String, file: URL, _ attachment: Attachment = Attachment()) async throws -> Attached {
         let attached = try await background { [core] in
-            Attached(try core.attach(id: id, path: file.path, attachment: attachment.core))
+            try Attached(core.attach(id: id, path: file.path, attachment: attachment.core))
         }
         for write in [attached.upload, attached.item, attached.edge] {
             feed.announce(write)
@@ -240,9 +247,7 @@ public struct Items: Sendable {
     }
 
     private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try work(core) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed, work)
     }
 }
 
@@ -293,9 +298,7 @@ public struct Edges: Sendable {
     }
 
     private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try work(core) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed, work)
     }
 }
 
@@ -304,15 +307,11 @@ public struct Tags: Sendable {
     let feed: Feed
 
     public func add(_ tag: String, to id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.addTag(id: id, tag: tag) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.addTag(id: id, tag: tag) }
     }
 
     public func remove(_ tag: String, from id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.removeTag(id: id, tag: tag) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.removeTag(id: id, tag: tag) }
     }
 }
 
@@ -321,15 +320,11 @@ public struct Metadata: Sendable {
     let feed: Feed
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.replaceMetadata(id: id, tags: tags) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.replaceMetadata(id: id, tags: tags) }
     }
 
     public func mergeTags(_ tags: [String], into id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.mergeMetadata(id: id, tags: tags) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.mergeMetadata(id: id, tags: tags) }
     }
 }
 
@@ -338,19 +333,15 @@ public struct Extensions: Sendable {
     let feed: Feed
 
     public func write(_ namespace: String, _ body: [String: JSONValue], on id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(
-            try await background { [core] in
-                try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
-            })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in
+            try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
+        }
     }
 
     public func delete(_ namespace: String, from id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(
-            try await background { [core] in try core.deleteExtension(id: id, namespace: namespace) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in
+            try core.deleteExtension(id: id, namespace: namespace)
+        }
     }
 }
 
@@ -360,10 +351,9 @@ public struct Blobs: Sendable {
 
     /// Copies the file's bytes beside the store and queues their upload.
     public func put(file: URL, mimeType: String? = nil) async throws -> QueuedWrite {
-        let written = QueuedWrite(
-            try await background { [core] in try core.putBlob(path: file.path, mimeType: mimeType) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in
+            try core.putBlob(path: file.path, mimeType: mimeType)
+        }
     }
 
     /// Where a blob's bytes are held, fetching them first when they are not.
@@ -392,6 +382,9 @@ public struct Queue: Sendable {
     /// Nothing drains on its own.
     public func drain() async throws -> DrainReport {
         let report = DrainReport(try await background { [core] in try core.drain() })
+        for answered in report.verdicts where answered.verdict != nil {
+            feed.announce(Change(origin: .answered(answered), itemId: answered.itemId, edgeId: answered.edgeId))
+        }
         if !report.verdicts.isEmpty {
             feed.announce(Change(origin: .refreshed(.drained), itemId: nil, edgeId: nil))
         }
@@ -427,10 +420,28 @@ public struct Queue: Sendable {
     /// server's answer.
     ///
     /// Blocked and dead writes stay until released or withdrawn, as does an
-    /// answered write a waiting write depends on.
+    /// answered write a waiting write depends on, and a refused write that
+    /// carried content stays, its `body` readable, until `discard(_:)`.
     public func forgetAnswered() async throws -> UInt64 {
         try await background { [core] in try core.forgetAnswered() }
     }
+
+    /// Takes a refused write, and the content it carried, out of the queue.
+    ///
+    /// `false` for a write that is not refused, or that a waiting write
+    /// still depends on. The copy's row already shows what the server holds.
+    public func discard(_ id: String) async throws -> Bool {
+        try await background { [core] in try core.discard(id: id) }
+    }
+}
+
+/// Queues one write and tells every held stream of it.
+func queued(_ core: Core, _ feed: Feed, _ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite)
+    async throws -> QueuedWrite
+{
+    let written = try await background { try QueuedWrite(work(core)) }
+    feed.announce(written)
+    return written
 }
 
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
@@ -626,8 +637,11 @@ final class Feed: Sendable {
             case .following(let current, _) where current == generation:
                 state.phase = .idle
                 state.halted = true
-                state.failure = error
-                return (error == nil ? [] : Array(state.streams.values), [])
+                // A store that holds no hydration has nothing to follow
+                // yet: the streams wait, and the next hydration starts it.
+                let told = error.flatMap { Self.awaitsHydration($0) ? nil : $0 }
+                state.failure = told
+                return (told == nil ? [] : Array(state.streams.values), [])
             default:
                 return ([], [])
             }
@@ -638,6 +652,13 @@ final class Feed: Sendable {
             }
         }
         return ended.waiting
+    }
+
+    private static func awaitsHydration(_ error: MarfaError) -> Bool {
+        switch error {
+        case .hydrationIncomplete, .noCursor: true
+        default: false
+        }
     }
 
     private func untilStopped() async {

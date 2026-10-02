@@ -163,26 +163,47 @@ struct OwnValueTypes {
         for field in SortField.allCases { #expect(SortField(field.core) == field) }
         for direction in SortDirection.allCases { #expect(SortDirection(direction.core) == direction) }
         for end in EdgeEnd.allCases { #expect(EdgeEnd(end.core) == end) }
+        for kind in GrantKind.allCases { #expect(GrantKind(kind.core) == kind) }
+        for level in GrantLevel.allCases { #expect(GrantLevel(level.core) == level) }
     }
 
     @Test func everyVerdictCrossesToTheGlueAndBack() {
         let verdicts: [Verdict] =
             [
                 .accepted, .merged(fields: ["a"]), .conflicted(siblingId: "s", fields: ["a", "b"]),
-                .refused(reason: "r"), .dead,
+                .refused(Refusal(reason: "r")), .refused(Self.refusal), .dead,
             ] + BlockedReason.allCases.map { .blocked(reason: $0) }
         for verdict in verdicts { #expect(Verdict(verdict.core) == verdict) }
     }
 
-    @Test func recordsCrossToTheGlueAndBack() {
+    static let refusal = Refusal(
+        reason: "validation_error", code: "validation_error", message: "m",
+        fields: [FieldRefusal(field: "title", message: "too long")], trashed: true,
+        grant: MissingGrant(kind: .extension, name: "acme", level: .write))
+
+    @Test func aRefusalArrivesInItsParts() {
+        let core = CoreRefusal(
+            reason: "validation_error", code: "validation_error", message: "m",
+            fields: [CoreFieldRefusal(field: "title", message: "too long")], trashed: true,
+            grant: CoreMissingGrant(kind: .extension, name: "acme", level: .write))
+        #expect(Verdict(.refused(refusal: core)) == .refused(Self.refusal))
+    }
+
+    @Test func recordsCrossToTheGlueAndBack() throws {
         let write = QueuedWrite(
             id: "q", kind: .uploadBlob, itemId: "i", targetId: "t", edgeId: "e", namespace: "n", tag: "g",
             blob: "b", baseVersion: 2, idempotencyKey: "k", dependsOn: ["d"], follows: "f",
-            verdict: .blocked(reason: .keySpent), answer: "a", refusals: 3, queuedAt: "t0", answeredAt: "t1")
-        #expect(QueuedWrite(write.core) == write)
+            verdict: .refused(Self.refusal), body: ["title": "kept", "n": 1], answer: "a", refusals: 3,
+            queuedAt: "t0", answeredAt: "t1")
+        #expect(try QueuedWrite(write.core()) == write)
+        let waiting = QueuedWrite(id: "w", kind: .updateItem, idempotencyKey: "k", waiting: true, queuedAt: "t0")
+        #expect(try QueuedWrite(waiting.core()) == waiting)
         let report = DrainReport(
             sent: 1, held: 2,
-            verdicts: [DrainVerdict(id: "q", kind: .addTag, itemId: "i", verdict: .dead, refusals: 1, replayed: true)],
+            verdicts: [
+                DrainVerdict(
+                    id: "q", kind: .addTag, itemId: "i", edgeId: "e", verdict: .dead, refusals: 1, replayed: true)
+            ],
             stopped: "s", unclaimedSources: ["u"], retryAfterSeconds: 4)
         #expect(DrainReport(report.core) == report)
         let hydrated = HydrateReport(
@@ -198,6 +219,19 @@ struct OwnValueTypes {
         #expect(Status(unheld.core).catalogVersion == nil)
         let sort = Sort(field: .occurredAt, direction: .descending)
         #expect(Sort(sort.core) == sort)
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct QueuedBodies {
+    @Test func aBodyTheCoreCannotReadIsRefusedRatherThanEmptied() throws {
+        var core = try QueuedWrite(id: "q", kind: .createItem, idempotencyKey: "k", queuedAt: "t0").core()
+        core.bodyJson = "[1]"
+        #expect {
+            try translated { try QueuedWrite(core) }
+        } throws: { error in
+            if case Marfa.MarfaError.decoding = error { true } else { false }
+        }
     }
 }
 

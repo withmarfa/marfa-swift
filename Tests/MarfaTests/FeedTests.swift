@@ -72,19 +72,14 @@ struct Changes {
         #expect(copy.feed.count == 0)
     }
 
-    @Test func aFollowThatStopsIsToldAndLocalWritesGoOn() async throws {
+    /// The real core refuses a follow on a store with no hydration.
+    @Test func aStoreThatNeverHydratedTellsItsStreamsOnlyWhatHappens() async throws {
         let copy = try await WorkingCopy.open(
             store: temporaryStore(), server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "k"))
         var heard = copy.changes().makeAsyncIterator()
-        guard case .stopped(.noCursor) = await heard.next()?.origin else {
-            Issue.record("the refused follow was not told")
-            return
-        }
+        try await eventually("the refused follow ended") { copy.feed.watchTask == nil && copy.feed.count == 1 }
+        try await Task.sleep(for: .milliseconds(100))
         var later = copy.changes().makeAsyncIterator()
-        guard case .stopped(.noCursor) = await later.next()?.origin else {
-            Issue.record("a stream taken after the follow stopped was not told it had")
-            return
-        }
         copy.feed.announce(write(.addTag, item: "n1"))
         #expect(await heard.next()?.origin == .local(.addTag))
         #expect(await later.next()?.origin == .local(.addTag))
@@ -179,6 +174,27 @@ struct Changes {
         try await bounded("close") { await feed.close() }
     }
 
+    /// An app that listens at launch, before its first hydration, is told
+    /// nothing until there is something to follow.
+    @Test func aStoreWithNoHydrationLetsItsStreamsWaitForOne() async throws {
+        for error: CoreMarfaError in [.HydrationIncomplete(message: "m"), .NoCursor(message: "m")] {
+            let core = FakeCore.writer()
+            let copy = WorkingCopy(core: core, hasServer: true)
+            let first = Heard(copy.changes())
+            core.fail(0, with: error)
+            try await eventually("the follow ended") { core.follows[0].ended }
+            let second = Heard(copy.changes())
+            try await Task.sleep(for: .milliseconds(100))
+            #expect(first.all.isEmpty, "\(first.all)")
+            #expect(second.all.isEmpty, "\(second.all)")
+            #expect(core.follows.count == 1, "a stream taken while nothing could be followed started a follow")
+            _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
+            #expect(core.follows.count == 2)
+            try await eventually("the hydration was told") { first.all == [refreshed(.hydrated)] }
+            try await bounded("close") { await copy.close() }
+        }
+    }
+
     @Test func aFollowThatFailedStartsAgainOnlyOnAHydrationOrACatchUp() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(core: core, hasServer: true)
@@ -243,16 +259,34 @@ struct Changes {
         let heard = Heard(copy.changes())
         core.fail(0, with: .Network(message: "gone"))
         _ = try await copy.queue.drain()
+        let refusal = CoreRefusal(
+            reason: "validation_error", code: "validation_error", message: "m",
+            fields: [CoreFieldRefusal(field: "title", message: "too long")], trashed: false, grant: nil)
         core.state.withLock {
             $0.drained.verdicts = [
                 CoreDrainVerdict(
-                    id: "q", kind: .createItem, itemId: "n1", verdict: .accepted, refusals: 0, replayed: false)
+                    id: "q", kind: .createItem, itemId: "n1", edgeId: nil, verdict: .accepted, refusals: 0,
+                    replayed: false),
+                CoreDrainVerdict(
+                    id: "r", kind: .createEdge, itemId: "n1", edgeId: "e1", verdict: .refused(refusal: refusal),
+                    refusals: 1, replayed: false),
+                CoreDrainVerdict(
+                    id: "w", kind: .updateItem, itemId: "n2", edgeId: nil, verdict: nil, refusals: 0,
+                    replayed: false),
             ]
         }
-        _ = try await copy.queue.drain()
-        try await eventually("the drain that recorded a verdict was told") {
-            heard.all == [stopped(.network(message: "gone")), refreshed(.drained)]
+        let report = try await copy.queue.drain()
+        let answered = report.verdicts.prefix(2).map {
+            Marfa.Change(origin: .answered($0), itemId: $0.itemId, edgeId: $0.edgeId)
         }
+        try await eventually("the drain that recorded a verdict was told") { heard.all.count == 4 }
+        #expect(heard.all == [stopped(.network(message: "gone"))] + answered + [refreshed(.drained)])
+        guard case .answered(let edge) = heard.all[2].origin, case .refused(let refused) = edge.verdict else {
+            Issue.record("the refused edge write was not told with its refusal: \(heard.all)")
+            return
+        }
+        #expect(refused.fields == [FieldRefusal(field: "title", message: "too long")])
+        #expect(heard.all[2].edgeId == "e1")
         #expect(core.follows.count == 1, "a drain started the failed follow again")
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
         try await eventually("a catch-up started the follow again") { core.follows.count == 2 }

@@ -38,6 +38,20 @@ import Testing
             verdict: .conflicted(siblingId: "s", fields: ["title"]), queuedAt: "")
         #expect(answered.verdict == .conflicted(siblingId: "s", fields: ["title"]))
         #expect(Verdict.blocked(reason: .keySpent) != .blocked(reason: .awaitingDependency))
+        let refusal = Refusal(
+            reason: "validation_error", fields: [FieldRefusal(field: "title", message: "too long")],
+            grant: MissingGrant(kind: .type, name: "core.note", level: .write))
+        switch Verdict.refused(refusal) {
+        case .refused(let read): #expect(read.fields.map(\.field) == ["title"])
+        default: Issue.record("a refusal read as another verdict")
+        }
+        let kept = QueuedWrite(
+            id: "q", kind: .createItem, idempotencyKey: "k", verdict: .refused(refusal), body: ["title": "x"],
+            queuedAt: "")
+        #expect(kept.body["title"] == "x")
+        #expect(QueuedWrite(id: "w", kind: .addTag, idempotencyKey: "k", waiting: true, queuedAt: "").waiting)
+        let edgeAnswer = DrainVerdict(id: "q", kind: .createEdge, itemId: "a", edgeId: "e", verdict: .accepted)
+        #expect(Change.Origin.answered(edgeAnswer) != .refreshed(.drained))
 
         let report = DrainReport(
             sent: 1, verdicts: [DrainVerdict(id: "q", kind: .createItem, verdict: .merged(fields: ["body"]))])

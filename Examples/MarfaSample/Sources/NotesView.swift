@@ -43,7 +43,7 @@ struct NotesView: View {
                         HStack {
                             Text(String(describing: write.kind))
                             Spacer()
-                            Text(describe(write.verdict)).foregroundStyle(.secondary)
+                            Text(describe(write)).foregroundStyle(.secondary)
                         }
                         .font(.caption)
                     }
@@ -100,13 +100,18 @@ struct NoteRow: View {
     }
 }
 
+func describe(_ write: QueuedWrite) -> String {
+    write.waiting ? "waiting" : describe(write.verdict)
+}
+
 func describe(_ verdict: Verdict?) -> String {
     switch verdict {
     case nil: "unanswered"
     case .accepted: "accepted"
     case .merged(let fields): "merged \(fields.joined(separator: ", "))"
     case .conflicted(let sibling, _): "conflicted, sibling \(sibling)"
-    case .refused(let reason): "refused: \(reason)"
+    case .refused(let refusal):
+        "refused: \(([refusal.reason] + refusal.fields.map { "\($0.field) \($0.message)" }).joined(separator: "; "))"
     case .blocked(let reason): "blocked: \(reason)"
     case .dead: "dead"
     }

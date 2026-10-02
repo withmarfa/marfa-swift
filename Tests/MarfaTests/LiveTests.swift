@@ -180,7 +180,12 @@ struct LiveServer {
             Draft(type: "system.connection", properties: ["name": "not a connection's to write"]))
         var report = try await copy.queue.drain()
         #expect(report.verdicts.first { $0.id == titled.id }?.verdict == .accepted)
-        #expect(report.verdicts.first { $0.id == refused.id }?.verdict == .refused(reason: "type_not_permitted"))
+        guard case .refused(let refusal) = report.verdicts.first(where: { $0.id == refused.id })?.verdict else {
+            Issue.record("the write to a type the key cannot write was not refused: \(report.verdicts)")
+            return
+        }
+        #expect(refusal.reason == "type_not_permitted")
+        #expect(refusal.code == "type_not_permitted")
         let titledId = try #require(titled.itemId)
         let bodiedId = try #require(bodied.itemId)
 
@@ -563,6 +568,65 @@ struct LiveServer {
             }()
             #expect(try await WorkingCopy.open(store: store).handle == .writer)
         }
+    }
+}
+
+@Suite(
+    .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
+    .timeLimit(.minutes(2)))
+struct LiveAnswers {
+    @Test func aRefusedWriteKeepsItsTypedRefusalAndContentUntilDiscarded() async throws {
+        let type = "user.dish\(UUID().uuidString.prefix(8).lowercased())"
+        try await Live.register(["id": type, "fields": ["title": ["type": "string"], "serves": ["type": "integer"]]])
+        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+        _ = try await copy.hydrate(types: [type], tier: .feed)
+        let heard = Heard(copy.changes())
+        let refused = try await copy.items.create(
+            Draft(type: type, properties: ["title": "Too many", "serves": "many"], tier: .feed))
+        let report = try await copy.queue.drain()
+        let answer = try #require(report.verdicts.first { $0.id == refused.id })
+        guard case .refused(let refusal) = answer.verdict else {
+            Issue.record("the write was not refused: \(report.verdicts)")
+            return
+        }
+        #expect(refusal.code == "invalid_properties")
+        #expect(refusal.fields.map(\.field) == ["serves"])
+        #expect(refusal.fields.first?.message.isEmpty == false)
+        #expect(answer.itemId == refused.itemId)
+        try await eventually("the drain told which write it answered") {
+            heard.all.contains { $0.origin == .answered(answer) && $0.itemId == refused.itemId }
+        }
+
+        _ = try await copy.queue.forgetAnswered()
+        let kept = try #require(try await copy.queue.all().first { $0.id == refused.id })
+        #expect(kept.body["properties"] == ["title": "Too many", "serves": "many"], "\(kept.body)")
+        #expect(kept.verdict == .refused(refusal))
+        #expect(try await copy.queue.discard(refused.id))
+        #expect(try await copy.queue.all().contains { $0.id == refused.id } == false)
+        await #expect {
+            _ = try await copy.queue.discard(refused.id)
+        } throws: { error in
+            guard case Marfa.MarfaError.notFound(let code, _) = error else { return false }
+            return code == "queued_write_not_found"
+        }
+        try await bounded("close") { await copy.close() }
+    }
+
+    /// An app listens at launch, before its first hydration.
+    @Test func aStreamHeldBeforeTheFirstHydrationWaitsForIt() async throws {
+        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+        let heard = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.all.isEmpty, "\(heard.all)")
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        let elsewhere = try await Live.hydrated()
+        let made = try await elsewhere.items.create(Live.note("after the first hydration"))
+        _ = try await elsewhere.queue.drain()
+        try await eventually("the follow started with the hydration", within: 20) {
+            heard.all.contains { $0.itemId == made.itemId }
+        }
+        #expect(heard.stops.isEmpty, "\(heard.stops)")
+        try await bounded("close") { await copy.close() }
     }
 }
 
