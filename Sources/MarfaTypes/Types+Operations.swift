@@ -3254,7 +3254,7 @@ public enum Operations {
     }
     /// Get an item
     ///
-    /// Returns a single item with its metadata layer and outbound edges hydrated inline; extensions are not included. A row that is not stored answers 404, and so does a row whose type the credential's type map does not reach, with the same code and message, so the answer says nothing of whether the row exists or what type it is. A credential whose map reaches no type at all is refused `403 type_not_permitted`, whatever the id names.
+    /// Returns a single item with its metadata layer and outbound edges hydrated inline, the metadata carrying the extension namespaces the caller may read. A row that is not stored answers 404, and so does a row whose type the credential's type map does not reach, with the same code and message, so the answer says nothing of whether the row exists or what type it is. A credential whose map reaches no type at all is refused `403 type_not_permitted`, whatever the id names.
     ///
     /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots, oldest first. Tokens are comma-separated and compose.
     ///
@@ -16257,7 +16257,7 @@ public enum Operations {
     ///
     /// An entry that resolves a row of a different type is refused with `type_mismatch` — a write does not re-type the row it lands on. Passing `retype: true` for the batch moves those rows instead, which is how a corpus is brought onto a type a mapping now names. It is opt-in rather than inferred from a differing type, because a declared type accompanies nearly every write and inferring would move a corpus on an ordinary sync bug. Each move requires write on the type being entered as well as the one being left, and the resulting properties are validated against the destination: an item the destination type cannot accept is reported as an `errored` entry naming why, and the rest of the batch proceeds.
     ///
-    /// An ordinary update is validated too, against the row's own type and on the properties the write would leave on it rather than on the body alone, so a patch removing a required field is refused even though it names no invalid value. A refusal is an `errored` entry under `invalid_properties`; with the default `atomic` it rolls the page back instead, carrying that code in `details.code`. An entry may also carry the `version` it was based on, which makes its upsert conditional and is refused the same two ways.
+    /// An ordinary update is validated too, against the row's own type and on the properties the write would leave on it rather than on the body alone, so a patch removing a required field is refused even though it names no invalid value. A refusal is an `errored` entry under `invalid_properties`; with the default `atomic` it rolls the page back instead, carrying that code in `details.code`. An entry may also carry the `version` it was based on, which makes its upsert conditional and is refused the same two ways. An entry may carry `properties_mode` as `PATCH /items/{id}` does: `replace` takes its properties as the row's whole, so a field left out is cleared, and a stale one is merged against the version it names as a stale `PATCH` is.
     ///
     /// Where the entry's type names a `link_field`, an entry that would give its row a value another item of the type holds, in any state, is refused `link_taken` with `details.existing_id` naming the holder, on a create and an update alike, and the same two ways.
     ///
@@ -16310,6 +16310,17 @@ public enum Operations {
                         }
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/properties`.
                         public var properties: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload.PropertiesPayload?
+                        /// How `properties` lands on a row this entry resolves, as on `PATCH /items/{id}`: `merge`, the default, lays them over the row's, and `replace` takes them as the row's whole properties, so a field left out is cleared. A stale `replace` clears a field nobody changed since and collides on one the other writer changed. An entry that creates a row writes its properties whole either way.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/properties_mode`.
+                        @frozen public enum PropertiesModePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                            case merge = "merge"
+                            case replace = "replace"
+                        }
+                        /// How `properties` lands on a row this entry resolves, as on `PATCH /items/{id}`: `merge`, the default, lays them over the row's, and `replace` takes them as the row's whole properties, so a field left out is cleared. A stale `replace` clears a field nobody changed since and collides on one the other writer changed. An entry that creates a row writes its properties whole either way.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/properties_mode`.
+                        public var propertiesMode: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload.PropertiesModePayload?
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/state`.
                         public var state: Components.Schemas.ItemState?
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/tier`.
@@ -16354,6 +16365,7 @@ public enum Operations {
                         ///   - id:
                         ///   - _type:
                         ///   - properties:
+                        ///   - propertiesMode: How `properties` lands on a row this entry resolves, as on `PATCH /items/{id}`: `merge`, the default, lays them over the row's, and `replace` takes them as the row's whole properties, so a field left out is cleared. A stale `replace` clears a field nobody changed since and collides on one the other writer changed. An entry that creates a row writes its properties whole either way.
                         ///   - state:
                         ///   - tier:
                         ///   - occurredAt:
@@ -16366,6 +16378,7 @@ public enum Operations {
                             id: Swift.String? = nil,
                             _type: Swift.String,
                             properties: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload.PropertiesPayload? = nil,
+                            propertiesMode: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload.PropertiesModePayload? = nil,
                             state: Components.Schemas.ItemState? = nil,
                             tier: Components.Schemas.Tier? = nil,
                             occurredAt: Swift.String? = nil,
@@ -16378,6 +16391,7 @@ public enum Operations {
                             self.id = id
                             self._type = _type
                             self.properties = properties
+                            self.propertiesMode = propertiesMode
                             self.state = state
                             self.tier = tier
                             self.occurredAt = occurredAt
@@ -16391,6 +16405,7 @@ public enum Operations {
                             case id
                             case _type = "type"
                             case properties
+                            case propertiesMode = "properties_mode"
                             case state
                             case tier
                             case occurredAt = "occurred_at"
@@ -16653,7 +16668,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Validation error, or an atomic rollback. `atomic` defaults to true, so a single refused entry aborts the whole page and the per-entry reason travels in `details.code`. Two of them turn on an entry declaring a `type` that is not the type of the row it resolved: `type_mismatch` where the natural key resolved it, because the entry named no id and the declaration is the mistake, and `id_reused` where the entry's own `id` did, because the id is taken by a row the entry is not describing — the same code the single-item doors answer. Send `atomic: false` to have each entry reported on its own instead.
+            /// Validation error, or an atomic rollback. `atomic` defaults to true, so a single refused entry aborts the whole page and the per-entry reason travels in `details.code`, at the status that refusal carries on its own: `400` here, `403`, `404` or `409` below. Send `atomic: false` to have each entry reported on its own instead.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/400`.
             ///
@@ -16889,6 +16904,224 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct NotFound: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.BulkUpsertItems.Output.NotFound.Headers
+                /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/404/content/application\/json`.
+                    case json(Components.Schemas.BulkAtomicRollbackRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.BulkAtomicRollbackRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.BulkUpsertItems.Output.NotFound.Body
+                /// Creates a new `NotFound`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.BulkUpsertItems.Output.NotFound.Headers = .init(),
+                    body: Operations.BulkUpsertItems.Output.NotFound.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// An atomic rollback for an entry naming a row that is not there, such as an inline edge's target, with `item_not_found` in `details.code`.
+            ///
+            /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Operations.BulkUpsertItems.Output.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Operations.BulkUpsertItems.Output.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.BulkUpsertItems.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.BulkAtomicRollbackRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.BulkAtomicRollbackRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.BulkUpsertItems.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.BulkUpsertItems.Output.Conflict.Headers = .init(),
+                    body: Operations.BulkUpsertItems.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// An atomic rollback for an entry whose row moved or is taken, with `version_conflict`, `link_taken`, `type_mismatch` or `id_reused` in `details.code`. The last two turn on an entry declaring a `type` that is not the type of the row it resolved: `type_mismatch` where the natural key resolved it, because the entry named no id and the declaration is the mistake, and `id_reused` where the entry's own `id` did, because the id is taken by a row the entry is not describing, the same code the single-item doors answer.
+            ///
+            /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.BulkUpsertItems.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.BulkUpsertItems.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -17240,7 +17473,7 @@ public enum Operations {
     }
     /// Apply a bulk action
     ///
-    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item. A purge takes only rows in the trash when the job reaches them: any other match, live or restored since the job was queued, is left untouched and reported in the job's `errors` with `invalid_transition`. A purge may carry `expected_ids`, the ids its dry run returned, and then takes only the rows in that list the filter still matches: a row the filter has come to match since the dry run is left untouched, and `max_items` caps the rows the purge takes rather than the filter's whole match.
+    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item. A purge takes only rows in the trash when the job reaches them: any other match, live or restored since the job was queued, is left untouched and reported in the job's `errors` with `invalid_transition`. A purge may carry `expected_ids`, the ids its dry run returned, and then takes only the rows in that list the filter still matches: a row the filter has come to match since the dry run is left untouched, and `max_items` caps the rows the purge takes rather than the filter's whole match. The job acts for the credential that queued it as that credential stands when each chunk runs: once the key is revoked, deleted or expired, the sign-in's token or grant is revoked, or a purge's credential no longer holds `items.purge`, the job writes nothing further and ends `failed`, keeping the `result` it had gathered. A sign-in's token reaching its ordinary expiry does not stop it. A row whose type the credential may read but no longer write is that row's `type_not_permitted` entry in the job's `errors`, and one whose type it may no longer read is its `item_not_found` entry, naming no type. Where the instance's strict-mode lever names a row's type, an `update_properties` patch naming a property the type does not declare is refused for that row, recorded in the job's `errors` under `invalid_properties` with `details.code` `unknown_property`, and the row is not written; the lever is read when the job writes the row, for the credential that queued it.
     ///
     /// Unrecognized fields are refused with `400` rather than ignored, in the request body and inside `filter` alike: a dropped filter field is not a narrower match set but every item, and a dropped `dry_run` is the action running for real. A field of your own must start with `_`, which is always ignored.
     ///
@@ -24780,7 +25013,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Updated extensions
+            /// The namespaces on the item the caller may read
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/200`.
             ///
@@ -25721,7 +25954,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Remaining extensions after deletion
+            /// The namespaces left on the item the caller may read
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/200`.
             ///
@@ -34429,6 +34662,224 @@ public enum Operations {
                     }
                 }
             }
+            public struct NotFound: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.BulkUpsertEdges.Output.NotFound.Headers
+                /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/404/content/application\/json`.
+                    case json(Components.Schemas.BulkAtomicRollbackRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.BulkAtomicRollbackRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.BulkUpsertEdges.Output.NotFound.Body
+                /// Creates a new `NotFound`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.BulkUpsertEdges.Output.NotFound.Headers = .init(),
+                    body: Operations.BulkUpsertEdges.Output.NotFound.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// An atomic rollback for an edge naming an end that is not there, with `item_not_found` in `details.code`.
+            ///
+            /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Operations.BulkUpsertEdges.Output.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Operations.BulkUpsertEdges.Output.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.BulkUpsertEdges.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.BulkAtomicRollbackRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.BulkAtomicRollbackRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.BulkUpsertEdges.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.BulkUpsertEdges.Output.Conflict.Headers = .init(),
+                    body: Operations.BulkUpsertEdges.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// An atomic rollback for an edge whose row moved or whose id is taken, with `version_conflict` or `id_reused` in `details.code`.
+            ///
+            /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.BulkUpsertEdges.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.BulkUpsertEdges.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -34775,7 +35226,7 @@ public enum Operations {
     }
     /// List edge types
     ///
-    /// Returns every edge type this instance resolves — the shipped types plus any registered through `POST /edge-types` — each with its cardinality, cascade behavior, source/target type constraints, and the reverse name it declares, if any.
+    /// Returns every edge type this instance resolves — the shipped types plus any registered through `POST /edge-types` — each with its cardinality, cascade behavior, source/target type constraints, the reverse name it declares, if any, and whether Marfa ships it.
     ///
     /// - Remark: HTTP `GET /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)`.
@@ -35272,7 +35723,7 @@ public enum Operations {
     }
     /// Register an edge type
     ///
-    /// Registers an edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`. The shipped edge-type names are reserved and reject with a conflict, as does an id or a `reverse_name` another edge type already holds as either, and a registered edge type is flat with no inheritance.
+    /// Registers an edge type with its cardinality, cascade behavior, type constraints, and optional property schema. Requires `metadata.edge_types:write`, and an edge map granting write on the id and on any `reverse_name`, so a key registers only the names it may write. The shipped edge-type names are reserved and reject with a conflict, as does an id or a `reverse_name` another edge type already holds as either, and a registered edge type is flat with no inheritance.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)`.
@@ -35485,12 +35936,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edge-types/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edge-types/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -35703,12 +36154,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edge-types/POST/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edge-types/POST/responses/403/content/application\/json`.
-                    case json(Components.Schemas.ForbiddenRefusal)
+                    case json(Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ForbiddenRefusal {
+                    public var json: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -35732,7 +36183,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `metadata.edge_types:write` required
+            /// `forbidden`: `metadata.edge_types:write` required. `edge_permission_denied`: the credential's edge map does not grant write on the id or on the `reverse_name`, which `details.edge_type` names.
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)/responses/403`.
             ///
@@ -36210,7 +36661,7 @@ public enum Operations {
     }
     /// Delete an edge type
     ///
-    /// Removes a registered edge type. Requires `schema.write`; core edge types are rejected, and an edge type this instance does not hold resolves as not-found. Refused `409 edge_type_in_use` while any edge of the type is stored, the shape the sibling `DELETE /types/{id}` has for items. `?force=true` deletes the registration anyway and leaves those edges in place, still naming a type the instance no longer holds — it orphans rather than cascades, because deleting rows nobody asked to delete is the worse of the two surprises.
+    /// Removes a registered edge type. Requires `schema.write` and an edge map granting write on the id and on any `reverse_name` the type declares, `?force=true` included; core edge types are rejected, and an edge type this instance does not hold resolves as not-found. Refused `409 edge_type_in_use` while any edge of the type is stored, the shape the sibling `DELETE /types/{id}` has for items. `?force=true` deletes the registration anyway and leaves those edges in place, still naming a type the instance no longer holds — it orphans rather than cascades, because deleting rows nobody asked to delete is the worse of the two surprises.
     ///
     /// - Remark: HTTP `DELETE /edge-types/{id}`.
     /// - Remark: Generated from `#/paths//edge-types/{id}/delete(deleteEdgeType)`.
@@ -36660,12 +37111,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/403/content/application\/json`.
-                    case json(Components.Schemas.ForbiddenRefusal)
+                    case json(Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ForbiddenRefusal {
+                    public var json: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -36689,7 +37140,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential does not hold `schema.write`
+            /// `forbidden`: the credential does not hold `schema.write`. `edge_permission_denied`: the credential's edge map does not grant write on the id or on the type's `reverse_name`, which `details.edge_type` names.
             ///
             /// - Remark: Generated from `#/paths//edge-types/{id}/delete(deleteEdgeType)/responses/403`.
             ///
@@ -37773,7 +38224,7 @@ public enum Operations {
     }
     /// Register a type
     ///
-    /// Registers a type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; a reserved root rejects with `403 forbidden`, and ancestor-field redefinitions and property names shadowing first-class `Item` fields reject with `400`, as does a `link_field` naming anything but a string field the type declares or inherits, or one whose name holds a double quote or a backslash (`invalid_schema`). A type registered under an identifier starts with no tombstones, even those the purge of a row a forced delete left under it recorded. Every credential needs the `metadata.types:write` scope, which is off by default. The operator key is no exception: this door reads the map like any other.
+    /// Registers a type at runtime under the `app.*`, `user.*`, or `<publisher>.*` namespaces; a reserved root rejects with `403 forbidden`, and ancestor-field redefinitions and property names shadowing first-class `Item` fields reject with `400`, as does a `link_field` naming anything but a string field the type declares or inherits, or one whose name holds a double quote or a backslash (`invalid_schema`). A type registered under an identifier starts with no tombstones, even those the purge of a row a forced delete left under it recorded. Every credential needs the `metadata.types:write` scope, which is off by default, and a type map granting write on the identifier, so a key registers only the types it may write. The operator key is no exception: this door reads the map like any other.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -38189,12 +38640,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/POST/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/POST/responses/403/content/application\/json`.
-                    case json(Components.Schemas.ForbiddenRefusal)
+                    case json(Components.Schemas.ForbiddenOrTypeNotPermittedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ForbiddenRefusal {
+                    public var json: Components.Schemas.ForbiddenOrTypeNotPermittedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -38218,7 +38669,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Missing metadata.types:write permission, or a reserved namespace: `core.*`, `system.*` and `marfa.*` are refused to every credential
+            /// `forbidden`: missing metadata.types:write permission, or a reserved namespace: `core.*`, `system.*` and `marfa.*` are refused to every credential. `type_not_permitted`: the credential's type map does not grant write on the identifier.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/403`.
             ///
@@ -39542,7 +39993,7 @@ public enum Operations {
     }
     /// Update a registered type
     ///
-    /// Replaces a registered type's schema, re-running the registration-time correctness rails. Requires `schema.write` — core types are immutable and return 403. The replacement keeps whatever `version` it is given, 0 when it names none, and demands no bump. When it names, changes or withdraws a `link_field`, the type's rows in every state are held to the new link at once: two holding one value refuse the replacement `409 link_taken`. The old link's tombstones go with it, since they hold another field's values. A change that would leave a type inheriting from this one linking by a field it no longer declares or inherits, or by one no longer a string, is refused `400 invalid_schema`.
+    /// Replaces a registered type's schema, re-running the registration-time correctness rails. Requires `schema.write` and a type map granting write on the identifier, so a key replaces only the types it may write — core types are immutable and return 403. The replacement keeps whatever `version` it is given, 0 when it names none, and demands no bump. When it names, changes or withdraws a `link_field`, the type's rows in every state are held to the new link at once: two holding one value refuse the replacement `409 link_taken`. The old link's tombstones go with it, since they hold another field's values. A change that would leave a type inheriting from this one linking by a field it no longer declares or inherits, or by one no longer a string, is refused `400 invalid_schema`.
     ///
     /// - Remark: HTTP `PUT /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/put(updateType)`.
@@ -39758,12 +40209,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/400/content/application\/json`.
-                    case json(Components.Schemas.InheritanceViolationOrInvalidSchemaOrValidationErrorRefusal)
+                    case json(Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InheritanceViolationOrInvalidSchemaOrValidationErrorRefusal {
+                    public var json: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -39787,7 +40238,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `validation_error` for a malformed identifier, a body of the wrong shape, or a parent chain that is circular, too deep or unresolved; `inheritance_violation` for a field whose shape differs from the one a type above or below it in the chain declares under the same name; `invalid_schema` for any other schema the validator refuses.
+            /// `validation_error` for a malformed identifier, a body of the wrong shape, or a parent chain that is circular, too deep or unresolved; `property_shadows_field` for a field name a first-class `Item` field already holds; `inheritance_violation` for a field whose shape differs from the one a type above or below it in the chain declares under the same name; `invalid_schema` for any other schema the validator refuses.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/400`.
             ///
@@ -39976,12 +40427,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/403/content/application\/json`.
-                    case json(Components.Schemas.CoreTypeImmutableOrForbiddenRefusal)
+                    case json(Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CoreTypeImmutableOrForbiddenRefusal {
+                    public var json: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -40005,7 +40456,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: the credential does not hold `schema.write`. `core_type_immutable`: the identifier names a platform-shipped type, which no credential may replace.
+            /// `forbidden`: the credential does not hold `schema.write`. `core_type_immutable`: the identifier names a platform-shipped type, which no credential may replace. `type_not_permitted`: the credential's type map does not grant write on the identifier.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/403`.
             ///
@@ -40334,6 +40785,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UpdateType.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/content/application\/json`.
+                    case json(Components.Schemas.CompatibleWithViolationRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateType.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UpdateType.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.UpdateType.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// A `compatible_with` naming an unknown type or missing a required field of its target, as registration refuses it.
+            ///
+            /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.UpdateType.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.UpdateType.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -40592,7 +41152,7 @@ public enum Operations {
     }
     /// Delete a registered type
     ///
-    /// Removes a type registration. Requires `schema.write` — platform-shipped types are immutable.
+    /// Removes a type registration. Requires `schema.write` and a type map granting write on the identifier, `?force=true` included — platform-shipped types are immutable.
     ///
     /// Rejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.
     ///
@@ -40939,12 +41499,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/403/content/application\/json`.
-                    case json(Components.Schemas.CoreTypeImmutableOrForbiddenRefusal)
+                    case json(Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CoreTypeImmutableOrForbiddenRefusal {
+                    public var json: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -40968,7 +41528,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: the credential does not hold `schema.write`. `core_type_immutable`: the identifier names a platform-shipped type, which no credential may remove.
+            /// `forbidden`: the credential does not hold `schema.write`. `core_type_immutable`: the identifier names a platform-shipped type, which no credential may remove. `type_not_permitted`: the credential's type map does not grant write on the identifier.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/403`.
             ///
@@ -42370,7 +42930,7 @@ public enum Operations {
     }
     /// List event occurrences in a window
     ///
-    /// Returns the events that fall inside a time window, expanding recurring series from their rules at read time rather than storing occurrences. Single events appear by their own times; a series contributes one entry per occurrence in the window, carrying `series_id`; a stored exception replaces the occurrence it was recorded against and carries `replaces`. A row is shown at the times its own item carries; only a computed series occurrence, whose time the item does not hold, is shown at the time the rule produced. Two bounds refuse rather than silently trimming: the window may not be longer than `max_days`, and the assembled result may not exceed `max_occurrences`. The second depends on what the window holds, so a window well inside the length limit can still be refused for being too full; `scan.max_occurrences` is reported on every successful read so the ceiling is visible before it is reached. Its refusal carries `max_occurrences` and `found` in `details`, and `expansion_incomplete` with `series_unexpanded` as well when expansion had already been truncated — worth branching on, because the refusal says to narrow the window and those two say that narrowing it returns a calendar that is partial for a second reason. A rule that cannot be read or cannot be fully applied is reported in `series_errors` while the rest of the calendar still returns. Entries there are failures rather than rows: one row can carry two, and `item_id` is what a caller groups on. That list alone is capped rather than refused, at `scan.max_series_errors`: it is a diagnostic beside the calendar and nothing in `data` depends on it, so a capped list sets `series_errors_truncated` while `scan.series_errors` still carries the true total for the event types the request read — not for every event type, which a request narrowed by `type` or a credential not permitted an event type never sees all of. Expansion itself is bounded too: a request spends at most `scan.max_unproductive_iterations` rule iterations on expansions that return no occurrence, and one that reaches that ceiling stops expanding, sets `expansion_incomplete` and reports `scan.series_unexpanded`, rather than running for as long as the data gives it work.
+    /// Returns the events that overlap a time window, expanding recurring series from their rules at read time rather than storing occurrences. An event overlaps when it starts before the window ends and ends after it opens, as RFC 4791 reads a time range, so one already running when the window opens is included and one ending as it opens is not; an event with no length is included where it starts. An event's end is its `ends_at`, else its start plus `duration`, else the day after its start for a whole-day event. Single events appear by their own times; a series contributes one entry per occurrence in the window, carrying `series_id`; a stored exception replaces the occurrence it was recorded against and carries `replaces`, and appears in the windows its own times overlap rather than in the one its old slot sat in. A row is shown at the times its own item carries; only a computed series occurrence, whose time the item does not hold, is shown at the time the rule produced. Two bounds refuse rather than silently trimming: the window may not be longer than `max_days`, and the assembled result may not exceed `max_occurrences`. The second depends on what the window holds, so a window well inside the length limit can still be refused for being too full; `scan.max_occurrences` is reported on every successful read so the ceiling is visible before it is reached. Its refusal carries `max_occurrences` and `found` in `details`, and `expansion_incomplete` with `series_unexpanded` as well when expansion had already been truncated — worth branching on, because the refusal says to narrow the window and those two say that narrowing it returns a calendar that is partial for a second reason. A rule that cannot be read or cannot be fully applied is reported in `series_errors` while the rest of the calendar still returns. Entries there are failures rather than rows: one row can carry two, and `item_id` is what a caller groups on. That list alone is capped rather than refused, at `scan.max_series_errors`: it is a diagnostic beside the calendar and nothing in `data` depends on it, so a capped list sets `series_errors_truncated` while `scan.series_errors` still carries the true total for the event types the request read — not for every event type, which a request narrowed by `type` or a credential not permitted an event type never sees all of. Expansion itself is bounded too: each series' walk stops at a bound on the candidate times its rule considers and on its time, and a request spends at most `scan.max_unproductive_iterations` on expansions that return no occurrence; a series stopped either way sets `expansion_incomplete` and counts in `scan.series_unexpanded`, rather than running for as long as the data gives it work.
     ///
     /// - Remark: HTTP `GET /occurrences`.
     /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)`.
@@ -42379,11 +42939,11 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/occurrences/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Window start, ISO 8601. Inclusive.
+                /// Window start, ISO 8601. An event ending at or before it is outside the window; one with no length starting at it is inside.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/from`.
                 public var from: Swift.String
-                /// Window end, ISO 8601. Exclusive.
+                /// Window end, ISO 8601. An event starting at or after it is outside the window.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/to`.
                 public var to: Swift.String
@@ -42394,8 +42954,8 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - from: Window start, ISO 8601. Inclusive.
-                ///   - to: Window end, ISO 8601. Exclusive.
+                ///   - from: Window start, ISO 8601. An event ending at or before it is outside the window; one with no length starting at it is inside.
+                ///   - to: Window end, ISO 8601. An event starting at or after it is outside the window.
                 ///   - _type: Restrict to one event type. Defaults to every event type the caller can read.
                 public init(
                     from: Swift.String,
@@ -42513,7 +43073,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Occurrences in the window, ordered by start time
+            /// Occurrences overlapping the window, ordered by start time
             ///
             /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)/responses/200`.
             ///
@@ -43727,7 +44287,7 @@ public enum Operations {
     }
     /// Upload a blob
     ///
-    /// Takes the raw bytes as the body, with `Content-Type` naming their MIME type, and answers `201` with the `sha256:<hex>` content-addressed hash. The body streams to disk as it arrives and has no size cap. Uploading bytes already held answers the existing hash. `multipart/form-data` is refused: send the bytes themselves.
+    /// Takes the raw bytes as the body, with `Content-Type` naming their MIME type, and answers `201` with the `sha256:<hex>` content-addressed hash. The body streams to disk as it arrives and has no size cap. Uploading bytes already held answers the existing hash. `multipart/form-data` is refused: send the bytes themselves. Takes write, through the item doors, on at least one type registered when the request is made, since an item of any type can reference a blob; a credential with none is refused `403 type_not_permitted` before the body is read. The operator key uploads without one. Bytes become readable through an item whose properties name them once a write sending the digest is made for a credential that uploaded them or could read them.
     ///
     /// - Remark: HTTP `POST /blobs`.
     /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)`.
@@ -43874,7 +44434,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Blob stored
+            /// Blob stored. `mime_type` is the type the blob is served with: the type sent, or, for bytes already held, the type the upload that first stored them sent.
             ///
             /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/201`.
             ///
@@ -44110,6 +44670,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UploadBlob.Output.Forbidden.Headers
+                /// - Remark: Generated from `#/paths/blobs/POST/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/403/content/application\/json`.
+                    case json(Components.Schemas.TypeNotPermittedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TypeNotPermittedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadBlob.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UploadBlob.Output.Forbidden.Headers = .init(),
+                    body: Operations.UploadBlob.Output.Forbidden.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The credential's type permissions reach no type, or, on an upload, grant write on none
+            ///
+            /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.UploadBlob.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.UploadBlob.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
                             response: self
                         )
                     }
@@ -45585,7 +46254,7 @@ public enum Operations {
     }
     /// Download blob binary
     ///
-    /// Streams the bytes of a blob as `application/octet-stream` from whichever store holds them, honoring one `Range`. `HEAD` answers the same headers with no body. A hash this instance does not hold answers `404`.
+    /// Streams the bytes of a blob as `application/octet-stream` from whichever store holds them, honoring one `Range`. `HEAD` answers the same headers with no body. A hash this instance does not hold answers `404`. A working key or a signed-in app reads a blob only when an item of a type it may read, in any lifecycle state, references the blob's digest in its properties, with a reference that lends: one a write sent for a credential that had uploaded the bytes or could read the blob as it wrote; any other blob answers `404 blob_not_found` as an unknown hash does, and a credential whose type permissions reach no type is refused `403 type_not_permitted`. The operator key reads every blob.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)`.
@@ -45656,6 +46325,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// Always `attachment; filename="<hex>"`, whatever the type: the bytes are a file to save, never a page to render.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/200/headers/Content-Disposition`.
+                    public var contentDisposition: Swift.String?
+                    /// Always `sandbox; default-src 'none'`, so bytes a browser renders anyway run in an opaque origin with nothing loaded.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/200/headers/Content-Security-Policy`.
+                    public var contentSecurityPolicy: Swift.String?
                     /// Always `bytes`: one range of a blob can be asked for.
                     ///
                     /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/200/headers/Accept-Ranges`.
@@ -45672,6 +46349,8 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - contentDisposition: Always `attachment; filename="<hex>"`, whatever the type: the bytes are a file to save, never a page to render.
+                    ///   - contentSecurityPolicy: Always `sandbox; default-src 'none'`, so bytes a browser renders anyway run in an opaque origin with nothing loaded.
                     ///   - acceptRanges: Always `bytes`: one range of a blob can be asked for.
                     ///   - eTag: The blob's content hash, so a cached copy is validated by the name it was fetched under.
                     public init(
@@ -45680,6 +46359,8 @@ public enum Operations {
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        contentDisposition: Swift.String? = nil,
+                        contentSecurityPolicy: Swift.String? = nil,
                         acceptRanges: Swift.String? = nil,
                         eTag: Swift.String? = nil
                     ) {
@@ -45688,6 +46369,8 @@ public enum Operations {
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.contentDisposition = contentDisposition
+                        self.contentSecurityPolicy = contentSecurityPolicy
                         self.acceptRanges = acceptRanges
                         self.eTag = eTag
                     }
@@ -45726,7 +46409,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The bytes, with the content type they were uploaded under.
+            /// The bytes, with the content type the blob was first uploaded under, as a download.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/200`.
             ///
@@ -45772,6 +46455,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/206/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// Always `attachment; filename="<hex>"`, whatever the type: the bytes are a file to save, never a page to render.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/206/headers/Content-Disposition`.
+                    public var contentDisposition: Swift.String?
+                    /// Always `sandbox; default-src 'none'`, so bytes a browser renders anyway run in an opaque origin with nothing loaded.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/206/headers/Content-Security-Policy`.
+                    public var contentSecurityPolicy: Swift.String?
                     /// Always `bytes`: one range of a blob can be asked for.
                     ///
                     /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/206/headers/Accept-Ranges`.
@@ -45792,6 +46483,8 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - contentDisposition: Always `attachment; filename="<hex>"`, whatever the type: the bytes are a file to save, never a page to render.
+                    ///   - contentSecurityPolicy: Always `sandbox; default-src 'none'`, so bytes a browser renders anyway run in an opaque origin with nothing loaded.
                     ///   - acceptRanges: Always `bytes`: one range of a blob can be asked for.
                     ///   - eTag: The blob's content hash, so a cached copy is validated by the name it was fetched under.
                     ///   - contentRange: `bytes <first>-<last>/<size>` for the range served.
@@ -45801,6 +46494,8 @@ public enum Operations {
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        contentDisposition: Swift.String? = nil,
+                        contentSecurityPolicy: Swift.String? = nil,
                         acceptRanges: Swift.String? = nil,
                         eTag: Swift.String? = nil,
                         contentRange: Swift.String? = nil
@@ -45810,6 +46505,8 @@ public enum Operations {
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.contentDisposition = contentDisposition
+                        self.contentSecurityPolicy = contentSecurityPolicy
                         self.acceptRanges = acceptRanges
                         self.eTag = eTag
                         self.contentRange = contentRange
@@ -46090,6 +46787,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DownloadBlob.Output.Forbidden.Headers
+                /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/403/content/application\/json`.
+                    case json(Components.Schemas.TypeNotPermittedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TypeNotPermittedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DownloadBlob.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DownloadBlob.Output.Forbidden.Headers = .init(),
+                    body: Operations.DownloadBlob.Output.Forbidden.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The credential's type permissions reach no type, or, on an upload, grant write on none
+            ///
+            /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.DownloadBlob.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.DownloadBlob.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct NotFound: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/404/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -46176,7 +46982,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No blob with this hash, or no store holding its bytes.
+            /// No blob with this hash that an item the credential may read references, or no store holding its bytes
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/404`.
             ///
@@ -46579,7 +47385,7 @@ public enum Operations {
     }
     /// Get a time-limited link to a blob's bytes
     ///
-    /// Answers a URL a client fetches the bytes from without a credential, and `expires_in`, the seconds until it stops working. When an object store holds the blob the link is the store's own signed link, so the bytes never pass through the instance; otherwise the instance serves it. `ttl` is capped at seven days.
+    /// Answers a URL a client fetches the bytes from without a credential, and `expires_in`, the seconds until it stops working. When an object store holds the blob the link is the store's own signed link, so the bytes never pass through the instance; otherwise the instance serves it. `ttl` is capped at seven days. A working key or a signed-in app reads a blob only when an item of a type it may read, in any lifecycle state, references the blob's digest in its properties, with a reference that lends: one a write sent for a credential that had uploaded the bytes or could read the blob as it wrote; any other blob answers `404 blob_not_found` as an unknown hash does, and a credential whose type permissions reach no type is refused `403 type_not_permitted`. The operator key reads every blob. The link is checked when it is minted: it serves the bytes for its lifetime whatever happens to the credential afterwards.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}/url`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)`.
@@ -46747,7 +47553,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// A link and its lifetime
+            /// A link and its lifetime. Either link serves the blob's recorded type as a download (`Content-Disposition: attachment`).
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)/responses/200`.
             ///
@@ -46988,6 +47794,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetBlobUrl.Output.Forbidden.Headers
+                /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/403/content/application\/json`.
+                    case json(Components.Schemas.TypeNotPermittedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TypeNotPermittedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetBlobUrl.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetBlobUrl.Output.Forbidden.Headers = .init(),
+                    body: Operations.GetBlobUrl.Output.Forbidden.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The credential's type permissions reach no type, or, on an upload, grant write on none
+            ///
+            /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.GetBlobUrl.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.GetBlobUrl.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct NotFound: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/responses/404/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -47074,7 +47989,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Blob not found
+            /// No blob with this hash that an item the credential may read references
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)/responses/404`.
             ///
@@ -47355,7 +48270,7 @@ public enum Operations {
     }
     /// List the stores holding a blob
     ///
-    /// The location log for one blob: every store recorded as holding its bytes, with when the copy was recorded and when a check last found it present and intact (`verified_at`, `null` until one has). A store the configuration no longer names is shown `detached` and does not count as a copy.
+    /// The location log for one blob: every store recorded as holding its bytes, with when the copy was recorded and when a check last found it present and intact (`verified_at`, `null` until one has). A store the configuration no longer names is shown `detached` and does not count as a copy. A working key or a signed-in app reads a blob only when an item of a type it may read, in any lifecycle state, references the blob's digest in its properties, with a reference that lends: one a write sent for a credential that had uploaded the bytes or could read the blob as it wrote; any other blob answers `404 blob_not_found` as an unknown hash does, and a credential whose type permissions reach no type is refused `403 type_not_permitted`. The operator key reads every blob.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}/locations`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/locations/get(listBlobLocations)`.
@@ -47723,6 +48638,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ListBlobLocations.Output.Forbidden.Headers
+                /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/403/content/application\/json`.
+                    case json(Components.Schemas.TypeNotPermittedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.TypeNotPermittedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListBlobLocations.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ListBlobLocations.Output.Forbidden.Headers = .init(),
+                    body: Operations.ListBlobLocations.Output.Forbidden.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The credential's type permissions reach no type, or, on an upload, grant write on none
+            ///
+            /// - Remark: Generated from `#/paths//blobs/{hash}/locations/get(listBlobLocations)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.ListBlobLocations.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.ListBlobLocations.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct NotFound: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/responses/404/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -47809,7 +48833,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Blob not found
+            /// No blob with this hash that an item the credential may read references
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/get(listBlobLocations)/responses/404`.
             ///
@@ -61439,7 +62463,7 @@ public enum Operations {
     }
     /// Take or renew the hold on a registration
     ///
-    /// Holds the registration for `process` until the server's clock plus the instance's hold window, three minutes unless it names another, and answers until when and whether this renewed a hold the process still held. The process holding it renews it the same way; while another process holds it and its hold has not lapsed, this answers `409 connector_held` and nothing moves. Only the process holding a live hold writes the state and the agreements. A hold is a lock the process takes and gives up: nothing watches it, and a process that stops renewing simply loses it, so one answered `renewed: false` while it believed it held the registration re-reads the state and the agreements before writing again. A top-level field the body does not declare is refused. The connector's own key only.
+    /// Holds the registration for `process` until the server's clock plus the instance's hold window, three minutes unless it names another, and answers until when, for how long, and whether this renewed a hold the process still held. The process holding it renews it the same way; while another process holds it and its hold has not lapsed, this answers `409 connector_held` and nothing moves. Only the process holding a live hold writes the state and the agreements. A hold is a lock the process takes and gives up: nothing watches it, and a process that stops renewing simply loses it, so one answered `renewed: false` while it believed it held the registration re-reads the state and the agreements before writing again. A top-level field the body does not declare is refused. The connector's own key only.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/hold`.
     /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)`.
@@ -61568,6 +62592,10 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/200/content/json/expires_at`.
                         public var expiresAt: Swift.String
+                        /// The instance's hold window in milliseconds: `expires_at` is the server's clock plus this when it took the hold, so a process schedules its next renewal without reading the server's clock.
+                        ///
+                        /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/200/content/json/ttl_ms`.
+                        public var ttlMs: Swift.Int
                         /// True only when this process's hold was still live when the call arrived; false on a first take and on a take after a lapse. A process answered false while it believed it held the registration re-reads the state and the agreements before writing again.
                         ///
                         /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/200/content/json/renewed`.
@@ -61576,16 +62604,20 @@ public enum Operations {
                         ///
                         /// - Parameters:
                         ///   - expiresAt: When the hold lapses.
+                        ///   - ttlMs: The instance's hold window in milliseconds: `expires_at` is the server's clock plus this when it took the hold, so a process schedules its next renewal without reading the server's clock.
                         ///   - renewed: True only when this process's hold was still live when the call arrived; false on a first take and on a take after a lapse. A process answered false while it believed it held the registration re-reads the state and the agreements before writing again.
                         public init(
                             expiresAt: Swift.String,
+                            ttlMs: Swift.Int,
                             renewed: Swift.Bool
                         ) {
                             self.expiresAt = expiresAt
+                            self.ttlMs = ttlMs
                             self.renewed = renewed
                         }
                         public enum CodingKeys: String, CodingKey {
                             case expiresAt = "expires_at"
+                            case ttlMs = "ttl_ms"
                             case renewed
                         }
                     }
@@ -73100,7 +74132,7 @@ public enum Operations {
     }
     /// List API keys
     ///
-    /// Returns every API key without plaintext, which is only ever returned at creation time. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.
+    /// Returns the API keys within the caller's reach, the caller included, without plaintext, which is only ever returned at creation time. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -73741,7 +74773,7 @@ public enum Operations {
                     public var label: Swift.String
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/source`.
                     public var source: Swift.String
-                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
+                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. At most 1,000 entries. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -73858,7 +74890,7 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label:
                     ///   - source:
-                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
+                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. At most 1,000 entries. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///   - permissions:
                     ///   - defaultTier:
                     ///   - isOperator:
@@ -74181,7 +75213,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `missing_required_field` for a body without `label` or `source`. `validation_error` when the body named a reserved `source` or claimed one in `sources`, or the bootstrap secret was refused.
+            /// `missing_required_field` for a body without `label` or `source`. `validation_error` when the body named a reserved `source` or claimed one in `sources`, claimed more than 1,000 sources, or the bootstrap secret was refused.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/400`.
             ///
@@ -74877,7 +75909,7 @@ public enum Operations {
     }
     /// Read the calling key
     ///
-    /// Returns the key the request bears, without plaintext: its permissions, its maps, its claimed sources and its tier. Any key may read itself, whatever it holds, so a process handed a key can check it holds what it should and no more; every other key stays behind `keys.mint`. A signed-in app's token is not a key, and is refused.
+    /// Returns the key the request bears, without plaintext: its permissions, its maps, its claimed sources, its tier and its own enforcement levers, if it carries any. Any key may read itself, whatever it holds, so a process handed a key can check it holds what it should and no more; every other key stays behind `keys.mint`. A signed-in app's token is not a key, and is refused.
     ///
     /// - Remark: HTTP `GET /keys/current`.
     /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)`.
@@ -75483,7 +76515,7 @@ public enum Operations {
     }
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, claimed `sources` or permission maps in place. `source` is immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change it. Requires `keys.mint`. A permission map may not be widened past what the calling credential itself holds, and `sources` may name only the caller's own `source` and what it claims. The operator key is excepted, since running the instance sits outside the permission model, but an operator key holds nothing at all, so no map on one may be widened by any caller. A key created by an app is never widened at all, by any caller including the operator key: it holds what that app held, and may only be narrowed.
+    /// Updates a key's label, default tier, claimed `sources` or permission maps in place. `source` is immutable and rejected with `400 validation_error` if present in the body — revoke and recreate to change it. Requires `keys.mint`. A permission map may not be widened past what the calling credential itself holds, and `sources` may name only the caller's own `source` and what it claims. The operator key is excepted, since running the instance sits outside the permission model, but an operator key holds nothing at all, so no map on one may be widened by any caller. A key created by an app is never widened at all, by any caller including the operator key: it holds what that app held, and may only be narrowed. A key beyond the caller's reach answers `404 api_key_not_found` exactly as an unknown id does. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -75525,7 +76557,7 @@ public enum Operations {
                     public var label: Swift.String?
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/default_tier`.
                     public var defaultTier: Components.Schemas.Tier?
-                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
+                    /// The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. At most 1,000 entries. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -75640,7 +76672,7 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label:
                     ///   - defaultTier:
-                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
+                    ///   - sources: The sources a write by this key may name besides its own `source`, so its rows are keyed by the named source. At most 1,000 entries. Two keys may claim one source, which is how two devices present one natural key; a key's own `source` stays unique. Held to the rules the permission maps keep: omitted on a create that names no map either, it takes the creator's claims; named, it is only what it names; a working key may grant only its own `source` and what it claims itself, and the operator key may grant any. A source starting `oauth:` is refused.
                     ///   - typePermissions:
                     ///   - extensionPermissions:
                     ///   - edgePermissions:
@@ -76275,7 +77307,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Key not found
+            /// No key with this id is within the caller's reach
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/404`.
             ///
@@ -76644,7 +77676,7 @@ public enum Operations {
     }
     /// Revoke an API key
     ///
-    /// Revokes the key immediately; the next request bearing it returns `401 unauthorized`. In-flight long-lived connections (SSE) terminate on the next heartbeat. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission. A revoke that changes no row answers `404 api_key_not_found` rather than success, for every caller: an unknown id and a key already revoked are both refused, and the message says which it was.
+    /// Revokes the key immediately; the next request bearing it returns `401 unauthorized`. An event stream the key holds open ends before it sends anything written after the revoke, and at its next heartbeat when nothing is written. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission. A key beyond the caller's reach answers `404 api_key_not_found` exactly as an unknown id does, so the answer does not say whether it exists. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key. A revoke that changes no row answers `404 api_key_not_found` rather than success: an unknown id and a key already revoked are both refused, and only the operator key is told which it was, since a revoked key's reach cannot be measured.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -77207,7 +78239,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No key was revoked: unknown or already revoked
+            /// No key was revoked: unknown, already revoked, or beyond the caller's reach
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/404`.
             ///
@@ -83268,7 +84300,7 @@ public enum Operations {
     }
     /// Export data
     ///
-    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and blob bytes that `POST /admin/restore-archive` can ingest. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
+    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and the bytes of each blob the selection references that `GET /blobs/{hash}` would serve the caller, which `POST /admin/restore-archive` can ingest. Each archive item line carries `lending_blobs`, the digests in that row's properties that lend its reach, and a restore lends through those alone. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
@@ -89844,9 +90876,13 @@ public enum Operations {
     ///
     /// The cursor is a position in one ascending sequence, and `type` and `edges` select a subset of that sequence rather than reordering it, so a cursor taken under one filter can be replayed under another without skipping or repeating a row.
     ///
-    /// An item frame carries `type` and `item`, and an edge frame `type` and `edge`. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
+    /// An item frame carries `type` and `item`, and an edge frame `type`, `edge` and `source_type`, the type of the edge's source item when the event was published. An edge frame reaches a subscriber that may read its edge type and that `source_type`, on a replay as on a live frame, so the edges a purge takes reach only a subscriber that could read the purged item. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
     ///
-    /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame — `{ "type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }` — and closes. `reason` says which of a failed catch-up, an overflowing catch-up buffer, or a failed item or edge subscription ended it. Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
+    /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame — `{ "type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }` — and closes. `reason` is one of `replay_failed` (the catch-up failed), `backlog_overflow` (the frames held while the stream opened outgrew their buffer), `live_delivery_failed` (the subscription or a read of the credential failed), `credential_ended` (the credential no longer stands: a key revoked, deleted or past its expiry, a sign-in token revoked or expired, or its app disconnected) or `reader_behind` (a live frame found 4 MiB of frames unread, or the client took no frame for 30 seconds while a replay, which waits for room before every frame, waited for it). Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
+    ///
+    /// The stream answers to the credential as it stands: it reads it again before each batch of frames and at each heartbeat, every 30 seconds. A key narrowed meanwhile narrows the stream; one that no longer stands ends it with `stream_incomplete` and `credential_ended`, and nothing written after the change is sent. A reconnect with a revoked key is refused `401`; an app reconnects with the token it refreshed to.
+    ///
+    /// A `Last-Event-ID` past the log's head is a position the log never issued, which is what a client holds after the instance is restored behind it. The stream answers a terminal `cursor_ahead` frame, `{ "type": "cursor_ahead", "requested": "<event id>", "head": "<event id>" }`, with no SSE `id:`, and closes; the client re-reads state from the API, as for `catchup_too_old`.
     ///
     /// - Remark: HTTP `GET /events`.
     /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
@@ -89884,7 +90920,7 @@ public enum Operations {
             public var query: Operations.StreamEvents.Input.Query
             /// - Remark: Generated from `#/paths/events/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// Resume from this event id, replaying events the client missed.
+                /// Resume from this event id, replaying events the client missed. It must be an id the log issued, written as a decimal number with no sign, spaces or leading zeros; anything else is refused `400 validation_error`, and an id past the log's head is answered with a terminal `cursor_ahead` frame. Empty is no cursor.
                 ///
                 /// - Remark: Generated from `#/paths/events/GET/header/Last-Event-ID`.
                 public var lastEventID: Swift.String?
@@ -89892,7 +90928,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - lastEventID: Resume from this event id, replaying events the client missed.
+                ///   - lastEventID: Resume from this event id, replaying events the client missed. It must be an id the log issued, written as a decimal number with no sign, spaces or leading zeros; anything else is refused `400 validation_error`, and an id past the log's head is answered with a terminal `cursor_ahead` frame. Empty is no cursor.
                 ///   - accept:
                 public init(
                     lastEventID: Swift.String? = nil,
@@ -90105,7 +91141,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The filter cannot be honored: more than 10 types, a `type` entry that is the global `*` or is outside the type-identifier grammar, or an `edges` value outside the enum.
+            /// The filter or the cursor cannot be honored: more than 10 types, a `type` entry that is the global `*` or is outside the type-identifier grammar, an `edges` value outside the enum, or a `Last-Event-ID` that is not a decimal event id.
             ///
             /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/400`.
             ///

@@ -885,6 +885,16 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
      */
     func drain() throws  -> DrainReport
     
+    /**
+     * `NotFound` where the catalog holds no such edge type.
+     */
+    func edgeType(id: String) throws  -> EdgeType
+    
+    /**
+     * Every edge type the copy holds, by id, read from the copy alone.
+     */
+    func edgeTypes() throws  -> [EdgeType]
+    
     func edgesFrom(id: String) throws  -> [Edge]
     
     func edgesOfType(edgeType: String) throws  -> [Edge]
@@ -918,6 +928,16 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
      * whichever ends the copy holds.
      */
     func hydrateWith(types: [String], tier: Tier, edgeTypes: [String]) throws  -> HydrateReport
+    
+    /**
+     * `NotFound` where the catalog holds no such type.
+     */
+    func itemType(id: String) throws  -> ItemType
+    
+    /**
+     * Every item type the copy holds, by id, read from the copy alone.
+     */
+    func itemTypes() throws  -> [ItemType]
     
     func list(filters: ListFilters, sort: Sort) throws  -> [Item]
     
@@ -1238,6 +1258,29 @@ open func drain()throws  -> DrainReport  {
 })
 }
     
+    /**
+     * `NotFound` where the catalog holds no such edge type.
+     */
+open func edgeType(id: String)throws  -> EdgeType  {
+    return try  FfiConverterTypeEdgeType_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_edge_type(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+    /**
+     * Every edge type the copy holds, by id, read from the copy alone.
+     */
+open func edgeTypes()throws  -> [EdgeType]  {
+    return try  FfiConverterSequenceTypeEdgeType.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_edge_types(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
 open func edgesFrom(id: String)throws  -> [Edge]  {
     return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_marfacore_edges_from(
@@ -1332,6 +1375,29 @@ open func hydrateWith(types: [String], tier: Tier, edgeTypes: [String])throws  -
         FfiConverterSequenceString.lower(types),
         FfiConverterTypeTier_lower(tier),
         FfiConverterSequenceString.lower(edgeTypes),$0
+    )
+})
+}
+    
+    /**
+     * `NotFound` where the catalog holds no such type.
+     */
+open func itemType(id: String)throws  -> ItemType  {
+    return try  FfiConverterTypeItemType_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_item_type(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+    /**
+     * Every item type the copy holds, by id, read from the copy alone.
+     */
+open func itemTypes()throws  -> [ItemType]  {
+    return try  FfiConverterSequenceTypeItemType.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_item_types(
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -1944,8 +2010,10 @@ public func FfiConverterTypeCatchUpReport_lower(_ value: CatchUpReport) -> RustB
 
 
 /**
- * One event a held stream applied: what it was, what it was about, and the
- * cursor it left.
+ * What a held stream changed in the copy: an event it applied, named by the
+ * event's type with the item or edge it was about, or `catalog.changed`,
+ * naming neither, where a stream it opened read a catalog that differs from
+ * the one held. `cursor` is the cursor held after it.
  */
 public struct Change: Equatable, Hashable {
     public var event: String
@@ -2489,6 +2557,105 @@ public func FfiConverterTypeEdgeEdit_lower(_ value: EdgeEdit) -> RustBuffer {
 
 
 /**
+ * An edge type as the copy holds it.
+ */
+public struct EdgeType: Equatable, Hashable {
+    public var id: String
+    public var label: String?
+    public var description: String?
+    public var cardinality: String
+    /**
+     * The name the edge goes by read from its target.
+     */
+    public var reverseName: String?
+    public var writtenAt: EdgeEnd
+    public var sourceTypeConstraints: [String]
+    public var targetTypeConstraints: [String]
+    public var cascadeOnDelete: String
+    public var properties: [TypeField]
+    public var shipped: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, label: String?, description: String?, cardinality: String, 
+        /**
+         * The name the edge goes by read from its target.
+         */reverseName: String?, writtenAt: EdgeEnd, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.cardinality = cardinality
+        self.reverseName = reverseName
+        self.writtenAt = writtenAt
+        self.sourceTypeConstraints = sourceTypeConstraints
+        self.targetTypeConstraints = targetTypeConstraints
+        self.cascadeOnDelete = cascadeOnDelete
+        self.properties = properties
+        self.shipped = shipped
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension EdgeType: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeType {
+        return
+            try EdgeType(
+                id: FfiConverterString.read(from: &buf), 
+                label: FfiConverterOptionString.read(from: &buf), 
+                description: FfiConverterOptionString.read(from: &buf), 
+                cardinality: FfiConverterString.read(from: &buf), 
+                reverseName: FfiConverterOptionString.read(from: &buf), 
+                writtenAt: FfiConverterTypeEdgeEnd.read(from: &buf), 
+                sourceTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
+                targetTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
+                cascadeOnDelete: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterSequenceTypeTypeField.read(from: &buf), 
+                shipped: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EdgeType, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterOptionString.write(value.label, into: &buf)
+        FfiConverterOptionString.write(value.description, into: &buf)
+        FfiConverterString.write(value.cardinality, into: &buf)
+        FfiConverterOptionString.write(value.reverseName, into: &buf)
+        FfiConverterTypeEdgeEnd.write(value.writtenAt, into: &buf)
+        FfiConverterSequenceString.write(value.sourceTypeConstraints, into: &buf)
+        FfiConverterSequenceString.write(value.targetTypeConstraints, into: &buf)
+        FfiConverterString.write(value.cascadeOnDelete, into: &buf)
+        FfiConverterSequenceTypeTypeField.write(value.properties, into: &buf)
+        FfiConverterBool.write(value.shipped, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeType_lift(_ buf: RustBuffer) throws -> EdgeType {
+    return try FfiConverterTypeEdgeType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeType_lower(_ value: EdgeType) -> RustBuffer {
+    return FfiConverterTypeEdgeType.lower(value)
+}
+
+
+/**
  * A change to an item, and the version it was read at.
  */
 public struct Edit: Equatable, Hashable {
@@ -2744,6 +2911,99 @@ public func FfiConverterTypeItem_lift(_ buf: RustBuffer) throws -> Item {
 #endif
 public func FfiConverterTypeItem_lower(_ value: Item) -> RustBuffer {
     return FfiConverterTypeItem.lower(value)
+}
+
+
+/**
+ * An item type as the copy holds it, with the fields it inherits.
+ */
+public struct ItemType: Equatable, Hashable {
+    public var id: String
+    public var label: String?
+    public var description: String?
+    public var parent: String?
+    public var version: Int64
+    public var fields: [TypeField]
+    public var titleField: String?
+    public var bodyField: String?
+    public var linkField: String?
+    public var roles: [String]
+    public var compatibleWith: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, label: String?, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.parent = parent
+        self.version = version
+        self.fields = fields
+        self.titleField = titleField
+        self.bodyField = bodyField
+        self.linkField = linkField
+        self.roles = roles
+        self.compatibleWith = compatibleWith
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ItemType: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ItemType {
+        return
+            try ItemType(
+                id: FfiConverterString.read(from: &buf), 
+                label: FfiConverterOptionString.read(from: &buf), 
+                description: FfiConverterOptionString.read(from: &buf), 
+                parent: FfiConverterOptionString.read(from: &buf), 
+                version: FfiConverterInt64.read(from: &buf), 
+                fields: FfiConverterSequenceTypeTypeField.read(from: &buf), 
+                titleField: FfiConverterOptionString.read(from: &buf), 
+                bodyField: FfiConverterOptionString.read(from: &buf), 
+                linkField: FfiConverterOptionString.read(from: &buf), 
+                roles: FfiConverterSequenceString.read(from: &buf), 
+                compatibleWith: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ItemType, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterOptionString.write(value.label, into: &buf)
+        FfiConverterOptionString.write(value.description, into: &buf)
+        FfiConverterOptionString.write(value.parent, into: &buf)
+        FfiConverterInt64.write(value.version, into: &buf)
+        FfiConverterSequenceTypeTypeField.write(value.fields, into: &buf)
+        FfiConverterOptionString.write(value.titleField, into: &buf)
+        FfiConverterOptionString.write(value.bodyField, into: &buf)
+        FfiConverterOptionString.write(value.linkField, into: &buf)
+        FfiConverterSequenceString.write(value.roles, into: &buf)
+        FfiConverterSequenceString.write(value.compatibleWith, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemType_lift(_ buf: RustBuffer) throws -> ItemType {
+    return try FfiConverterTypeItemType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemType_lower(_ value: ItemType) -> RustBuffer {
+    return FfiConverterTypeItemType.lower(value)
 }
 
 
@@ -3292,10 +3552,19 @@ public struct Status: Equatable, Hashable {
     public var hydration: Hydration
     public var items: UInt64
     public var edges: UInt64
+    /**
+     * Moves each time a refresh changes the catalog; none where the copy has
+     * never held one.
+     */
+    public var catalogVersion: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(serverOrigin: String?, sliceTypes: [String], sliceTier: Tier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64) {
+    public init(serverOrigin: String?, sliceTypes: [String], sliceTier: Tier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64, 
+        /**
+         * Moves each time a refresh changes the catalog; none where the copy has
+         * never held one.
+         */catalogVersion: UInt64?) {
         self.serverOrigin = serverOrigin
         self.sliceTypes = sliceTypes
         self.sliceTier = sliceTier
@@ -3305,6 +3574,7 @@ public struct Status: Equatable, Hashable {
         self.hydration = hydration
         self.items = items
         self.edges = edges
+        self.catalogVersion = catalogVersion
     }
 
     
@@ -3331,7 +3601,8 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
                 eventCursor: FfiConverterOptionString.read(from: &buf), 
                 hydration: FfiConverterTypeHydration.read(from: &buf), 
                 items: FfiConverterUInt64.read(from: &buf), 
-                edges: FfiConverterUInt64.read(from: &buf)
+                edges: FfiConverterUInt64.read(from: &buf), 
+                catalogVersion: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
@@ -3345,6 +3616,7 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
         FfiConverterTypeHydration.write(value.hydration, into: &buf)
         FfiConverterUInt64.write(value.items, into: &buf)
         FfiConverterUInt64.write(value.edges, into: &buf)
+        FfiConverterOptionUInt64.write(value.catalogVersion, into: &buf)
     }
 }
 
@@ -3418,6 +3690,99 @@ public func FfiConverterTypeThumbnail_lift(_ buf: RustBuffer) throws -> Thumbnai
 #endif
 public func FfiConverterTypeThumbnail_lower(_ value: Thumbnail) -> RustBuffer {
     return FfiConverterTypeThumbnail.lower(value)
+}
+
+
+/**
+ * A field of an item type, or a property of an edge type.
+ */
+public struct TypeField: Equatable, Hashable {
+    public var name: String
+    /**
+     * The field's own type, such as `string` or `thumbnail`.
+     */
+    public var fieldType: String
+    public var required: Bool
+    public var description: String?
+    /**
+     * The type that declares it: the type itself, or the nearest one it
+     * inherits the field from.
+     */
+    public var declaredBy: String
+    /**
+     * The definition whole, as the server answers it, as one JSON object.
+     */
+    public var definitionJson: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(name: String, 
+        /**
+         * The field's own type, such as `string` or `thumbnail`.
+         */fieldType: String, required: Bool, description: String?, 
+        /**
+         * The type that declares it: the type itself, or the nearest one it
+         * inherits the field from.
+         */declaredBy: String, 
+        /**
+         * The definition whole, as the server answers it, as one JSON object.
+         */definitionJson: String) {
+        self.name = name
+        self.fieldType = fieldType
+        self.required = required
+        self.description = description
+        self.declaredBy = declaredBy
+        self.definitionJson = definitionJson
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TypeField: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTypeField: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TypeField {
+        return
+            try TypeField(
+                name: FfiConverterString.read(from: &buf), 
+                fieldType: FfiConverterString.read(from: &buf), 
+                required: FfiConverterBool.read(from: &buf), 
+                description: FfiConverterOptionString.read(from: &buf), 
+                declaredBy: FfiConverterString.read(from: &buf), 
+                definitionJson: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TypeField, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.fieldType, into: &buf)
+        FfiConverterBool.write(value.required, into: &buf)
+        FfiConverterOptionString.write(value.description, into: &buf)
+        FfiConverterString.write(value.declaredBy, into: &buf)
+        FfiConverterString.write(value.definitionJson, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTypeField_lift(_ buf: RustBuffer) throws -> TypeField {
+    return try FfiConverterTypeTypeField.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTypeField_lower(_ value: TypeField) -> RustBuffer {
+    return FfiConverterTypeTypeField.lower(value)
 }
 
 // Note that we don't yet support `indirect` for enums.
@@ -3508,6 +3873,76 @@ public func FfiConverterTypeBlockedReason_lift(_ buf: RustBuffer) throws -> Bloc
 #endif
 public func FfiConverterTypeBlockedReason_lower(_ value: BlockedReason) -> RustBuffer {
     return FfiConverterTypeBlockedReason.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The end of an edge whose file writes it.
+ */
+
+public enum EdgeEnd: Equatable, Hashable {
+    
+    case source
+    case target
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension EdgeEnd: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEdgeEnd: FfiConverterRustBuffer {
+    typealias SwiftType = EdgeEnd
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeEnd {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .source
+        
+        case 2: return .target
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: EdgeEnd, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .source:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .target:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeEnd_lift(_ buf: RustBuffer) throws -> EdgeEnd {
+    return try FfiConverterTypeEdgeEnd.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeEnd_lower(_ value: EdgeEnd) -> RustBuffer {
+    return FfiConverterTypeEdgeEnd.lower(value)
 }
 
 
@@ -3778,6 +4213,11 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     )
     case HydrationIncomplete(message: String
     )
+    /**
+     * The copy has never held the type catalog: a hydration reads it.
+     */
+    case NoCatalog(message: String
+    )
     case WrongSchema(expected: String, found: String, 
         /**
          * The store the caller has to discard. Carried rather than left in
@@ -3888,41 +4328,44 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 13: return .HydrationIncomplete(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .WrongSchema(
+        case 14: return .NoCatalog(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 15: return .WrongSchema(
             expected: try FfiConverterString.read(from: &buf), 
             found: try FfiConverterString.read(from: &buf), 
             path: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 15: return .ReadingHandle(
+        case 16: return .ReadingHandle(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .CatchUpTooOld(
+        case 17: return .CatchUpTooOld(
             minRetainedId: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 17: return .StreamIncomplete(
+        case 18: return .StreamIncomplete(
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 18: return .WrongServer(
+        case 19: return .WrongServer(
             expected: try FfiConverterString.read(from: &buf), 
             got: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .BytesAbsent(
+        case 20: return .BytesAbsent(
             hash: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .ContractMismatch(
+        case 21: return .ContractMismatch(
             served: try FfiConverterOptionString.read(from: &buf), 
             expected: try FfiConverterUInt64.read(from: &buf), 
             status: try FfiConverterUInt16.read(from: &buf), 
             writeSent: try FfiConverterBool.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 21: return .Invalid(
+        case 22: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -4010,8 +4453,13 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .WrongSchema(expected,found,path,message):
+        case let .NoCatalog(message):
             writeInt(&buf, Int32(14))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .WrongSchema(expected,found,path,message):
+            writeInt(&buf, Int32(15))
             FfiConverterString.write(expected, into: &buf)
             FfiConverterString.write(found, into: &buf)
             FfiConverterString.write(path, into: &buf)
@@ -4019,38 +4467,38 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .ReadingHandle(message):
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(16))
             FfiConverterString.write(message, into: &buf)
             
         
         case let .CatchUpTooOld(minRetainedId,message):
-            writeInt(&buf, Int32(16))
+            writeInt(&buf, Int32(17))
             FfiConverterString.write(minRetainedId, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .StreamIncomplete(reason,message):
-            writeInt(&buf, Int32(17))
+            writeInt(&buf, Int32(18))
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .WrongServer(expected,got,message):
-            writeInt(&buf, Int32(18))
+            writeInt(&buf, Int32(19))
             FfiConverterString.write(expected, into: &buf)
             FfiConverterString.write(got, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .BytesAbsent(hash,reason,message):
-            writeInt(&buf, Int32(19))
+            writeInt(&buf, Int32(20))
             FfiConverterString.write(hash, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .ContractMismatch(served,expected,status,writeSent,message):
-            writeInt(&buf, Int32(20))
+            writeInt(&buf, Int32(21))
             FfiConverterOptionString.write(served, into: &buf)
             FfiConverterUInt64.write(expected, into: &buf)
             FfiConverterUInt16.write(status, into: &buf)
@@ -4059,7 +4507,7 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .Invalid(message):
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(22))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -4894,6 +5342,31 @@ fileprivate struct FfiConverterSequenceTypeEdge: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeEdgeType: FfiConverterRustBuffer {
+    typealias SwiftType = [EdgeType]
+
+    public static func write(_ value: [EdgeType], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeEdgeType.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [EdgeType] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [EdgeType]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeEdgeType.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
     typealias SwiftType = [Item]
 
@@ -4911,6 +5384,31 @@ fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeItemType: FfiConverterRustBuffer {
+    typealias SwiftType = [ItemType]
+
+    public static func write(_ value: [ItemType], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeItemType.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ItemType] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ItemType]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeItemType.read(from: &buf))
         }
         return seq
     }
@@ -4961,6 +5459,31 @@ fileprivate struct FfiConverterSequenceTypeSearchHit: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSearchHit.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTypeField: FfiConverterRustBuffer {
+    typealias SwiftType = [TypeField]
+
+    public static func write(_ value: [TypeField], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTypeField.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TypeField] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TypeField]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTypeField.read(from: &buf))
         }
         return seq
     }
@@ -5023,6 +5546,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_drain() != 47499) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edge_type() != 6087) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edge_types() != 60631) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_from() != 44341) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5048,6 +5577,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_hydrate_with() != 8055) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_item_type() != 11196) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_item_types() != 39521) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_list() != 50227) {
