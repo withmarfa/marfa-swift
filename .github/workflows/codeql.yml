@@ -72,14 +72,19 @@ jobs:
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim
           scripts/core.sh
 
+      # Before CodeQL watches, so only the build is traced. Outside the
+      # checkout, so the dependencies' sources are not reported as its own.
+      - name: Resolve the dependencies
+        run: swift package resolve --scratch-path "${RUNNER_TEMP}/swift-build"
       - uses: github/codeql-action/init@v4
         with:
           languages: swift
           build-mode: manual
-      # The library targets alone. Dependencies resolve outside the checkout,
-      # so their sources are not reported as this repository's.
+      # The library targets alone. Traced, a build that does not name its
+      # architecture picks no slice of the core's framework and cannot import
+      # it; CodeQL advises one architecture.
       - name: Build the package
-        run: swift build --scratch-path "${RUNNER_TEMP}/swift-build"
+        run: swift build --arch arm64 --scratch-path "${RUNNER_TEMP}/swift-build"
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:swift
