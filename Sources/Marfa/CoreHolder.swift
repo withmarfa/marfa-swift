@@ -5,13 +5,16 @@ import Synchronization
 /// can let it go and, for a new key, replace it.
 ///
 /// A call holds a lease on the core while it runs. Closing or replacing waits
-/// for the leases, then drops the core before it reports done, and a core's
-/// store is released when it is dropped.
+/// for the leases, then drops the core, and a core's store is released when it
+/// is dropped. Closing reports done only once the drop is over, whichever
+/// caller dropped it.
 final class CoreHolder: Sendable {
     private enum Phase {
         case open
         case replacing
-        case closed
+        /// One caller has been chosen to drop the core, and has not finished.
+        case dropping
+        case released
     }
 
     private struct State {
@@ -38,7 +41,18 @@ final class CoreHolder: Sendable {
     /// once closed.
     var handle: Handle { state.withLock { $0.handle } }
 
-    var isClosed: Bool { state.withLock { $0.phase == .closed } }
+    var isClosed: Bool { state.withLock { $0.phase == .released } }
+
+    /// Throws what `replace(key:)` would throw before it starts: `closed`, or
+    /// `noServer` where there is no key to change.
+    func checkKeyCanChange() throws {
+        try state.withLock { state in
+            if state.closing || state.phase == .dropping || state.phase == .released {
+                throw MarfaError.closed(message: Self.closedMessage)
+            }
+            if reopen == nil { throw Self.noKey }
+        }
+    }
 
     /// Runs `work` off the caller's thread against the core.
     func run<T: Sendable>(_ work: @escaping @Sendable (Core) throws -> T) async throws -> T {
@@ -57,43 +71,42 @@ final class CoreHolder: Sendable {
     }
 
     /// Refuses new calls and returns once the running ones are done and the
-    /// core is dropped.
+    /// core is dropped, so it can take as long as the slowest running call.
     ///
-    /// A second call waits for the first.
+    /// Every caller returns only after the drop, whichever of them did it.
     func close() async {
-        var finished = state.withLock { state -> Finish? in
+        let elected = state.withLock { state in
             state.closing = true
-            return finish(&state)
+            return elect(&state)
         }
-        guard case .some = finished else {
-            await withCheckedContinuation { continuation in
-                let done = state.withLock { state -> Bool in
-                    guard state.phase != .closed else { return true }
-                    state.closers.append(continuation)
-                    return false
-                }
-                if done { continuation.resume() }
-            }
+        if elected {
+            releaseNow()
             return
         }
-        finished?.complete()
+        await withCheckedContinuation { continuation in
+            let done = state.withLock { state -> Bool in
+                guard state.phase != .released else { return true }
+                state.closers.append(continuation)
+                return false
+            }
+            if done { continuation.resume() }
+        }
     }
 
-    /// Closes the old core, then opens the store again with `key` and holds
-    /// that.
+    /// Waits for the running calls, closes the old core, then opens the store
+    /// again with `key` and holds that.
     ///
-    /// Calls that start meanwhile throw `invalid`. When the store cannot be
-    /// opened again the holder is closed.
+    /// From the start until the new core is held, every call throws
+    /// `invalid`. When the store cannot be opened again the holder is closed,
+    /// and a `close()` that arrived meanwhile closes it: this throws `closed`.
     func replace(key: String) async throws {
         try state.withLock { state in
             switch state.phase {
-            case .closed: throw MarfaError.closed(message: Self.closedMessage)
+            case .dropping, .released: throw MarfaError.closed(message: Self.closedMessage)
             case .replacing: throw MarfaError.invalid(message: Self.replacingMessage)
             case .open:
                 if state.closing { throw MarfaError.closed(message: Self.closedMessage) }
-                if reopen == nil {
-                    throw MarfaError.noServer(message: "this working copy has no server, so it has no key to change")
-                }
+                if reopen == nil { throw Self.noKey }
                 state.phase = .replacing
             }
         }
@@ -113,34 +126,36 @@ final class CoreHolder: Sendable {
         } catch {
             reopened = .failure(error)
         }
-        var finished = state.withLock { state -> Finish in
-            var dropped: Core?
-            switch reopened {
-            case .success(let core) where !state.closing:
-                state.handle = Handle(core.heldHandle())
+        let (elected, closedMeanwhile) = state.withLock { state -> (Bool, Bool) in
+            if case .success(let core) = reopened {
                 state.core = core
-                state.phase = .open
-            case .success(let core):
-                dropped = core
-                state.phase = .closed
-            case .failure:
-                state.phase = .closed
+                if !state.closing {
+                    state.handle = Handle(core.heldHandle())
+                    state.phase = .open
+                    return (false, false)
+                }
             }
-            let closers = state.phase == .closed ? state.closers.drain() : []
-            return Finish(dropped: dropped, closers: closers)
+            state.phase = .dropping
+            return (true, state.closing)
         }
-        finished.complete()
-        _ = try reopened.get()
+        if elected { releaseNow() }
+        if case .failure(let error) = reopened { throw error }
+        if closedMeanwhile { throw MarfaError.closed(message: Self.closedMessage) }
     }
 
     static let closedMessage = "this working copy is closed"
+    private static let noKey = MarfaError.noServer(
+        message: "this working copy has no server, so it has no key to change")
     private static let replacingMessage = "this working copy is changing its key; ask again"
 
     private func lease() throws -> Core {
         try state.withLock { state in
             switch state.phase {
-            case .closed: throw MarfaError.closed(message: Self.closedMessage)
-            case .replacing: throw MarfaError.invalid(message: Self.replacingMessage)
+            case .dropping, .released: throw MarfaError.closed(message: Self.closedMessage)
+            case .replacing:
+                throw state.closing
+                    ? MarfaError.closed(message: Self.closedMessage)
+                    : MarfaError.invalid(message: Self.replacingMessage)
             case .open:
                 guard !state.closing, let core = state.core else {
                     throw MarfaError.closed(message: Self.closedMessage)
@@ -152,30 +167,32 @@ final class CoreHolder: Sendable {
     }
 
     private func returnLease() {
-        var (finished, drained) = state.withLock { state -> (Finish?, CheckedContinuation<Void, Never>?) in
+        let (elected, drained) = state.withLock { state -> (Bool, CheckedContinuation<Void, Never>?) in
             state.leases -= 1
-            guard state.leases == 0 else { return (nil, nil) }
-            return (state.closing ? finish(&state) : nil, state.drained.take())
+            guard state.leases == 0 else { return (false, nil) }
+            return (elect(&state), state.drained.take())
         }
-        finished?.complete()
+        if elected { releaseNow() }
         drained?.resume()
     }
 
-    private struct Finish {
-        var dropped: Core?
-        var closers: [CheckedContinuation<Void, Never>]
-
-        mutating func complete() {
-            dropped = nil
-            for closer in closers { closer.resume() }
-        }
+    /// Chooses the caller that drops the core: once a close was asked for,
+    /// nothing leases the core and nobody has been chosen yet.
+    private func elect(_ state: inout State) -> Bool {
+        guard state.closing, state.phase == .open, state.leases == 0 else { return false }
+        state.phase = .dropping
+        return true
     }
 
-    /// Takes the core out once nothing leases it and a close was asked for.
-    private func finish(_ state: inout State) -> Finish? {
-        guard state.closing, state.phase == .open, state.leases == 0 else { return nil }
-        state.phase = .closed
-        return Finish(dropped: state.core.take(), closers: state.closers.drain())
+    /// Drops the core, and only then tells the closers waiting for the store.
+    private func releaseNow() {
+        var core = state.withLock { $0.core.take() }
+        core = nil
+        let closers = state.withLock { state in
+            state.phase = .released
+            return state.closers.drain()
+        }
+        for closer in closers { closer.resume() }
     }
 }
 

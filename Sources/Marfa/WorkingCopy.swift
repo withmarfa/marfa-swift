@@ -147,14 +147,16 @@ public final class WorkingCopy: Sendable {
         return stream
     }
 
-    /// Ends every stream `changes()` handed out, stops what fed them, and
+    /// Ends every stream `changes()` handed out, stops what feeds them, and
     /// releases the store, so another opener of it can take the writer role
     /// once this returns.
     ///
-    /// Calls already running finish first. Every call made after, on the
-    /// copy or any of its parts (`items`, `queue` and the rest), throws
-    /// `MarfaError.closed`, and a call racing `close()` either completes or
-    /// throws it. Closing a closed copy does nothing.
+    /// Calls already running finish first, so this takes as long as the
+    /// slowest of them. Every call made after it begins, on the copy or any of
+    /// its parts (`items`, `queue` and the rest), throws `MarfaError.closed`,
+    /// and a call racing `close()` either completes or throws it. Closing a
+    /// closed copy does nothing, and a second `close()` made while the first is
+    /// running returns only once the store is released.
     public func close() async {
         await feed.close()
         await holder.close()
@@ -166,15 +168,21 @@ public final class WorkingCopy: Sendable {
     /// The key is held in memory only, as when opening. Held `changes()`
     /// streams keep going: a follow stopped by the old key, such as an
     /// `unauthorized` one, starts again with the new one, and a stream is
-    /// told nothing of the change itself. Calls made while the store is
-    /// being opened again throw `invalid`; ask again. The role the copy
-    /// holds, `handle`, is taken again, so it is a reader if another opener
-    /// took the writer role in between.
+    /// told nothing of the change itself, except that a reader's stream added
+    /// during it is told one `.saved`, to read again.
     ///
-    /// Throws `noServer` for a copy opened without a server, and `closed`
-    /// for a closed one. When the store cannot be opened again the error is
-    /// thrown and the copy is closed, its streams ended.
+    /// The store cannot be reopened while a call is running, so this waits for
+    /// the slowest running call, and from the moment it starts until the new
+    /// key is in use every call on the copy, new ones included, throws
+    /// `invalid`: ask again. The role the copy holds, `handle`, is taken again,
+    /// so it is a reader if another opener took the writer role in between.
+    ///
+    /// Throws `noServer` for a copy opened without a server, and `closed` for
+    /// a closed one, or one closed while this ran. When the store cannot be
+    /// opened again the error is thrown and the copy is closed, its streams
+    /// ended.
     public func useKey(_ key: String) async throws {
+        try holder.checkKeyCanChange()
         try await feed.suspend()
         defer { feed.resume() }
         do {
@@ -567,6 +575,9 @@ final class Feed: Sendable {
         /// Holds every source off, as a key change does while the core is
         /// replaced; a pause holds off only a follow.
         var suspends = 0
+        /// Streams added while a key change held the feed off: a reader's
+        /// baseline cannot be read until the new core is held.
+        var addedWhileSuspended: Set<UUID> = []
         var waitingForStop: [CheckedContinuation<Void, Never>] = []
     }
 
@@ -597,6 +608,7 @@ final class Feed: Sendable {
         let (added, failure) = state.withLock { state -> (Bool, MarfaError?) in
             guard !state.closed else { return (false, nil) }
             state.streams[token] = continuation
+            if state.suspends > 0 { state.addedWhileSuspended.insert(token) }
             settle(&state, seen: seen)
             return (true, state.failure)
         }
@@ -613,6 +625,7 @@ final class Feed: Sendable {
     func remove(_ token: UUID) {
         state.withLock { state in
             state.streams.removeValue(forKey: token)
+            state.addedWhileSuspended.remove(token)
             settle(&state)
         }
     }
@@ -663,12 +676,22 @@ final class Feed: Sendable {
     }
 
     /// For the core's role changing under a suspended feed.
+    ///
+    /// A reader's stream added meanwhile could take no baseline, and a save
+    /// since may have gone unseen, so each is told one `.saved` to read again.
     func retarget(_ source: Source) {
-        state.withLock { state in
+        let late = state.withLock { state -> [AsyncStream<Change>.Continuation] in
             state.source = source
             state.halted = false
             state.failure = nil
+            let late = source == .watch ? state.addedWhileSuspended.compactMap { state.streams[$0] } : []
+            state.addedWhileSuspended = []
             settle(&state)
+            return late
+        }
+        guard !late.isEmpty, let now = try? holder.with({ try $0.dataVersion() }) else { return }
+        for continuation in late {
+            continuation.yield(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil))
         }
     }
 
@@ -760,7 +783,18 @@ final class Feed: Sendable {
         switch state.phase {
         case .idle where wanted:
             state.generation += 1
-            state.phase = start(state, generation: state.generation, seen: seen)
+            do {
+                state.phase = try start(state, generation: state.generation, seen: seen)
+            } catch {
+                // Stays stopped, as a follow that ended on an error does, until
+                // the next hydration or catch-up.
+                let error = error as? MarfaError ?? .store(message: "\(error)")
+                state.halted = true
+                state.failure = error
+                for continuation in state.streams.values {
+                    continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
+                }
+            }
         case .following(let generation, let subscription) where !wanted:
             subscription.stop()
             state.phase = .stopping(generation: generation)
@@ -773,18 +807,14 @@ final class Feed: Sendable {
         }
     }
 
-    private func start(_ state: State, generation: Int, seen: Result<Int64, any Error>?) -> Phase {
+    private func start(_ state: State, generation: Int, seen: Result<Int64, any Error>?) throws -> Phase {
         switch state.source {
         case .none:
             return .idle
         case .follow:
-            // The feed is closed before the holder, and suspended around a
-            // replacement, so the holder is there whenever a follow is wanted.
-            guard
-                let subscription = try? holder.with({
-                    $0.follow(listener: Listener(feed: self, generation: generation))
-                })
-            else { return .idle }
+            let subscription = try holder.with {
+                $0.follow(listener: Listener(feed: self, generation: generation))
+            }
             return .following(generation: generation, subscription)
         case .watch:
             // Read under the lock where the watch stopped between `add`'s look

@@ -143,6 +143,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
         var catchUpFails: CoreMarfaError?
+        var probe: DropProbe?
     }
 
     let state = Mutex(State())
@@ -155,6 +156,20 @@ final class FakeCore: Core, @unchecked Sendable {
 
     static func writer() -> FakeCore {
         FakeCore(noHandle: .init())
+    }
+
+    /// A writer whose drop waits on `probe`, to hold a close in the middle of
+    /// releasing the store.
+    static func writer(probe: DropProbe) -> FakeCore {
+        let core = FakeCore(noHandle: .init())
+        core.state.withLock { $0.probe = probe }
+        return core
+    }
+
+    deinit {
+        guard let probe = state.withLock({ $0.probe }) else { return }
+        probe.begin()
+        probe.gate.wait()
     }
 
     var follows: [Follow] { state.withLock { $0.follows } }
@@ -269,6 +284,18 @@ final class FakeCore: Core, @unchecked Sendable {
 
     private func later(_ work: @escaping @Sendable () -> Void) {
         DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(50), execute: work)
+    }
+}
+
+/// Lets a test see a core being dropped and hold the drop.
+final class DropProbe: Sendable {
+    private let started = Mutex(false)
+    let gate = DispatchSemaphore(value: 0)
+
+    var hasStarted: Bool { started.withLock { $0 } }
+
+    func begin() {
+        started.withLock { $0 = true }
     }
 }
 
