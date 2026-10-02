@@ -52,6 +52,7 @@ import Testing
         #expect(QueuedWrite(id: "w", kind: .addTag, idempotencyKey: "k", waiting: true, queuedAt: "").waiting)
         let edgeAnswer = DrainVerdict(id: "q", kind: .createEdge, itemId: "a", edgeId: "e", verdict: .accepted)
         #expect(Change.Origin.answered(edgeAnswer) != .refreshed(.drained))
+        #expect(exhaustive(.dead, .refreshed(.catalog), .noCatalog(message: "m")) == 3)
 
         let report = DrainReport(
             sent: 1, verdicts: [DrainVerdict(id: "q", kind: .createItem, verdict: .merged(fields: ["body"]))])
@@ -76,4 +77,25 @@ import Testing
         #expect(Status(catalogVersion: 2).catalogVersion == 2)
         #expect(Change.Refresh.catalog != .hydrated)
     }
+}
+
+/// Compiles only while these switches are exhaustive with no `@unknown
+/// default`, as the README tells apps to write them.
+private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: MarfaError) -> Int {
+    let verdictRead: Bool =
+        switch verdict {
+        case .accepted, .merged, .conflicted, .refused, .blocked, .dead: true
+        }
+    let originRead: Bool =
+        switch origin {
+        case .local, .server, .answered, .saved, .refreshed, .stopped: true
+        }
+    let errorRead: Bool =
+        switch error {
+        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network,
+            .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle,
+            .catchUpTooOld, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid:
+            true
+        }
+    return [verdictRead, originRead, errorRead].filter { $0 }.count
 }

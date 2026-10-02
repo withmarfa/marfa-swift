@@ -154,12 +154,18 @@ struct LiveServer {
     /// The server answers `404 blob_not_found` for bytes it holds none of,
     /// as it does for bytes beyond the credential's reach.
     @Test func bytesTheServerHoldsNoneOfAreAbsentAndTheItemStaysWhole() async throws {
-        let copy = try await Live.hydrated()
-        let note = try await copy.items.create(Live.note("beside absent bytes"))
-        _ = try await copy.queue.drain()
-        let id = try #require(note.itemId)
+        let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+        _ = try await copy.hydrate(types: ["core.file"], tier: .feed)
         let hash =
             "sha256:" + SHA256.hash(data: Data(UUID().uuidString.utf8)).map { String(format: "%02x", $0) }.joined()
+        let file = try await copy.items.create(
+            Draft(
+                type: "core.file",
+                properties: ["title": "names absent bytes", "blob_ref": .string(hash), "mime_type": "text/plain"],
+                tier: .feed))
+        let report = try await copy.queue.drain()
+        #expect(report.verdicts.first { $0.id == file.id }?.verdict == .accepted)
+        let id = try #require(file.itemId)
         await #expect {
             _ = try await copy.blobs.get(hash)
         } throws: { error in
@@ -167,7 +173,10 @@ struct LiveServer {
             return absent == hash
         }
         #expect(try await !copy.blobs.isHeld(hash))
-        #expect(try await copy.items.get(id)?.title == "beside absent bytes")
+        let held = try #require(try await copy.items.get(id))
+        #expect(held.title == "names absent bytes")
+        #expect(held.properties["blob_ref"] == .string(hash))
+        #expect(held.state == .active)
     }
 
     @Test func eachVerdictArrivesTyped() async throws {

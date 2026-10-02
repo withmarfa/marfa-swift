@@ -110,9 +110,9 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     case keySpent
     case ancestorUnavailable
     case conflictUnresolved
-    /// The queue's own name for a write held behind another. No verdict
-    /// carries it: such a write has no verdict, and `QueuedWrite.waiting` is
-    /// set. It clears on its own, so a release by it takes nothing.
+    /// Never a verdict's reason, here only because the core still lists it.
+    /// A write held behind another has no verdict and `QueuedWrite.waiting`
+    /// set instead.
     case awaitingDependency
 
     init(_ core: CoreBlockedReason) {
