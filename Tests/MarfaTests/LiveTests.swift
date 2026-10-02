@@ -516,7 +516,7 @@ struct LiveServer {
 
         heard.stop()
         try await eventually("the follow let go of the stream") {
-            (try? await background { [core = watching.core] in try core.catchUp() }) != nil
+            (try? await watching.holder.run { try $0.catchUp() }) != nil
         }
     }
 

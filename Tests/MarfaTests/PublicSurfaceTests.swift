@@ -94,7 +94,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         switch error {
         case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network,
             .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle,
-            .catchUpTooOld, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid:
+            .catchUpTooOld, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid, .closed:
             true
         }
     return [verdictRead, originRead, errorRead].filter { $0 }.count

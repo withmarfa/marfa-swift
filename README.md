@@ -55,6 +55,12 @@ The package is not built for library evolution, so its enums are exhaustive: swi
 
 `Server.fromEnvironment()` reads `MARFA_API_URL` and `MARFA_API_KEY`, for agents and tests, and throws when only one is set. An app keeps a person's key between launches with `Keychain.system` (`save`, `key`, `delete`), under a service and account it chooses. The working copy never writes the key to its store.
 
+`copy.useKey(_:)` gives an open copy a new key: it closes the store and opens it again with the new key, and the copy, its parts and its held `changes()` streams carry on. The core has no call to change a key in place, so the store is reopened; calls made in that moment throw `invalid`, and if the store cannot be opened again the error is thrown and the copy is closed.
+
+## Closing
+
+`copy.close()` ends every `changes()` stream, stops what feeds them, and releases the store, so another opener can take the writer role once it returns. Calls already running finish first. Every call made after it, on the copy or any part of it, throws `MarfaError.closed`; a call racing `close()` either completes or throws that.
+
 Tests keep keys in `Keychain.isolated()` (macOS only), a keychain file of their own outside the search list. It turns off keychain prompts for the whole process, so an app never calls it.
 
 ## The sample
