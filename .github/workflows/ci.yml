@@ -60,7 +60,7 @@ jobs:
     name: Build + test
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false') }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     # Inside the workspace: actions/cache refuses a path with `..` in it.
     env:

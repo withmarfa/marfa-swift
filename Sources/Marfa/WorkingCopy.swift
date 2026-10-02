@@ -22,6 +22,7 @@ public final class WorkingCopy: Sendable {
     public let extensions: Extensions
     public let blobs: Blobs
     public let queue: Queue
+    public let catalog: Catalog
 
     init(core: Core, hasServer: Bool) {
         self.core = core
@@ -35,6 +36,7 @@ public final class WorkingCopy: Sendable {
         extensions = Extensions(core: core, feed: feed)
         blobs = Blobs(core: core, feed: feed)
         queue = Queue(core: core, feed: feed)
+        catalog = Catalog(core: core)
     }
 
     /// Opens the store at `store`, making it when absent.
@@ -78,11 +80,23 @@ public final class WorkingCopy: Sendable {
         return report
     }
 
-    /// Applies every event since the last hydration or catch-up.
+    /// Reads the type catalog again, then applies every event since the
+    /// last hydration or catch-up.
     public func catchUp() async throws -> CatchUpReport {
         await feed.pause()
         defer { feed.unpause() }
-        let report = CatchUpReport(try await background { [core] in try core.catchUp() })
+        // The core commits a new catalog before it applies anything, so a
+        // catch-up that then fails has still changed it.
+        let (caughtUp, catalogChanged) = try await background { [core] in
+            let before = try core.status().catalogVersion
+            let caughtUp = Result { try translated { CatchUpReport(try core.catchUp()) } }
+            let after = try? core.status().catalogVersion
+            return (caughtUp, after.map { $0 != before } ?? false)
+        }
+        if catalogChanged {
+            feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+        }
+        let report = try caughtUp.get()
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -100,12 +114,20 @@ public final class WorkingCopy: Sendable {
 
     /// What changes in the copy while the stream is held, to read again by.
     ///
+    /// A server event the copy applied arrives as `.server`, naming the
+    /// event's type and the item or edge it was about. A catch-up or a held
+    /// stream that read a changed type catalog arrives as
+    /// `.refreshed(.catalog)`, naming neither.
+    ///
     /// A writer with a server follows the server's events only while at least
     /// one stream is held, and pauses the follow during a hydration or
     /// catch-up. A reader is told each save the writer makes.
     ///
     /// When the follow stops with an error, every stream is told `.stopped`
-    /// and it stays stopped until the app's next hydration or catch-up. A
+    /// and it stays stopped until the app's next hydration or catch-up. On a
+    /// store that holds no completed hydration there is nothing to follow:
+    /// the streams are told nothing, and the follow starts with the next
+    /// hydration. `status().hydration` says which. A
     /// reader's watch keeps retrying, and tells `.saved` once it reads the
     /// store again.
     public func changes() -> AsyncStream<Change> {
@@ -134,6 +156,10 @@ public struct Change: Sendable, Hashable {
     public enum Origin: Sendable, Hashable {
         case local(WriteKind)
         case server(event: String, cursor: String)
+        /// A drain answered this write; `itemId` and `edgeId` name what it
+        /// wrote. Told for each write with a verdict, before the drain's
+        /// `.refreshed(.drained)`.
+        case answered(DrainVerdict)
         /// The writer saved; a reader should read again.
         case saved(dataVersion: Int64)
         /// Many rows may have changed at once.
@@ -144,10 +170,15 @@ public struct Change: Sendable, Hashable {
     }
 
     public enum Refresh: Sendable, Hashable {
+        /// Everything may have changed, the type catalog included.
         case hydrated
         case caughtUp
         case drained
         case withdrawn
+        /// A catch-up or a held stream read an item type or edge type
+        /// catalog that differs from the one the copy held; read `catalog`
+        /// again.
+        case catalog
     }
 
     public let origin: Origin
@@ -211,7 +242,7 @@ public struct Items: Sendable {
     /// naming the bytes, and an `attached-to` edge from the file to the item.
     public func attach(to id: String, file: URL, _ attachment: Attachment = Attachment()) async throws -> Attached {
         let attached = try await background { [core] in
-            Attached(try core.attach(id: id, path: file.path, attachment: attachment.core))
+            try Attached(core.attach(id: id, path: file.path, attachment: attachment.core))
         }
         for write in [attached.upload, attached.item, attached.edge] {
             feed.announce(write)
@@ -220,9 +251,7 @@ public struct Items: Sendable {
     }
 
     private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try work(core) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed, work)
     }
 }
 
@@ -273,9 +302,7 @@ public struct Edges: Sendable {
     }
 
     private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try work(core) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed, work)
     }
 }
 
@@ -284,15 +311,11 @@ public struct Tags: Sendable {
     let feed: Feed
 
     public func add(_ tag: String, to id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.addTag(id: id, tag: tag) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.addTag(id: id, tag: tag) }
     }
 
     public func remove(_ tag: String, from id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.removeTag(id: id, tag: tag) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.removeTag(id: id, tag: tag) }
     }
 }
 
@@ -301,15 +324,11 @@ public struct Metadata: Sendable {
     let feed: Feed
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.replaceMetadata(id: id, tags: tags) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.replaceMetadata(id: id, tags: tags) }
     }
 
     public func mergeTags(_ tags: [String], into id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(try await background { [core] in try core.mergeMetadata(id: id, tags: tags) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in try core.mergeMetadata(id: id, tags: tags) }
     }
 }
 
@@ -318,19 +337,15 @@ public struct Extensions: Sendable {
     let feed: Feed
 
     public func write(_ namespace: String, _ body: [String: JSONValue], on id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(
-            try await background { [core] in
-                try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
-            })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in
+            try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
+        }
     }
 
     public func delete(_ namespace: String, from id: String) async throws -> QueuedWrite {
-        let written = QueuedWrite(
-            try await background { [core] in try core.deleteExtension(id: id, namespace: namespace) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in
+            try core.deleteExtension(id: id, namespace: namespace)
+        }
     }
 }
 
@@ -340,10 +355,9 @@ public struct Blobs: Sendable {
 
     /// Copies the file's bytes beside the store and queues their upload.
     public func put(file: URL, mimeType: String? = nil) async throws -> QueuedWrite {
-        let written = QueuedWrite(
-            try await background { [core] in try core.putBlob(path: file.path, mimeType: mimeType) })
-        feed.announce(written)
-        return written
+        try await queued(core, feed) { core in
+            try core.putBlob(path: file.path, mimeType: mimeType)
+        }
     }
 
     /// Where a blob's bytes are held, fetching them first when they are not.
@@ -372,6 +386,9 @@ public struct Queue: Sendable {
     /// Nothing drains on its own.
     public func drain() async throws -> DrainReport {
         let report = DrainReport(try await background { [core] in try core.drain() })
+        for answered in report.verdicts where answered.verdict != nil {
+            feed.announce(Change(origin: .answered(answered), itemId: answered.itemId, edgeId: answered.edgeId))
+        }
         if !report.verdicts.isEmpty {
             feed.announce(Change(origin: .refreshed(.drained), itemId: nil, edgeId: nil))
         }
@@ -407,10 +424,29 @@ public struct Queue: Sendable {
     /// server's answer.
     ///
     /// Blocked and dead writes stay until released or withdrawn, as does an
-    /// answered write a waiting write depends on.
+    /// answered write a waiting write depends on, and a refused write that
+    /// carried content stays, its `body` readable, until `discard(_:)`.
     public func forgetAnswered() async throws -> UInt64 {
         try await background { [core] in try core.forgetAnswered() }
     }
+
+    /// Takes a refused write, and the content it carried, out of the queue.
+    ///
+    /// `false` for a write that is not refused, or that a waiting write
+    /// still depends on, and `notFound` for an id the queue does not hold.
+    /// The copy's row already shows what the server holds.
+    public func discard(_ id: String) async throws -> Bool {
+        try await background { [core] in try core.discard(id: id) }
+    }
+}
+
+/// Queues one write and tells every held stream of it.
+func queued(_ core: Core, _ feed: Feed, _ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite)
+    async throws -> QueuedWrite
+{
+    let written = try await background { try QueuedWrite(work(core)) }
+    feed.announce(written)
+    return written
 }
 
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
@@ -606,8 +642,11 @@ final class Feed: Sendable {
             case .following(let current, _) where current == generation:
                 state.phase = .idle
                 state.halted = true
-                state.failure = error
-                return (error == nil ? [] : Array(state.streams.values), [])
+                // A store that holds no hydration has nothing to follow
+                // yet: the streams wait, and the next hydration starts it.
+                let told = error.flatMap { Self.awaitsHydration($0) ? nil : $0 }
+                state.failure = told
+                return (told == nil ? [] : Array(state.streams.values), [])
             default:
                 return ([], [])
             }
@@ -618,6 +657,13 @@ final class Feed: Sendable {
             }
         }
         return ended.waiting
+    }
+
+    private static func awaitsHydration(_ error: MarfaError) -> Bool {
+        switch error {
+        case .hydrationIncomplete, .noCursor: true
+        default: false
+        }
     }
 
     private func untilStopped() async {
@@ -746,12 +792,15 @@ final class Listener: CoreChangeListener, Sendable {
     private var feed: Feed? { held.withLock { $0.feed } }
 
     func changed(change: CoreChange) {
-        feed?.announce(
-            Change(
-                origin: .server(event: change.event, cursor: change.cursor), itemId: change.itemId,
-                edgeId: change.edgeId),
-            from: generation)
+        let origin: Change.Origin =
+            change.event == Self.catalogChanged
+            ? .refreshed(.catalog) : .server(event: change.event, cursor: change.cursor)
+        feed?.announce(Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId), from: generation)
     }
+
+    /// What the core names a stream that read a changed catalog, in place of
+    /// an event's type.
+    static let catalogChanged = "catalog.changed"
 
     /// Resumes waiters only once nothing on this thread holds the feed, since
     /// one may drop the working copy and open the store again at once.

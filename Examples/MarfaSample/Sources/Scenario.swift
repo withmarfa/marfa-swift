@@ -64,7 +64,7 @@ enum Scenario {
                 try await checkSearch(first: firstId, kept: kept.id, in: copy, expect)
                 let queued = try await copy.queue.all()
                 print("queued \(queued.count) write(s)")
-                for write in queued { print("  \(write.kind)  \(describe(write.verdict))") }
+                for write in queued { print("  \(write.kind)  \(describe(write))") }
                 expect(queued.count == 10, "queued \(queued.count) writes, not 10")
                 let offline = try await copy.queue.drain()
                 let answered = offline.verdicts.filter { $0.verdict != nil }.count
@@ -72,11 +72,10 @@ enum Scenario {
                 expect(offline.sent > 0, "a drain with the server away tried nothing")
                 expect(answered == 0, "a drain with the server away answered a write")
                 let after = try await copy.queue.all()
-                let waiting = after.filter { $0.verdict == .blocked(reason: .awaitingDependency) }.count
+                let waiting = after.filter(\.waiting).count
                 print("held for an earlier write: \(waiting)")
-                expect(
-                    after.allSatisfy { $0.verdict == nil || $0.verdict == .blocked(reason: .awaitingDependency) },
-                    "a write was answered with the server away")
+                expect(waiting > 0, "no write waited on an earlier one")
+                expect(after.allSatisfy { $0.verdict == nil }, "a write was answered with the server away")
 
             case "drain":
                 let report = try await copy.queue.drain()

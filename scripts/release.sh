@@ -81,12 +81,12 @@ consumer() {
 
   mkdir -p "${dir}/Sources/Consumer" "${dir}/Sources/Run"
   cat >"${dir}/Package.swift" <<SWIFT
-// swift-tools-version: 6.2
+// swift-tools-version: 6.4
 import PackageDescription
 
 let package = Package(
     name: "Consumer",
-    platforms: [.iOS(.v18), .macOS(.v15)],
+    platforms: [.iOS(.v27), .macOS(.v27)],
     dependencies: [${dependency}],
     targets: [
         .target(

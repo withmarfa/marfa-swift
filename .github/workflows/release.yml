@@ -23,7 +23,7 @@ permissions:
 jobs:
   build:
     name: Build the core
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -205,7 +205,7 @@ jobs:
   verify:
     name: Build an app on the release, without Rust
     needs: [build, publish]
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
       VERSION: ${{ needs.build.outputs.version }}

@@ -38,6 +38,21 @@ import Testing
             verdict: .conflicted(siblingId: "s", fields: ["title"]), queuedAt: "")
         #expect(answered.verdict == .conflicted(siblingId: "s", fields: ["title"]))
         #expect(Verdict.blocked(reason: .keySpent) != .blocked(reason: .awaitingDependency))
+        let refusal = Refusal(
+            reason: "validation_error", fields: [FieldRefusal(field: "title", message: "too long")],
+            grant: MissingGrant(kind: .type, name: "core.note", level: .write))
+        switch Verdict.refused(refusal) {
+        case .refused(let read): #expect(read.fields.map(\.field) == ["title"])
+        default: Issue.record("a refusal read as another verdict")
+        }
+        let kept = QueuedWrite(
+            id: "q", kind: .createItem, idempotencyKey: "k", verdict: .refused(refusal), body: ["title": "x"],
+            queuedAt: "")
+        #expect(kept.body["title"] == "x")
+        #expect(QueuedWrite(id: "w", kind: .addTag, idempotencyKey: "k", waiting: true, queuedAt: "").waiting)
+        let edgeAnswer = DrainVerdict(id: "q", kind: .createEdge, itemId: "a", edgeId: "e", verdict: .accepted)
+        #expect(Change.Origin.answered(edgeAnswer) != .refreshed(.drained))
+        #expect(exhaustive(.dead, .refreshed(.catalog), .noCatalog(message: "m")) == 3)
 
         let report = DrainReport(
             sent: 1, verdicts: [DrainVerdict(id: "q", kind: .createItem, verdict: .merged(fields: ["body"]))])
@@ -54,5 +69,33 @@ import Testing
         #expect(ListFilters(state: .archived, tier: .feed).state == .archived)
         #expect(SearchFilters(state: .trashed).state == .trashed)
         #expect(Draft(type: "core.note", tier: .library).tier == .library)
+        let field = TypeField(name: "title", type: "string", declaredBy: "core.note")
+        #expect(ItemType(id: "core.note", fields: [field]).fields.map(\.id) == ["title"])
+        let edgeType = EdgeType(
+            id: "parent-of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target)
+        #expect(edgeType.writtenAt == .target)
+        #expect(Status(catalogVersion: 2).catalogVersion == 2)
+        #expect(Change.Refresh.catalog != .hydrated)
     }
+}
+
+/// Compiles only while these switches are exhaustive with no `@unknown
+/// default`, as the README tells apps to write them.
+private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: MarfaError) -> Int {
+    let verdictRead: Bool =
+        switch verdict {
+        case .accepted, .merged, .conflicted, .refused, .blocked, .dead: true
+        }
+    let originRead: Bool =
+        switch origin {
+        case .local, .server, .answered, .saved, .refreshed, .stopped: true
+        }
+    let errorRead: Bool =
+        switch error {
+        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network,
+            .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle,
+            .catchUpTooOld, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid:
+            true
+        }
+    return [verdictRead, originRead, errorRead].filter { $0 }.count
 }

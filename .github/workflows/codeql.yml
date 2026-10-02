@@ -45,7 +45,7 @@ jobs:
   # built here when that has gone.
   swift:
     name: Analyze (swift)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     permissions:
       contents: read
@@ -82,9 +82,10 @@ jobs:
           build-mode: manual
       # The library targets alone. Traced, a build that does not name its
       # architecture picks no slice of the core's framework and cannot import
-      # it; CodeQL advises one architecture.
+      # it; CodeQL advises one architecture. On macOS 27 the tracer cannot
+      # start `sandbox-exec` ("Bad CPU type"), so the manifest runs unsandboxed.
       - name: Build the package
-        run: swift build --arch arm64 --scratch-path "${RUNNER_TEMP}/swift-build"
+        run: swift build --arch arm64 --disable-sandbox --scratch-path "${RUNNER_TEMP}/swift-build"
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:swift
