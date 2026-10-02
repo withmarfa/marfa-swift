@@ -26,7 +26,7 @@ public final class WorkingCopy: Sendable {
     init(core: Core, hasServer: Bool) {
         self.core = core
         let source: Feed.Source =
-            core.heldHandle() == .reader ? .watch : hasServer ? .follow : .none
+            Handle(core.heldHandle()) == .reader ? .watch : hasServer ? .follow : .none
         feed = Feed(core: core, source: source)
         items = Items(core: core, feed: feed)
         edges = Edges(core: core, feed: feed)
@@ -61,10 +61,10 @@ public final class WorkingCopy: Sendable {
         return WorkingCopy(core: core, hasServer: false)
     }
 
-    public var handle: Handle { core.heldHandle() }
+    public var handle: Handle { Handle(core.heldHandle()) }
 
     public func status() async throws -> Status {
-        try await background { [core] in try core.status() }
+        try await background { [core] in Status(try core.status()) }
     }
 
     /// Replaces the copy with every item of `types` at `tier`, with their tags
@@ -72,7 +72,8 @@ public final class WorkingCopy: Sendable {
     public func hydrate(types: [String], tier: Tier) async throws -> HydrateReport {
         await feed.pause()
         defer { feed.unpause() }
-        let report = try await background { [core] in try core.hydrate(types: types, tier: tier) }
+        let report = HydrateReport(
+            try await background { [core] in try core.hydrate(types: types, tier: tier.core) })
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }
@@ -81,7 +82,7 @@ public final class WorkingCopy: Sendable {
     public func catchUp() async throws -> CatchUpReport {
         await feed.pause()
         defer { feed.unpause() }
-        let report = try await background { [core] in try core.catchUp() }
+        let report = CatchUpReport(try await background { [core] in try core.catchUp() })
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -163,7 +164,7 @@ public struct Items: Sendable {
     )
         async throws -> [Item]
     {
-        try await background { [core] in try core.list(filters: filters.core, sort: sort).map(Item.init) }
+        try await background { [core] in try core.list(filters: filters.core, sort: sort.core).map(Item.init) }
     }
 
     /// `nil` for an item in the bin or not held.
@@ -173,7 +174,7 @@ public struct Items: Sendable {
 
     /// Read from the held row, with no request.
     public func thumbnail(_ id: String) async throws -> Thumbnail? {
-        try await background { [core] in try core.thumbnail(id: id) }
+        try await background { [core] in try core.thumbnail(id: id).map(Thumbnail.init) }
     }
 
     public func create(_ draft: Draft) async throws -> QueuedWrite {
@@ -203,14 +204,14 @@ public struct Items: Sendable {
     }
 
     public func transition(_ id: String, to state: ItemState) async throws -> QueuedWrite {
-        try await write { core in try core.transitionItem(id: id, state: state) }
+        try await write { core in try core.transitionItem(id: id, state: state.core) }
     }
 
     /// Queues three writes, each with its own verdict: the upload, a file item
     /// naming the bytes, and an `attached-to` edge from the file to the item.
     public func attach(to id: String, file: URL, _ attachment: Attachment = Attachment()) async throws -> Attached {
         let attached = try await background { [core] in
-            try core.attach(id: id, path: file.path, attachment: attachment)
+            Attached(try core.attach(id: id, path: file.path, attachment: attachment.core))
         }
         for write in [attached.upload, attached.item, attached.edge] {
             feed.announce(write)
@@ -218,8 +219,8 @@ public struct Items: Sendable {
         return attached
     }
 
-    private func write(_ work: @escaping @Sendable (Core) throws -> QueuedWrite) async throws -> QueuedWrite {
-        let written = try await background { [core] in try work(core) }
+    private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
+        let written = QueuedWrite(try await background { [core] in try work(core) })
         feed.announce(written)
         return written
     }
@@ -271,8 +272,8 @@ public struct Edges: Sendable {
         try await write { core in try core.deleteEdge(id: id) }
     }
 
-    private func write(_ work: @escaping @Sendable (Core) throws -> QueuedWrite) async throws -> QueuedWrite {
-        let written = try await background { [core] in try work(core) }
+    private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
+        let written = QueuedWrite(try await background { [core] in try work(core) })
         feed.announce(written)
         return written
     }
@@ -283,13 +284,13 @@ public struct Tags: Sendable {
     let feed: Feed
 
     public func add(_ tag: String, to id: String) async throws -> QueuedWrite {
-        let written = try await background { [core] in try core.addTag(id: id, tag: tag) }
+        let written = QueuedWrite(try await background { [core] in try core.addTag(id: id, tag: tag) })
         feed.announce(written)
         return written
     }
 
     public func remove(_ tag: String, from id: String) async throws -> QueuedWrite {
-        let written = try await background { [core] in try core.removeTag(id: id, tag: tag) }
+        let written = QueuedWrite(try await background { [core] in try core.removeTag(id: id, tag: tag) })
         feed.announce(written)
         return written
     }
@@ -300,13 +301,13 @@ public struct Metadata: Sendable {
     let feed: Feed
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
-        let written = try await background { [core] in try core.replaceMetadata(id: id, tags: tags) }
+        let written = QueuedWrite(try await background { [core] in try core.replaceMetadata(id: id, tags: tags) })
         feed.announce(written)
         return written
     }
 
     public func mergeTags(_ tags: [String], into id: String) async throws -> QueuedWrite {
-        let written = try await background { [core] in try core.mergeMetadata(id: id, tags: tags) }
+        let written = QueuedWrite(try await background { [core] in try core.mergeMetadata(id: id, tags: tags) })
         feed.announce(written)
         return written
     }
@@ -317,15 +318,17 @@ public struct Extensions: Sendable {
     let feed: Feed
 
     public func write(_ namespace: String, _ body: [String: JSONValue], on id: String) async throws -> QueuedWrite {
-        let written = try await background { [core] in
-            try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
-        }
+        let written = QueuedWrite(
+            try await background { [core] in
+                try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
+            })
         feed.announce(written)
         return written
     }
 
     public func delete(_ namespace: String, from id: String) async throws -> QueuedWrite {
-        let written = try await background { [core] in try core.deleteExtension(id: id, namespace: namespace) }
+        let written = QueuedWrite(
+            try await background { [core] in try core.deleteExtension(id: id, namespace: namespace) })
         feed.announce(written)
         return written
     }
@@ -337,7 +340,8 @@ public struct Blobs: Sendable {
 
     /// Copies the file's bytes beside the store and queues their upload.
     public func put(file: URL, mimeType: String? = nil) async throws -> QueuedWrite {
-        let written = try await background { [core] in try core.putBlob(path: file.path, mimeType: mimeType) }
+        let written = QueuedWrite(
+            try await background { [core] in try core.putBlob(path: file.path, mimeType: mimeType) })
         feed.announce(written)
         return written
     }
@@ -360,14 +364,14 @@ public struct Queue: Sendable {
     let feed: Feed
 
     public func all() async throws -> [QueuedWrite] {
-        try await background { [core] in try core.queue() }
+        try await background { [core] in try core.queue().map(QueuedWrite.init) }
     }
 
     /// Sends what the queue holds once, and records each verdict.
     ///
     /// Nothing drains on its own.
     public func drain() async throws -> DrainReport {
-        let report = try await background { [core] in try core.drain() }
+        let report = DrainReport(try await background { [core] in try core.drain() })
         if !report.verdicts.isEmpty {
             feed.announce(Change(origin: .refreshed(.drained), itemId: nil, edgeId: nil))
         }
@@ -381,7 +385,7 @@ public struct Queue: Sendable {
     }
 
     public func release(reason: BlockedReason) async throws -> UInt64 {
-        try await background { [core] in try core.releaseReason(reason: reason) }
+        try await background { [core] in try core.releaseReason(reason: reason.core) }
     }
 
     /// Takes a write that can never be sent out of the queue, and puts its

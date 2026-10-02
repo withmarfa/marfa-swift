@@ -149,3 +149,50 @@ struct Opening {
     }
 
 }
+
+@Suite(.timeLimit(.minutes(1)))
+struct OwnValueTypes {
+    @Test func everyEnumCaseCrossesToTheGlueAndBack() {
+        for tier in Tier.allCases { #expect(Tier(tier.core) == tier) }
+        for state in ItemState.allCases { #expect(ItemState(state.core) == state) }
+        for kind in WriteKind.allCases { #expect(WriteKind(kind.core) == kind) }
+        for reason in BlockedReason.allCases { #expect(BlockedReason(reason.core) == reason) }
+        for handle in Handle.allCases { #expect(Handle(handle.core) == handle) }
+        for hydration in Hydration.allCases { #expect(Hydration(hydration.core) == hydration) }
+        for field in SortField.allCases { #expect(SortField(field.core) == field) }
+        for direction in SortDirection.allCases { #expect(SortDirection(direction.core) == direction) }
+    }
+
+    @Test func everyVerdictCrossesToTheGlueAndBack() {
+        let verdicts: [Verdict] =
+            [
+                .accepted, .merged(fields: ["a"]), .conflicted(siblingId: "s", fields: ["a", "b"]),
+                .refused(reason: "r"), .dead,
+            ] + BlockedReason.allCases.map { .blocked(reason: $0) }
+        for verdict in verdicts { #expect(Verdict(verdict.core) == verdict) }
+    }
+
+    @Test func recordsCrossToTheGlueAndBack() {
+        let write = QueuedWrite(
+            id: "q", kind: .uploadBlob, itemId: "i", targetId: "t", edgeId: "e", namespace: "n", tag: "g",
+            blob: "b", baseVersion: 2, idempotencyKey: "k", dependsOn: ["d"], follows: "f",
+            verdict: .blocked(reason: .keySpent), answer: "a", refusals: 3, queuedAt: "t0", answeredAt: "t1")
+        #expect(QueuedWrite(write.core) == write)
+        let report = DrainReport(
+            sent: 1, held: 2,
+            verdicts: [DrainVerdict(id: "q", kind: .addTag, itemId: "i", verdict: .dead, refusals: 1, replayed: true)],
+            stopped: "s", unclaimedSources: ["u"], retryAfterSeconds: 4)
+        #expect(DrainReport(report.core) == report)
+        let hydrated = HydrateReport(
+            types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, cursor: "c")
+        #expect(HydrateReport(hydrated.core) == hydrated)
+        let caught = CatchUpReport(applied: 1, skipped: 2, cursor: "c", reachedHead: false)
+        #expect(CatchUpReport(caught.core) == caught)
+        let status = Status(
+            serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],
+            eventCursor: "c", hydration: .inProgress, items: 1, edges: 2)
+        #expect(Status(status.core) == status)
+        let sort = Sort(field: .occurredAt, direction: .descending)
+        #expect(Sort(sort.core) == sort)
+    }
+}
