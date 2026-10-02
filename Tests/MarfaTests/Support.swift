@@ -1,5 +1,6 @@
 import Foundation
 import MarfaCoreNames
+import Network
 import Synchronization
 import Testing
 
@@ -141,6 +142,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var withdrawable: Set<String> = []
         var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
+        var catchUpFails: CoreMarfaError?
     }
 
     let state = Mutex(State())
@@ -199,8 +201,9 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func catchUp() throws -> CoreCatchUpReport {
         try refreshing()
-        return state.withLock { state in
+        return try state.withLock { state in
             if state.catchUpChangesCatalog { state.catalogVersion = (state.catalogVersion ?? 0) + 1 }
+            if let failure = state.catchUpFails { throw failure }
             return state.caughtUp
         }
     }
@@ -291,4 +294,59 @@ func write(_ kind: WriteKind, item: String?, target: String? = nil, edge: String
         id: "q-\(UUID())", kind: kind, itemId: item, targetId: target, edgeId: edge, namespace: nil, tag: nil,
         blob: nil, baseVersion: nil, idempotencyKey: "k", dependsOn: [], follows: nil, verdict: nil, answer: nil,
         refusals: 0, queuedAt: "", answeredAt: nil)
+}
+
+/// A server on a local port answering each request by its method and path.
+///
+/// Every answer names `contract`.
+struct LocalServer: Sendable {
+    typealias Answer = (status: Int, type: String, body: String)
+
+    let url: URL
+    let listener: NWListener
+
+    static func emptyPage(_ method: String, _ path: String) -> Answer {
+        (200, "application/json", #"{"data":[],"next_cursor":null}"#)
+    }
+
+    static func start(
+        contract: Int, answer: @escaping @Sendable (_ method: String, _ path: String) -> Answer = emptyPage
+    ) async throws -> LocalServer {
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        let listener = try NWListener(using: parameters)
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: .global())
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
+                let line = String(decoding: data ?? Data(), as: UTF8.self).prefix { $0 != "\r" }.split(separator: " ")
+                let method = line.first.map(String.init) ?? ""
+                let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
+                let (status, type, body) = answer(method, path)
+                let response = Data(
+                    ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
+                        + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
+                connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+            }
+        }
+        let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(returning: listener.port?.rawValue ?? 0)
+                case .failed(let error):
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(throwing: error)
+                default: break
+                }
+            }
+            listener.start(queue: .global())
+        }
+        let url = try #require(URL(string: "http://127.0.0.1:\(port)"))
+        return LocalServer(url: url, listener: listener)
+    }
+
+    func stop() {
+        listener.cancel()
+    }
 }

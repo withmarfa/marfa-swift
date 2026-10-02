@@ -85,14 +85,18 @@ public final class WorkingCopy: Sendable {
     public func catchUp() async throws -> CatchUpReport {
         await feed.pause()
         defer { feed.unpause() }
-        let (report, catalogChanged) = try await background { [core] in
+        // The core commits a new catalog before it applies anything, so a
+        // catch-up that then fails has still changed it.
+        let (caughtUp, catalogChanged) = try await background { [core] in
             let before = try core.status().catalogVersion
-            let report = CatchUpReport(try core.catchUp())
-            return (report, try core.status().catalogVersion != before)
+            let caughtUp = Result { try translated { CatchUpReport(try core.catchUp()) } }
+            let after = try? core.status().catalogVersion
+            return (caughtUp, after.map { $0 != before } ?? false)
         }
         if catalogChanged {
             feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
         }
+        let report = try caughtUp.get()
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -429,7 +433,8 @@ public struct Queue: Sendable {
     /// Takes a refused write, and the content it carried, out of the queue.
     ///
     /// `false` for a write that is not refused, or that a waiting write
-    /// still depends on. The copy's row already shows what the server holds.
+    /// still depends on, and `notFound` for an id the queue does not hold.
+    /// The copy's row already shows what the server holds.
     public func discard(_ id: String) async throws -> Bool {
         try await background { [core] in try core.discard(id: id) }
     }

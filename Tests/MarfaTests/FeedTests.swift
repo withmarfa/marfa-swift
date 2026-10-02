@@ -253,6 +253,22 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
+    /// The catalog is read and kept before a catch-up applies anything.
+    @Test func aCatchUpThatChangedTheCatalogAndThenFailedIsToldBoth() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(core: core, hasServer: false)
+        let heard = Heard(copy.changes())
+        core.state.withLock {
+            $0.catchUpChangesCatalog = true
+            $0.catchUpFails = .CatchUpTooOld(minRetainedId: "5", message: "m")
+        }
+        await #expect(throws: Marfa.MarfaError.catchUpTooOld(minRetainedId: "5", message: "m")) {
+            _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        }
+        try await eventually("the catalog change was told") { heard.all == [refreshed(.catalog)] }
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func aDrainThatRecordedVerdictsIsToldAndStartsNothing() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(core: core, hasServer: true)
