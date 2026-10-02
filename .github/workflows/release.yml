@@ -1,0 +1,228 @@
+name: Release
+
+# SwiftPM reads a binary target's URL and checksum from the manifest at the
+# tagged commit, and main keeps the local path for building the core. So the
+# tag points at one commit on top of main that changes only the binary target,
+# and that commit is on no branch.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and check the release, without tagging or publishing it
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+# No caches: a release is built only from what main names.
+jobs:
+  build:
+    name: Build the core
+    runs-on: macos-26
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      checksum: ${{ steps.archive.outputs.checksum }}
+      pin: ${{ steps.pin.outputs.sha }}
+    steps:
+      - name: Refuse any branch but main
+        run: |
+          if [[ "${GITHUB_REF}" != refs/heads/main ]]; then
+            echo "::error::A release is made from main only, and this run is on ${GITHUB_REF}."
+            exit 1
+          fi
+
+      # Every tag, to name the next version.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          if [[ ! -d /Applications/Xcode.app ]]; then
+            echo "::error::This hosted runner has no /Applications/Xcode.app."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Test the release steps
+        run: scripts/release.test.sh
+
+      - name: Read the pin
+        id: pin
+        run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
+
+      - name: Name the release
+        id: version
+        run: echo "version=$(scripts/release.sh version)" >> "$GITHUB_OUTPUT"
+
+      - name: Add the iOS targets
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build the core at the pin
+        run: scripts/core.sh
+
+      - name: Check what the pin generates
+        run: |
+          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
+            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
+            echo "::error::The glue or the wire types are not what the pinned commit generates."
+            exit 1
+          fi
+
+      - name: Archive the framework
+        id: archive
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            Frameworks/MarfaCoreFFI.xcframework "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip"
+          echo "checksum=$(swift package compute-checksum "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip")" >> "$GITHUB_OUTPUT"
+
+      # The package with its binary target at the archive itself, so SwiftPM
+      # unpacks the zip a release would publish.
+      - name: Build an app on the archive, without Rust
+        run: |
+          copy="${RUNNER_TEMP}/archived/marfa-swift"
+          mkdir -p "${copy}"
+          git archive HEAD | tar -x -C "${copy}"
+          cp "${RUNNER_TEMP}/MarfaCoreFFI.xcframework.zip" "${copy}/"
+          (cd "${copy}" && "${GITHUB_WORKSPACE}/scripts/release.sh" archive MarfaCoreFFI.xcframework.zip)
+          scripts/release.sh consumer ".package(path: \"${copy}\")"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: framework
+          path: ${{ runner.temp }}/MarfaCoreFFI.xcframework.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summarize
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CHECKSUM: ${{ steps.archive.outputs.checksum }}
+          PIN: ${{ steps.pin.outputs.sha }}
+        run: |
+          echo "${VERSION}: MarfaCore from withmarfa/marfa@${PIN}, archive checksum ${CHECKSUM}" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Tag and publish
+    needs: build
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only main can deploy to this environment.
+    environment: release
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      CHECKSUM: ${{ needs.build.outputs.checksum }}
+      PIN: ${{ needs.build.outputs.pin }}
+      ASSET: MarfaCoreFFI.xcframework.zip
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: framework
+          path: ${{ runner.temp }}/framework
+
+      - name: Check the archive and the version
+        run: |
+          if [[ "$(sha256sum "${RUNNER_TEMP}/framework/${ASSET}" | cut -d' ' -f1)" != "${CHECKSUM}" ]]; then
+            echo "::error::The archive is not the one the build checksummed."
+            exit 1
+          fi
+          if [[ "$(scripts/release.sh version)" != "${VERSION}" ]]; then
+            echo "::error::A tag was made since the build named ${VERSION}."
+            exit 1
+          fi
+
+      - name: Commit the release manifest
+        id: commit
+        run: |
+          scripts/release.sh manifest \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${VERSION}/${ASSET}" "${CHECKSUM}"
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "chore(release): point the binary target at ${VERSION}" -- Package.swift
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a release that already has this tag name
+        run: |
+          taken="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+            --jq ".[] | select(.tag_name == \"${VERSION}\") | .html_url")"
+          if [[ -n "${taken}" ]]; then
+            echo "::error::A release named ${VERSION} already exists: ${taken}"
+            exit 1
+          fi
+
+      # A draft first, so the asset is in place before any tag can name it.
+      - name: Draft the release with the archive
+        id: draft
+        run: |
+          url="$(gh release create "${VERSION}" "${RUNNER_TEMP}/framework/${ASSET}" --draft \
+            --title "${VERSION}" --notes "Carries MarfaCore built from withmarfa/marfa@${PIN}.")"
+          id="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+            --jq ".[] | select(.html_url == \"${url}\") | .id")"
+          if [[ ! "${id}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not find the draft gh made at ${url}."
+            exit 1
+          fi
+          echo "id=${id}" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the release commit
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: git push origin "${SHA}:refs/tags/${VERSION}"
+
+      - name: Publish the release
+        env:
+          ID: ${{ steps.draft.outputs.id }}
+        run: gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${ID}" -F draft=false --silent
+
+      - name: Remove this run's draft unless its tag is pushed
+        if: ${{ (failure() || cancelled()) && steps.draft.outputs.id != '' }}
+        env:
+          ID: ${{ steps.draft.outputs.id }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          tagged="$(git ls-remote origin "refs/tags/${VERSION}" | cut -f1)"
+          if [[ -n "${SHA}" && "${tagged}" == "${SHA}" ]]; then
+            echo "::error::${VERSION} is tagged at this run's commit but its release is a draft. Publish it with: gh api -X PATCH repos/${GITHUB_REPOSITORY}/releases/${ID} -F draft=false"
+            exit 1
+          fi
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${ID}"
+
+  verify:
+    name: Build an app on the release, without Rust
+    needs: [build, publish]
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          if [[ ! -d /Applications/Xcode.app ]]; then
+            echo "::error::This hosted runner has no /Applications/Xcode.app."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Build an app on the release
+        run: |
+          scripts/release.sh consumer \
+            ".package(url: \"https://github.com/${GITHUB_REPOSITORY}\", exact: \"${VERSION#v}\")"

@@ -4,7 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,6 +32,30 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: scripts/ci-changes.sh
 
+  # On every change, since `Build + test` skips one only to `.github/`, and
+  # `release.yml` runs only from main.
+  lint-workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # actionlint checks each `run:` with the runner's shellcheck.
+      - name: Lint workflows and scripts
+        run: |
+          archive="${RUNNER_TEMP}/actionlint.tar.gz"
+          curl -fsSL -o "${archive}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "${archive}" -C "${RUNNER_TEMP}" actionlint
+          "${RUNNER_TEMP}/actionlint"
+          shellcheck scripts/*.sh
+
   validate:
     name: Build + test
     needs: changes
@@ -49,6 +72,9 @@ jobs:
 
       - name: Test which changes run this job
         run: scripts/ci-changes.test.sh
+
+      - name: Test the release steps
+        run: scripts/release.test.sh
 
       - name: Read the pin
         id: pin

@@ -5,8 +5,8 @@
 #   scripts/ci-changes.sh -   # prints the answer for NUL-separated paths on stdin
 #
 # A skipped job satisfies a required check, where a workflow filtered out by
-# `paths` would leave it pending. A push, a dispatch, an empty diff and one
-# that cannot be read all answer true. `scripts/ci-changes.test.sh` pins the
+# `paths` would leave it pending. A push, an empty diff and one that cannot
+# be read all answer true. `scripts/ci-changes.test.sh` pins the
 # rules.
 set -euo pipefail
 

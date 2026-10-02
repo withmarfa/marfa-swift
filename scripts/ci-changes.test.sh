@@ -75,6 +75,5 @@ ci() {
 check "a documentation-only pull request skips the job" "$(ci pull_request "${base}" "${head}")" validate=false
 check "an unreadable diff runs it" "$(ci pull_request invalid "${head}")" validate=true
 check "a push runs it" "$(ci push "${base}" "${head}")" validate=true
-check "a dispatch runs it" "$(ci workflow_dispatch "${base}" "${head}")" validate=true
 
 exit "${failed}"
