@@ -881,6 +881,13 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     func deleteItem(id: String) throws  -> QueuedWrite
     
     /**
+     * Takes a refused write out of the queue, with the content it carried.
+     * Answers whether the row was one a discard takes: refused, and with no
+     * write still waiting on it.
+     */
+    func discard(id: String) throws  -> Bool
+    
+    /**
      * Sends what the queue holds and records what came back. One pass.
      */
     func drain() throws  -> DrainReport
@@ -908,7 +915,8 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
     func follow(listener: ChangeListener)  -> Subscription
     
     /**
-     * Clears the writes the server has answered, and says how many went.
+     * Clears the writes the server has answered, and says how many went. A
+     * refused write that carried content stays until it is discarded.
      */
     func forgetAnswered() throws  -> UInt64
     
@@ -1248,6 +1256,20 @@ open func deleteItem(id: String)throws  -> QueuedWrite  {
 }
     
     /**
+     * Takes a refused write out of the queue, with the content it carried.
+     * Answers whether the row was one a discard takes: refused, and with no
+     * write still waiting on it.
+     */
+open func discard(id: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_marfacore_discard(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+    /**
      * Sends what the queue holds and records what came back. One pass.
      */
 open func drain()throws  -> DrainReport  {
@@ -1322,7 +1344,8 @@ open func follow(listener: ChangeListener) -> Subscription  {
 }
     
     /**
-     * Clears the writes the server has answered, and says how many went.
+     * Clears the writes the server has answered, and says how many went. A
+     * refused write that carried content stays until it is discarded.
      */
 open func forgetAnswered()throws  -> UInt64  {
     return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2272,12 +2295,16 @@ public func FfiConverterTypeDrainReport_lower(_ value: DrainReport) -> RustBuffe
 
 
 /**
- * What became of one write a drain sent.
+ * What became of one write a drain answered, sent or not.
  */
 public struct DrainVerdict: Equatable, Hashable {
     public var id: String
     public var kind: WriteKind
+    /**
+     * An edge write's source; otherwise the row written to.
+     */
     public var itemId: String?
+    public var edgeId: String?
     public var verdict: Verdict?
     public var refusals: Int64
     /**
@@ -2288,7 +2315,10 @@ public struct DrainVerdict: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, kind: WriteKind, itemId: String?, verdict: Verdict?, refusals: Int64, 
+    public init(id: String, kind: WriteKind, 
+        /**
+         * An edge write's source; otherwise the row written to.
+         */itemId: String?, edgeId: String?, verdict: Verdict?, refusals: Int64, 
         /**
          * The server answered from its record of this idempotency key rather
          * than writing again.
@@ -2296,6 +2326,7 @@ public struct DrainVerdict: Equatable, Hashable {
         self.id = id
         self.kind = kind
         self.itemId = itemId
+        self.edgeId = edgeId
         self.verdict = verdict
         self.refusals = refusals
         self.replayed = replayed
@@ -2320,6 +2351,7 @@ public struct FfiConverterTypeDrainVerdict: FfiConverterRustBuffer {
                 id: FfiConverterString.read(from: &buf), 
                 kind: FfiConverterTypeWriteKind.read(from: &buf), 
                 itemId: FfiConverterOptionString.read(from: &buf), 
+                edgeId: FfiConverterOptionString.read(from: &buf), 
                 verdict: FfiConverterOptionTypeVerdict.read(from: &buf), 
                 refusals: FfiConverterInt64.read(from: &buf), 
                 replayed: FfiConverterBool.read(from: &buf)
@@ -2330,6 +2362,7 @@ public struct FfiConverterTypeDrainVerdict: FfiConverterRustBuffer {
         FfiConverterString.write(value.id, into: &buf)
         FfiConverterTypeWriteKind.write(value.kind, into: &buf)
         FfiConverterOptionString.write(value.itemId, into: &buf)
+        FfiConverterOptionString.write(value.edgeId, into: &buf)
         FfiConverterOptionTypeVerdict.write(value.verdict, into: &buf)
         FfiConverterInt64.write(value.refusals, into: &buf)
         FfiConverterBool.write(value.replayed, into: &buf)
@@ -2736,6 +2769,60 @@ public func FfiConverterTypeEdit_lower(_ value: Edit) -> RustBuffer {
 }
 
 
+public struct FieldRefusal: Equatable, Hashable {
+    public var field: String
+    public var message: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(field: String, message: String) {
+        self.field = field
+        self.message = message
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FieldRefusal: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFieldRefusal: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FieldRefusal {
+        return
+            try FieldRefusal(
+                field: FfiConverterString.read(from: &buf), 
+                message: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FieldRefusal, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.field, into: &buf)
+        FfiConverterString.write(value.message, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFieldRefusal_lift(_ buf: RustBuffer) throws -> FieldRefusal {
+    return try FfiConverterTypeFieldRefusal.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFieldRefusal_lower(_ value: FieldRefusal) -> RustBuffer {
+    return FfiConverterTypeFieldRefusal.lower(value)
+}
+
+
 public struct HydrateReport: Equatable, Hashable {
     public var types: [String]
     public var tier: Tier
@@ -3119,6 +3206,70 @@ public func FfiConverterTypeListFilters_lower(_ value: ListFilters) -> RustBuffe
 }
 
 
+public struct MissingGrant: Equatable, Hashable {
+    public var kind: GrantKind
+    /**
+     * The type or edge type id, or the extension namespace.
+     */
+    public var name: String
+    public var level: GrantLevel
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(kind: GrantKind, 
+        /**
+         * The type or edge type id, or the extension namespace.
+         */name: String, level: GrantLevel) {
+        self.kind = kind
+        self.name = name
+        self.level = level
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension MissingGrant: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMissingGrant: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MissingGrant {
+        return
+            try MissingGrant(
+                kind: FfiConverterTypeGrantKind.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                level: FfiConverterTypeGrantLevel.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MissingGrant, into buf: inout [UInt8]) {
+        FfiConverterTypeGrantKind.write(value.kind, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterTypeGrantLevel.write(value.level, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMissingGrant_lift(_ buf: RustBuffer) throws -> MissingGrant {
+    return try FfiConverterTypeMissingGrant.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMissingGrant_lower(_ value: MissingGrant) -> RustBuffer {
+    return FfiConverterTypeMissingGrant.lower(value)
+}
+
+
 /**
  * What a pin or an unpin answers.
  */
@@ -3214,7 +3365,20 @@ public struct QueuedWrite: Equatable, Hashable {
      * out after and is not refused with.
      */
     public var follows: String?
+    /**
+     * None while the server has not answered it.
+     */
     public var verdict: Verdict?
+    /**
+     * Held behind a write that has no answer yet: `depends_on` and
+     * `follows` say which.
+     */
+    public var waiting: Bool
+    /**
+     * The body the write sends, or sent, as one JSON object: a refused
+     * write's content stays readable here until it is discarded.
+     */
+    public var bodyJson: String
     /**
      * The server's answer, whole, as it arrived.
      */
@@ -3235,7 +3399,18 @@ public struct QueuedWrite: Equatable, Hashable {
         /**
          * The write ahead of this one to the same row or edge, which it goes
          * out after and is not refused with.
-         */follows: String?, verdict: Verdict?, 
+         */follows: String?, 
+        /**
+         * None while the server has not answered it.
+         */verdict: Verdict?, 
+        /**
+         * Held behind a write that has no answer yet: `depends_on` and
+         * `follows` say which.
+         */waiting: Bool, 
+        /**
+         * The body the write sends, or sent, as one JSON object: a refused
+         * write's content stays readable here until it is discarded.
+         */bodyJson: String, 
         /**
          * The server's answer, whole, as it arrived.
          */answer: String?, refusals: Int64, queuedAt: String, answeredAt: String?) {
@@ -3252,6 +3427,8 @@ public struct QueuedWrite: Equatable, Hashable {
         self.dependsOn = dependsOn
         self.follows = follows
         self.verdict = verdict
+        self.waiting = waiting
+        self.bodyJson = bodyJson
         self.answer = answer
         self.refusals = refusals
         self.queuedAt = queuedAt
@@ -3287,6 +3464,8 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
                 dependsOn: FfiConverterSequenceString.read(from: &buf), 
                 follows: FfiConverterOptionString.read(from: &buf), 
                 verdict: FfiConverterOptionTypeVerdict.read(from: &buf), 
+                waiting: FfiConverterBool.read(from: &buf), 
+                bodyJson: FfiConverterString.read(from: &buf), 
                 answer: FfiConverterOptionString.read(from: &buf), 
                 refusals: FfiConverterInt64.read(from: &buf), 
                 queuedAt: FfiConverterString.read(from: &buf), 
@@ -3308,6 +3487,8 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.dependsOn, into: &buf)
         FfiConverterOptionString.write(value.follows, into: &buf)
         FfiConverterOptionTypeVerdict.write(value.verdict, into: &buf)
+        FfiConverterBool.write(value.waiting, into: &buf)
+        FfiConverterString.write(value.bodyJson, into: &buf)
         FfiConverterOptionString.write(value.answer, into: &buf)
         FfiConverterInt64.write(value.refusals, into: &buf)
         FfiConverterString.write(value.queuedAt, into: &buf)
@@ -3328,6 +3509,111 @@ public func FfiConverterTypeQueuedWrite_lift(_ buf: RustBuffer) throws -> Queued
 #endif
 public func FfiConverterTypeQueuedWrite_lower(_ value: QueuedWrite) -> RustBuffer {
     return FfiConverterTypeQueuedWrite.lower(value)
+}
+
+
+/**
+ * Why the server, or the drain for a write it never sent, refused a write.
+ */
+public struct Refusal: Equatable, Hashable {
+    /**
+     * The server's code verbatim, or the sentence naming the write this one
+     * waited on where that write was refused.
+     */
+    public var reason: String
+    /**
+     * The code in the server's envelope, where the server refused it.
+     */
+    public var code: String?
+    public var message: String?
+    /**
+     * Each property the server would not take, and why.
+     */
+    public var fields: [FieldRefusal]
+    /**
+     * The row the write named is in the bin, and can be restored.
+     */
+    public var trashed: Bool
+    /**
+     * The permission the credential's key lacks, where the refusal names one.
+     */
+    public var grant: MissingGrant?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The server's code verbatim, or the sentence naming the write this one
+         * waited on where that write was refused.
+         */reason: String, 
+        /**
+         * The code in the server's envelope, where the server refused it.
+         */code: String?, message: String?, 
+        /**
+         * Each property the server would not take, and why.
+         */fields: [FieldRefusal], 
+        /**
+         * The row the write named is in the bin, and can be restored.
+         */trashed: Bool, 
+        /**
+         * The permission the credential's key lacks, where the refusal names one.
+         */grant: MissingGrant?) {
+        self.reason = reason
+        self.code = code
+        self.message = message
+        self.fields = fields
+        self.trashed = trashed
+        self.grant = grant
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Refusal: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRefusal: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Refusal {
+        return
+            try Refusal(
+                reason: FfiConverterString.read(from: &buf), 
+                code: FfiConverterOptionString.read(from: &buf), 
+                message: FfiConverterOptionString.read(from: &buf), 
+                fields: FfiConverterSequenceTypeFieldRefusal.read(from: &buf), 
+                trashed: FfiConverterBool.read(from: &buf), 
+                grant: FfiConverterOptionTypeMissingGrant.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Refusal, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.reason, into: &buf)
+        FfiConverterOptionString.write(value.code, into: &buf)
+        FfiConverterOptionString.write(value.message, into: &buf)
+        FfiConverterSequenceTypeFieldRefusal.write(value.fields, into: &buf)
+        FfiConverterBool.write(value.trashed, into: &buf)
+        FfiConverterOptionTypeMissingGrant.write(value.grant, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRefusal_lift(_ buf: RustBuffer) throws -> Refusal {
+    return try FfiConverterTypeRefusal.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRefusal_lower(_ value: Refusal) -> RustBuffer {
+    return FfiConverterTypeRefusal.lower(value)
 }
 
 
@@ -3943,6 +4229,147 @@ public func FfiConverterTypeEdgeEnd_lift(_ buf: RustBuffer) throws -> EdgeEnd {
 #endif
 public func FfiConverterTypeEdgeEnd_lower(_ value: EdgeEnd) -> RustBuffer {
     return FfiConverterTypeEdgeEnd.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum GrantKind: Equatable, Hashable {
+    
+    case type
+    case edgeType
+    case `extension`
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension GrantKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeGrantKind: FfiConverterRustBuffer {
+    typealias SwiftType = GrantKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GrantKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .type
+        
+        case 2: return .edgeType
+        
+        case 3: return .`extension`
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: GrantKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .type:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .edgeType:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .`extension`:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGrantKind_lift(_ buf: RustBuffer) throws -> GrantKind {
+    return try FfiConverterTypeGrantKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGrantKind_lower(_ value: GrantKind) -> RustBuffer {
+    return FfiConverterTypeGrantKind.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum GrantLevel: Equatable, Hashable {
+    
+    case read
+    case write
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension GrantLevel: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeGrantLevel: FfiConverterRustBuffer {
+    typealias SwiftType = GrantLevel
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GrantLevel {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .read
+        
+        case 2: return .write
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: GrantLevel, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .read:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .write:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGrantLevel_lift(_ buf: RustBuffer) throws -> GrantLevel {
+    return try FfiConverterTypeGrantLevel.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeGrantLevel_lower(_ value: GrantLevel) -> RustBuffer {
+    return FfiConverterTypeGrantLevel.lower(value)
 }
 
 
@@ -4758,11 +5185,15 @@ public enum Verdict: Equatable, Hashable {
     case conflicted(siblingId: String, fields: [String]
     )
     /**
-     * The server's code verbatim, or the sentence naming the write this one
-     * waited on where that write was refused.
+     * The refusal read into its parts.
      */
-    case refused(reason: String
+    case refused(refusal: Refusal
     )
+    /**
+     * Stopped until something outside the queue changes. A write held
+     * behind another that has no answer yet is not blocked: it has no
+     * verdict, and its `waiting` says so.
+     */
     case blocked(reason: BlockedReason
     )
     /**
@@ -4799,7 +5230,7 @@ public struct FfiConverterTypeVerdict: FfiConverterRustBuffer {
         case 3: return .conflicted(siblingId: try FfiConverterString.read(from: &buf), fields: try FfiConverterSequenceString.read(from: &buf)
         )
         
-        case 4: return .refused(reason: try FfiConverterString.read(from: &buf)
+        case 4: return .refused(refusal: try FfiConverterTypeRefusal.read(from: &buf)
         )
         
         case 5: return .blocked(reason: try FfiConverterTypeBlockedReason.read(from: &buf)
@@ -4830,9 +5261,9 @@ public struct FfiConverterTypeVerdict: FfiConverterRustBuffer {
             FfiConverterSequenceString.write(fields, into: &buf)
             
         
-        case let .refused(reason):
+        case let .refused(refusal):
             writeInt(&buf, Int32(4))
-            FfiConverterString.write(reason, into: &buf)
+            FfiConverterTypeRefusal.write(refusal, into: &buf)
             
         
         case let .blocked(reason):
@@ -5147,6 +5578,30 @@ fileprivate struct FfiConverterOptionTypeItem: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeMissingGrant: FfiConverterRustBuffer {
+    typealias SwiftType = MissingGrant?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMissingGrant.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMissingGrant.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeThumbnail: FfiConverterRustBuffer {
     typealias SwiftType = Thumbnail?
 
@@ -5367,6 +5822,31 @@ fileprivate struct FfiConverterSequenceTypeEdgeType: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFieldRefusal: FfiConverterRustBuffer {
+    typealias SwiftType = [FieldRefusal]
+
+    public static func write(_ value: [FieldRefusal], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFieldRefusal.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FieldRefusal] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FieldRefusal]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFieldRefusal.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
     typealias SwiftType = [Item]
 
@@ -5543,6 +6023,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_delete_item() != 322) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_discard() != 12257) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_drain() != 47499) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5564,7 +6047,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_follow() != 58729) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_forget_answered() != 47863) {
+    if (uniffi_marfa_core_ffi_checksum_method_marfacore_forget_answered() != 55451) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_marfacore_get() != 56150) {

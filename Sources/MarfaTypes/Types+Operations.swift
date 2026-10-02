@@ -85115,7 +85115,7 @@ public enum Operations {
     }
     /// List webhooks
     ///
-    /// Returns every outbound webhook subscription. Secrets are redacted here — the plaintext is only returned at create time.
+    /// Returns the outbound webhook subscriptions that belong to this credential. Secrets are redacted here — the plaintext is only returned at create time.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -85721,7 +85721,7 @@ public enum Operations {
     }
     /// Create a webhook
     ///
-    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The `secret` is the HMAC-SHA256 signing key, generated server-side when omitted, and returned in plaintext only on creation.
+    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The subscription belongs to the credential that registers it, which for a signed-in app is its grant rather than the token: each delivery carries only what that credential may read when it is sent, and the subscription is deleted when the key or the app's grant is revoked, while a key that expires or no longer holds `webhooks.manage` delivers nothing more. The URL must be `http` or `https` and reach a public address. The `secret` is the HMAC-SHA256 signing key, at least 32 characters, generated server-side when omitted, and returned in plaintext only on creation.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
@@ -86187,12 +86187,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/webhooks/POST/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/webhooks/POST/responses/403/content/application\/json`.
-                    case json(Components.Schemas.ForbiddenOrScopedCredentialNotPermittedRefusal)
+                    case json(Components.Schemas.ForbiddenRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ForbiddenOrScopedCredentialNotPermittedRefusal {
+                    public var json: Components.Schemas.ForbiddenRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -86216,7 +86216,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: the credential does not hold `webhooks.manage`. `scoped_credential_not_permitted`: it does, but its content read does not cover everything stored. A subscription is instance-wide and carries no credential of its own, so a delivery cannot be narrowed to what its creator could read; only a credential that can read everything may register or re-point one.
+            /// The credential does not hold `webhooks.manage`.
             ///
             /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/403`.
             ///
@@ -86585,7 +86585,7 @@ public enum Operations {
     }
     /// Get a webhook
     ///
-    /// Returns one outbound webhook subscription by id, with its secret redacted.
+    /// Returns one outbound webhook subscription by id, with its secret redacted. A subscription another credential registered answers as an unknown id.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -87320,7 +87320,7 @@ public enum Operations {
     }
     /// Update a webhook
     ///
-    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. The signing secret cannot be rotated here — delete the subscription and create a new one.
+    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. Pointing it at another URL or turning it off settles its pending deliveries unsent. The signing secret cannot be rotated here — delete the subscription and create a new one.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
@@ -87804,12 +87804,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/403/content/application\/json`.
-                    case json(Components.Schemas.ForbiddenOrScopedCredentialNotPermittedRefusal)
+                    case json(Components.Schemas.ForbiddenRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ForbiddenOrScopedCredentialNotPermittedRefusal {
+                    public var json: Components.Schemas.ForbiddenRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -87833,7 +87833,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: the credential does not hold `webhooks.manage`. `scoped_credential_not_permitted`: it does, but its content read does not cover everything stored. A subscription is instance-wide and carries no credential of its own, so a delivery cannot be narrowed to what its creator could read; only a credential that can read everything may register or re-point one.
+            /// The credential does not hold `webhooks.manage`.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/403`.
             ///
@@ -88311,7 +88311,7 @@ public enum Operations {
     }
     /// Delete a webhook
     ///
-    /// Removes the subscription so no new deliveries are queued. Deliveries already queued still fire and retry on the standard schedule, and delivery history is retained until the audit retention window expires.
+    /// Removes the subscription so no new deliveries are queued, and its pending deliveries are settled unsent rather than retried.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
@@ -88627,12 +88627,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/403/content/application\/json`.
-                    case json(Components.Schemas.ForbiddenOrScopedCredentialNotPermittedRefusal)
+                    case json(Components.Schemas.ForbiddenRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ForbiddenOrScopedCredentialNotPermittedRefusal {
+                    public var json: Components.Schemas.ForbiddenRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -88656,7 +88656,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: the credential does not hold `webhooks.manage`. `scoped_credential_not_permitted`: it does, but its content read does not cover everything stored. A subscription is instance-wide and carries no credential of its own, so a delivery cannot be narrowed to what its creator could read; only a credential that can read everything may create, re-point or destroy one.
+            /// The credential does not hold `webhooks.manage`.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/403`.
             ///

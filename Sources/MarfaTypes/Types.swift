@@ -702,35 +702,35 @@ public protocol APIProtocol: Sendable {
     func exportData(_ input: Operations.ExportData.Input) async throws -> Operations.ExportData.Output
     /// List webhooks
     ///
-    /// Returns every outbound webhook subscription. Secrets are redacted here — the plaintext is only returned at create time.
+    /// Returns the outbound webhook subscriptions that belong to this credential. Secrets are redacted here — the plaintext is only returned at create time.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
     func listWebhooks(_ input: Operations.ListWebhooks.Input) async throws -> Operations.ListWebhooks.Output
     /// Create a webhook
     ///
-    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The `secret` is the HMAC-SHA256 signing key, generated server-side when omitted, and returned in plaintext only on creation.
+    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The subscription belongs to the credential that registers it, which for a signed-in app is its grant rather than the token: each delivery carries only what that credential may read when it is sent, and the subscription is deleted when the key or the app's grant is revoked, while a key that expires or no longer holds `webhooks.manage` delivers nothing more. The URL must be `http` or `https` and reach a public address. The `secret` is the HMAC-SHA256 signing key, at least 32 characters, generated server-side when omitted, and returned in plaintext only on creation.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
     func createWebhook(_ input: Operations.CreateWebhook.Input) async throws -> Operations.CreateWebhook.Output
     /// Get a webhook
     ///
-    /// Returns one outbound webhook subscription by id, with its secret redacted.
+    /// Returns one outbound webhook subscription by id, with its secret redacted. A subscription another credential registered answers as an unknown id.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
     func getWebhook(_ input: Operations.GetWebhook.Input) async throws -> Operations.GetWebhook.Output
     /// Update a webhook
     ///
-    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. The signing secret cannot be rotated here — delete the subscription and create a new one.
+    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. Pointing it at another URL or turning it off settles its pending deliveries unsent. The signing secret cannot be rotated here — delete the subscription and create a new one.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
     func updateWebhook(_ input: Operations.UpdateWebhook.Input) async throws -> Operations.UpdateWebhook.Output
     /// Delete a webhook
     ///
-    /// Removes the subscription so no new deliveries are queued. Deliveries already queued still fire and retry on the standard schedule, and delivery history is retained until the audit retention window expires.
+    /// Removes the subscription so no new deliveries are queued, and its pending deliveries are settled unsent rather than retried.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
@@ -2195,7 +2195,7 @@ extension APIProtocol {
     }
     /// List webhooks
     ///
-    /// Returns every outbound webhook subscription. Secrets are redacted here — the plaintext is only returned at create time.
+    /// Returns the outbound webhook subscriptions that belong to this credential. Secrets are redacted here — the plaintext is only returned at create time.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -2204,7 +2204,7 @@ extension APIProtocol {
     }
     /// Create a webhook
     ///
-    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The `secret` is the HMAC-SHA256 signing key, generated server-side when omitted, and returned in plaintext only on creation.
+    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The subscription belongs to the credential that registers it, which for a signed-in app is its grant rather than the token: each delivery carries only what that credential may read when it is sent, and the subscription is deleted when the key or the app's grant is revoked, while a key that expires or no longer holds `webhooks.manage` delivers nothing more. The URL must be `http` or `https` and reach a public address. The `secret` is the HMAC-SHA256 signing key, at least 32 characters, generated server-side when omitted, and returned in plaintext only on creation.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
@@ -2219,7 +2219,7 @@ extension APIProtocol {
     }
     /// Get a webhook
     ///
-    /// Returns one outbound webhook subscription by id, with its secret redacted.
+    /// Returns one outbound webhook subscription by id, with its secret redacted. A subscription another credential registered answers as an unknown id.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -2234,7 +2234,7 @@ extension APIProtocol {
     }
     /// Update a webhook
     ///
-    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. The signing secret cannot be rotated here — delete the subscription and create a new one.
+    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. Pointing it at another URL or turning it off settles its pending deliveries unsent. The signing secret cannot be rotated here — delete the subscription and create a new one.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
@@ -2251,7 +2251,7 @@ extension APIProtocol {
     }
     /// Delete a webhook
     ///
-    /// Removes the subscription so no new deliveries are queued. Deliveries already queued still fire and retry on the standard schedule, and delivery history is retained until the audit retention window expires.
+    /// Removes the subscription so no new deliveries are queued, and its pending deliveries are settled unsent rather than retried.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
