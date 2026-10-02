@@ -31,7 +31,7 @@ for await change in copy.changes() {
 
 Set the tier on each `Draft`. Without one, the key's default tier decides, and an item outside the copy's slice drops out of it once the server's event for it arrives.
 
-Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does. A held `changes()` stream follows the server's events; if it stops with an error, the next hydration or catch-up starts it again.
+Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does, and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events; if it stops with an error, the next hydration or catch-up starts it again.
 
 `MarfaTypes`, a second product, holds the server's wire types, generated from the pinned `openapi.json`, for reading answers the working copy does not hold.
 
@@ -39,7 +39,7 @@ Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, w
 
 `Server.fromEnvironment()` reads `MARFA_API_URL` and `MARFA_API_KEY`, for agents and tests, and throws when only one is set. An app keeps a person's key between launches with `Keychain.system` (`save`, `key`, `delete`), under a service and account it chooses. The working copy never writes the key to its store.
 
-Tests keep keys in `Keychain.isolated()`, a keychain file of their own outside the search list. It turns off keychain prompts for the whole process, so an app never calls it.
+Tests keep keys in `Keychain.isolated()` (macOS only), a keychain file of their own outside the search list. It turns off keychain prompts for the whole process, so an app never calls it.
 
 ## The sample
 

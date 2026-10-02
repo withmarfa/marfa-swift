@@ -21,7 +21,7 @@ The Swift package `Marfa`: Swift types, `async` calls, change streams and errors
 - American English in code, comments and commits. Scoped Conventional Commits (`feat(package):`, `fix(ci):`).
 - One clone per machine. Parallel work happens in worktrees inside it, made with `git worktree add .claude/worktrees/<name> -b <branch> origin/main`; never a second clone or a sibling folder. Once a branch is merged, `git worktree remove` its worktree and run `git worktree prune`; if git refuses, report it rather than forcing it.
 - Feature branches and pull requests; never push `main`. A session merges its own pull request once every required check is green and the review its risk calls for is done, with that depth stated on the pull request: squash, branch deleted.
-- Workflows use standard GitHub-hosted runners only.
+- Workflows use standard GitHub-hosted runners only. Never hold back a push or a check to ration runners.
 - No personal details of any machine or person: no absolute paths, hostnames, account names or credentials.
 - Removed means gone: no shims, aliases or compatibility paths.
 - A comment stays only if it says what the code cannot: a constraint from outside, a non-obvious reason, a trap. Never what the code does, history, a ticket or a person. When in doubt, it goes.
