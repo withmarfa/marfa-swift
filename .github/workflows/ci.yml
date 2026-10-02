@@ -14,14 +14,15 @@ permissions:
   contents: read
 
 jobs:
-  # A job rather than a `paths` filter: a skipped job satisfies a required
-  # check, and a workflow filtered out would leave it pending.
+  # `Build + test` runs only when `scripts/ci-changes.sh` says the pull
+  # request can affect it. A skipped job satisfies a required check, where a
+  # workflow filtered out by `paths` would leave it pending.
   changes:
     name: Classify changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      code: ${{ steps.classify.outputs.code }}
+      validate: ${{ steps.classify.outputs.validate }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,27 +31,24 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          code=true
-          if [ "$GITHUB_EVENT_NAME" = pull_request ] && paths="$(git diff --name-only --no-renames "$BASE...$HEAD")"; then
-            if [ -n "$paths" ] && ! grep -qvE '^([^/]+\.md|LICENSE)$' <<<"$paths"; then
-              code=false
-            fi
-          fi
-          echo "code=$code" >> "$GITHUB_OUTPUT"
+        run: scripts/ci-changes.sh
 
   validate:
     name: Build + test
     needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code != 'false') }}
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false') }}
     runs-on: macos-26
     timeout-minutes: 60
+    # Inside the workspace: actions/cache refuses a path with `..` in it.
     env:
       MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
-      CARGO_TARGET_DIR: ${{ github.workspace }}/../core-target
-      MARFA_GENERATOR_BUILD: ${{ github.workspace }}/../generator-build
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.build/core-target
+      MARFA_GENERATOR_BUILD: ${{ github.workspace }}/.build/generator-build
     steps:
       - uses: actions/checkout@v7
+
+      - name: Test which changes run this job
+        run: scripts/ci-changes.test.sh
 
       - name: Read the pin
         id: pin
@@ -80,10 +78,29 @@ jobs:
           swift format lint --strict --configuration .swift-format -r \
             Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources
 
-      - name: Add the iOS targets
-        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+      # Emptied first, so a committed file the pin does not generate shows as
+      # deleted whatever comes next.
+      - name: Empty what the core generates
+        run: rm -rf Sources/MarfaCore Sources/MarfaTypes
 
+      # What core.sh makes depends only on the pin, the script and the
+      # generator, so a change that leaves them alone reuses what it made
+      # last time and builds no Rust.
+      - name: Restore what the pin generates
+        id: core
+        uses: actions/cache@v5
+        with:
+          path: |
+            Frameworks/MarfaCoreFFI.xcframework
+            Sources/MarfaCore
+            Sources/MarfaTypes
+          key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
+
+      - name: Add the iOS targets
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
       - name: Cache the core's build
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
         uses: actions/cache@v5
         with:
           path: |
@@ -91,21 +108,21 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            ${{ github.workspace }}/../core-target
+            ${{ github.workspace }}/.build/core-target
           key: core-${{ runner.os }}-${{ hashFiles('core.pin') }}
           restore-keys: core-${{ runner.os }}-
       - name: Cache the generator's build
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
         uses: actions/cache@v5
         with:
-          path: ${{ github.workspace }}/../generator-build
+          path: ${{ github.workspace }}/.build/generator-build
           key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
+      - name: Build the core at the pin
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        run: scripts/core.sh
 
-      # Emptied here too, so a committed file the pin does not generate shows
-      # as deleted whatever core.sh leaves.
-      - name: Build the core and check what it generates
+      - name: Check what the pin generates
         run: |
-          rm -rf Sources/MarfaCore Sources/MarfaTypes
-          scripts/core.sh
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
             git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
             echo "::error::The glue or the wire types are not what the pinned commit generates. Run scripts/core.sh and commit them."
