@@ -11,6 +11,7 @@ The Swift package `Marfa`: Swift types, `async` calls, change streams and errors
 - `Examples/MarfaSample` is the sample app. `xcodegen generate` makes its project, which is gitignored.
 - `.github/workflows/ci.yml`'s `Build + test` is the full check: lint, the core at the pin, both generated sources, the live tests against a booted server, both sample builds, and the sample's scenario offline and back.
 - `scripts/ci-changes.sh` decides whether a pull request runs `Build + test`: Markdown anywhere, `LICENSE`, `.claude/` and `.github/` other than the workflow do not, and an unnamed path, a push or a dispatch does. A skipped job passes its required check; `scripts/ci-changes.test.sh` pins the rules and runs first in the job. The core is rebuilt only when `core.pin`, `scripts/core.sh` or `generator/` changes; otherwise the job reuses what that pin generated.
+- `.github/workflows/codeql.yml` analyzes Actions and Swift on every push to `main`, once a week, and on a pull request unless it changes only Markdown, the license or `.claude/`. It is not a required check, so a `paths-ignore` filter starts no run at all for documentation. Its Swift job builds the library targets for one architecture beside the framework `ci.yml` caches for the pin, so a change to that cache's paths or key changes both workflows.
 
 ## Versions
 
