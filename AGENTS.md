@@ -13,8 +13,7 @@ The Swift package `Marfa`: Swift types, `async` calls, change streams and errors
 
 ## Versions
 
-- Nothing is released, and this repository has no release workflow. Agents never add one, create a tag, or write a version into a file.
-- When releases start, a version is a tag on this repository, which is where SwiftPM reads versions from, and each is the previous plus 0.0.1 whatever the change.
+- A version is a tag on this repository, which is where SwiftPM reads versions from, created only when a release is called for, each the previous plus 0.0.1 whatever the change. No one writes a version into a file. Nothing has been released yet, and there is no release workflow.
 
 ## Working here
 
