@@ -2,26 +2,6 @@ import Foundation
 import MarfaCore
 import MarfaCoreNames
 
-public typealias Tier = CoreTier
-public typealias ItemState = CoreItemState
-public typealias WriteKind = CoreWriteKind
-public typealias Verdict = CoreVerdict
-public typealias BlockedReason = CoreBlockedReason
-public typealias Handle = CoreHandle
-public typealias Hydration = CoreHydration
-public typealias SortField = CoreSortField
-public typealias SortDirection = CoreSortDirection
-public typealias Sort = CoreSort
-public typealias QueuedWrite = CoreQueuedWrite
-public typealias DrainReport = CoreDrainReport
-public typealias DrainVerdict = CoreDrainVerdict
-public typealias HydrateReport = CoreHydrateReport
-public typealias CatchUpReport = CoreCatchUpReport
-public typealias Status = CoreStatus
-public typealias Attachment = CoreAttachment
-public typealias Attached = CoreAttached
-public typealias Thumbnail = CoreThumbnail
-
 /// Every way the core refuses or fails. `code` is the server's, where the
 /// server answered.
 public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
@@ -144,8 +124,8 @@ public struct Item: Sendable, Hashable, Identifiable {
         id = item.id
         type = item.type
         properties = try Properties.object(item.propertiesJson)
-        state = item.state
-        tier = item.tier
+        state = ItemState(item.state)
+        tier = item.tier.map(Tier.init)
         version = item.version
         schemaVersion = item.schemaVersion
         source = item.source
@@ -244,7 +224,7 @@ public struct Draft: Sendable, Hashable {
 
     func core() throws -> CoreDraft {
         CoreDraft(
-            type: type, id: id, propertiesJson: try Properties.text(properties), tags: tags, tier: tier,
+            type: type, id: id, propertiesJson: try Properties.text(properties), tags: tags, tier: tier?.core,
             source: source, sourceId: sourceId, occurredAt: occurredAt, baseVersion: baseVersion)
     }
 }
@@ -297,7 +277,7 @@ public struct ListFilters: Sendable, Hashable {
 
     var core: CoreListFilters {
         CoreListFilters(
-            type: type, state: state, allStates: allStates, tier: tier, tags: tags,
+            type: type, state: state?.core, allStates: allStates, tier: tier?.core, tags: tags,
             occurredAfter: occurredAfter, occurredBefore: occurredBefore, limit: limit, offset: offset)
     }
 }
@@ -318,6 +298,6 @@ public struct SearchFilters: Sendable, Hashable {
     }
 
     var core: CoreSearchFilters {
-        CoreSearchFilters(state: state, allStates: allStates, type: type, tags: tags)
+        CoreSearchFilters(state: state?.core, allStates: allStates, type: type, tags: tags)
     }
 }
