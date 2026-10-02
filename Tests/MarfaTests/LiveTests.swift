@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 
@@ -148,6 +149,25 @@ struct LiveServer {
         let fetched = try await fresh.blobs.get(hash)
         #expect(try Data(contentsOf: fetched) == Data(text.utf8))
         #expect(try await fresh.blobs.isHeld(hash))
+    }
+
+    /// The server answers `404 blob_not_found` for bytes it holds none of,
+    /// as it does for bytes beyond the credential's reach.
+    @Test func bytesTheServerHoldsNoneOfAreAbsentAndTheItemStaysWhole() async throws {
+        let copy = try await Live.hydrated()
+        let note = try await copy.items.create(Live.note("beside absent bytes"))
+        _ = try await copy.queue.drain()
+        let id = try #require(note.itemId)
+        let hash =
+            "sha256:" + SHA256.hash(data: Data(UUID().uuidString.utf8)).map { String(format: "%02x", $0) }.joined()
+        await #expect {
+            _ = try await copy.blobs.get(hash)
+        } throws: { error in
+            guard case Marfa.MarfaError.bytesAbsent(let absent, _, _) = error else { return false }
+            return absent == hash
+        }
+        #expect(try await !copy.blobs.isHeld(hash))
+        #expect(try await copy.items.get(id)?.title == "beside absent bytes")
     }
 
     @Test func eachVerdictArrivesTyped() async throws {
