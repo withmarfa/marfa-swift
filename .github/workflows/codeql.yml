@@ -66,6 +66,9 @@ jobs:
             Sources/MarfaCore
             Sources/MarfaTypes
           key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
       - name: Build the core at the pin
         if: ${{ steps.core.outputs.cache-hit != 'true' }}
         run: |

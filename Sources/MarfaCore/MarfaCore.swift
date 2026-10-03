@@ -5295,7 +5295,7 @@ public enum Verdict: Equatable, Hashable {
      * behind another that has no answer yet is not blocked: it has no
      * verdict, and its `waiting` says so.
      */
-    case blocked(reason: BlockedReason
+    case blocked(reason: BlockedReason, refusal: Refusal?
     )
     /**
      * Refused until the ceiling; released by id. The row's `answer` holds
@@ -5334,7 +5334,7 @@ public struct FfiConverterTypeVerdict: FfiConverterRustBuffer {
         case 4: return .refused(refusal: try FfiConverterTypeRefusal.read(from: &buf)
         )
         
-        case 5: return .blocked(reason: try FfiConverterTypeBlockedReason.read(from: &buf)
+        case 5: return .blocked(reason: try FfiConverterTypeBlockedReason.read(from: &buf), refusal: try FfiConverterOptionTypeRefusal.read(from: &buf)
         )
         
         case 6: return .dead
@@ -5367,9 +5367,10 @@ public struct FfiConverterTypeVerdict: FfiConverterRustBuffer {
             FfiConverterTypeRefusal.write(refusal, into: &buf)
             
         
-        case let .blocked(reason):
+        case let .blocked(reason,refusal):
             writeInt(&buf, Int32(5))
             FfiConverterTypeBlockedReason.write(reason, into: &buf)
+            FfiConverterOptionTypeRefusal.write(refusal, into: &buf)
             
         
         case .dead:
@@ -5695,6 +5696,30 @@ fileprivate struct FfiConverterOptionTypeMissingGrant: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeMissingGrant.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeRefusal: FfiConverterRustBuffer {
+    typealias SwiftType = Refusal?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRefusal.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRefusal.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
