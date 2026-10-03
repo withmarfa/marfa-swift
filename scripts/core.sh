@@ -40,22 +40,5 @@ cp -R "${built}/Sources/MarfaCore" "${root}/Sources/MarfaCore"
 scratch="${MARFA_GENERATOR_BUILD:-${root}/generator/.build}"
 swift build --quiet -c release --package-path "${root}/generator" --scratch-path "${scratch}" \
   --product swift-openapi-generator
-types="${root}/Sources/MarfaTypes"
-rm -rf "${types}"
-mkdir -p "${types}"
-"${scratch}/release/swift-openapi-generator" generate \
-  --config "${root}/generator/openapi-generator-config.yaml" \
-  --output-directory "${types}" "${src}/openapi.json"
-
-contract="$(plutil -extract info.version raw -o - "${src}/openapi.json")"
-if [[ ! "${contract}" =~ ^(0|[1-9][0-9]*)$ ]]; then
-  echo "core.sh: openapi.json states the contract as '${contract}', not a whole number" >&2
-  exit 1
-fi
-cat >"${types}/Contract.swift" <<SWIFT
-// Generated from the pinned openapi.json by scripts/core.sh; do not edit.
-
-/// The contract version these types describe: the document's \`info.version\`,
-/// which an instance's root answers as \`contract\`.
-public let marfaContractVersion = ${contract}
-SWIFT
+node "${root}/generator/generate.mjs" \
+  "${scratch}/release/swift-openapi-generator" "${src}/openapi.json" "${root}/Sources/MarfaTypes"

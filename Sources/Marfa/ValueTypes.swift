@@ -148,7 +148,7 @@ public enum Verdict: Sendable, Hashable {
     /// The server kept its own value and wrote the losing one to a sibling.
     case conflicted(siblingId: String, fields: [String])
     case refused(Refusal)
-    case blocked(reason: BlockedReason)
+    case blocked(reason: BlockedReason, refusal: Refusal? = nil)
     /// Refused until the ceiling; released by id. The row's `answer` holds
     /// the last answer it got.
     case dead
@@ -159,7 +159,8 @@ public enum Verdict: Sendable, Hashable {
         case .merged(let fields): self = .merged(fields: fields)
         case .conflicted(let siblingId, let fields): self = .conflicted(siblingId: siblingId, fields: fields)
         case .refused(let refusal): self = .refused(Refusal(refusal))
-        case .blocked(let reason): self = .blocked(reason: BlockedReason(reason))
+        case .blocked(let reason, let refusal):
+            self = .blocked(reason: BlockedReason(reason), refusal: refusal.map(Refusal.init))
         case .dead: self = .dead
         }
     }
@@ -170,7 +171,7 @@ public enum Verdict: Sendable, Hashable {
         case .merged(let fields): .merged(fields: fields)
         case .conflicted(let siblingId, let fields): .conflicted(siblingId: siblingId, fields: fields)
         case .refused(let refusal): .refused(refusal: refusal.core)
-        case .blocked(let reason): .blocked(reason: reason.core)
+        case .blocked(let reason, let refusal): .blocked(reason: reason.core, refusal: refusal?.core)
         case .dead: .dead
         }
     }

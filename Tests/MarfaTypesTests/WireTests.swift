@@ -66,3 +66,102 @@ func thePinnedServerAnswersInTheseTypes() async throws {
     }
     #expect(titles.contains(title), "the page read as \(page.data.count) row(s), none the note sent")
 }
+
+@Test func previouslySkippedFieldsDecodeNullAndValues() throws {
+    let decoder = JSONDecoder()
+    let connector = try decoder.decode(
+        Components.Schemas.Connector.self,
+        from: Data(
+            #"{"id":"c","key_id":"k","source":"s","name":"n","description":null,"registered_at":"now","updated_at":"now","last_heartbeat_at":null,"hold_expires_at":null,"last_run":null}"#
+                .utf8))
+    #expect(connector.lastRun == .null)
+    let run = try decoder.decode(
+        Components.Schemas.MarfaNullableConnectorRun.self,
+        from: Data(
+            #"{"id":"r","connector_id":"c","outcome":"succeeded","started_at":"now","finished_at":"now","summary":null,"error":null,"reported_at":"now"}"#
+                .utf8))
+    #expect(run.value?.id == "r")
+    let job = try decoder.decode(
+        Components.Schemas.HousekeepingJob.self,
+        from: Data(
+            #"{"name":"j","interval_ms":1,"next_run_at":"now","running_since":null,"last_started_at":null,"last_finished_at":null,"last_outcome":"ok","last_error":null,"last_result":{"count":2}}"#
+                .utf8))
+    #expect(job.lastOutcome.value == .ok)
+    #expect(job.lastResult.value?.value["count"] as? Int == 2)
+    let houseRun = try decoder.decode(
+        Components.Schemas.HousekeepingRun.self,
+        from: Data(
+            #"{"name":"j","started_at":"now","finished_at":"now","outcome":"ok","result":null,"error":null}"#.utf8))
+    #expect(houseRun.result == .null)
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(MarfaNullValue.self, from: Data("false".utf8))
+    }
+}
+
+@Test func anOverrideUpdateDistinguishesOmissionSettingAndClearing() throws {
+    typealias Patch = Operations.UpdateKey.Input.Body.JsonPayload
+    func object(_ patch: Patch) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(patch)
+        let object = try JSONSerialization.jsonObject(with: data)
+        return try #require(object as? [String: Any])
+    }
+    #expect(try object(Patch())["enforcement_override"] == nil)
+    let clear = Patch(enforcementOverride: .null)
+    #expect(try object(clear)["enforcement_override"] is NSNull)
+    let decodedClear = try JSONDecoder().decode(Patch.self, from: Data(#"{"enforcement_override":null}"#.utf8))
+    #expect(decodedClear.enforcementOverride == .some(.null))
+    #expect(try object(decodedClear)["enforcement_override"] is NSNull)
+    let set = Patch(enforcementOverride: .value(.init(strictMode: .init(types: ["core.note"]))))
+    let override = try #require(try object(set)["enforcement_override"] as? [String: Any])
+    let strict = try #require(override["strict_mode"] as? [String: Any])
+    #expect(strict["types"] as? [String] == ["core.note"])
+}
+
+@Test(
+    .enabled(
+        if: live != nil && ProcessInfo.processInfo.environment["MARFA_TEST_OPERATOR_KEY"] != nil,
+        "the pinned test server supplies an isolated operator key"))
+func nullableWireFieldsRoundTripThroughTheServer() async throws {
+    let (url, _) = try #require(live)
+    let key = try #require(ProcessInfo.processInfo.environment["MARFA_TEST_OPERATOR_KEY"])
+    func send(_ method: String, _ path: String, _ body: Data? = nil, status: Int = 200) async throws -> Data {
+        var request = URLRequest(url: url.appending(path: path))
+        request.httpMethod = method
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try #require((response as? HTTPURLResponse)?.statusCode == status)
+        return data
+    }
+    let jobs = try JSONDecoder().decode(
+        Components.Schemas.HousekeepingJobPage.self, from: await send("GET", "housekeeping"))
+    #expect(!jobs.data.isEmpty)
+    let source = "wire-\(UUID().uuidString.lowercased())"
+    let made = try JSONDecoder().decode(
+        Components.Schemas.KeyResponse.self,
+        from: await send(
+            "POST", "keys",
+            Data(#"{"label":"Wire test","source":"\#(source)","type_permissions":{"core.note":"write"}}"#.utf8),
+            status: 201))
+    typealias Patch = Operations.UpdateKey.Input.Body.JsonPayload
+    let path = "keys/\(made.id)"
+    do {
+        let set = Patch(enforcementOverride: .value(.init(strictMode: .init(types: ["core.note"]))))
+        let applied = try JSONDecoder().decode(
+            Components.Schemas.ApiKey.self, from: await send("PATCH", path, JSONEncoder().encode(set)))
+        #expect(applied.enforcementOverride?.strictMode?.types == ["core.note"])
+        let omitted = try JSONDecoder().decode(
+            Components.Schemas.ApiKey.self,
+            from: await send("PATCH", path, JSONEncoder().encode(Patch(label: "Still set"))))
+        #expect(omitted.enforcementOverride?.strictMode?.types == ["core.note"])
+        let cleared = try JSONDecoder().decode(
+            Components.Schemas.ApiKey.self,
+            from: await send("PATCH", path, JSONEncoder().encode(Patch(enforcementOverride: .null))))
+        #expect(cleared.enforcementOverride == nil)
+        _ = try await send("DELETE", path)
+    } catch {
+        _ = try? await send("DELETE", path)
+        throw error
+    }
+}

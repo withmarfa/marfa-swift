@@ -52117,7 +52117,7 @@ public enum Operations {
     }
     /// List the registered connectors
     ///
-    /// Every registration, newest first, each with when it last heartbeated, its last run, and until when a process holds it. Any key.
+    /// The caller's own registration, or every registration for the operator key, newest first, each with when it last heartbeated, its last run, and until when a process holds it.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -53552,6 +53552,8 @@ public enum Operations {
         }
     }
     /// Get one registered connector
+    ///
+    /// The connector's own key or the operator key. Another credential is answered as if the connector did not exist.
     ///
     /// - Remark: HTTP `GET /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
@@ -55838,7 +55840,7 @@ public enum Operations {
     }
     /// List a connector's runs
     ///
-    /// Newest first. Any key.
+    /// Newest first, to the connector's own key or the operator key. Another credential is answered as if the connector did not exist.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
@@ -77057,6 +77059,10 @@ public enum Operations {
                     public var profilePermissions: Operations.UpdateKey.Input.Body.JsonPayload.ProfilePermissionsPayload?
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/permissions`.
                     public var permissions: [Components.Schemas.Permission]?
+                    /// `null` clears the override; an object replaces it whole.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/enforcement_override`.
+                    public var enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride?
                     /// A key's source is immutable: a body carrying this field is refused `400 validation_error`. Revoke the key and mint another to change it.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/source`.
@@ -77073,6 +77079,7 @@ public enum Operations {
                     ///   - metadataPermissions:
                     ///   - profilePermissions:
                     ///   - permissions:
+                    ///   - enforcementOverride: `null` clears the override; an object replaces it whole.
                     ///   - source: A key's source is immutable: a body carrying this field is refused `400 validation_error`. Revoke the key and mint another to change it.
                     public init(
                         label: Swift.String? = nil,
@@ -77084,6 +77091,7 @@ public enum Operations {
                         metadataPermissions: Operations.UpdateKey.Input.Body.JsonPayload.MetadataPermissionsPayload? = nil,
                         profilePermissions: Operations.UpdateKey.Input.Body.JsonPayload.ProfilePermissionsPayload? = nil,
                         permissions: [Components.Schemas.Permission]? = nil,
+                        enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride? = nil,
                         source: Swift.String? = nil
                     ) {
                         self.label = label
@@ -77095,6 +77103,7 @@ public enum Operations {
                         self.metadataPermissions = metadataPermissions
                         self.profilePermissions = profilePermissions
                         self.permissions = permissions
+                        self.enforcementOverride = enforcementOverride
                         self.source = source
                     }
                     public enum CodingKeys: String, CodingKey {
@@ -77107,6 +77116,7 @@ public enum Operations {
                         case metadataPermissions = "metadata_permissions"
                         case profilePermissions = "profile_permissions"
                         case permissions
+                        case enforcementOverride = "enforcement_override"
                         case source
                     }
                     public init(from decoder: any Swift.Decoder) throws {
@@ -77147,6 +77157,10 @@ public enum Operations {
                             [Components.Schemas.Permission].self,
                             forKey: .permissions
                         )
+                        self.enforcementOverride = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableEnforcementOverride.self,
+                            forKey: .enforcementOverride
+                        )
                         self.source = try container.decodeIfPresent(
                             Swift.String.self,
                             forKey: .source
@@ -77161,6 +77175,7 @@ public enum Operations {
                             "metadata_permissions",
                             "profile_permissions",
                             "permissions",
+                            "enforcement_override",
                             "source"
                         ])
                     }

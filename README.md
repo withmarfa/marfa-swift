@@ -17,7 +17,7 @@ and depend on the `Marfa` product, plus `MarfaTypes` for the wire types. Each re
 Working on the package itself builds the core from source:
 
 ```sh
-scripts/core.sh   # builds the core at core.pin and copies it in; needs the Rust toolchain
+scripts/core.sh   # builds the core at core.pin and copies it in; needs the Rust toolchain and Node.js 22 or later
 swift build
 swift test        # live tests run when MARFA_API_URL and MARFA_API_KEY name a server
 ```
@@ -57,7 +57,9 @@ The package is not built for library evolution, so its enums are exhaustive: swi
 
 `copy.catalog` reads the instance's item types, with the fields each inherits, and its edge types, with their reverse names, custom ones included. It answers from the copy alone, so it works offline. The first hydration brings the catalog; before it, every read throws `noCatalog` rather than answering no types. `Status.catalogVersion` moves whenever a hydration, a catch-up or a held stream changes the catalog, and a held `changes()` stream is told `.refreshed(.catalog)`, or `.refreshed(.hydrated)` for a hydration.
 
-`MarfaTypes`, a second product, holds the server's wire types, generated from the pinned `openapi.json`, for reading answers the working copy does not hold.
+`MarfaTypes`, a second product, holds the server's wire types, generated from the pinned `openapi.json`, for reading answers the working copy does not hold. Generation fails on any diagnostic instead of silently dropping an unsupported schema. Nullable reference unions use `MarfaNullable.null` for an explicit JSON null; an absent optional omits the field. For example, `Operations.UpdateKey.Input.Body.JsonPayload(enforcementOverride: .null)` clears an override, while leaving `enforcementOverride` unset makes no change.
+
+A blocked verdict can carry the structured refusal and missing grant. Drain reports preserve the core’s retry delay, including when an intermediary answers without the server’s contract header.
 
 ## Keys
 

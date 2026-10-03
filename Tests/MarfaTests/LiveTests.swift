@@ -330,7 +330,13 @@ struct LiveServer {
         func verdict(_ write: QueuedWrite) async throws -> Verdict? {
             try await unkeyed.queue.all().first { $0.id == write.id }?.verdict
         }
-        #expect(try await verdict(first) == .blocked(reason: .credentialRefused))
+        guard case .blocked(let reason, let refusal) = try await verdict(first) else {
+            Issue.record("the refused credential did not block its write")
+            return
+        }
+        #expect(reason == .credentialRefused)
+        #expect(refusal?.code == "unauthorized")
+        #expect(refusal?.message == "Authentication required")
         #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
         #expect(try await unkeyed.queue.release(first.id))
         #expect(try await verdict(first) == nil)

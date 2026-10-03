@@ -6863,8 +6863,12 @@ extension Components {
             public var lastStartedAt: Swift.String?
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_finished_at`.
             public var lastFinishedAt: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_outcome`.
+            public var lastOutcome: Components.Schemas.MarfaNullableHousekeepingOutcome
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_error`.
             public var lastError: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_result`.
+            public var lastResult: Components.Schemas.MarfaNullableHousekeepingReport
             /// Creates a new `HousekeepingJob`.
             ///
             /// - Parameters:
@@ -6874,7 +6878,9 @@ extension Components {
             ///   - runningSince:
             ///   - lastStartedAt:
             ///   - lastFinishedAt:
+            ///   - lastOutcome:
             ///   - lastError:
+            ///   - lastResult:
             public init(
                 name: Swift.String,
                 intervalMs: Swift.Int,
@@ -6882,7 +6888,9 @@ extension Components {
                 runningSince: Swift.String? = nil,
                 lastStartedAt: Swift.String? = nil,
                 lastFinishedAt: Swift.String? = nil,
-                lastError: Swift.String? = nil
+                lastOutcome: Components.Schemas.MarfaNullableHousekeepingOutcome,
+                lastError: Swift.String? = nil,
+                lastResult: Components.Schemas.MarfaNullableHousekeepingReport
             ) {
                 self.name = name
                 self.intervalMs = intervalMs
@@ -6890,7 +6898,9 @@ extension Components {
                 self.runningSince = runningSince
                 self.lastStartedAt = lastStartedAt
                 self.lastFinishedAt = lastFinishedAt
+                self.lastOutcome = lastOutcome
                 self.lastError = lastError
+                self.lastResult = lastResult
             }
             public enum CodingKeys: String, CodingKey {
                 case name
@@ -6899,7 +6909,9 @@ extension Components {
                 case runningSince = "running_since"
                 case lastStartedAt = "last_started_at"
                 case lastFinishedAt = "last_finished_at"
+                case lastOutcome = "last_outcome"
                 case lastError = "last_error"
+                case lastResult = "last_result"
             }
         }
         /// - Remark: Generated from `#/components/schemas/HousekeepingOutcome`.
@@ -6919,6 +6931,8 @@ extension Components {
             public var finishedAt: Swift.String
             /// - Remark: Generated from `#/components/schemas/HousekeepingRun/outcome`.
             public var outcome: Components.Schemas.HousekeepingOutcome
+            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/result`.
+            public var result: Components.Schemas.MarfaNullableHousekeepingReport
             /// - Remark: Generated from `#/components/schemas/HousekeepingRun/error`.
             public var error: Swift.String?
             /// Creates a new `HousekeepingRun`.
@@ -6928,18 +6942,21 @@ extension Components {
             ///   - startedAt:
             ///   - finishedAt:
             ///   - outcome:
+            ///   - result:
             ///   - error:
             public init(
                 name: Swift.String,
                 startedAt: Swift.String,
                 finishedAt: Swift.String,
                 outcome: Components.Schemas.HousekeepingOutcome,
+                result: Components.Schemas.MarfaNullableHousekeepingReport,
                 error: Swift.String? = nil
             ) {
                 self.name = name
                 self.startedAt = startedAt
                 self.finishedAt = finishedAt
                 self.outcome = outcome
+                self.result = result
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -6947,6 +6964,7 @@ extension Components {
                 case startedAt = "started_at"
                 case finishedAt = "finished_at"
                 case outcome
+                case result
                 case error
             }
         }
@@ -7100,6 +7118,8 @@ extension Components {
             public var updatedAt: Swift.String
             /// - Remark: Generated from `#/components/schemas/Connector/last_heartbeat_at`.
             public var lastHeartbeatAt: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/Connector/last_run`.
+            public var lastRun: Components.Schemas.MarfaNullableConnectorRun
             /// When the hold a process took at `POST /connectors/{id}/hold` lapses; `null` when no process holds the registration or its hold has lapsed.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/hold_expires_at`.
@@ -7115,6 +7135,7 @@ extension Components {
             ///   - registeredAt:
             ///   - updatedAt:
             ///   - lastHeartbeatAt:
+            ///   - lastRun:
             ///   - holdExpiresAt: When the hold a process took at `POST /connectors/{id}/hold` lapses; `null` when no process holds the registration or its hold has lapsed.
             public init(
                 id: Swift.String,
@@ -7125,6 +7146,7 @@ extension Components {
                 registeredAt: Swift.String,
                 updatedAt: Swift.String,
                 lastHeartbeatAt: Swift.String? = nil,
+                lastRun: Components.Schemas.MarfaNullableConnectorRun,
                 holdExpiresAt: Swift.String? = nil
             ) {
                 self.id = id
@@ -7135,6 +7157,7 @@ extension Components {
                 self.registeredAt = registeredAt
                 self.updatedAt = updatedAt
                 self.lastHeartbeatAt = lastHeartbeatAt
+                self.lastRun = lastRun
                 self.holdExpiresAt = holdExpiresAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -7146,6 +7169,7 @@ extension Components {
                 case registeredAt = "registered_at"
                 case updatedAt = "updated_at"
                 case lastHeartbeatAt = "last_heartbeat_at"
+                case lastRun = "last_run"
                 case holdExpiresAt = "hold_expires_at"
             }
         }
@@ -10184,5 +10208,15 @@ extension Components {
                 case error
             }
         }
+        /// - Remark: Generated from `#/components/schemas/MarfaNull`.
+        public typealias MarfaNull = MarfaNullValue
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
+        public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.
+        public typealias MarfaNullableHousekeepingOutcome = MarfaNullable<Components.Schemas.HousekeepingOutcome>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingReport`.
+        public typealias MarfaNullableHousekeepingReport = MarfaNullable<Components.Schemas.HousekeepingReport>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorRun`.
+        public typealias MarfaNullableConnectorRun = MarfaNullable<Components.Schemas.ConnectorRun>
     }
 }

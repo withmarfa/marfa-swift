@@ -437,7 +437,7 @@ public protocol APIProtocol: Sendable {
     func runHousekeeping(_ input: Operations.RunHousekeeping.Input) async throws -> Operations.RunHousekeeping.Output
     /// List the registered connectors
     ///
-    /// Every registration, newest first, each with when it last heartbeated, its last run, and until when a process holds it. Any key.
+    /// The caller's own registration, or every registration for the operator key, newest first, each with when it last heartbeated, its last run, and until when a process holds it.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -450,6 +450,8 @@ public protocol APIProtocol: Sendable {
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
     func registerConnector(_ input: Operations.RegisterConnector.Input) async throws -> Operations.RegisterConnector.Output
     /// Get one registered connector
+    ///
+    /// The connector's own key or the operator key. Another credential is answered as if the connector did not exist.
     ///
     /// - Remark: HTTP `GET /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
@@ -470,7 +472,7 @@ public protocol APIProtocol: Sendable {
     func heartbeatConnector(_ input: Operations.HeartbeatConnector.Input) async throws -> Operations.HeartbeatConnector.Output
     /// List a connector's runs
     ///
-    /// Newest first. Any key.
+    /// Newest first, to the connector's own key or the operator key. Another credential is answered as if the connector did not exist.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
@@ -1648,7 +1650,7 @@ extension APIProtocol {
     }
     /// List the registered connectors
     ///
-    /// Every registration, newest first, each with when it last heartbeated, its last run, and until when a process holds it. Any key.
+    /// The caller's own registration, or every registration for the operator key, newest first, each with when it last heartbeated, its last run, and until when a process holds it.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -1671,6 +1673,8 @@ extension APIProtocol {
         ))
     }
     /// Get one registered connector
+    ///
+    /// The connector's own key or the operator key. Another credential is answered as if the connector did not exist.
     ///
     /// - Remark: HTTP `GET /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
@@ -1715,7 +1719,7 @@ extension APIProtocol {
     }
     /// List a connector's runs
     ///
-    /// Newest first. Any key.
+    /// Newest first, to the connector's own key or the operator key. Another credential is answered as if the connector did not exist.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.

@@ -102,7 +102,7 @@ jobs:
       - name: Lint
         run: |
           swift format lint --strict --configuration .swift-format -r \
-            Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources
+            Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
 
       # Emptied first, so a committed file the pin does not generate shows as
       # deleted whatever comes next.
@@ -143,18 +143,6 @@ jobs:
         with:
           path: ${{ github.workspace }}/.build/generator-build
           key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
-      - name: Build the core at the pin
-        if: ${{ steps.core.outputs.cache-hit != 'true' }}
-        run: scripts/core.sh
-
-      - name: Check what the pin generates
-        run: |
-          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
-            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
-            echo "::error::The glue or the wire types are not what the pinned commit generates. Run scripts/core.sh and commit them."
-            exit 1
-          fi
-
       - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm
@@ -164,6 +152,24 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: .build/marfa/pnpm-lock.yaml
+      - name: Build the core at the pin
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        run: scripts/core.sh
+
+      - name: Test wire generation
+        run: |
+          if [[ -x "${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator" ]]; then
+            export MARFA_GENERATOR_BIN="${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator"
+          fi
+          node --test generator/generate.test.mjs
+
+      - name: Check what the pin generates
+        run: |
+          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
+            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
+            echo "::error::The glue or the wire types are not what the pinned commit generates. Run scripts/core.sh and commit them."
+            exit 1
+          fi
 
       # server-up.sh runs the server through tsx, which resolves
       # @withmarfa/shared through its dist.

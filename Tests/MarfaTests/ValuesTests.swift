@@ -200,6 +200,7 @@ struct OwnValueTypes {
             [
                 .accepted, .merged(fields: ["a"]), .conflicted(siblingId: "s", fields: ["a", "b"]),
                 .refused(Refusal(reason: "r")), .refused(Self.refusal), .dead,
+                .blocked(reason: .credentialRefused, refusal: Self.refusal),
             ] + BlockedReason.allCases.map { .blocked(reason: $0) }
         for verdict in verdicts { #expect(Verdict(verdict.core) == verdict) }
     }
