@@ -6,6 +6,33 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct Values {
+    @Test func filtersCarryEveryFieldTheCoreDeclares() {
+        func fields(_ value: Any) -> Set<String> {
+            Set(Mirror(reflecting: value).children.compactMap(\.label))
+        }
+        #expect(fields(ListFilters()) == fields(CoreListFilters()))
+        #expect(fields(SearchFilters()) == fields(CoreSearchFilters()))
+        #expect(fields(DrainReport()) == fields(DrainReport().core))
+        #expect(fields(Status()) == fields(Status().core))
+    }
+
+    @Test func filterValuesCrossToTheCore() {
+        let list = ListFilters(
+            type: "core.note", state: .archived, allStates: true, tier: .feed, tags: ["x"],
+            occurredAfter: "a", occurredBefore: "b", filter: "title=x", beneath: "root", limit: 7, offset: 2)
+        #expect(
+            list.core
+                == CoreListFilters(
+                    type: "core.note", state: .archived, allStates: true, tier: .feed, tags: ["x"],
+                    occurredAfter: "a", occurredBefore: "b", filter: "title=x", beneath: "root", limit: 7, offset: 2))
+        let search = SearchFilters(
+            type: "core.note", state: .trashed, allStates: true, tags: ["x"], filter: "title=x", beneath: "r")
+        #expect(
+            search.core
+                == CoreSearchFilters(
+                    state: .trashed, allStates: true, type: "core.note", tags: ["x"], filter: "title=x", beneath: "r"))
+    }
+
     @Test func jsonRoundTripsThroughTheTextTheCoreTakes() throws {
         let properties: [String: JSONValue] = [
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
@@ -68,6 +95,7 @@ struct Errors {
         ),
         (.Server(status: 503, code: "c", message: "m"), .server(status: 503, code: "c", message: "m")),
         (.Network(message: "m"), .network(message: "m")),
+        (.Unnamed(status: 429, message: "m"), .unnamed(status: 429, message: "m")),
         (.Decoding(message: "m"), .decoding(message: "m")),
         (.Store(message: "m"), .store(message: "m")),
         (.NoServer(message: "m"), .noServer(message: "m")),
@@ -75,11 +103,11 @@ struct Errors {
         (.HydrationIncomplete(message: "m"), .hydrationIncomplete(message: "m")),
         (.NoCatalog(message: "m"), .noCatalog(message: "m")),
         (
-            .WrongSchema(expected: "8", found: "7", path: "p", message: "m"),
-            .wrongSchema(expected: "8", found: "7", path: "p", message: "m")
+            .WrongSchema(path: "p", reason: "shape", unsent: 2, message: "m"),
+            .wrongSchema(path: "p", reason: "shape", unsent: 2, message: "m")
         ),
         (.ReadingHandle(message: "m"), .readingHandle(message: "m")),
-        (.CatchUpTooOld(minRetainedId: "5", message: "m"), .catchUpTooOld(minRetainedId: "5", message: "m")),
+        (.CopyExpired(reason: "aged_out", message: "m"), .copyExpired(reason: "aged_out", message: "m")),
         (.StreamIncomplete(reason: "r", message: "m"), .streamIncomplete(reason: "r", message: "m")),
         (.WrongServer(expected: "a", got: "b", message: "m"), .wrongServer(expected: "a", got: "b", message: "m")),
         (.BytesAbsent(hash: "h", reason: "r", message: "m"), .bytesAbsent(hash: "h", reason: "r", message: "m")),
@@ -199,7 +227,7 @@ struct OwnValueTypes {
         let waiting = QueuedWrite(id: "w", kind: .updateItem, idempotencyKey: "k", waiting: true, queuedAt: "t0")
         #expect(try QueuedWrite(waiting.core()) == waiting)
         let report = DrainReport(
-            sent: 1, held: 2,
+            answered: 1, held: 2, undelivered: 3, unsent: 4, unmade: 5, unavailable: "network",
             verdicts: [
                 DrainVerdict(
                     id: "q", kind: .addTag, itemId: "i", edgeId: "e", verdict: .dead, refusals: 1, replayed: true)
@@ -213,7 +241,7 @@ struct OwnValueTypes {
         #expect(CatchUpReport(caught.core) == caught)
         let status = Status(
             serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],
-            eventCursor: "c", hydration: .inProgress, items: 1, edges: 2, catalogVersion: 5)
+            eventCursor: "c", hydration: .inProgress, items: 1, edges: 2, catalogVersion: 5, instanceId: "instance")
         #expect(Status(status.core) == status)
         let unheld = Status(hydration: .never)
         #expect(Status(unheld.core).catalogVersion == nil)

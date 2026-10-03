@@ -510,26 +510,35 @@ public struct DrainVerdict: Sendable, Hashable {
 }
 
 public struct DrainReport: Sendable, Hashable {
-    public var sent: UInt64
+    /// Writes whose requests the server answered, whatever the answer was.
+    public var answered: UInt64
     public var held: UInt64
-    /// Each write the drain answered, with the item or edge it wrote; a
-    /// held `changes()` stream is told each one with a verdict as
-    /// `.answered`.
+    /// Writes that could not reach the server, still waiting and uncounted.
+    public var undelivered: UInt64
+    /// Writes settled without sending a request.
+    public var unsent: UInt64
+    /// Requests that could not be made, counted against their queued write.
+    public var unmade: UInt64
+    /// Why the drain ended before the queue was through.
+    public var unavailable: String?
+    /// Writes attempted or settled; unanswered entries have no verdict.
     public var verdicts: [DrainVerdict]
-    /// Why the drain stopped before the queue was empty, where it did.
+    /// The credential refusal that parked the queue, where one did.
     public var stopped: String?
-    /// The sources the server said this credential's key does not claim,
-    /// where a create naming one was refused for it: every create naming
-    /// one is blocked `credential_refused` until the key claims it.
     public var unclaimedSources: [String]
     public var retryAfterSeconds: UInt64?
 
     public init(
-        sent: UInt64 = 0, held: UInt64 = 0, verdicts: [DrainVerdict] = [], stopped: String? = nil,
+        answered: UInt64 = 0, held: UInt64 = 0, undelivered: UInt64 = 0, unsent: UInt64 = 0,
+        unmade: UInt64 = 0, unavailable: String? = nil, verdicts: [DrainVerdict] = [], stopped: String? = nil,
         unclaimedSources: [String] = [], retryAfterSeconds: UInt64? = nil
     ) {
-        self.sent = sent
+        self.answered = answered
         self.held = held
+        self.undelivered = undelivered
+        self.unsent = unsent
+        self.unmade = unmade
+        self.unavailable = unavailable
         self.verdicts = verdicts
         self.stopped = stopped
         self.unclaimedSources = unclaimedSources
@@ -538,14 +547,16 @@ public struct DrainReport: Sendable, Hashable {
 
     init(_ core: CoreDrainReport) {
         self.init(
-            sent: core.sent, held: core.held, verdicts: core.verdicts.map(DrainVerdict.init),
+            answered: core.answered, held: core.held, undelivered: core.undelivered, unsent: core.unsent,
+            unmade: core.unmade, unavailable: core.unavailable, verdicts: core.verdicts.map(DrainVerdict.init),
             stopped: core.stopped, unclaimedSources: core.unclaimedSources,
             retryAfterSeconds: core.retryAfterSeconds)
     }
 
     var core: CoreDrainReport {
         CoreDrainReport(
-            sent: sent, held: held, verdicts: verdicts.map(\.core), stopped: stopped,
+            answered: answered, held: held, undelivered: undelivered, unsent: unsent, unmade: unmade,
+            unavailable: unavailable, verdicts: verdicts.map(\.core), stopped: stopped,
             unclaimedSources: unclaimedSources, retryAfterSeconds: retryAfterSeconds)
     }
 }
@@ -585,6 +596,20 @@ public struct HydrateReport: Sendable, Hashable {
     }
 }
 
+public struct PinReport: Sendable, Hashable {
+    public var pinned: Bool
+    public var wasPinned: Bool
+
+    public init(pinned: Bool, wasPinned: Bool) {
+        self.pinned = pinned
+        self.wasPinned = wasPinned
+    }
+
+    init(_ core: CorePinReport) {
+        self.init(pinned: core.pinned, wasPinned: core.wasPinned)
+    }
+}
+
 public struct CatchUpReport: Sendable, Hashable {
     public var applied: UInt64
     public var skipped: UInt64
@@ -610,6 +635,7 @@ public struct CatchUpReport: Sendable, Hashable {
 
 public struct Status: Sendable, Hashable {
     public var serverOrigin: String?
+    public var instanceId: String?
     public var sliceTypes: [String]
     public var sliceTier: Tier?
     public var sliceEdgeTypes: [String]
@@ -625,9 +651,11 @@ public struct Status: Sendable, Hashable {
     public init(
         serverOrigin: String? = nil, sliceTypes: [String] = [], sliceTier: Tier? = nil,
         sliceEdgeTypes: [String] = [], pinned: [String] = [], eventCursor: String? = nil,
-        hydration: Hydration = .never, items: UInt64 = 0, edges: UInt64 = 0, catalogVersion: UInt64? = nil
+        hydration: Hydration = .never, items: UInt64 = 0, edges: UInt64 = 0, catalogVersion: UInt64? = nil,
+        instanceId: String? = nil
     ) {
         self.serverOrigin = serverOrigin
+        self.instanceId = instanceId
         self.sliceTypes = sliceTypes
         self.sliceTier = sliceTier
         self.sliceEdgeTypes = sliceEdgeTypes
@@ -644,12 +672,12 @@ public struct Status: Sendable, Hashable {
             serverOrigin: core.serverOrigin, sliceTypes: core.sliceTypes, sliceTier: core.sliceTier.map(Tier.init),
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
             hydration: Hydration(core.hydration), items: core.items, edges: core.edges,
-            catalogVersion: core.catalogVersion)
+            catalogVersion: core.catalogVersion, instanceId: core.instanceId)
     }
 
     var core: CoreStatus {
         CoreStatus(
-            serverOrigin: serverOrigin, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
+            serverOrigin: serverOrigin, instanceId: instanceId, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
             sliceEdgeTypes: sliceEdgeTypes, pinned: pinned, eventCursor: eventCursor, hydration: hydration.core,
             items: items, edges: edges, catalogVersion: catalogVersion)
     }

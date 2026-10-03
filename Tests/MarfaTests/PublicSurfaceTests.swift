@@ -55,7 +55,7 @@ import Testing
         #expect(exhaustive(.dead, .refreshed(.catalog), .noCatalog(message: "m")) == 3)
 
         let report = DrainReport(
-            sent: 1, verdicts: [DrainVerdict(id: "q", kind: .createItem, verdict: .merged(fields: ["body"]))])
+            answered: 1, verdicts: [DrainVerdict(id: "q", kind: .createItem, verdict: .merged(fields: ["body"]))])
         #expect(report.verdicts.count == 1)
         #expect(Sort(field: .createdAt, direction: .descending).direction == .descending)
         #expect(Status(sliceTier: .feed, hydration: .complete).hydration == .complete)
@@ -66,6 +66,7 @@ import Testing
         let hydrated = HydrateReport(
             types: ["core.note"], tier: .library, edgeTypes: [], items: 1, edges: 0, pages: 1, cursor: "1")
         #expect(hydrated.tier == .library)
+        #expect(PinReport(pinned: true, wasPinned: false).pinned)
         #expect(ListFilters(state: .archived, tier: .feed).state == .archived)
         #expect(SearchFilters(state: .trashed).state == .trashed)
         #expect(Draft(type: "core.note", tier: .library).tier == .library)
@@ -93,8 +94,9 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
     let errorRead: Bool =
         switch error {
         case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network,
-            .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle,
-            .catchUpTooOld, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid, .closed:
+            .unnamed, .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema,
+            .readingHandle,
+            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid, .closed:
             true
         }
     return [verdictRead, originRead, errorRead].filter { $0 }.count

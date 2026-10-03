@@ -13,6 +13,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?)
     case server(status: UInt16, code: String, message: String)
     case network(message: String)
+    /// A response from something in front of the server, without its contract.
+    case unnamed(status: UInt16, message: String)
     case decoding(message: String)
     case store(message: String)
     case noServer(message: String)
@@ -21,10 +23,12 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The copy has never held the server's type catalog; a hydration reads
     /// it.
     case noCatalog(message: String)
-    /// The store at `path` was made by another build; discard it and hydrate.
-    case wrongSchema(expected: String, found: String, path: String, message: String)
+    /// The store at `path` has a shape this build cannot read. `unsent`
+    /// names the writes another build can still send, where the queue is readable.
+    case wrongSchema(path: String, reason: String, unsent: UInt64?, message: String)
     case readingHandle(message: String)
-    case catchUpTooOld(minRetainedId: String, message: String)
+    /// Hydration is needed to make the copy current; its queue is kept.
+    case copyExpired(reason: String, message: String)
     case streamIncomplete(reason: String, message: String)
     case wrongServer(expected: String, got: String, message: String)
     /// The item is whole and its bytes are not here, nor can they be fetched.
@@ -45,9 +49,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         switch self {
         case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
             .validation(_, let message), .unknownType(let message), .rateLimited(_, let message, _),
-            .server(_, _, let message), .network(let message), .decoding(let message), .store(let message),
+            .server(_, _, let message), .network(let message), .unnamed(_, let message), .decoding(let message),
+            .store(let message),
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
-            .wrongSchema(_, _, _, let message), .readingHandle(let message), .catchUpTooOld(_, let message),
+            .wrongSchema(_, _, _, let message), .readingHandle(let message), .copyExpired(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .contractMismatch(_, _, _, _, let message), .invalid(let message), .closed(let message):
             message
@@ -67,17 +72,18 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
         case .Server(let status, let code, let message): self = .server(status: status, code: code, message: message)
         case .Network(let message): self = .network(message: message)
+        case .Unnamed(let status, let message): self = .unnamed(status: status, message: message)
         case .Decoding(let message): self = .decoding(message: message)
         case .Store(let message): self = .store(message: message)
         case .NoServer(let message): self = .noServer(message: message)
         case .NoCursor(let message): self = .noCursor(message: message)
         case .HydrationIncomplete(let message): self = .hydrationIncomplete(message: message)
         case .NoCatalog(let message): self = .noCatalog(message: message)
-        case .WrongSchema(let expected, let found, let path, let message):
-            self = .wrongSchema(expected: expected, found: found, path: path, message: message)
+        case .WrongSchema(let path, let reason, let unsent, let message):
+            self = .wrongSchema(path: path, reason: reason, unsent: unsent, message: message)
         case .ReadingHandle(let message): self = .readingHandle(message: message)
-        case .CatchUpTooOld(let minRetainedId, let message):
-            self = .catchUpTooOld(minRetainedId: minRetainedId, message: message)
+        case .CopyExpired(let reason, let message):
+            self = .copyExpired(reason: reason, message: message)
         case .StreamIncomplete(let reason, let message): self = .streamIncomplete(reason: reason, message: message)
         case .WrongServer(let expected, let got, let message):
             self = .wrongServer(expected: expected, got: got, message: message)
@@ -263,13 +269,17 @@ public struct ListFilters: Sendable, Hashable {
     public var tags: [String]
     public var occurredAfter: String?
     public var occurredBefore: String?
+    /// The server's listing grammar; back-reference conditions are not local.
+    public var filter: String?
+    /// This item and its held descendants through `parent-of` edges.
+    public var beneath: String?
     public var limit: UInt32?
     public var offset: UInt32?
 
     public init(
         type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil,
         tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil,
-        limit: UInt32? = nil, offset: UInt32? = nil
+        filter: String? = nil, beneath: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil
     ) {
         self.type = type
         self.state = state
@@ -278,6 +288,8 @@ public struct ListFilters: Sendable, Hashable {
         self.tags = tags
         self.occurredAfter = occurredAfter
         self.occurredBefore = occurredBefore
+        self.filter = filter
+        self.beneath = beneath
         self.limit = limit
         self.offset = offset
     }
@@ -285,7 +297,8 @@ public struct ListFilters: Sendable, Hashable {
     var core: CoreListFilters {
         CoreListFilters(
             type: type, state: state?.core, allStates: allStates, tier: tier?.core, tags: tags,
-            occurredAfter: occurredAfter, occurredBefore: occurredBefore, limit: limit, offset: offset)
+            occurredAfter: occurredAfter, occurredBefore: occurredBefore, filter: filter, beneath: beneath,
+            limit: limit, offset: offset)
     }
 }
 
@@ -296,15 +309,23 @@ public struct SearchFilters: Sendable, Hashable {
     public var state: ItemState?
     public var allStates: Bool
     public var tags: [String]
+    public var filter: String?
+    public var beneath: String?
 
-    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tags: [String] = []) {
+    public init(
+        type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tags: [String] = [],
+        filter: String? = nil, beneath: String? = nil
+    ) {
         self.type = type
         self.state = state
         self.allStates = allStates
         self.tags = tags
+        self.filter = filter
+        self.beneath = beneath
     }
 
     var core: CoreSearchFilters {
-        CoreSearchFilters(state: state?.core, allStates: allStates, type: type, tags: tags)
+        CoreSearchFilters(
+            state: state?.core, allStates: allStates, type: type, tags: tags, filter: filter, beneath: beneath)
     }
 }

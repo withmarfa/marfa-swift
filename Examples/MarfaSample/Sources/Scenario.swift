@@ -68,8 +68,8 @@ enum Scenario {
                 expect(queued.count == 10, "queued \(queued.count) writes, not 10")
                 let offline = try await copy.queue.drain()
                 let answered = offline.verdicts.filter { $0.verdict != nil }.count
-                print("drain with the server away: sent \(offline.sent), answered \(answered)")
-                expect(offline.sent > 0, "a drain with the server away tried nothing")
+                print("drain with the server away: undelivered \(offline.undelivered), answered \(answered)")
+                expect(offline.undelivered > 0 && offline.unavailable != nil, "the drain did not report the outage")
                 expect(answered == 0, "a drain with the server away answered a write")
                 let after = try await copy.queue.all()
                 let waiting = after.filter(\.waiting).count
