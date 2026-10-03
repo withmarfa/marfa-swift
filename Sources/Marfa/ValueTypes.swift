@@ -521,7 +521,7 @@ public struct DrainReport: Sendable, Hashable {
     public var unmade: UInt64
     /// Why the drain ended before the queue was through.
     public var unavailable: String?
-    /// Each settled write; a held change stream is told every verdict.
+    /// Writes attempted or settled; unanswered entries have no verdict.
     public var verdicts: [DrainVerdict]
     /// The credential refusal that parked the queue, where one did.
     public var stopped: String?

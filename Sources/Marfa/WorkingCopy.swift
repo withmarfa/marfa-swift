@@ -90,8 +90,6 @@ public final class WorkingCopy: Sendable {
 
     /// Reads and holds an item whatever the slice says of it.
     public func pin(_ id: String) async throws -> PinReport {
-        await feed.pause()
-        defer { feed.unpause() }
         let report = PinReport(try await holder.run { core in try core.pin(id: id) })
         feed.announce(Change(origin: .refreshed(.pinned), itemId: id, edgeId: nil))
         return report
@@ -99,8 +97,6 @@ public final class WorkingCopy: Sendable {
 
     /// Lets an item outside the slice go unless queued writes still need it.
     public func unpin(_ id: String) async throws -> PinReport {
-        await feed.pause()
-        defer { feed.unpause() }
         let report = PinReport(try await holder.run { core in try core.unpin(id: id) })
         feed.announce(Change(origin: .refreshed(.unpinned), itemId: id, edgeId: nil))
         return report

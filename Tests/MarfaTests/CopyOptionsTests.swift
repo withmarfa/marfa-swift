@@ -5,6 +5,18 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct CopyOptions {
+    @Test func pinChangesDoNotRestartAFollowStoppedByItsCredential() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let heard = Heard(copy.changes())
+        core.fail(0, with: .Unauthorized(code: "invalid_key", message: "refused"))
+        try await eventually("the credential stopped the follow") { heard.stops.count == 1 }
+        _ = try await copy.pin("outside")
+        _ = try await copy.unpin("outside")
+        #expect(core.follows.count == 1)
+        await copy.close()
+    }
+
     @Test func hydrationCarriesEdgeTypesAndReportsThem() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)

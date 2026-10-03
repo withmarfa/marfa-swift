@@ -51,7 +51,7 @@ Hydration normally holds the edges going out from items in its slice. To hold an
 
 `ListFilters` and `SearchFilters` carry `filter`, an expression in the server's listing grammar, and `beneath`, the root of a held `parent-of` subtree. A local filter cannot use a back-reference condition. These options narrow what the copy already holds.
 
-`Status.instanceId` names the instance the copy was hydrated from. `copyExpired(reason:message:)` means hydration is needed while the queue is kept; a streamed `copy.expired` change carries the same cause in `Change.reason`. A store whose shape this build cannot read throws `wrongSchema(path:reason:unsent:message:)`, including the count of pending writes where its queue is readable. An answer without the server's contract throws `unnamed(status:message:)` when read directly; a drain reports such a gateway answer as unavailable and keeps its writes.
+`Status.instanceId` names the instance the copy was hydrated from. `copyExpired(reason:message:)` means hydration is needed while the queue is kept; a streamed `copy.expired` change carries the same cause in `Change.reason`. A store whose shape this build cannot read throws `wrongSchema(path:reason:unsent:message:)`, including the count of pending writes where its queue is readable. A refusal without the server's contract throws `unnamed(status:message:)` when read directly; a drain reports such a gateway refusal as unavailable and keeps its writes. A success missing the contract is refused as `contractMismatch`.
 
 The package is not built for library evolution, so its enums are exhaustive: switch over them without `@unknown default`. A case added in a later version stops the app's build at each switch that has to handle it, which is intended.
 
