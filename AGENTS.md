@@ -11,13 +11,20 @@ The Swift package `Marfa`: Swift types, `async` calls, change streams and errors
 - `Examples/MarfaSample` is the sample app. `xcodegen generate` makes its project, which is gitignored.
 - `.github/workflows/ci.yml`'s `Build + test` is the full check: lint, the core at the pin, both generated sources, the live tests against a booted server, both sample builds, and the sample's scenario offline and back.
 - `ci.yml`'s `Lint workflows` runs actionlint on every workflow and shellcheck on `scripts/` for every pull request and push, whatever it changes.
-- `scripts/ci-changes.sh` decides whether a pull request runs `Build + test`: Markdown anywhere, `LICENSE`, `.claude/` and `.github/` other than `ci.yml` do not, and an unnamed path or a push does. A skipped job passes its required check; `scripts/ci-changes.test.sh` pins the rules and runs first in the job. The core is rebuilt only when `core.pin`, `scripts/core.sh` or `generator/` changes; otherwise the job reuses what that pin generated.
-- `.github/workflows/codeql.yml` analyzes Actions and Swift on every push to `main`, once a week, and on a pull request unless it changes only Markdown, the license or `.claude/`. It is not a required check, so a `paths-ignore` filter starts no run at all for documentation. Its Swift job builds the library targets for one architecture beside the framework `ci.yml` caches for the pin, so a change to that cache's paths or key changes both workflows.
+- A draft pull request runs only the quick checks: `Lint workflows`, and `Build + test` up to its lint, where it then fails. A skipped job passes its required check, so without that failure a draft's results would let the pull request merge in the moment between marking it ready and the first full run. Marking it ready for review, and every push after, runs everything.
+- `scripts/ci-changes.sh` decides whether a pull request runs `Build + test`: Markdown anywhere, `LICENSE`, `.claude/` and `.github/` other than `ci.yml` do not, an unnamed path, a push and a draft do. A skipped job passes its required check; `scripts/ci-changes.test.sh` pins the rules and runs first in the job. The core is rebuilt only when `core.pin`, `scripts/core.sh` or `generator/` changes; otherwise the job reuses what that pin generated.
+- `.github/workflows/codeql.yml` analyzes Actions and Swift on every push to `main`, once a week, and on a pull request that is not a draft unless it changes only Markdown, the license or `.claude/`. It is not a required check, so a `paths-ignore` filter starts no run at all for documentation. Its Swift job builds the library targets for one architecture beside the framework `ci.yml` caches for the pin, so a change to that cache's paths or key changes both workflows.
 
 ## Versions
 
 - A version is a tag on this repository, which is where SwiftPM reads versions from, created only when a release is called for, each the previous plus 0.0.1 whatever the change, as `v0.0.1`, `v0.0.2` and so on. No one writes a version into a file.
 - `.github/workflows/release.yml`, run from `main`, makes a release. With `dry_run`, the default, it builds the core at the pin and an app on the archived framework without Rust. Without it, it also tags the next version on a commit on top of `main` that only points the binary target at the release's archive and checksum, publishes the release from the `release` environment, which only `main` can deploy to, and builds an app on it by URL.
+
+## Writing
+
+- Public prose (README, docs, issues, pull requests) follows the Google developer documentation style guide, in American English, with docs organized by Diátaxis: tutorials, how-to guides, reference and explanation kept apart.
+- Code comments follow the language's own conventions. A comment stays only if it says what the code cannot: a constraint from outside, a non-obvious reason, a trap. Never what the code does, history, a ticket or a person. When in doubt, it goes.
+- Words people read in an app follow the Writing section of Apple's Human Interface Guidelines, with the Apple Style Guide for terms.
 
 ## Working here
 
@@ -27,5 +34,4 @@ The Swift package `Marfa`: Swift types, `async` calls, change streams and errors
 - Workflows use standard GitHub-hosted runners only. Never hold back a push or a check to ration runners.
 - No personal details of any machine or person: no absolute paths, hostnames, account names or credentials.
 - Removed means gone: no shims, aliases or compatibility paths.
-- A comment stays only if it says what the code cannot: a constraint from outside, a non-obvious reason, a trap. Never what the code does, history, a ticket or a person. When in doubt, it goes.
 - Swift 6 language mode, except the generated glue; Swift Testing, not XCTest.

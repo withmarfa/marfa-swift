@@ -1,7 +1,10 @@
 name: CI
 
 on:
+  # A draft runs only the quick checks; marking it ready for review runs the
+  # rest, and so does every push after that.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -15,7 +18,8 @@ permissions:
 jobs:
   # `Build + test` runs only when `scripts/ci-changes.sh` says the pull
   # request can affect it. A skipped job satisfies a required check, where a
-  # workflow filtered out by `paths` would leave it pending.
+  # workflow filtered out by `paths` would leave it pending, so a draft always
+  # runs it, to stop after the lint.
   changes:
     name: Classify changes
     runs-on: ubuntu-latest
@@ -30,6 +34,7 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
+          DRAFT: ${{ github.event.pull_request.draft }}
         run: scripts/ci-changes.sh
 
   # On every change, since `Build + test` skips one only to `.github/`, and
@@ -70,6 +75,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Never a beta beside it.
+      - name: Select Xcode
+        run: |
+          if [[ ! -d /Applications/Xcode.app ]]; then
+            echo "::error::This hosted runner has no /Applications/Xcode.app."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Lint
+        run: |
+          swift format lint --strict --configuration .swift-format -r \
+            Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
+
+      # A skipped job passes its required check, and a draft skips the rest of
+      # this one, so a draft's results would let a pull request merge in the
+      # moment between marking it ready and the first run that runs it. This
+      # job fails for a draft, whatever the diff, until that run replaces it.
+      - name: Stop a draft after the lint
+        if: ${{ github.event.pull_request.draft }}
+        run: |
+          echo "::error::A draft runs only the quick checks. Mark the pull request ready for review to run the build and the tests."
+          exit 1
+
       - name: Test which changes run this job
         run: scripts/ci-changes.test.sh
 
@@ -87,22 +116,8 @@ jobs:
           ref: ${{ steps.pin.outputs.sha }}
           path: .build/marfa
 
-      # Never a beta beside it.
-      - name: Select Xcode
-        run: |
-          if [[ ! -d /Applications/Xcode.app ]]; then
-            echo "::error::This hosted runner has no /Applications/Xcode.app."
-            exit 1
-          fi
-          echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
-
       - name: Install sample project generator
         run: brew install xcodegen
-
-      - name: Lint
-        run: |
-          swift format lint --strict --configuration .swift-format -r \
-            Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
 
       # Emptied first, so a committed file the pin does not generate shows as
       # deleted whatever comes next.
