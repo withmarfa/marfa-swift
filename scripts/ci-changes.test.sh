@@ -49,6 +49,9 @@ runs "an empty change" true
 workflow="${root}/.github/workflows/ci.yml"
 gate="if: \${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false') }}"
 check "Build + test reads the answer" "$(grep -cF "${gate}" "${workflow}")" 1
+draft="\${{ github.event.pull_request.draft }}"
+check "the classifier reads whether the pull request is a draft" "$(grep -cF "DRAFT: ${draft}" "${workflow}")" 1
+check "a draft fails Build + test after the lint" "$(grep -cF "if: ${draft}" "${workflow}")" 1
 check "the classifier runs in CI" "$(grep -cF "run: scripts/ci-changes.sh" "${workflow}")" 1
 
 # As CI runs it, against a repository with a documentation-only commit.
@@ -67,7 +70,7 @@ head="$(git -C "${repo}" rev-parse HEAD)"
 ci() {
   local output="${repo}/output"
   : >"${output}"
-  (cd "${repo}" && GITHUB_EVENT_NAME="$1" BASE="$2" HEAD="$3" GITHUB_OUTPUT="${output}" \
+  (cd "${repo}" && GITHUB_EVENT_NAME="$1" BASE="$2" HEAD="$3" DRAFT="${4:-}" GITHUB_OUTPUT="${output}" \
     "${classifier}" >/dev/null)
   cat "${output}"
 }
@@ -75,5 +78,7 @@ ci() {
 check "a documentation-only pull request skips the job" "$(ci pull_request "${base}" "${head}")" validate=false
 check "an unreadable diff runs it" "$(ci pull_request invalid "${head}")" validate=true
 check "a push runs it" "$(ci push "${base}" "${head}")" validate=true
+check "a documentation-only draft runs it, to fail" "$(ci pull_request "${base}" "${head}" true)" validate=true
+check "a documentation-only pull request that is no draft skips it" "$(ci pull_request "${base}" "${head}" false)" validate=false
 
 exit "${failed}"

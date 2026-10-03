@@ -6,8 +6,10 @@
 #
 # A skipped job satisfies a required check, where a workflow filtered out by
 # `paths` would leave it pending. A push, an empty diff and one that cannot
-# be read all answer true. `scripts/ci-changes.test.sh` pins the
-# rules.
+# be read all answer true, and so does a draft (DRAFT=true): it runs the job
+# only to lint and then fail, so that the skip of everything after does not
+# let it merge before the first full run. `scripts/ci-changes.test.sh` pins
+# the rules.
 set -euo pipefail
 
 # Whether one changed path can affect the job. A path no rule names can.
@@ -53,5 +55,6 @@ if [[ "${GITHUB_EVENT_NAME:-}" == pull_request ]]; then
     echo "Could not classify the change; running the job."
   fi
 fi
+if [[ "${DRAFT:-}" == true ]]; then validate=true; fi
 echo "validate=${validate}"
 echo "validate=${validate}" >>"${GITHUB_OUTPUT:-/dev/null}"
