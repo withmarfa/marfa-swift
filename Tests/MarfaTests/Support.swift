@@ -134,7 +134,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var streamHeld = false
         var caughtUp = CoreCatchUpReport(applied: 0, skipped: 0, cursor: "1", reachedHead: true)
         var drained = CoreDrainReport(
-            sent: 0, held: 0, verdicts: [], stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
+            answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
+            unclaimedSources: [], retryAfterSeconds: nil)
         var dataVersion: Int64 = 0
         var gate: DispatchSemaphore?
         var gated = false
@@ -143,6 +144,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
         var catchUpFails: CoreMarfaError?
+        var hydrationOptions: (types: [String], tier: CoreTier, edgeTypes: [String])?
+        var pins: Set<String> = []
         var probe: DropProbe?
     }
 
@@ -209,9 +212,21 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.follows[index].listener }.changed(change: change)
     }
 
-    override func hydrate(types: [String], tier: CoreTier) throws -> CoreHydrateReport {
+    override func hydrateWith(types: [String], tier: CoreTier, edgeTypes: [String]) throws -> CoreHydrateReport {
         try refreshing()
-        return CoreHydrateReport(types: types, tier: tier, edgeTypes: [], items: 0, edges: 0, pages: 1, cursor: "1")
+        state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
+        return CoreHydrateReport(
+            types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "1")
+    }
+
+    override func pin(id: String) throws -> CorePinReport {
+        let added = state.withLock { $0.pins.insert(id).inserted }
+        return CorePinReport(pinned: true, wasPinned: !added)
+    }
+
+    override func unpin(id: String) throws -> CorePinReport {
+        let removed = state.withLock { $0.pins.remove(id) != nil }
+        return CorePinReport(pinned: false, wasPinned: removed)
     }
 
     override func catchUp() throws -> CoreCatchUpReport {
@@ -225,7 +240,8 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func status() throws -> CoreStatus {
         CoreStatus(
-            serverOrigin: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [], eventCursor: nil,
+            serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
+            eventCursor: nil,
             hydration: .complete, items: 0, edges: 0, catalogVersion: state.withLock { $0.catalogVersion })
     }
 
@@ -340,7 +356,10 @@ struct LocalServer: Sendable {
     }
 
     static func emptyPage(_ method: String, _ path: String) -> Answer {
-        (200, "application/json", #"{"data":[],"next_cursor":null}"#)
+        if path == "/" {
+            return (200, "application/json", #"{"instance_id":"test-instance"}"#)
+        }
+        return (200, "application/json", #"{"data":[],"next_cursor":null}"#)
     }
 
     static func start(

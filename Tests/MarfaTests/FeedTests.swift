@@ -92,7 +92,7 @@ struct Changes {
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
         #expect(core.follows.count == 1)
-        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7"))
+        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7", reason: nil))
         let told = Marfa.Change(origin: .server(event: "item.created", cursor: "7"), itemId: "n1", edgeId: nil)
         try await eventually("both streams were told") { first.all == [told] && second.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -102,7 +102,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, CoreChange(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42"))
+        core.change(0, CoreChange(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42", reason: nil))
         let told = Marfa.Change(origin: .server(event: "edge.created", cursor: "42"), itemId: "a", edgeId: "e1")
         try await eventually("the change was told") { heard.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -112,8 +112,8 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, CoreChange(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9"))
-        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10"))
+        core.change(0, CoreChange(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9", reason: nil))
+        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10", reason: nil))
         let item = Marfa.Change(origin: .server(event: "item.created", cursor: "10"), itemId: "n1", edgeId: nil)
         try await eventually("both changes were told") { heard.all.count == 2 }
         #expect(heard.all == [refreshed(.catalog), item])
@@ -149,8 +149,8 @@ struct Changes {
         try await eventually("a second follow started") { core.follows.count == 2 }
 
         core.endAgain(0, with: .Network(message: "late"))
-        core.change(0, CoreChange(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
-        core.change(1, CoreChange(event: "item.created", itemId: "current", edgeId: nil, cursor: "2"))
+        core.change(0, CoreChange(event: "item.created", itemId: "late", edgeId: nil, cursor: "1", reason: nil))
+        core.change(1, CoreChange(event: "item.created", itemId: "current", edgeId: nil, cursor: "2", reason: nil))
         try await eventually("the running follow's change was told") { !heard.all.isEmpty }
         #expect(heard.all.map(\.itemId) == ["current"])
         heard.stop()
@@ -260,9 +260,9 @@ struct Changes {
         let heard = Heard(copy.changes())
         core.state.withLock {
             $0.catchUpChangesCatalog = true
-            $0.catchUpFails = .CatchUpTooOld(minRetainedId: "5", message: "m")
+            $0.catchUpFails = .CopyExpired(reason: "aged_out", message: "m")
         }
-        await #expect(throws: Marfa.MarfaError.catchUpTooOld(minRetainedId: "5", message: "m")) {
+        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m")) {
             _ = try await bounded("the catch-up") { try await copy.catchUp() }
         }
         try await eventually("the catalog change was told") { heard.all == [refreshed(.catalog)] }

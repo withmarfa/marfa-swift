@@ -872,7 +872,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/items/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -880,7 +880,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -3256,7 +3256,7 @@ public enum Operations {
     ///
     /// Returns a single item with its metadata layer and outbound edges hydrated inline, the metadata carrying the extension namespaces the caller may read. A row that is not stored answers 404, and so does a row whose type the credential's type map does not reach, with the same code and message, so the answer says nothing of whether the row exists or what type it is. A credential whose map reaches no type at all is refused `403 type_not_permitted`, whatever the id names.
     ///
-    /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the item's version snapshots, oldest first. Tokens are comma-separated and compose.
+    /// `?include=` widens the response with the item's 1-hop neighborhood in one round trip instead of a per-section fan-out: `backrefs` adds inbound edges grouped by type (same block shape as `edges`, capped + cursored per type); `neighbors` adds the far-end items of the item's edges (outbound targets, plus inbound sources when `backrefs` is also requested), each with its metadata and filtered to what the caller may read; `versions` adds the first page of the item's version snapshots the caller may read, oldest first, which `GET /items/{id}/versions` continues from its `next_cursor`. Tokens are comma-separated and compose.
     ///
     /// Every edge carried on a response is held to the two permissions `GET /edges/{id}` asks for: read on the source item's type, and read on the edge type. A block whose edges all fail is left out rather than returned empty, so a response can carry fewer kinds of relationship than the item has.
     ///
@@ -4159,7 +4159,7 @@ public enum Operations {
             public var query: Operations.UpdateItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -4167,7 +4167,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -4854,12 +4854,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/403/content/application\/json`.
-                    case json(Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal)
+                    case json(Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal {
+                    public var json: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -4883,7 +4883,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `type_not_permitted` when the credential may read the item's type and does not hold write on it, or reaches no type; `edge_permission_denied` when the body's `edges` name an edge type it does not hold write on.
+            /// `type_not_permitted` when the credential may read the item's type and does not hold write on it, or reaches no type; `edge_permission_denied` when the body's `edges` name an edge type it does not hold write on; `forbidden` when the body changes `source_id` on a row whose source the key neither writes under nor claims, named in `details.source`.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/403`.
             ///
@@ -5003,7 +5003,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An inline edge naming an edge type that does not exist answers `edge_type_not_found`, and one naming a target that does not exist or whose type the caller may not read answers `item_not_found`, the two targets alike.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed. An inline edge naming an edge type that does not exist answers `edge_type_not_found`, and one naming a target that does not exist or whose type the caller may not read answers `item_not_found`, the two targets alike.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/404`.
             ///
@@ -5204,7 +5204,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Version conflict — a stale `version`, whether the write carried properties to merge or only edges, `ancestor_unavailable` (the base version's snapshot has been thinned, so the write cannot be merged and is never auto-resolved), `source_id_conflict` (target natural key already in use by another item under the item's `source`), `link_taken` (the properties the row ends up with, in the type it ends up as, hold a link another item of that type holds in any state, named in `details.existing_id`; judged at a stale version on the merge as it lands), or `type_mismatch` (the request declared a `type` that is not this item's).
+            /// Version conflict — a stale `version`, whether the write carried properties to merge or only edges, `ancestor_unavailable` (no snapshot of the base version is held, or it is of a type the credential may not read, so the write cannot be merged and is never auto-resolved), `source_id_conflict` (target natural key already in use by another item under the item's `source`), `link_taken` (the properties the row ends up with, in the type it ends up as, hold a link another item of that type holds in any state, named in `details.existing_id`; judged at a stale version on the merge as it lands), or `type_mismatch` (the request declared a `type` that is not this item's).
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/409`.
             ///
@@ -5715,7 +5715,7 @@ public enum Operations {
     }
     /// Soft delete an item
     ///
-    /// Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. Every row a cascading edge such as `parent-of` takes into the bin with it carries `trashed_by_cascade`, and `trashed_with` naming this item to a caller that may read its type, and its `item.deleted` frame says so too. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
+    /// Moves the item to the trashed state, reversible via restore until the retention window expires, after which it is purged permanently. For immediate, irreversible removal use the purge endpoint instead. `version` makes the delete conditional on the row being where the caller read it: at any other version it answers `409 version_conflict` with the row as it now stands under `current`, as a stale write carrying nothing to merge does, and trashes nothing. Every row a cascading edge such as `parent-of` takes into the bin with it carries `trashed_by_cascade`, and `trashed_with` naming this item to a caller that may read its type, and its `item.deleted` frame says so too. A live `system.connection` is refused: an app grant is revoked through the grants routes first, so its tokens and stored consent go with it.
     ///
     /// - Remark: HTTP `DELETE /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)`.
@@ -5737,9 +5737,24 @@ public enum Operations {
                 }
             }
             public var path: Operations.DeleteItem.Input.Path
+            /// - Remark: Generated from `#/paths/items/{id}/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// The version the caller read. Where given and the row has moved since, the delete is refused `409 version_conflict` and nothing is trashed. Without it the delete applies to the row as it is.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/DELETE/query/version`.
+                public var version: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - version: The version the caller read. Where given and the row has moved since, the delete is refused `409 version_conflict` and nothing is trashed. Without it the delete applies to the row as it is.
+                public init(version: Swift.Int? = nil) {
+                    self.version = version
+                }
+            }
+            public var query: Operations.DeleteItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -5747,7 +5762,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -5762,12 +5777,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.DeleteItem.Input.Path,
+                query: Operations.DeleteItem.Input.Query = .init(),
                 headers: Operations.DeleteItem.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -5982,7 +6000,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `invalid_id` for a malformed id. `edge_constraint_violation` when an edge type the item is an end of declares `cascade_on_delete: block` and such an edge exists. `validation_error` when the item is a live `system.connection`: revoke the app grant through `DELETE /auth/grants/{id}` first, because removing the row here would leave the app's tokens and stored consent behind with nothing naming their owner.
+            /// `invalid_id` for a malformed id. `edge_constraint_violation` when an edge type the item is an end of declares `cascade_on_delete: block` and such an edge exists. `validation_error` when the item is a live `system.connection`: revoke the app grant through `DELETE /auth/grants/{id}` first, because removing the row here would leave the app's tokens and stored consent behind with nothing naming their owner; or for a `version` that is not a positive whole number, or an unrecognized query parameter.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/400`.
             ///
@@ -6200,7 +6218,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/403`.
             ///
@@ -6320,7 +6338,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/404`.
             ///
@@ -6410,13 +6428,58 @@ public enum Operations {
                 public var headers: Operations.DeleteItem.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ItemStaleVersion?
+                        /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ItemStaleVersion? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.DeleteItem.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.DeleteItem.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -6440,7 +6503,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// A request carrying this `Idempotency-Key` is still being processed. Nothing was written; retry.
+            /// `version_conflict`: the request named a `version` and the row is no longer at it. `current` carries the row as it stands; nothing was trashed. `idempotency_key_in_flight`: a request carrying this `Idempotency-Key` is still being processed; nothing was trashed, retry.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/409`.
             ///
@@ -6975,7 +7038,7 @@ public enum Operations {
             public var path: Operations.RestoreItem.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/restore/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/restore/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -6983,7 +7046,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -7436,7 +7499,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)/responses/403`.
             ///
@@ -8187,7 +8250,7 @@ public enum Operations {
     }
     /// Transition item state
     ///
-    /// Moves the item to the supplied lifecycle state. Going straight from trashed to archived is rejected — restore to active first. A move from trashed to active brings back every row the item's trash took through a cascading edge, as a restore does, each announced `item.restored` with `restored_with` naming this item to a subscriber that may read its type.
+    /// Moves the item to the supplied lifecycle state. Going straight from trashed to archived is rejected — restore to active first. A move into trashed is a delete: it takes every row a cascading edge reaches, each announced `item.deleted` with the mark a delete gives it, and is refused `400 edge_constraint_violation` by a `block` edge as a delete is. A move from trashed to active brings back every row the item's trash took through a cascading edge, as a restore does, each announced `item.restored` with `restored_with` naming this item to a subscriber that may read its type.
     ///
     /// - Remark: HTTP `POST /items/{id}/transition`.
     /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)`.
@@ -8211,7 +8274,7 @@ public enum Operations {
             public var path: Operations.TransitionItem.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -8219,7 +8282,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -8455,12 +8518,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -8484,7 +8547,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Invalid transition
+            /// `invalid_transition`: the type's lifecycle does not allow the move. `edge_constraint_violation`: a `block` edge holds a row a move into trashed would take.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/400`.
             ///
@@ -8702,7 +8765,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/403`.
             ///
@@ -9453,7 +9516,7 @@ public enum Operations {
     }
     /// List item versions
     ///
-    /// Returns the version-snapshot history for one item, oldest first. Older snapshots are thinned on a rolling schedule and the most recent is never dropped, so the history is not guaranteed to be contiguous.
+    /// Returns the version-snapshot history for one item, oldest first, paged by cursor. Each snapshot carries the properties the row held before the write that left it behind and the `type`, `tier`, `occurred_at` and `source_id` the row had at that version. Requires read access to the item's type now, and a snapshot is answered only where the credential may also read the type it was written under: a row moved from a type the credential may not read keeps those snapshots, and they are left out rather than refused, and a page is filled past them, so only the last page is short. Older snapshots are thinned on a rolling schedule and the most recent is never dropped, so the history is not guaranteed to be contiguous. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /items/{id}/versions`.
     /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)`.
@@ -9475,6 +9538,30 @@ public enum Operations {
                 }
             }
             public var path: Operations.ListItemVersions.Input.Path
+            /// - Remark: Generated from `#/paths/items/{id}/versions/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// Page size, 1–200 (default 50)
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/versions/GET/query/limit`.
+                public var limit: Swift.Int?
+                /// Opaque cursor from a previous page's `next_cursor`.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/versions/GET/query/cursor`.
+                public var cursor: Swift.String?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - limit: Page size, 1–200 (default 50)
+                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                public init(
+                    limit: Swift.Int? = nil,
+                    cursor: Swift.String? = nil
+                ) {
+                    self.limit = limit
+                    self.cursor = cursor
+                }
+            }
+            public var query: Operations.ListItemVersions.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/versions/GET/header`.
             public struct Headers: Sendable, Hashable {
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItemVersions.AcceptableContentType>]
@@ -9491,12 +9578,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.ListItemVersions.Input.Path,
+                query: Operations.ListItemVersions.Input.Query = .init(),
                 headers: Operations.ListItemVersions.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -9660,12 +9750,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/versions/GET/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/versions/GET/responses/400/content/application\/json`.
-                    case json(Components.Schemas.InvalidIdRefusal)
+                    case json(Components.Schemas.InvalidIdOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InvalidIdRefusal {
+                    public var json: Components.Schemas.InvalidIdOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -9689,7 +9779,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The id is not a well-formed item id.
+            /// The id is not a well-formed item id, or a query parameter is unknown or out of range, or the cursor is malformed or was issued by another listing.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)/responses/400`.
             ///
@@ -11619,7 +11709,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(mergeItemMetadata)/responses/403`.
             ///
@@ -11728,7 +11818,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(mergeItemMetadata)/responses/404`.
             ///
@@ -12575,7 +12665,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/403`.
             ///
@@ -12684,7 +12774,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/404`.
             ///
@@ -13531,7 +13621,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/403`.
             ///
@@ -13640,7 +13730,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/404`.
             ///
@@ -14052,7 +14142,7 @@ public enum Operations {
             public var query: Operations.PurgeItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -14060,7 +14150,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -15775,7 +15865,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The credential may read the item's type and does not hold write on it, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
+            /// The credential may read the item's type and does not hold write on it, which `details.grant` names as `{ kind: "type", name, level: "write" }`, or its type permissions reach no type. An item of a type it may not read answers 404 instead.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/403`.
             ///
@@ -15884,7 +15974,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/404`.
             ///
@@ -16253,7 +16343,7 @@ public enum Operations {
     }
     /// Bulk upsert items
     ///
-    /// Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`, trashed rows included, as `POST /items` does. An entry whose natural key resolves a trashed row is not written: under `upsert` it is reported `skipped` with `reason` `trashed` and the row's id, and under `create_only` it is a repeated pair like any other. Atomic by default. Each entry's `source` is the credential's own unless the entry names one the credential's key claims, and an entry naming any other source is refused `forbidden` with `details.source`. Where the instance's source allow-list names the entry's type, the source the entry resolves to must be on it, or the entry is refused `forbidden` as `POST /items` refuses it. Requires write access to each item's type — the credential's own type permissions decide, and nothing bypasses them.
+    /// Creates or upserts up to 5000 items in one call, matching existing rows on `(source, source_id)`, trashed rows included, as `POST /items` does. A key reaching no type at all is refused `403 type_not_permitted` before the list is read, an empty list included. An entry whose natural key resolves a trashed row is not written: under `upsert` it is reported `skipped` with `reason` `trashed` and the row's id, and under `create_only` it is a repeated pair like any other. Atomic by default. Each entry's `source` is the credential's own unless the entry names one the credential's key claims, and an entry naming any other source is refused `forbidden` with `details.source`. Where the instance's source allow-list names the entry's type, the source the entry resolves to must be on it, or the entry is refused `forbidden` as `POST /items` refuses it. Requires write access to each item's type — the credential's own type permissions decide, and nothing bypasses them.
     ///
     /// An entry that resolves a row of a different type is refused with `type_mismatch` — a write does not re-type the row it lands on. Passing `retype: true` for the batch moves those rows instead, which is how a corpus is brought onto a type a mapping now names. It is opt-in rather than inferred from a differing type, because a declared type accompanies nearly every write and inferring would move a corpus on an ordinary sync bug. Each move requires write on the type being entered as well as the one being left, and the resulting properties are validated against the destination: an item the destination type cannot accept is reported as an `errored` entry naming why, and the rest of the batch proceeds.
     ///
@@ -16886,7 +16976,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Write access denied for one of the item types, or for the type of a row an entry's natural key resolves, refused without naming that row where the credential may not read its type. Under the default `atomic` the page rolls back and the code is `bulk_atomic_rollback` with `type_not_permitted` in `details.code`; the status is the inner refusal's, because a caller sorts by status before it reads a code and a permission failure filed under 400 reads as a body it can fix.
+            /// Write access denied for one of the item types, or for the type of a row an entry's natural key resolves, refused without naming that row where the credential may not read its type; `forbidden` for a source the credential does not claim, or for an entry landing by `id` that would move a row's natural key under a source the key neither writes under nor claims. Under the default `atomic` the page rolls back and the code is `bulk_atomic_rollback` with the inner refusal, `type_not_permitted` or `forbidden`, in `details.code`; the status is the inner refusal's, because a caller sorts by status before it reads a code and a permission failure filed under 400 reads as a body it can fix.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/403`.
             ///
@@ -17473,7 +17563,7 @@ public enum Operations {
     }
     /// Apply a bulk action
     ///
-    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item. A purge takes only rows in the trash when the job reaches them: any other match, live or restored since the job was queued, is left untouched and reported in the job's `errors` with `invalid_transition`. A purge may carry `expected_ids`, the ids its dry run returned, and then takes only the rows in that list the filter still matches: a row the filter has come to match since the dry run is left untouched, and `max_items` caps the rows the purge takes rather than the filter's whole match. The job acts for the credential that queued it as that credential stands when each chunk runs: once the key is revoked, deleted or expired, the sign-in's token or grant is revoked, or a purge's credential no longer holds `items.purge`, the job writes nothing further and ends `failed`, keeping the `result` it had gathered. A sign-in's token reaching its ordinary expiry does not stop it. A row whose type the credential may read but no longer write is that row's `type_not_permitted` entry in the job's `errors`, and one whose type it may no longer read is its `item_not_found` entry, naming no type. Where the instance's strict-mode lever names a row's type, an `update_properties` patch naming a property the type does not declare is refused for that row, recorded in the job's `errors` under `invalid_properties` with `details.code` `unknown_property`, and the row is not written; the lever is read when the job writes the row, for the credential that queued it.
+    /// Applies one action (transition, purge, retag, retier, or a property or own-time update) to every item matching a filter. A key reaching no type at all, the operator key among them, is refused `403 type_not_permitted` before the filter is read; any other key matches only what it may write. Non-dry-run calls queue an async job; `dry_run: true` returns the matched ids without writing, and `max_items` caps the match set before a `bulk_cap_exceeded` error. A transition out of the bin brings back every row each item's trash took through a cascading edge, each announced `item.restored` with `restored_with` naming the item moved to a subscriber that may read its type, and a purge announces each edge it takes `edge.deleted` with `purged_with` naming the purged item. A purge takes only rows in the trash when the job reaches them: any other match, live or restored since the job was queued, is left untouched and reported in the job's `errors` with `invalid_transition`. A purge may carry `expected_ids`, the ids its dry run returned, and then takes only the rows in that list the filter still matches: a row the filter has come to match since the dry run is left untouched, and `max_items` caps the rows the purge takes rather than the filter's whole match. The job acts for the credential that queued it as that credential stands when each chunk runs: once the key is revoked, deleted or expired, the sign-in's token or grant is revoked, or a purge's credential no longer holds `items.purge`, the job writes nothing further and ends `failed`, keeping the `result` it had gathered. A sign-in's token reaching its ordinary expiry does not stop it. A row whose type the credential may read but no longer write is that row's `type_not_permitted` entry in the job's `errors`, and one whose type it may no longer read is its `item_not_found` entry, naming no type. Where the instance's strict-mode lever names a row's type, an `update_properties` patch naming a property the type does not declare is refused for that row, recorded in the job's `errors` under `invalid_properties` with `details.code` `unknown_property`, and the row is not written; the lever is read when the job writes the row, for the credential that queued it.
     ///
     /// Unrecognized fields are refused with `400` rather than ignored, in the request body and inside `filter` alike: a dropped filter field is not a narrower match set but every item, and a dropped `dry_run` is the action running for real. A field of your own must start with `_`, which is always ignored.
     ///
@@ -17484,12 +17574,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/bulk-actions/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///
+                /// - Remark: Generated from `#/paths/items/bulk-actions/POST/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyBulkAction.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyBulkAction.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyBulkAction.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
                     self.accept = accept
                 }
             }
@@ -17960,6 +18059,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -17968,18 +18075,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -18062,6 +18172,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/202/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/202/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -18070,18 +18188,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -18168,6 +18289,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -18177,13 +18306,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -18191,6 +18322,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -18416,12 +18548,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/403/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/403/content/application\/json`.
-                    case json(Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal)
+                    case json(Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal {
+                    public var json: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -18463,6 +18595,126 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ApplyBulkAction.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ApplyBulkAction.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ApplyBulkAction.Output.Conflict.Headers = .init(),
+                    body: Operations.ApplyBulkAction.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// A request carrying this `Idempotency-Key` is still being processed. Nothing was written; retry.
+            ///
+            /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ApplyBulkAction.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ApplyBulkAction.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -18556,6 +18808,126 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ApplyBulkAction.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ApplyBulkAction.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ApplyBulkAction.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.ApplyBulkAction.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// The key names a different request from the one it was first used for, or the first attempt's response was too large to retain and cannot be replayed. Neither repeated the write.
+            ///
+            /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.ApplyBulkAction.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.ApplyBulkAction.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -18587,6 +18959,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -18597,6 +18977,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -18604,7 +18985,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -18613,6 +18995,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -18699,6 +19082,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -18708,13 +19099,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -18722,6 +19115,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -25449,7 +25843,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/404`.
             ///
@@ -26390,7 +26784,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists.
+            /// No item has this id that the credential may read. An item of a type it may not read answers alike, so the answer says nothing of whether one exists. An item in the bin answers alike, carrying `details.trashed: true` to a credential that may read its type, so a client holding a write to it can tell an item someone deleted from one that never existed.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/404`.
             ///
@@ -29297,7 +29691,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/edges/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/edges/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -29305,7 +29699,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -31520,7 +31914,7 @@ public enum Operations {
             public var path: Operations.UpdateEdge.Input.Path
             /// - Remark: Generated from `#/paths/edges/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/edges/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -31528,7 +31922,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -32873,7 +33267,7 @@ public enum Operations {
             public var path: Operations.DeleteEdge.Input.Path
             /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -32881,7 +33275,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -41156,7 +41550,7 @@ public enum Operations {
     ///
     /// Rejected with `409 type_has_subtypes` while another registered type declares this one as its parent, naming them in `details.subtype_ids`. `?force=true` does not cover that case: delete each subtype first, or give it a different parent through `PUT /types/{id}`.
     ///
-    /// Rejected with `409 type_in_use` if any item of the type still exists in any lifecycle state, the bin included, unless `?force=true` orphans those rows (they persist, but new writes against the type return `400 unknown_type`).
+    /// Rejected with `409 type_in_use` if any item of the type still exists in any lifecycle state, the bin included, unless `?force=true` orphans those rows (they persist, but new writes against the type, and any write setting a field of one of those rows, return `400 unknown_type` until the type is registered again).
     ///
     /// The tombstones purges left under the type go with it.
     ///
@@ -45042,7 +45436,7 @@ public enum Operations {
     }
     /// List the blobs nothing references
     ///
-    /// The orphan report: every registered blob the last run of the `blob-orphans` housekeeping job found nothing referencing, with when a run first said so. A blob stands here for the grace period before a later run purges it, and leaves the report if something names it again. Operator key only.
+    /// The orphan report: every registered blob the last run of the `blob-orphans` housekeeping job found nothing referencing, with when a run first said so. A blob stands here for the grace period before a later run purges it, and leaves the report if something names it again or its bytes are uploaded again. Operator key only.
     ///
     /// - Remark: HTTP `GET /blobs/orphans`.
     /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)`.
@@ -70245,7 +70639,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/folders/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/folders/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -70253,7 +70647,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -71486,7 +71880,7 @@ public enum Operations {
             public var path: Operations.UpdateFolder.Input.Path
             /// - Remark: Generated from `#/paths/folders/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/folders/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -71494,7 +71888,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -72920,7 +73314,7 @@ public enum Operations {
             public var path: Operations.RevokeFolder.Input.Path
             /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///
                 /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -72928,7 +73322,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to this instance; a key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -81678,7 +82072,7 @@ public enum Operations {
     }
     /// Remove one shipped type the build no longer carries
     ///
-    /// Removes exactly one platform type row this build does not ship. Refused with `409` when the identifier is one the build still ships, so this can never remove a live type; refused with `409` when items still carry it, because the row is what makes those items resolve, and orphaning readable data to tidy a registry is the wrong trade; and refused with `409` when another registered type inherits from it, naming them in `details.child_types`, because a parent supplies its children's fields. The item count is recomputed inside the request rather than read from the boot-time report. The type stops resolving at once, on this process and not at the next restart: the row and the in-process registry entry go together. Operator key only.
+    /// Removes exactly one platform type row this build does not ship. Refused with `409` when the identifier is one the build still ships, so this can never remove a live type; refused with `409` when items still carry it, because the row is what makes those items resolve, and orphaning readable data to tidy a registry is the wrong trade; and refused with `409` when another registered type inherits from it, naming them in `details.child_types`, because a parent supplies its children's fields. The item count and the inheriting types are asked in the transaction that removes the row, rather than read from the boot-time report, so an item of the type written meanwhile is either counted or refused. The removal is audited as `platform_type.removed`, naming the key. The type stops resolving at once, on this process and not at the next restart: the row and the in-process registry entry go together. Operator key only.
     ///
     /// - Remark: HTTP `DELETE /admin/platform-types/{id}`.
     /// - Remark: Generated from `#/paths//admin/platform-types/{id}/delete(adminRemovePlatformType)`.

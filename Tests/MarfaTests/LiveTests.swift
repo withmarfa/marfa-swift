@@ -88,6 +88,68 @@ func theLiveTestsHaveAServerWhereTheyAreRequired() {
     .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
     .timeLimit(.minutes(2)))
 struct LiveServer {
+    @Test func edgeTypesHoldIncomingEdgesAndPinsHoldTheirRows() async throws {
+        let writer = try await Live.hydrated()
+        let note = try #require(try await writer.items.create(Live.note("held attachment \(UUID())")).itemId)
+        let attachment = try await writer.items.attach(to: note, file: try Live.file("attachment options"))
+        let file = try #require(attachment.item.itemId)
+        let drained = try await writer.queue.drain()
+        #expect(drained.verdicts.allSatisfy { $0.verdict == .accepted })
+
+        let ordinary = try await Live.hydrated()
+        #expect(try await ordinary.items.get(note) != nil)
+        #expect(try await ordinary.items.get(file) == nil)
+        #expect(try await !ordinary.edges.to(note).contains { $0.sourceId == file })
+        #expect(try await ordinary.pin(file) == PinReport(pinned: true, wasPinned: false))
+        #expect(try await ordinary.items.get(file) != nil)
+        #expect(try await ordinary.edges.to(note).contains { $0.sourceId == file })
+        #expect(try await ordinary.status().pinned.contains(file))
+        #expect(try await ordinary.unpin(file) == PinReport(pinned: false, wasPinned: true))
+        #expect(try await ordinary.items.get(file) == nil)
+
+        let whole = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+        let report = try await whole.hydrate(types: ["core.note"], tier: .feed, edgeTypes: ["attached-to"])
+        #expect(report.edgeTypes == ["attached-to"])
+        #expect(try await whole.status().sliceEdgeTypes == ["attached-to"])
+        #expect(try await whole.items.get(file) == nil)
+        #expect(try await whole.edges.to(note).contains { $0.sourceId == file })
+        _ = try await whole.pin(file)
+        #expect(try await whole.items.get(file) != nil)
+        _ = try await whole.unpin(file)
+        #expect(try await whole.items.get(file) == nil)
+        #expect(try await whole.edges.to(note).contains { $0.sourceId == file })
+        await writer.close()
+        await ordinary.close()
+        await whole.close()
+    }
+
+    @Test func listingAndSearchApplyFilterAndBeneath() async throws {
+        let writer = try await Live.hydrated()
+        let root = try #require(
+            try await writer.items.create(Live.note("bounded root \(UUID())", tags: ["root"])).itemId)
+        let child = try #require(
+            try await writer.items.create(Live.note("bounded child \(UUID())", tags: ["child"])).itemId)
+        let outside = try #require(
+            try await writer.items.create(Live.note("bounded outside \(UUID())", tags: ["child"])).itemId)
+        _ = try await writer.edges.create(from: root, to: child, type: "parent-of")
+        #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+        let reader = try await Live.hydrated()
+        #expect(Set(try await reader.items.list(ListFilters(beneath: root)).map(\.id)) == Set([root, child]))
+        #expect(try await reader.items.get(outside) != nil)
+        #expect(
+            try await reader.items.list(ListFilters(filter: "tags contains \"child\"", beneath: root)).map(\.id) == [
+                child
+            ])
+        #expect(
+            Set(try await reader.search("bounded", filters: SearchFilters(beneath: root)).map(\.item.id))
+                == Set([root, child]))
+        #expect(
+            try await reader.search("bounded", filters: SearchFilters(filter: "tags contains \"child\"", beneath: root))
+                .map(\.item.id) == [child])
+        await writer.close()
+        await reader.close()
+    }
+
     @Test func aWriteMadeHereIsAnsweredAndHeld() async throws {
         let copy = try await Live.hydrated()
         let title = "Live \(UUID())"

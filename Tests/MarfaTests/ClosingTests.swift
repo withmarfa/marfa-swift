@@ -280,7 +280,7 @@ struct ChangingTheKey {
 
         #expect(keys.withLock { $0 } == ["new-key"])
         try await eventually("the follow started on the new core") { new.follows.count == 1 }
-        new.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2"))
+        new.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2", reason: nil))
         try await eventually("the stream heard the new core") { heard.all.count == 1 }
         #expect(heard.stops.isEmpty, "the stream was told the follow stopped")
         try await bounded("close") { await copy.close() }

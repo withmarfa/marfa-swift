@@ -77,13 +77,32 @@ public final class WorkingCopy: Sendable {
     }
 
     /// Replaces the copy with every item of `types` at `tier`, with their tags
-    /// and the edges going out from them.
-    public func hydrate(types: [String], tier: Tier) async throws -> HydrateReport {
+    /// and the edges going out from them. `edgeTypes` also holds each named
+    /// edge type whole, whichever of its endpoints the item slice holds.
+    public func hydrate(types: [String], tier: Tier, edgeTypes: [String] = []) async throws -> HydrateReport {
         await feed.pause()
         defer { feed.unpause() }
         let report = HydrateReport(
-            try await holder.run { core in try core.hydrate(types: types, tier: tier.core) })
+            try await holder.run { core in try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes) })
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
+        return report
+    }
+
+    /// Reads and holds an item whatever the slice says of it.
+    public func pin(_ id: String) async throws -> PinReport {
+        await feed.pause()
+        defer { feed.unpause() }
+        let report = PinReport(try await holder.run { core in try core.pin(id: id) })
+        feed.announce(Change(origin: .refreshed(.pinned), itemId: id, edgeId: nil))
+        return report
+    }
+
+    /// Lets an item outside the slice go unless queued writes still need it.
+    public func unpin(_ id: String) async throws -> PinReport {
+        await feed.pause()
+        defer { feed.unpause() }
+        let report = PinReport(try await holder.run { core in try core.unpin(id: id) })
+        feed.announce(Change(origin: .refreshed(.unpinned), itemId: id, edgeId: nil))
         return report
     }
 
@@ -219,6 +238,8 @@ public struct Change: Sendable, Hashable {
         case caughtUp
         case drained
         case withdrawn
+        case pinned
+        case unpinned
         /// A catch-up or a held stream read an item type or edge type
         /// catalog that differs from the one the copy held; read `catalog`
         /// again.
@@ -228,6 +249,14 @@ public struct Change: Sendable, Hashable {
     public let origin: Origin
     public let itemId: String?
     public let edgeId: String?
+    public let reason: String?
+
+    public init(origin: Origin, itemId: String?, edgeId: String?, reason: String? = nil) {
+        self.origin = origin
+        self.itemId = itemId
+        self.edgeId = edgeId
+        self.reason = reason
+    }
 }
 
 public struct Items: Sendable {
@@ -310,14 +339,14 @@ public struct Edges: Sendable {
     /// The edges the copy holds to one item, unsent ones included.
     ///
     /// A hydration holds the edges going out from the slice's items, so an
-    /// edge from an item of a type outside the slice, such as a file attached
-    /// on another device when `core.file` is not hydrated, is not here.
+    /// edge from an item outside it is held only when its type was hydrated
+    /// whole or the copy pinned its source item.
     public func to(_ id: String) async throws -> [Edge] {
         try await holder.run { core in try core.edgesTo(id: id).map(Edge.init) }
     }
 
     /// Every edge of one type the copy holds, unsent ones included, oldest
-    /// first: only edges going out from held items, as with `to(_:)`.
+    /// first: edges going out from held items and edge types hydrated whole.
     public func ofType(_ type: String) async throws -> [Edge] {
         try await holder.run { core in try core.edgesOfType(edgeType: type).map(Edge.init) }
     }
@@ -921,7 +950,9 @@ final class Listener: CoreChangeListener, Sendable {
         let origin: Change.Origin =
             change.event == Self.catalogChanged
             ? .refreshed(.catalog) : .server(event: change.event, cursor: change.cursor)
-        feed?.announce(Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId), from: generation)
+        feed?.announce(
+            Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId, reason: change.reason),
+            from: generation)
     }
 
     /// What the core names a stream that read a changed catalog, in place of

@@ -29,6 +29,7 @@ public typealias CoreQueuedWrite = QueuedWrite
 public typealias CoreDrainReport = DrainReport
 public typealias CoreDrainVerdict = DrainVerdict
 public typealias CoreHydrateReport = HydrateReport
+public typealias CorePinReport = PinReport
 public typealias CoreCatchUpReport = CatchUpReport
 public typealias CoreStatus = Status
 public typealias CoreAttachment = Attachment
