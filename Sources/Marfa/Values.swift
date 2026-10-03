@@ -12,11 +12,16 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case unknownType(message: String)
     case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?)
     case server(status: UInt16, code: String, message: String)
+    case io(message: String)
     case network(message: String)
     /// A response from something in front of the server, without its contract.
     case unnamed(status: UInt16, message: String)
     case decoding(message: String)
     case store(message: String)
+    case storageFull(message: String)
+    case signedOut(origin: String, message: String)
+    case noKeychain(message: String)
+    case redirected(origin: String, status: UInt16, location: String?, message: String)
     case noServer(message: String)
     case noCursor(message: String)
     case hydrationIncomplete(message: String)
@@ -38,7 +43,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// where a success named none. Where `writeSent`, the answer was to a
     /// write, which may have taken effect: it stays queued, and goes again
     /// under its idempotency key once the app speaks the server's contract.
-    case contractMismatch(served: String?, expected: UInt64, status: UInt16, writeSent: Bool, message: String)
+    /// `status` is nil when the failure carries no HTTP status.
+    case contractMismatch(served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String)
     case invalid(message: String)
     /// The working copy was closed, or failed to reopen its store with a new
     /// key; it is gone for good, and the app opens the store again.
@@ -49,8 +55,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         switch self {
         case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
             .validation(_, let message), .unknownType(let message), .rateLimited(_, let message, _),
-            .server(_, _, let message), .network(let message), .unnamed(_, let message), .decoding(let message),
-            .store(let message),
+            .server(_, _, let message), .io(let message), .network(let message), .unnamed(_, let message),
+            .decoding(let message),
+            .store(let message), .storageFull(let message), .signedOut(_, let message),
+            .noKeychain(let message), .redirected(_, _, _, let message),
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .copyExpired(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
@@ -71,10 +79,16 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .RateLimited(let code, let message, let retryAfterSeconds):
             self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
         case .Server(let status, let code, let message): self = .server(status: status, code: code, message: message)
+        case .Io(let message): self = .io(message: message)
         case .Network(let message): self = .network(message: message)
         case .Unnamed(let status, let message): self = .unnamed(status: status, message: message)
         case .Decoding(let message): self = .decoding(message: message)
         case .Store(let message): self = .store(message: message)
+        case .StorageFull(let message): self = .storageFull(message: message)
+        case .SignedOut(let origin, let message): self = .signedOut(origin: origin, message: message)
+        case .NoKeychain(let message): self = .noKeychain(message: message)
+        case .Redirected(let origin, let status, let location, let message):
+            self = .redirected(origin: origin, status: status, location: location, message: message)
         case .NoServer(let message): self = .noServer(message: message)
         case .NoCursor(let message): self = .noCursor(message: message)
         case .HydrationIncomplete(let message): self = .hydrationIncomplete(message: message)

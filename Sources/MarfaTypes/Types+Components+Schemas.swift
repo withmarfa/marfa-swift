@@ -8953,6 +8953,10 @@ extension Components {
             public var eventLogRetentionHours: Swift.Int?
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/trash_retention_days`.
             public var trashRetentionDays: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_handled_retention_days`.
+            public var inboundHandledRetentionDays: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_pending_retention_days`.
+            public var inboundPendingRetentionDays: Swift.Int?
             /// Creates a new `InstanceConfig`.
             ///
             /// - Parameters:
@@ -8961,18 +8965,24 @@ extension Components {
             ///   - auditRetentionDays:
             ///   - eventLogRetentionHours:
             ///   - trashRetentionDays:
+            ///   - inboundHandledRetentionDays:
+            ///   - inboundPendingRetentionDays:
             public init(
                 instanceId: Swift.String,
                 enforcement: Components.Schemas.InstanceConfig.EnforcementPayload? = nil,
                 auditRetentionDays: Swift.Int? = nil,
                 eventLogRetentionHours: Swift.Int? = nil,
-                trashRetentionDays: Swift.Int? = nil
+                trashRetentionDays: Swift.Int? = nil,
+                inboundHandledRetentionDays: Swift.Int? = nil,
+                inboundPendingRetentionDays: Swift.Int? = nil
             ) {
                 self.instanceId = instanceId
                 self.enforcement = enforcement
                 self.auditRetentionDays = auditRetentionDays
                 self.eventLogRetentionHours = eventLogRetentionHours
                 self.trashRetentionDays = trashRetentionDays
+                self.inboundHandledRetentionDays = inboundHandledRetentionDays
+                self.inboundPendingRetentionDays = inboundPendingRetentionDays
             }
             public enum CodingKeys: String, CodingKey {
                 case instanceId = "instance_id"
@@ -8980,6 +8990,8 @@ extension Components {
                 case auditRetentionDays = "audit_retention_days"
                 case eventLogRetentionHours = "event_log_retention_hours"
                 case trashRetentionDays = "trash_retention_days"
+                case inboundHandledRetentionDays = "inbound_handled_retention_days"
+                case inboundPendingRetentionDays = "inbound_pending_retention_days"
             }
         }
         /// - Remark: Generated from `#/components/schemas/TypeLeverStrict`.
@@ -9654,12 +9666,23 @@ extension Components {
         public struct WebhookDelivery: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/id`.
             public var id: Swift.String
+            /// - Remark: Generated from `#/components/schemas/WebhookDelivery/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case pending = "pending"
+                case success = "success"
+                case deadLetter = "dead_letter"
+                case canceled = "canceled"
+            }
+            /// - Remark: Generated from `#/components/schemas/WebhookDelivery/status`.
+            public var status: Components.Schemas.WebhookDelivery.StatusPayload
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/webhook_id`.
             public var webhookId: Swift.String
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/event_type`.
             public var eventType: Swift.String
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/status_code`.
             public var statusCode: Swift.Double?
+            /// Cumulative accepted-outcome ordinal, not a census of concurrent or lost HTTP sends.
+            ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/attempt`.
             public var attempt: Swift.Double
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/succeeded`.
@@ -9672,15 +9695,17 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id:
+            ///   - status:
             ///   - webhookId:
             ///   - eventType:
             ///   - statusCode:
-            ///   - attempt:
+            ///   - attempt: Cumulative accepted-outcome ordinal, not a census of concurrent or lost HTTP sends.
             ///   - succeeded:
             ///   - error:
             ///   - createdAt:
             public init(
                 id: Swift.String,
+                status: Components.Schemas.WebhookDelivery.StatusPayload,
                 webhookId: Swift.String,
                 eventType: Swift.String,
                 statusCode: Swift.Double? = nil,
@@ -9690,6 +9715,7 @@ extension Components {
                 createdAt: Swift.String
             ) {
                 self.id = id
+                self.status = status
                 self.webhookId = webhookId
                 self.eventType = eventType
                 self.statusCode = statusCode
@@ -9700,6 +9726,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case id
+                case status
                 case webhookId = "webhook_id"
                 case eventType = "event_type"
                 case statusCode = "status_code"

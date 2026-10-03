@@ -98,6 +98,21 @@ struct Errors {
         (.Unnamed(status: 429, message: "m"), .unnamed(status: 429, message: "m")),
         (.Decoding(message: "m"), .decoding(message: "m")),
         (.Store(message: "m"), .store(message: "m")),
+        (.Io(message: "m"), .io(message: "m")),
+        (.StorageFull(message: "m"), .storageFull(message: "m")),
+        (
+            .SignedOut(origin: "https://marfa.example", message: "m"),
+            .signedOut(origin: "https://marfa.example", message: "m")
+        ),
+        (.NoKeychain(message: "m"), .noKeychain(message: "m")),
+        (
+            .Redirected(origin: "https://marfa.example", status: 307, location: "/next", message: "m"),
+            .redirected(origin: "https://marfa.example", status: 307, location: "/next", message: "m")
+        ),
+        (
+            .Redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m"),
+            .redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m")
+        ),
         (.NoServer(message: "m"), .noServer(message: "m")),
         (.NoCursor(message: "m"), .noCursor(message: "m")),
         (.HydrationIncomplete(message: "m"), .hydrationIncomplete(message: "m")),
@@ -118,6 +133,10 @@ struct Errors {
         (
             .ContractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m"),
             .contractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m")
+        ),
+        (
+            .ContractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m"),
+            .contractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m")
         ),
         (.Invalid(message: "m"), .invalid(message: "m")),
     ]

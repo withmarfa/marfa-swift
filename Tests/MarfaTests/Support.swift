@@ -363,7 +363,8 @@ struct LocalServer: Sendable {
     }
 
     static func start(
-        contract: Int, answer: @escaping @Sendable (_ method: String, _ path: String) -> Answer = emptyPage
+        contract: Int, headers: String = "",
+        answer: @escaping @Sendable (_ method: String, _ path: String) -> Answer = emptyPage
     ) async throws -> LocalServer {
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
@@ -380,7 +381,7 @@ struct LocalServer: Sendable {
                 let (status, type, body) = answer(method, path)
                 let response = Data(
                     ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
-                        + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
+                        + headers + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
                 connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
             }
         }

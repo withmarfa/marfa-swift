@@ -93,8 +93,9 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         }
     let errorRead: Bool =
         switch error {
-        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network,
-            .unnamed, .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema,
+        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .io, .network,
+            .unnamed, .decoding, .store, .storageFull, .signedOut, .noKeychain, .redirected, .noServer, .noCursor,
+            .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid, .closed:
             true
