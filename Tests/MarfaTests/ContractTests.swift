@@ -13,9 +13,11 @@ struct ContractTests {
         do {
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
             Issue.record("a server on contract \(marfaContractVersion + 1) was not refused")
-        } catch let MarfaError.contractMismatch(served, expected, _, _, _) {
+        } catch let MarfaError.contractMismatch(served, expected, status, writeSent, _) {
             #expect(served == String(marfaContractVersion + 1))
             #expect(expected == UInt64(marfaContractVersion))
+            #expect(status == 200)
+            #expect(!writeSent)
         }
     }
 

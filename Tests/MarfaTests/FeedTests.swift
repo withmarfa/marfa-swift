@@ -18,6 +18,28 @@ private func saved(_ version: Int64) -> Marfa.Change {
 
 @Suite(.timeLimit(.minutes(1)))
 struct Changes {
+    @Test(
+        arguments: Errors.cases.filter { _, error in
+            switch error {
+            case .hydrationIncomplete, .noCursor: false
+            default: true
+            }
+        })
+    func aStoppedStreamPreservesEveryFailureForExistingAndNewListeners(
+        coreError: CoreMarfaError, expected: Marfa.MarfaError
+    ) async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let first = Heard(copy.changes())
+        core.fail(0, with: coreError)
+        let failure = stopped(expected)
+        try await eventually("the original listener receives the typed failure") { first.all == [failure] }
+        let second = Heard(copy.changes())
+        try await eventually("the later listener receives the same failure") { second.all == [failure] }
+        #expect(core.follows.count == 1)
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func aWriteIsToldToEveryStreamHeldAndNoneAfterItIsLetGo() async throws {
         let feed = Feed(holder: CoreHolder(FakeCore.writer()), source: .none)
         let (first, firstContinuation) = AsyncStream<Marfa.Change>.makeStream()
