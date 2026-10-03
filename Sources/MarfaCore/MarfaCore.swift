@@ -4705,6 +4705,8 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     )
     case Server(status: UInt16, code: String, message: String
     )
+    case Io(message: String
+    )
     case Network(message: String
     )
     /**
@@ -4716,6 +4718,14 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case Decoding(message: String
     )
     case Store(message: String
+    )
+    case Redirected(origin: String, status: UInt16, location: String?, message: String
+    )
+    case StorageFull(message: String
+    )
+    case SignedOut(origin: String, message: String
+    )
+    case NoKeychain(message: String
     )
     case NoServer(message: String
     )
@@ -4763,7 +4773,7 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case ContractMismatch(
         /**
          * The contract the answer named, or none where a success named none.
-         */served: String?, expected: UInt64, status: UInt16, 
+         */served: String?, expected: UInt64, status: UInt16?, 
         /**
          * The answer was to a write, which may have taken effect.
          */writeSent: Bool, message: String
@@ -4828,66 +4838,85 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             code: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 8: return .Network(
+        case 8: return .Io(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 9: return .Unnamed(
+        case 9: return .Network(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 10: return .Unnamed(
             status: try FfiConverterUInt16.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 10: return .Decoding(
+        case 11: return .Decoding(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 11: return .Store(
+        case 12: return .Store(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 12: return .NoServer(
+        case 13: return .Redirected(
+            origin: try FfiConverterString.read(from: &buf), 
+            status: try FfiConverterUInt16.read(from: &buf), 
+            location: try FfiConverterOptionString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 13: return .NoCursor(
+        case 14: return .StorageFull(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .HydrationIncomplete(
+        case 15: return .SignedOut(
+            origin: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 15: return .NoCatalog(
+        case 16: return .NoKeychain(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .WrongSchema(
+        case 17: return .NoServer(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 18: return .NoCursor(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 19: return .HydrationIncomplete(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 20: return .NoCatalog(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 21: return .WrongSchema(
             path: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             unsent: try FfiConverterOptionUInt64.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 17: return .ReadingHandle(
+        case 22: return .ReadingHandle(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 18: return .CopyExpired(
+        case 23: return .CopyExpired(
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .StreamIncomplete(
+        case 24: return .StreamIncomplete(
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .WrongServer(
+        case 25: return .WrongServer(
             expected: try FfiConverterString.read(from: &buf), 
             got: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 21: return .BytesAbsent(
+        case 26: return .BytesAbsent(
             hash: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 22: return .ContractMismatch(
+        case 27: return .ContractMismatch(
             served: try FfiConverterOptionString.read(from: &buf), 
             expected: try FfiConverterUInt64.read(from: &buf), 
-            status: try FfiConverterUInt16.read(from: &buf), 
+            status: try FfiConverterOptionUInt16.read(from: &buf), 
             writeSent: try FfiConverterBool.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 23: return .Invalid(
+        case 28: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -4945,49 +4974,78 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Network(message):
+        case let .Io(message):
             writeInt(&buf, Int32(8))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Unnamed(status,message):
+        case let .Network(message):
             writeInt(&buf, Int32(9))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Unnamed(status,message):
+            writeInt(&buf, Int32(10))
             FfiConverterUInt16.write(status, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .Decoding(message):
-            writeInt(&buf, Int32(10))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .Store(message):
             writeInt(&buf, Int32(11))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NoServer(message):
+        case let .Store(message):
             writeInt(&buf, Int32(12))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NoCursor(message):
+        case let .Redirected(origin,status,location,message):
             writeInt(&buf, Int32(13))
+            FfiConverterString.write(origin, into: &buf)
+            FfiConverterUInt16.write(status, into: &buf)
+            FfiConverterOptionString.write(location, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .HydrationIncomplete(message):
+        case let .StorageFull(message):
             writeInt(&buf, Int32(14))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NoCatalog(message):
+        case let .SignedOut(origin,message):
             writeInt(&buf, Int32(15))
+            FfiConverterString.write(origin, into: &buf)
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .NoKeychain(message):
+            writeInt(&buf, Int32(16))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .NoServer(message):
+            writeInt(&buf, Int32(17))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .NoCursor(message):
+            writeInt(&buf, Int32(18))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .HydrationIncomplete(message):
+            writeInt(&buf, Int32(19))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .NoCatalog(message):
+            writeInt(&buf, Int32(20))
             FfiConverterString.write(message, into: &buf)
             
         
         case let .WrongSchema(path,reason,unsent,message):
-            writeInt(&buf, Int32(16))
+            writeInt(&buf, Int32(21))
             FfiConverterString.write(path, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterOptionUInt64.write(unsent, into: &buf)
@@ -4995,47 +5053,47 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .ReadingHandle(message):
-            writeInt(&buf, Int32(17))
+            writeInt(&buf, Int32(22))
             FfiConverterString.write(message, into: &buf)
             
         
         case let .CopyExpired(reason,message):
-            writeInt(&buf, Int32(18))
+            writeInt(&buf, Int32(23))
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .StreamIncomplete(reason,message):
-            writeInt(&buf, Int32(19))
+            writeInt(&buf, Int32(24))
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .WrongServer(expected,got,message):
-            writeInt(&buf, Int32(20))
+            writeInt(&buf, Int32(25))
             FfiConverterString.write(expected, into: &buf)
             FfiConverterString.write(got, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .BytesAbsent(hash,reason,message):
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(26))
             FfiConverterString.write(hash, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .ContractMismatch(served,expected,status,writeSent,message):
-            writeInt(&buf, Int32(22))
+            writeInt(&buf, Int32(27))
             FfiConverterOptionString.write(served, into: &buf)
             FfiConverterUInt64.write(expected, into: &buf)
-            FfiConverterUInt16.write(status, into: &buf)
+            FfiConverterOptionUInt16.write(status, into: &buf)
             FfiConverterBool.write(writeSent, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .Invalid(message):
-            writeInt(&buf, Int32(23))
+            writeInt(&buf, Int32(28))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -5556,6 +5614,30 @@ public func FfiConverterTypeWriteKind_lower(_ value: WriteKind) -> RustBuffer {
     return FfiConverterTypeWriteKind.lower(value)
 }
 
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionUInt16: FfiConverterRustBuffer {
+    typealias SwiftType = UInt16?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterUInt16.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterUInt16.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
 
 #if swift(>=5.8)
 @_documentation(visibility: private)

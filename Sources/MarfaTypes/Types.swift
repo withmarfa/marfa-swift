@@ -739,11 +739,18 @@ public protocol APIProtocol: Sendable {
     func deleteWebhook(_ input: Operations.DeleteWebhook.Input) async throws -> Operations.DeleteWebhook.Output
     /// List webhook deliveries
     ///
-    /// Returns recent delivery attempts for one subscription, newest first, with each attempt's response status, attempt count, and next retry time. Use to debug delivery failures.
+    /// Returns recent delivery rows for one subscription, newest first, with the last accepted outcome and cumulative accepted-outcome ordinal. This is not a census of concurrent or lost HTTP sends.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
     func listWebhookDeliveries(_ input: Operations.ListWebhookDeliveries.Input) async throws -> Operations.ListWebhookDeliveries.Output
+    /// Redeliver a failed delivery
+    ///
+    /// Queues one retained failed delivery using the current subscription address and secret. Stable delivery and event identity are preserved. The cumulative attempt ordinal counts accepted outcomes, not every concurrent or lost HTTP send.
+    ///
+    /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
+    /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
+    func redeliverWebhookDelivery(_ input: Operations.RedeliverWebhookDelivery.Input) async throws -> Operations.RedeliverWebhookDelivery.Output
     /// List audit log entries
     ///
     /// Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads — item/edge reads, SSE, and search are not logged. Requires `audit.read`. The operator key holds no permission, so it is refused rather than shown the trail. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
@@ -2274,7 +2281,7 @@ extension APIProtocol {
     }
     /// List webhook deliveries
     ///
-    /// Returns recent delivery attempts for one subscription, newest first, with each attempt's response status, attempt count, and next retry time. Use to debug delivery failures.
+    /// Returns recent delivery rows for one subscription, newest first, with the last accepted outcome and cumulative accepted-outcome ordinal. This is not a census of concurrent or lost HTTP sends.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -2286,6 +2293,21 @@ extension APIProtocol {
         try await listWebhookDeliveries(Operations.ListWebhookDeliveries.Input(
             path: path,
             query: query,
+            headers: headers
+        ))
+    }
+    /// Redeliver a failed delivery
+    ///
+    /// Queues one retained failed delivery using the current subscription address and secret. Stable delivery and event identity are preserved. The cumulative attempt ordinal counts accepted outcomes, not every concurrent or lost HTTP send.
+    ///
+    /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
+    /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
+    public func redeliverWebhookDelivery(
+        path: Operations.RedeliverWebhookDelivery.Input.Path,
+        headers: Operations.RedeliverWebhookDelivery.Input.Headers = .init()
+    ) async throws -> Operations.RedeliverWebhookDelivery.Output {
+        try await redeliverWebhookDelivery(Operations.RedeliverWebhookDelivery.Input(
+            path: path,
             headers: headers
         ))
     }

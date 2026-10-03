@@ -21,6 +21,27 @@ struct ContractTests {
         }
     }
 
+    @Test(arguments: ["/next", nil] as [String?])
+    func aRedirectPreservesItsResponseWithoutFollowingIt(location: String?) async throws {
+        let server = try await LocalServer.start(
+            contract: marfaContractVersion,
+            headers: location.map { "location: \($0)\r\n" } ?? ""
+        ) { _, _ in (307, "application/json", "{}") }
+        defer { server.stop() }
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
+        do {
+            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+            Issue.record("a redirect was accepted")
+        } catch let MarfaError.redirected(origin, status, destination, message) {
+            #expect(origin == server.url.absoluteString)
+            #expect(status == 307)
+            #expect(destination == location)
+            #expect(!message.isEmpty)
+            #expect(server.log.all.count == 1)
+        }
+        await copy.close()
+    }
+
     /// The empty page names no event cursor, so `noCursor` shows the
     /// contract check passed.
     @Test func aServerOnTheContractTheTypesDescribeIsReadPastTheCheck() async throws {
