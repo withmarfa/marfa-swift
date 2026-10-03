@@ -30,6 +30,7 @@ runs() {
 runs "a README in a subfolder" false Examples/MarfaSample/README.md
 runs "top-level documentation and the licence" false README.md AGENTS.md LICENSE
 runs "a pull request template" false .github/PULL_REQUEST_TEMPLATE.md
+runs "the description check's workflow, which its test reads" true .github/workflows/pr-description.yml
 runs "Dependabot's settings" false .github/dependabot.yml
 runs "agent settings" false .claude/settings.json
 runs "a Swift-only change" true Sources/Marfa/Server.swift

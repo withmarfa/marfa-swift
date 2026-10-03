@@ -15,7 +15,8 @@ set -euo pipefail
 # Whether one changed path can affect the job. A path no rule names can.
 affects() {
   case "$1" in
-    scripts/ci-changes.sh | .github/workflows/ci.yml) return 0 ;;
+    # The description check's test reads its workflow.
+    scripts/ci-changes.sh | .github/workflows/ci.yml | .github/workflows/pr-description.yml) return 0 ;;
     .github/*) return 1 ;;
     # A fixture is test input, whatever its extension.
     fixtures/* | */fixtures/*) return 0 ;;
