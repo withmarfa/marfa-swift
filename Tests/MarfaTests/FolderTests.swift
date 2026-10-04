@@ -285,6 +285,31 @@ extension LiveWorkingCopies {
             #expect(passes >= 1)
         }
 
+        @Test func cancellingTheTaskThatIteratesAWatchStopsItAndFreesTheFolder() async throws {
+            let directory = try await FolderFixture.synced()
+            let watch = try await folders.watch(directory)
+            let iterating = Task {
+                for try await _ in watch {}
+            }
+            // The witness: the folder is held while the watch runs.
+            await #expect(throws: MarfaError.self) { try await folders.sync(directory) }
+            iterating.cancel()
+            try await eventually("a sync after the cancel", within: 20) {
+                (try? await folders.sync(directory)) != nil
+            }
+        }
+
+        @Test func releasingAWatchNobodyIteratesStopsItAndFreesTheFolder() async throws {
+            let directory = try await FolderFixture.synced()
+            var watch: FolderWatch? = try await folders.watch(directory)
+            await #expect(throws: MarfaError.self) { try await folders.sync(directory) }
+            #expect(watch != nil)
+            watch = nil
+            try await eventually("a sync after the release", within: 20) {
+                (try? await folders.sync(directory)) != nil
+            }
+        }
+
         @Test func aWatchWhoseCredentialIsRefusedEndsByThrowing() async throws {
             let directory = try await FolderFixture.synced()
             let server = try #require(Live.server)

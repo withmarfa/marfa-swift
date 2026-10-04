@@ -180,15 +180,29 @@ jobs:
         if: ${{ steps.core.outputs.cache-hit != 'true' }}
         run: scripts/core.sh
 
-      # The folder tests hold the package's registry to the one `marfa folders list` reads.
+      # The folder tests hold the package's registry to the one `marfa folders list` reads. Its own target
+      # directory and cache, so it never starts cold behind a core cache hit or swells the core's cache.
       - name: Restore the command line the pin builds
         id: cli
         uses: actions/cache@v6
         with:
           path: .build/marfa-cli
           key: marfa-cli-${{ runner.os }}-${{ hashFiles('core.pin') }}
+      - name: Cache the command line's build
+        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ${{ github.workspace }}/.build/cli-target
+          key: cli-build-${{ runner.os }}-${{ hashFiles('core.pin') }}
+          restore-keys: cli-build-${{ runner.os }}-
       - name: Build the command line at the pin
         if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/.build/cli-target
         run: |
           cargo build --locked -p marfa-cli --manifest-path "${MARFA_MONOREPO}/core/Cargo.toml"
           mkdir -p .build/marfa-cli
