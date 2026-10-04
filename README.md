@@ -131,8 +131,6 @@ A blocked verdict can carry the structured refusal and missing grant. Drain repo
 
 `copy.useKey(_:)` gives an open copy a new key: it closes the store and opens it again with the new key, and the copy, its parts and its held `changes()` streams carry on. The core has no call to change a key in place, so the store is reopened. That cannot happen while a call is running, so `useKey` waits for the slowest running call, and until the new key is in use every call on the copy throws `invalid`: ask again. A copy opened without a server throws `noServer`. If the store cannot be opened again the error is thrown and the copy is closed.
 
-Tests keep keys in `Keychain.isolated()` (macOS only), a keychain file of their own outside the search list. It turns off keychain prompts for the whole process, so an app never calls it.
-
 ## Closing
 
 `copy.close()` ends every `changes()` stream, stops what feeds them, and releases the store, so another opener can take the writer role once it returns. Calls already running finish first, so it takes as long as the slowest of them. Every call made after it begins, on the copy or any part of it, throws `MarfaError.closed`; a call racing `close()` either completes or throws that. A second `close()` returns only once the store is released.

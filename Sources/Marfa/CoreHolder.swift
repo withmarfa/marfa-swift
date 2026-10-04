@@ -208,8 +208,7 @@ final class CoreHolder: Sendable {
 
     /// Drops the core, and only then tells the closers waiting for the store.
     private func releaseNow() {
-        var core = state.withLock { $0.core.take() }
-        core = nil
+        _ = state.withLock { $0.core.take() }
         let closers = state.withLock { state in
             state.phase = .released
             return state.closers.drain()
