@@ -10,7 +10,9 @@ public struct Keychain: Sendable {
     /// On macOS, the user's default keychain, usually the login keychain.
     public static let system = Keychain()
 
-    /// Narrows a query, or a new item, to a keychain other than the default. Tests use it; an app has no way to.
+    /// Narrows a query, or a new item, to another keychain.
+    ///
+    /// Tests use it; an app has no way to.
     let narrow: @Sendable (_ query: inout [CFString: Any], _ forNewItem: Bool) throws -> Void
 
     init(narrow: @escaping @Sendable (inout [CFString: Any], Bool) throws -> Void = { _, _ in }) {
