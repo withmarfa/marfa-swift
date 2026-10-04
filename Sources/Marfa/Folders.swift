@@ -5,8 +5,8 @@ import Synchronization
 
 /// The folders on this Mac: directories whose files Marfa keeps in step with a folder's settings on the server.
 ///
-/// Folders work through the same core as the `marfa` command-line tool, and the Mac keeps one registry of
-/// them, so a folder added here appears in `marfa folders list`, and one added there appears in `list()`.
+/// Folders work through the same core and the same registry as the `marfa` command-line tool, so a folder
+/// added here appears in `marfa folders list`, and one added there appears in `list()`.
 ///
 /// One process works a folder at a time. While the command-line tool or a watch holds a folder, `sync(_:)`,
 /// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)` and `watch(_:)` throw `MarfaError.readingHandle`;
@@ -15,7 +15,10 @@ public struct Folders: Sendable {
     /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)` and `watch(_:)` reach.
     public let server: Server?
 
-    /// Without a server, only `list()`, `status(of:)`, `confirmRemoval(in:)` and `remove(_:)` work.
+    /// Creates a value that works the Mac's folders, reaching `server` where one is given.
+    ///
+    /// Without a server, only `list()`, `status(of:)`, `confirmRemoval(in:)`, `restoreRemoval(in:)` and
+    /// `remove(_:)` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -98,8 +101,9 @@ public struct Folders: Sendable {
 ///
 /// Iterate it for what the watch does. The sequence ends after `stop()`, and throws a `MarfaError` when the
 /// watch fails: when the server refuses the credential (`unauthorized`), when the server's changes stop
-/// reaching the folder, or when the directory can't be watched. Ending the task that iterates it stops the
-/// watch, and so does releasing it while nothing iterates it.
+/// reaching the folder, or when the directory can't be watched. Cancelling the task that iterates it stops
+/// the watch, and so does releasing it while nothing iterates it; leaving a loop over it early doesn't, so
+/// call `stop()`.
 public final class FolderWatch: AsyncSequence, Sendable {
     public typealias Element = FolderEvent
 

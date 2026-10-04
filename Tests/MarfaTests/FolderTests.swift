@@ -71,8 +71,9 @@ enum FolderFixture {
     /// Runs the command-line tool with this process's environment, the registry's name and the server's among
     /// it, and answers what it printed.
     static func run(_ arguments: [String]) throws -> Data {
+        let binary = try #require(commandLine)
         let process = Process()
-        process.executableURL = try #require(commandLine)
+        process.executableURL = binary
         process.arguments = arguments
         let output = Pipe()
         process.standardOutput = output

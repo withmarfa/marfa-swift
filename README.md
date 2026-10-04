@@ -127,7 +127,7 @@ A blocked verdict can carry the structured refusal and missing grant. Drain repo
 
 ## Sync a folder on a Mac
 
-A folder is a directory whose files Marfa keeps in step with the search a `system.folder` item on the server describes. `Folders` manages them on macOS through the same core and the same per-Mac registry as `marfa folders`, so a folder added from an app appears in `marfa folders list`, and one added from the command line appears in `folders.list()`.
+A folder is a directory whose files Marfa keeps in step with the search a `system.folder` item on the server describes. `Folders` manages them on macOS through the same core and the same registry as `marfa folders`, so a folder added from an app appears in `marfa folders list`, and one added from the command line appears in `folders.list()`.
 
 1. Create the folder's settings on the server, for example with `marfa folders create --title Notes --search '{"types":["core.note"]}'`, and note the returned item ID.
 1. Add the directory and sync it:
@@ -139,7 +139,7 @@ A folder is a directory whose files Marfa keeps in step with the search a `syste
     let notes = URL(filePath: "/path/to/Notes", directoryHint: .isDirectory)
     _ = try await folders.add(notes, following: folderID)
     let synced = try await folders.sync(notes)
-    if let error = synced.catchUpError {
+    if synced.catchUpError != nil {
         // The server was out of reach; local edits wait and go at the next sync.
     }
     ```
