@@ -39,9 +39,10 @@ public final class WorkingCopy: Sendable {
 
     /// Opens the store at `store`, making it when absent.
     ///
-    /// Reads of items and edges, and every write, are refused until the store
-    /// holds a completed hydration; after that a copy without a server reads
-    /// and queues writes. A server lets the copy hydrate, catch up and drain
+    /// A new store reads and queues writes before its first hydration. A store
+    /// whose hydration was interrupted or whose read view expired requires a
+    /// completed hydration before reads and writes resume.
+    /// A server lets the copy hydrate, catch up and drain
     /// when the app calls them, and lets a held `changes()` follow its
     /// events. A second opener of one store gets a reading handle,
     /// and its `changes()` watch for the writer's saves.
@@ -83,9 +84,25 @@ public final class WorkingCopy: Sendable {
         await feed.pause()
         defer { feed.unpause() }
         let report = HydrateReport(
-            try await holder.run { core in try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes) })
+            try await holder.runUntilCanceled { core, stop in
+                try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes, stop: stop)
+            })
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
+    }
+
+    /// Replaces the app's declared types, each a JSON type definition.
+    ///
+    /// Offline creates are checked against them before the first hydration.
+    /// Hydration registers any the instance lacks and reports refusals.
+    public func declareTypes(_ types: [String]) async throws {
+        try await holder.run { core in try core.declareTypes(types: types) }
+        feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+    }
+
+    /// Reads the declarations stored in this copy, each as normalized JSON.
+    public func declaredTypes() async throws -> [String] {
+        try await holder.run { core in try core.declaredTypes() }
     }
 
     /// Reads and holds an item whatever the slice says of it.
@@ -109,9 +126,9 @@ public final class WorkingCopy: Sendable {
         defer { feed.unpause() }
         // The core commits a new catalog before it applies anything, so a
         // catch-up that then fails has still changed it.
-        let (caughtUp, catalogChanged) = try await holder.run { core in
+        let (caughtUp, catalogChanged) = try await holder.runUntilCanceled { core, stop in
             let before = try core.status().catalogVersion
-            let caughtUp = Result { try translated { CatchUpReport(try core.catchUp()) } }
+            let caughtUp = Result { try translated { CatchUpReport(try core.catchUp(stop: stop)) } }
             let after = try? core.status().catalogVersion
             return (caughtUp, after.map { $0 != before } ?? false)
         }
@@ -125,7 +142,7 @@ public final class WorkingCopy: Sendable {
         return report
     }
 
-    /// Full-text search over titles, bodies and tags, best match first.
+    /// Full-text search over indexed fields and tags, best match first.
     public func search(_ query: String, filters: SearchFilters = SearchFilters(), limit: Int = 20) async throws
         -> [SearchHit]
     {
@@ -147,11 +164,11 @@ public final class WorkingCopy: Sendable {
     ///
     /// When the follow stops with an error, every stream is told `.stopped`
     /// and it stays stopped until the app's next hydration or catch-up. On a
-    /// store that holds no completed hydration there is nothing to follow:
-    /// the streams are told nothing, and the follow starts with the next
-    /// hydration. `status().hydration` says which. A
-    /// reader's watch keeps retrying, and tells `.saved` once it reads the
-    /// store again.
+    /// store that holds no completed hydration there are no server events
+    /// to follow until the next hydration. Local writes and declarations
+    /// still notify the writer's streams. `status().hydration` says which.
+    /// A reader's watch keeps retrying and tells `.saved` once it reads a
+    /// changed SQLite data version.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
         // Set before the stream is added: one finished in between would keep
@@ -236,9 +253,8 @@ public struct Change: Sendable, Hashable {
         case withdrawn
         case pinned
         case unpinned
-        /// A catch-up or a held stream read an item type or edge type
-        /// catalog that differs from the one the copy held; read `catalog`
-        /// again.
+        /// The app replaced its declarations, or a refresh read a changed
+        /// item type or edge type catalog; read `catalog` again.
         case catalog
     }
 
@@ -454,7 +470,7 @@ public struct Queue: Sendable {
     ///
     /// Nothing drains on its own.
     public func drain() async throws -> DrainReport {
-        let report = DrainReport(try await holder.run { core in try core.drain() })
+        let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
         for answered in report.verdicts where answered.verdict != nil {
             feed.announce(Change(origin: .answered(answered), itemId: answered.itemId, edgeId: answered.edgeId))
         }

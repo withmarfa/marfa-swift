@@ -85,11 +85,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/updated_before`.
                 public var updatedBefore: Swift.String?
-                /// Page size, 1–200 (default 50)
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Pagination cursor from a prior response
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -112,8 +112,8 @@ public enum Operations {
                 ///   - occurredBefore: Upper bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive).
                 ///   - updatedAfter: Lower bound on `updated_at`, when the row last changed (inclusive). The catch-up filter: pass the cursor you hold to get everything that changed since. Forces `(updated_at, id)` ascending order, so `sort` and `direction` cannot also be given, and a cursor issued under one ordering is refused under the other. Inclusive because `updated_at` ties across a bulk write, so deduplicate by id — and note that a high-water mark landing on an instant a large bulk write shares means that whole group is re-sent on every reconnect, which terminates but is not free. This read reports changes, never removals: a purge leaves no row behind, so pruning a local copy needs the event stream as well.
                 ///   - updatedBefore: Upper bound on `updated_at` (exclusive), closing the window its lower twin opens. Exclusive where `updated_after` is inclusive, because this is an end point the caller chooses rather than a resume point that must not drop a tie. It does not change the ordering, so it may be given under any sort.
-                ///   - limit: Page size, 1–200 (default 50)
-                ///   - cursor: Pagination cursor from a prior response
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///   - include: Comma-separated tokens. `edges`, `metadata` and `extensions` hydrate those extras inline on the rows already being returned. `system` is different in kind: it widens the row set, opting in `system.*` items, which are excluded by default. A `type` filter in the `system.` namespace, concrete or wildcard, opts in on its own without the token.
                 public init(
                     _type: Swift.String? = nil,
@@ -152,12 +152,21 @@ public enum Operations {
             public var query: Operations.ListItems.Input.Query
             /// - Remark: Generated from `#/paths/items/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/items/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItems.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItems.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItems.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -199,6 +208,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -207,18 +220,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -473,7 +489,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/get(listItems)/responses/401`.
             ///
@@ -523,6 +539,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -532,13 +552,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -546,6 +568,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -600,6 +623,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ListItems.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListItems.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ListItems.Output.Conflict.Headers = .init(),
+                    body: Operations.ListItems.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//items/get(listItems)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ListItems.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ListItems.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -698,7 +830,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/get(listItems)/responses/429`.
             ///
@@ -807,7 +939,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/get(listItems)/responses/503`.
             ///
@@ -872,7 +1004,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -880,7 +1012,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -1472,7 +1604,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/post(createItem)/responses/401`.
             ///
@@ -1978,7 +2110,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/post(createItem)/responses/413`.
             ///
@@ -2225,7 +2357,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/post(createItem)/responses/429`.
             ///
@@ -2345,7 +2477,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/post(createItem)/responses/503`.
             ///
@@ -2864,7 +2996,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)/responses/401`.
             ///
@@ -3089,7 +3221,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)/responses/429`.
             ///
@@ -3198,7 +3330,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)/responses/503`.
             ///
@@ -3297,12 +3429,21 @@ public enum Operations {
             public var query: Operations.GetItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItem.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItem.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -3347,6 +3488,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -3355,18 +3500,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -3621,7 +3769,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/get(getItem)/responses/401`.
             ///
@@ -3671,6 +3819,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -3680,13 +3832,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -3694,6 +3848,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -3780,6 +3935,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/404/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -3789,13 +3948,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -3803,6 +3964,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -3857,6 +4019,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetItem.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetItem.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetItem.Output.Conflict.Headers = .init(),
+                    body: Operations.GetItem.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/get(getItem)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.GetItem.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.GetItem.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -3955,7 +4226,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/get(getItem)/responses/429`.
             ///
@@ -4064,7 +4335,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/get(getItem)/responses/503`.
             ///
@@ -4159,7 +4430,7 @@ public enum Operations {
             public var query: Operations.UpdateItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -4167,7 +4438,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -4774,7 +5045,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/401`.
             ///
@@ -5292,7 +5563,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/413`.
             ///
@@ -5539,7 +5810,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/429`.
             ///
@@ -5659,7 +5930,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/503`.
             ///
@@ -5754,7 +6025,7 @@ public enum Operations {
             public var query: Operations.DeleteItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -5762,7 +6033,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -6109,7 +6380,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/401`.
             ///
@@ -6591,7 +6862,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/413`.
             ///
@@ -6838,7 +7109,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/429`.
             ///
@@ -6958,7 +7229,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/503`.
             ///
@@ -7038,7 +7309,7 @@ public enum Operations {
             public var path: Operations.RestoreItem.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/restore/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/restore/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -7046,7 +7317,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -7390,7 +7661,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)/responses/401`.
             ///
@@ -7827,7 +8098,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)/responses/413`.
             ///
@@ -8074,7 +8345,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)/responses/429`.
             ///
@@ -8194,7 +8465,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)/responses/503`.
             ///
@@ -8274,7 +8545,7 @@ public enum Operations {
             public var path: Operations.TransitionItem.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -8282,7 +8553,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -8656,7 +8927,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/401`.
             ///
@@ -9093,7 +9364,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/413`.
             ///
@@ -9340,7 +9611,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/429`.
             ///
@@ -9460,7 +9731,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/503`.
             ///
@@ -9540,19 +9811,19 @@ public enum Operations {
             public var path: Operations.ListItemVersions.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/versions/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Page size, 1–200 (default 50)
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/versions/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque cursor from a previous page's `next_cursor`.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/versions/GET/query/cursor`.
                 public var cursor: Swift.String?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - limit: Page size, 1–200 (default 50)
-                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     limit: Swift.Int? = nil,
                     cursor: Swift.String? = nil
@@ -9888,7 +10159,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)/responses/401`.
             ///
@@ -10222,7 +10493,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)/responses/429`.
             ///
@@ -10331,7 +10602,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)/responses/503`.
             ///
@@ -10732,7 +11003,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/get(getItemMetadata)/responses/401`.
             ///
@@ -11066,7 +11337,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/get(getItemMetadata)/responses/429`.
             ///
@@ -11175,7 +11446,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/get(getItemMetadata)/responses/503`.
             ///
@@ -11600,7 +11871,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(mergeItemMetadata)/responses/401`.
             ///
@@ -11906,7 +12177,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(mergeItemMetadata)/responses/413`.
             ///
@@ -12022,7 +12293,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(mergeItemMetadata)/responses/429`.
             ///
@@ -12131,7 +12402,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(mergeItemMetadata)/responses/503`.
             ///
@@ -12556,7 +12827,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/401`.
             ///
@@ -12862,7 +13133,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/413`.
             ///
@@ -12978,7 +13249,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/429`.
             ///
@@ -13087,7 +13358,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/503`.
             ///
@@ -13512,7 +13783,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/401`.
             ///
@@ -13818,7 +14089,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/413`.
             ///
@@ -13934,7 +14205,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/429`.
             ///
@@ -14043,7 +14314,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/503`.
             ///
@@ -14142,7 +14413,7 @@ public enum Operations {
             public var query: Operations.PurgeItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/purge/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -14150,7 +14421,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -14497,7 +14768,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)/responses/401`.
             ///
@@ -14979,7 +15250,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)/responses/413`.
             ///
@@ -15226,7 +15497,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)/responses/429`.
             ///
@@ -15346,7 +15617,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/purge/delete(purgeItem)/responses/503`.
             ///
@@ -15756,7 +16027,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/401`.
             ///
@@ -16062,7 +16333,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/413`.
             ///
@@ -16178,7 +16449,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/429`.
             ///
@@ -16287,7 +16558,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/503`.
             ///
@@ -16867,7 +17138,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/401`.
             ///
@@ -17282,7 +17553,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/413`.
             ///
@@ -17398,7 +17669,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/429`.
             ///
@@ -17507,7 +17778,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/503`.
             ///
@@ -17574,7 +17845,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/bulk-actions/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/bulk-actions/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -17582,7 +17853,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -18468,7 +18739,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/401`.
             ///
@@ -18785,7 +19056,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/413`.
             ///
@@ -19032,7 +19303,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/429`.
             ///
@@ -19152,7 +19423,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/503`.
             ///
@@ -19444,7 +19715,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)/responses/401`.
             ///
@@ -19778,7 +20049,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)/responses/429`.
             ///
@@ -19887,7 +20158,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)/responses/503`.
             ///
@@ -20179,7 +20450,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/delete(cancelBulkActionJob)/responses/401`.
             ///
@@ -20485,7 +20756,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/delete(cancelBulkActionJob)/responses/413`.
             ///
@@ -20601,7 +20872,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/delete(cancelBulkActionJob)/responses/429`.
             ///
@@ -20710,7 +20981,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/delete(cancelBulkActionJob)/responses/503`.
             ///
@@ -21167,7 +21438,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/401`.
             ///
@@ -21364,7 +21635,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/413`.
             ///
@@ -21480,7 +21751,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/429`.
             ///
@@ -21589,7 +21860,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/503`.
             ///
@@ -22116,7 +22387,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)/responses/401`.
             ///
@@ -22313,7 +22584,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)/responses/413`.
             ///
@@ -22429,7 +22700,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)/responses/429`.
             ///
@@ -22538,7 +22809,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)/responses/503`.
             ///
@@ -23028,7 +23299,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)/responses/401`.
             ///
@@ -23225,7 +23496,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)/responses/413`.
             ///
@@ -23341,7 +23612,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)/responses/429`.
             ///
@@ -23450,7 +23721,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)/responses/503`.
             ///
@@ -23851,7 +24122,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)/responses/401`.
             ///
@@ -24185,7 +24456,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)/responses/429`.
             ///
@@ -24294,7 +24565,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)/responses/503`.
             ///
@@ -24745,7 +25016,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)/responses/401`.
             ///
@@ -25079,7 +25350,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)/responses/429`.
             ///
@@ -25188,7 +25459,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)/responses/503`.
             ///
@@ -25625,7 +25896,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/401`.
             ///
@@ -25931,7 +26202,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/413`.
             ///
@@ -26047,7 +26318,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/429`.
             ///
@@ -26156,7 +26427,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/503`.
             ///
@@ -26566,7 +26837,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/401`.
             ///
@@ -26872,7 +27143,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/413`.
             ///
@@ -26988,7 +27259,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/429`.
             ///
@@ -27097,7 +27368,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/503`.
             ///
@@ -27181,11 +27452,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/edges/GET/query/edge_type`.
                 public var edgeType: Swift.String?
-                /// Maximum edges to return per page.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/edges/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Pagination cursor from a previous response.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/edges/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -27193,8 +27464,8 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - edgeType: Filter to a single edge type.
-                ///   - limit: Maximum edges to return per page.
-                ///   - cursor: Pagination cursor from a previous response.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     edgeType: Swift.String? = nil,
                     limit: Swift.Int? = nil,
@@ -27208,12 +27479,21 @@ public enum Operations {
             public var query: Operations.ListItemEdges.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/edges/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/edges/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItemEdges.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItemEdges.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItemEdges.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -27258,6 +27538,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -27266,18 +27550,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -27532,7 +27819,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)/responses/401`.
             ///
@@ -27582,6 +27869,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -27591,13 +27882,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -27605,6 +27898,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -27691,6 +27985,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/404/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -27700,13 +27998,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -27714,6 +28014,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -27768,6 +28069,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ListItemEdges.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListItemEdges.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ListItemEdges.Output.Conflict.Headers = .init(),
+                    body: Operations.ListItemEdges.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ListItemEdges.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ListItemEdges.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -27866,7 +28276,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)/responses/429`.
             ///
@@ -27975,7 +28385,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)/responses/503`.
             ///
@@ -28059,11 +28469,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/backrefs/GET/query/edge_type`.
                 public var edgeType: Swift.String?
-                /// Maximum edges to return per page.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/backrefs/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Pagination cursor from a previous response.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/backrefs/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -28071,8 +28481,8 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - edgeType: Filter to a single edge type.
-                ///   - limit: Maximum edges to return per page.
-                ///   - cursor: Pagination cursor from a previous response.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     edgeType: Swift.String? = nil,
                     limit: Swift.Int? = nil,
@@ -28410,7 +28820,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)/responses/401`.
             ///
@@ -28744,7 +29154,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)/responses/429`.
             ///
@@ -28853,7 +29263,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)/responses/503`.
             ///
@@ -28938,11 +29348,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/edges/GET/query/updated_before`.
                 public var updatedBefore: Swift.String?
-                /// Maximum edges to return per page.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/edges/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Pagination cursor from a previous response.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/edges/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -28952,8 +29362,8 @@ public enum Operations {
                 ///   - edgeType: Comma-separated edge types. Up to 10 entries. Omit to list every edge.
                 ///   - updatedAfter: Lower bound on `updated_at`, when the edge last changed (inclusive). The catch-up filter, matching `GET /items`. An RFC 3339 instant in any valid spelling; it is normalized before the comparison. Changes the order from newest-created-first to `(updated_at, id)` ascending, so a cursor from one ordering cannot be continued under the other and is refused if tried. Inclusive because `updated_at` ties across a bulk write, so deduplicate by id — and a high-water mark landing on an instant a large bulk write shares means that whole group is re-sent on every reconnect.
                 ///   - updatedBefore: Upper bound on `updated_at` (exclusive), closing the window its lower twin opens. Exclusive where `updated_after` is inclusive, because this is an end point the caller chooses rather than a resume point that must not drop a tie. It leaves the ordering alone.
-                ///   - limit: Maximum edges to return per page.
-                ///   - cursor: Pagination cursor from a previous response.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     edgeType: Swift.String? = nil,
                     updatedAfter: Swift.String? = nil,
@@ -28971,12 +29381,21 @@ public enum Operations {
             public var query: Operations.ListEdges.Input.Query
             /// - Remark: Generated from `#/paths/edges/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/edges/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdges.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdges.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdges.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -29018,6 +29437,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -29026,18 +29449,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -29292,7 +29718,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edges/get(listEdges)/responses/401`.
             ///
@@ -29342,6 +29768,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -29351,13 +29781,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -29365,6 +29797,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -29419,6 +29852,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ListEdges.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/edges/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListEdges.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ListEdges.Output.Conflict.Headers = .init(),
+                    body: Operations.ListEdges.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//edges/get(listEdges)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ListEdges.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ListEdges.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -29517,7 +30059,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edges/get(listEdges)/responses/429`.
             ///
@@ -29626,7 +30168,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edges/get(listEdges)/responses/503`.
             ///
@@ -29691,7 +30233,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/edges/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/edges/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -29699,7 +30241,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -30246,7 +30788,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/401`.
             ///
@@ -30728,7 +31270,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/413`.
             ///
@@ -30975,7 +31517,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/429`.
             ///
@@ -31095,7 +31637,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/503`.
             ///
@@ -31175,12 +31717,21 @@ public enum Operations {
             public var path: Operations.GetEdge.Input.Path
             /// - Remark: Generated from `#/paths/edges/{id}/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/edges/{id}/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetEdge.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetEdge.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetEdge.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -31222,6 +31773,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -31230,18 +31785,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -31387,7 +31945,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)/responses/401`.
             ///
@@ -31437,6 +31995,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -31446,13 +32008,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -31460,6 +32024,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -31546,6 +32111,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/404/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -31555,13 +32124,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -31569,6 +32140,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -31623,6 +32195,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetEdge.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetEdge.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetEdge.Output.Conflict.Headers = .init(),
+                    body: Operations.GetEdge.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.GetEdge.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.GetEdge.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -31721,7 +32402,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)/responses/429`.
             ///
@@ -31830,7 +32511,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)/responses/503`.
             ///
@@ -31914,7 +32595,7 @@ public enum Operations {
             public var path: Operations.UpdateEdge.Input.Path
             /// - Remark: Generated from `#/paths/edges/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/edges/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -31922,7 +32603,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -32338,7 +33019,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)/responses/401`.
             ///
@@ -32820,7 +33501,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)/responses/413`.
             ///
@@ -33067,7 +33748,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)/responses/429`.
             ///
@@ -33187,7 +33868,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)/responses/503`.
             ///
@@ -33267,7 +33948,7 @@ public enum Operations {
             public var path: Operations.DeleteEdge.Input.Path
             /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -33275,7 +33956,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -33619,7 +34300,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/delete(deleteEdge)/responses/401`.
             ///
@@ -34056,7 +34737,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/delete(deleteEdge)/responses/413`.
             ///
@@ -34303,7 +34984,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/delete(deleteEdge)/responses/429`.
             ///
@@ -34423,7 +35104,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/delete(deleteEdge)/responses/503`.
             ///
@@ -34924,7 +35605,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/401`.
             ///
@@ -35339,7 +36020,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/413`.
             ///
@@ -35455,7 +36136,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/429`.
             ///
@@ -35564,7 +36245,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/503`.
             ///
@@ -35629,12 +36310,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/edge-types/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/edge-types/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdgeTypes.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdgeTypes.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdgeTypes.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -35671,6 +36361,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edge-types/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -35679,18 +36373,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -35836,7 +36533,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)/responses/401`.
             ///
@@ -35854,6 +36551,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ListEdgeTypes.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListEdgeTypes.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ListEdgeTypes.Output.Conflict.Headers = .init(),
+                    body: Operations.ListEdgeTypes.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ListEdgeTypes.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ListEdgeTypes.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -35952,7 +36758,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)/responses/429`.
             ///
@@ -36061,7 +36867,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)/responses/503`.
             ///
@@ -36468,7 +37274,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)/responses/401`.
             ///
@@ -36774,7 +37580,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)/responses/413`.
             ///
@@ -36890,7 +37696,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)/responses/429`.
             ///
@@ -36999,7 +37805,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(createEdgeType)/responses/503`.
             ///
@@ -37425,7 +38231,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//edge-types/{id}/delete(deleteEdgeType)/responses/401`.
             ///
@@ -37840,7 +38646,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//edge-types/{id}/delete(deleteEdgeType)/responses/413`.
             ///
@@ -37956,7 +38762,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//edge-types/{id}/delete(deleteEdgeType)/responses/429`.
             ///
@@ -38065,7 +38871,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//edge-types/{id}/delete(deleteEdgeType)/responses/503`.
             ///
@@ -38130,12 +38936,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/types/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/types/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListTypes.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListTypes.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListTypes.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -38172,6 +38987,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/types/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -38180,18 +38999,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -38337,7 +39159,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//types/get(listTypes)/responses/401`.
             ///
@@ -38355,6 +39177,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/types/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ListTypes.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/types/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListTypes.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ListTypes.Output.Conflict.Headers = .init(),
+                    body: Operations.ListTypes.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//types/get(listTypes)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ListTypes.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ListTypes.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -38453,7 +39384,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//types/get(listTypes)/responses/429`.
             ///
@@ -38562,7 +39493,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//types/get(listTypes)/responses/503`.
             ///
@@ -38954,7 +39885,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/401`.
             ///
@@ -39260,7 +40191,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/413`.
             ///
@@ -39485,7 +40416,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/429`.
             ///
@@ -39594,7 +40525,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/503`.
             ///
@@ -39888,7 +40819,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/get(getType)/responses/401`.
             ///
@@ -40222,7 +41153,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/get(getType)/responses/429`.
             ///
@@ -40331,7 +41262,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/get(getType)/responses/503`.
             ///
@@ -40741,7 +41672,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/401`.
             ///
@@ -41156,7 +42087,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/413`.
             ///
@@ -41381,7 +42312,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/429`.
             ///
@@ -41490,7 +42421,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(updateType)/responses/503`.
             ///
@@ -41813,7 +42744,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/401`.
             ///
@@ -42228,7 +43159,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/413`.
             ///
@@ -42344,7 +43275,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/429`.
             ///
@@ -42453,7 +43384,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/503`.
             ///
@@ -42509,7 +43440,7 @@ public enum Operations {
     }
     /// Search items
     ///
-    /// Full-text search across every item the caller can read, indexing textual properties and tags, ranked by relevance with a configurable recency boost. Accepts the same filters as `GET /items` — including its two time bounds, which read the item's own time — and pages by cursor like every list: pass `next_cursor` back as `cursor`. The ranking is recomputed on every page, so a row whose score moves between two reads can be seen twice or missed; absolute scores aren't stable across index rebuilds. The ranking is read at most 10,000 rows deep, and the page that reaches that depth answers `next_cursor: null`. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
+    /// Full-text search across every item the caller can read, indexing textual properties and tags, ranked by BM25 relevance, hits of equal rank by item identifier. Accepts the same filters as `GET /items` — including its two time bounds, which read the item's own time — and pages by cursor like every list: pass `next_cursor` back as `cursor`. The ranking is recomputed on every page, so a row whose score moves between two reads can be seen twice or missed; absolute scores aren't stable across index rebuilds. The ranking is read at most 10,000 rows deep, and the page that reaches that depth answers `next_cursor: null`. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /search`.
     /// - Remark: Generated from `#/paths//search/get(searchItems)`.
@@ -42550,11 +43481,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/tags`.
                 public var tags: Swift.String?
-                /// Maximum results to return.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque cursor from a previous page's `next_cursor`.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -42579,8 +43510,8 @@ public enum Operations {
                 ///   - tier: Filter by tier; `all` or absent means unfiltered.
                 ///   - include: Comma-separated opt-in inclusions. `system` widens the row set to include `system.*` items, which are excluded by default. A `type` filter in the `system.` namespace, concrete or wildcard, opts in on its own without the token. It is the only token this route reads.
                 ///   - tags: Comma-separated tags; items must match all (AND).
-                ///   - limit: Maximum results to return.
-                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///   - filter: Structured filter expression, as on `GET /items`, including its edge terms and their refusals: a term naming an edge type the credential may not read is refused `403 edge_permission_denied`. A `backref` term counts only edges whose source the credential may read, so one anchored on an item it may not read matches as one anchored on an id no row holds; an `edge` term matches every edge it may read, one to an item it may not read included.
                 ///   - occurredAfter: Lower bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive). An RFC 3339 instant in any valid spelling; it is normalized before the comparison. Not the modification time.
                 ///   - occurredBefore: Upper bound on the item's own time — `occurred_at`, falling back to `created_at` (exclusive).
@@ -42934,7 +43865,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//search/get(searchItems)/responses/401`.
             ///
@@ -43159,7 +44090,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//search/get(searchItems)/responses/429`.
             ///
@@ -43268,7 +44199,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//search/get(searchItems)/responses/503`.
             ///
@@ -43685,7 +44616,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)/responses/401`.
             ///
@@ -43910,7 +44841,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)/responses/429`.
             ///
@@ -44019,7 +44950,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)/responses/503`.
             ///
@@ -44291,7 +45222,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//metadata/tags/get(listTags)/responses/401`.
             ///
@@ -44516,7 +45447,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//metadata/tags/get(listTags)/responses/429`.
             ///
@@ -44625,7 +45556,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//metadata/tags/get(listTags)/responses/503`.
             ///
@@ -45046,7 +45977,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/401`.
             ///
@@ -45271,7 +46202,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/429`.
             ///
@@ -45380,7 +46311,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/503`.
             ///
@@ -45652,7 +46583,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)/responses/401`.
             ///
@@ -45877,7 +46808,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)/responses/429`.
             ///
@@ -45986,7 +46917,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)/responses/503`.
             ///
@@ -46258,7 +47189,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)/responses/401`.
             ///
@@ -46483,7 +47414,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)/responses/429`.
             ///
@@ -46592,7 +47523,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)/responses/503`.
             ///
@@ -47158,7 +48089,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/401`.
             ///
@@ -47608,7 +48539,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/429`.
             ///
@@ -47717,7 +48648,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/503`.
             ///
@@ -48165,7 +49096,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)/responses/401`.
             ///
@@ -48499,7 +49430,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)/responses/429`.
             ///
@@ -48608,7 +49539,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)/responses/503`.
             ///
@@ -49009,7 +49940,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/get(listBlobLocations)/responses/401`.
             ///
@@ -49343,7 +50274,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/get(listBlobLocations)/responses/429`.
             ///
@@ -49452,7 +50383,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/get(listBlobLocations)/responses/503`.
             ///
@@ -49862,7 +50793,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(dropBlobLocation)/responses/401`.
             ///
@@ -50305,7 +51236,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(dropBlobLocation)/responses/429`.
             ///
@@ -50414,7 +51345,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(dropBlobLocation)/responses/503`.
             ///
@@ -50686,7 +51617,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)/responses/401`.
             ///
@@ -50911,7 +51842,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)/responses/429`.
             ///
@@ -51020,7 +51951,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)/responses/503`.
             ///
@@ -51421,7 +52352,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)/responses/401`.
             ///
@@ -51836,7 +52767,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)/responses/413`.
             ///
@@ -51952,7 +52883,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)/responses/429`.
             ///
@@ -52061,7 +52992,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)/responses/503`.
             ///
@@ -52333,7 +53264,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/get(listConnectors)/responses/401`.
             ///
@@ -52449,7 +53380,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/get(listConnectors)/responses/429`.
             ///
@@ -52558,7 +53489,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/get(listConnectors)/responses/503`.
             ///
@@ -53075,7 +54006,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/401`.
             ///
@@ -53272,7 +54203,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/413`.
             ///
@@ -53388,7 +54319,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/429`.
             ///
@@ -53497,7 +54428,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/503`.
             ///
@@ -53789,7 +54720,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)/responses/401`.
             ///
@@ -54014,7 +54945,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)/responses/429`.
             ///
@@ -54123,7 +55054,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)/responses/503`.
             ///
@@ -54415,7 +55346,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)/responses/401`.
             ///
@@ -54721,7 +55652,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)/responses/413`.
             ///
@@ -54837,7 +55768,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)/responses/429`.
             ///
@@ -54946,7 +55877,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)/responses/503`.
             ///
@@ -55253,7 +56184,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)/responses/401`.
             ///
@@ -55559,7 +56490,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)/responses/413`.
             ///
@@ -55675,7 +56606,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)/responses/429`.
             ///
@@ -55784,7 +56715,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)/responses/503`.
             ///
@@ -55864,19 +56795,19 @@ public enum Operations {
             public var path: Operations.ListConnectorRuns.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/runs/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// How many runs, newest first: at most 200, 50 unless given.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/runs/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque cursor from a previous page's `next_cursor`.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/runs/GET/query/cursor`.
                 public var cursor: Swift.String?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - limit: How many runs, newest first: at most 200, 50 unless given.
-                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     limit: Swift.Int? = nil,
                     cursor: Swift.String? = nil
@@ -56212,7 +57143,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)/responses/401`.
             ///
@@ -56437,7 +57368,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)/responses/429`.
             ///
@@ -56546,7 +57477,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)/responses/503`.
             ///
@@ -57002,7 +57933,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)/responses/401`.
             ///
@@ -57308,7 +58239,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)/responses/413`.
             ///
@@ -57424,7 +58355,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)/responses/429`.
             ///
@@ -57533,7 +58464,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)/responses/503`.
             ///
@@ -57825,7 +58756,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)/responses/401`.
             ///
@@ -58159,7 +59090,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)/responses/429`.
             ///
@@ -58268,7 +59199,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)/responses/503`.
             ///
@@ -58703,7 +59634,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)/responses/401`.
             ///
@@ -59118,7 +60049,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)/responses/413`.
             ///
@@ -59234,7 +60165,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)/responses/429`.
             ///
@@ -59343,7 +60274,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)/responses/503`.
             ///
@@ -59644,7 +60575,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)/responses/401`.
             ///
@@ -59950,7 +60881,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)/responses/413`.
             ///
@@ -60066,7 +60997,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)/responses/429`.
             ///
@@ -60175,7 +61106,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)/responses/503`.
             ///
@@ -60271,11 +61202,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/GET/query/endpoint_id`.
                 public var endpointId: Swift.String?
-                /// How many deliveries, oldest first: at most 200, 50 unless given.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque cursor from a previous page's `next_cursor`.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -60284,8 +61215,8 @@ public enum Operations {
                 /// - Parameters:
                 ///   - state: Which deliveries: not yet handled, handled, or both.
                 ///   - endpointId: Only the deliveries this endpoint received.
-                ///   - limit: How many deliveries, oldest first: at most 200, 50 unless given.
-                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     state: Operations.ListInboundDeliveries.Input.Query.StatePayload? = nil,
                     endpointId: Swift.String? = nil,
@@ -60625,7 +61556,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)/responses/401`.
             ///
@@ -60959,7 +61890,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)/responses/429`.
             ///
@@ -61068,7 +61999,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)/responses/503`.
             ///
@@ -61369,7 +62300,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)/responses/401`.
             ///
@@ -61703,7 +62634,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)/responses/429`.
             ///
@@ -61812,7 +62743,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)/responses/503`.
             ///
@@ -62272,7 +63203,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)/responses/401`.
             ///
@@ -62578,7 +63509,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)/responses/413`.
             ///
@@ -62694,7 +63625,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)/responses/429`.
             ///
@@ -62803,7 +63734,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)/responses/503`.
             ///
@@ -63265,7 +64196,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)/responses/401`.
             ///
@@ -63680,7 +64611,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)/responses/413`.
             ///
@@ -63796,7 +64727,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)/responses/429`.
             ///
@@ -63905,7 +64836,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)/responses/503`.
             ///
@@ -64324,7 +65255,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)/responses/401`.
             ///
@@ -64630,7 +65561,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)/responses/413`.
             ///
@@ -64746,7 +65677,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)/responses/429`.
             ///
@@ -64855,7 +65786,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)/responses/503`.
             ///
@@ -65147,7 +66078,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)/responses/401`.
             ///
@@ -65481,7 +66412,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)/responses/429`.
             ///
@@ -65590,7 +66521,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)/responses/503`.
             ///
@@ -66090,7 +67021,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)/responses/401`.
             ///
@@ -66505,7 +67436,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)/responses/413`.
             ///
@@ -66621,7 +67552,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)/responses/429`.
             ///
@@ -66730,7 +67661,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)/responses/503`.
             ///
@@ -67022,7 +67953,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(clearConnectorState)/responses/401`.
             ///
@@ -67328,7 +68259,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(clearConnectorState)/responses/413`.
             ///
@@ -67444,7 +68375,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(clearConnectorState)/responses/429`.
             ///
@@ -67553,7 +68484,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(clearConnectorState)/responses/503`.
             ///
@@ -67644,11 +68575,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/GET/query/waiting`.
                 public var waiting: Operations.ListConnectorAgreements.Input.Query.WaitingPayload?
-                /// How many agreements: at most 200, 50 unless given.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque cursor from a previous page's `next_cursor`.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -67656,8 +68587,8 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - waiting: Only the agreements waiting to be carried to the vendor, or only the others.
-                ///   - limit: How many agreements: at most 200, 50 unless given.
-                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     waiting: Operations.ListConnectorAgreements.Input.Query.WaitingPayload? = nil,
                     limit: Swift.Int? = nil,
@@ -67995,7 +68926,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)/responses/401`.
             ///
@@ -68329,7 +69260,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)/responses/429`.
             ///
@@ -68438,7 +69369,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)/responses/503`.
             ///
@@ -68965,7 +69896,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)/responses/401`.
             ///
@@ -69380,7 +70311,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)/responses/413`.
             ///
@@ -69496,7 +70427,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)/responses/429`.
             ///
@@ -69605,7 +70536,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)/responses/503`.
             ///
@@ -70045,7 +70976,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/find/post(findConnectorAgreements)/responses/401`.
             ///
@@ -70351,7 +71282,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/find/post(findConnectorAgreements)/responses/413`.
             ///
@@ -70467,7 +71398,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/find/post(findConnectorAgreements)/responses/429`.
             ///
@@ -70576,7 +71507,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/find/post(findConnectorAgreements)/responses/503`.
             ///
@@ -70641,7 +71572,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/folders/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/folders/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -70649,7 +71580,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -71118,7 +72049,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//folders/post(createFolder)/responses/401`.
             ///
@@ -71435,7 +72366,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//folders/post(createFolder)/responses/413`.
             ///
@@ -71682,7 +72613,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//folders/post(createFolder)/responses/429`.
             ///
@@ -71802,7 +72733,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//folders/post(createFolder)/responses/503`.
             ///
@@ -71882,7 +72813,7 @@ public enum Operations {
             public var path: Operations.UpdateFolder.Input.Path
             /// - Remark: Generated from `#/paths/folders/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/folders/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -71890,7 +72821,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -72375,7 +73306,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)/responses/401`.
             ///
@@ -72869,7 +73800,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)/responses/413`.
             ///
@@ -73116,7 +74047,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)/responses/429`.
             ///
@@ -73236,7 +74167,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)/responses/503`.
             ///
@@ -73316,7 +74247,7 @@ public enum Operations {
             public var path: Operations.RevokeFolder.Input.Path
             /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
@@ -73324,7 +74255,7 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - idempotencyKey: A client-chosen key identifying this write. The server records the status and body it returns against the key and answers a repeat carrying the same key with that stored result, performing no second write. A conflict is recorded like any other outcome, so a retry is told its first attempt collided rather than left to re-derive it. Scoped to the credential that sends it, which for a signed-in app is the app and the person it signed in as: another credential using the same key is answered about its own request and never served this one's result. A key replayed with a different request, or with the same one after the instance has moved to another contract version, is refused with `idempotency_key_reused`, since the stored answer is shaped for the contract it was written under.
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
@@ -73668,7 +74599,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)/responses/401`.
             ///
@@ -74105,7 +75036,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)/responses/413`.
             ///
@@ -74352,7 +75283,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)/responses/429`.
             ///
@@ -74472,7 +75403,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)/responses/503`.
             ///
@@ -74744,7 +75675,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//keys/get(listKeys)/responses/401`.
             ///
@@ -74969,7 +75900,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//keys/get(listKeys)/responses/429`.
             ///
@@ -75078,7 +76009,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//keys/get(listKeys)/responses/503`.
             ///
@@ -75718,7 +76649,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/401`.
             ///
@@ -76024,7 +76955,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/413`.
             ///
@@ -76140,7 +77071,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/429`.
             ///
@@ -76249,7 +77180,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/503`.
             ///
@@ -76314,12 +77245,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/keys/current/GET/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/keys/current/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCurrentKey.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. `GET /items` read this way needs `include=metadata`. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCurrentKey.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCurrentKey.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -76356,6 +77296,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/current/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -76364,18 +77308,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -76521,7 +77468,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)/responses/401`.
             ///
@@ -76571,6 +77518,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/current/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -76580,13 +77531,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -76594,6 +77547,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -76648,6 +77602,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetCurrentKey.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetCurrentKey.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetCurrentKey.Output.Conflict.Headers = .init(),
+                    body: Operations.GetCurrentKey.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.GetCurrentKey.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.GetCurrentKey.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -76746,7 +77809,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)/responses/429`.
             ///
@@ -76855,7 +77918,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)/responses/503`.
             ///
@@ -77498,7 +78561,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/401`.
             ///
@@ -77804,7 +78867,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/413`.
             ///
@@ -77920,7 +78983,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/429`.
             ///
@@ -78029,7 +79092,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/503`.
             ///
@@ -78085,7 +79148,7 @@ public enum Operations {
     }
     /// Revoke an API key
     ///
-    /// Revokes the key immediately; the next request bearing it returns `401 unauthorized`. An event stream the key holds open ends before it sends anything written after the revoke, and at its next heartbeat when nothing is written. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission. A key beyond the caller's reach answers `404 api_key_not_found` exactly as an unknown id does, so the answer does not say whether it exists. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key. A revoke that changes no row answers `404 api_key_not_found` rather than success: an unknown id and a key already revoked are both refused, and only the operator key is told which it was, since a revoked key's reach cannot be measured.
+    /// Revokes the key immediately; the next request bearing it returns `401 unauthorized`. An event stream the key holds open ends before it sends anything written after the revoke, and at its next heartbeat when nothing is written. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission. A key beyond the caller's reach answers `404 api_key_not_found` exactly as an unknown id does, so the answer does not say whether it exists. A key past its `expires_at` receives the same response, including when the caller is the operator key. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key. A revoke that changes no row answers `404 api_key_not_found` rather than success: an unknown id and a key already revoked are both refused, and only the operator key is told which it was, since a revoked key's reach cannot be measured.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -78430,7 +79493,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/401`.
             ///
@@ -78736,7 +79799,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/413`.
             ///
@@ -78852,7 +79915,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/429`.
             ///
@@ -78961,7 +80024,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/503`.
             ///
@@ -79233,7 +80296,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//config/get(getConfig)/responses/401`.
             ///
@@ -79458,7 +80521,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//config/get(getConfig)/responses/429`.
             ///
@@ -79567,7 +80630,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//config/get(getConfig)/responses/503`.
             ///
@@ -80101,7 +81164,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/401`.
             ///
@@ -80298,7 +81361,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/413`.
             ///
@@ -80414,7 +81477,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/429`.
             ///
@@ -80523,7 +81586,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/503`.
             ///
@@ -80579,7 +81642,7 @@ public enum Operations {
     }
     /// Restore types, items, edges, metadata, and blobs from an archive
     ///
-    /// Ingests a `marfa-archive-v0.tar.gz` produced by `GET /export?format=archive`. The archive's type and edge-type registrations are validated and registered first, so a restore into an empty instance can write the items that use them; a registration the instance already holds identically is skipped, and one it holds differently fails the whole restore with `409` naming every clashing id. Item ids are preserved so restored edges resolve; an id or natural-key collision, or a link another item of the row's type holds, counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Version *history* — the per-version snapshots behind `GET /items/{id}?include=versions` — and row timestamps are re-stamped, not carried.
+    /// Ingests a `marfa-archive-v0.tar.gz` produced by `GET /export?format=archive`. The archive's type and edge-type registrations are validated and registered first, so a restore into an empty instance can write the items that use them; a registration the instance already holds identically is skipped, and one it holds differently fails the whole restore with `409` naming every clashing id. Item ids are preserved so restored edges resolve; an id or natural-key collision, or a link another item of the row's type holds, counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Original item and edge dates and every archived item snapshot are preserved. Historical properties are not checked against current type schemas. Invalid dates or history refuse before row writes; a snapshot ID collision refuses the row transaction with `409 conflict`. Duplicate items retain their live metadata, dates and history. There is no separate item or edge count limit. Keys, webhooks, configuration and tombstones are not restored. Trashed items are restored only when explicitly included in the export. Until the first public release, archives are supported only by the build that wrote them; format 0 promises no compatibility between builds.
     ///
     /// - Remark: HTTP `POST /admin/restore-archive`.
     /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)`.
@@ -80895,7 +81958,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `validation_error` for an invalid archive or an unsupported version. `invalid_properties` when a row carries a property its type does not declare and the strict-mode lever names that type; the whole archive is refused before anything is written.
+            /// `validation_error` for an invalid archive or an unsupported version. `invalid_properties` when a row carries a property its type does not declare and the strict-mode lever names that type; item and edge restoration is refused; previously committed type preparation remains audited.
             ///
             /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)/responses/400`.
             ///
@@ -81004,7 +82067,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)/responses/401`.
             ///
@@ -81222,7 +82285,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `conflict`: the archive redefines a type this instance already registers differently, or carries a core edge type, and nothing was written. `link_taken`: the archive registers a type naming a `link_field` that two rows a forced delete left under the identifier share a value in, and the restore stops there, before any row or blob is written.
+            /// `conflict`: the archive redefines a type this instance already registers differently, or carries a core edge type, or an imported snapshot ID already exists. A snapshot collision rolls back the row transaction; earlier audited type and blob preparation remains. `link_taken`: the archive registers a type naming a `link_field` that two rows a forced delete left under the identifier share a value in, and the restore stops before items or blobs are written; earlier type registrations remain audited.
             ///
             /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)/responses/409`.
             ///
@@ -81338,7 +82401,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)/responses/429`.
             ///
@@ -81447,7 +82510,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//admin/restore-archive/post(adminRestoreArchive)/responses/503`.
             ///
@@ -81719,7 +82782,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/drift/get(adminListPlatformTypeDrift)/responses/401`.
             ///
@@ -81944,7 +83007,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/drift/get(adminListPlatformTypeDrift)/responses/429`.
             ///
@@ -82053,7 +83116,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/drift/get(adminListPlatformTypeDrift)/responses/503`.
             ///
@@ -82366,7 +83429,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/{id}/delete(adminRemovePlatformType)/responses/401`.
             ///
@@ -82781,7 +83844,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/{id}/delete(adminRemovePlatformType)/responses/413`.
             ///
@@ -82897,7 +83960,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/{id}/delete(adminRemovePlatformType)/responses/429`.
             ///
@@ -83006,7 +84069,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//admin/platform-types/{id}/delete(adminRemovePlatformType)/responses/503`.
             ///
@@ -83278,7 +84341,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//owner/get(getOwner)/responses/401`.
             ///
@@ -83612,7 +84675,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//owner/get(getOwner)/responses/429`.
             ///
@@ -83721,7 +84784,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//owner/get(getOwner)/responses/503`.
             ///
@@ -84144,7 +85207,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/401`.
             ///
@@ -84450,7 +85513,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/413`.
             ///
@@ -84566,7 +85629,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/429`.
             ///
@@ -84675,7 +85738,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/503`.
             ///
@@ -84731,7 +85794,7 @@ public enum Operations {
     }
     /// Export data
     ///
-    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and the bytes of each blob the selection references that `GET /blobs/{hash}` would serve the caller, which `POST /admin/restore-archive` can ingest. Each archive item line carries `lending_blobs`, the digests in that row's properties that lend its reach, and a restore lends through those alone. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
+    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and the bytes of each blob the selection or its readable history references that `GET /blobs/{hash}` would serve the caller, which `POST /admin/restore-archive` can ingest. Each archive item line carries `versions`, every stored earlier snapshot the caller may read under its historical type, strictly below the selected current row's version, and `lending_blobs`, the digests in that row's properties that lend its reach, and a restore lends through those alone. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read, so an export never carries a kind of relationship the edge doors would refuse. Unrecognized query parameters are refused with `400` rather than ignored, so a misspelled filter cannot silently return an unfiltered page. A parameter of your own — a cache-buster, an analytics tag — must start with `_`, which is always ignored.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
@@ -85144,7 +86207,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//export/get(exportData)/responses/401`.
             ///
@@ -85369,7 +86432,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//export/get(exportData)/responses/429`.
             ///
@@ -85478,7 +86541,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//export/get(exportData)/responses/503`.
             ///
@@ -85762,7 +86825,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)/responses/401`.
             ///
@@ -85987,7 +87050,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)/responses/429`.
             ///
@@ -86096,7 +87159,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)/responses/503`.
             ///
@@ -86540,7 +87603,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/401`.
             ///
@@ -86737,7 +87800,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/413`.
             ///
@@ -86853,7 +87916,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/429`.
             ///
@@ -86962,7 +88025,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/503`.
             ///
@@ -87254,7 +88317,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)/responses/401`.
             ///
@@ -87588,7 +88651,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)/responses/429`.
             ///
@@ -87697,7 +88760,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)/responses/503`.
             ///
@@ -88159,7 +89222,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/401`.
             ///
@@ -88465,7 +89528,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/413`.
             ///
@@ -88581,7 +89644,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/429`.
             ///
@@ -88690,7 +89753,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/503`.
             ///
@@ -88982,7 +90045,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/401`.
             ///
@@ -89288,7 +90351,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/413`.
             ///
@@ -89404,7 +90467,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/429`.
             ///
@@ -89513,7 +90576,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/503`.
             ///
@@ -89593,19 +90656,19 @@ public enum Operations {
             public var path: Operations.ListWebhookDeliveries.Input.Path
             /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Maximum number of delivery rows to return.
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque cursor from a previous page's `next_cursor`.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/GET/query/cursor`.
                 public var cursor: Swift.String?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - limit: Maximum number of delivery rows to return.
-                ///   - cursor: Opaque cursor from a previous page's `next_cursor`.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     limit: Swift.Int? = nil,
                     cursor: Swift.String? = nil
@@ -89832,7 +90895,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)/responses/401`.
             ///
@@ -90166,7 +91229,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)/responses/429`.
             ///
@@ -90275,7 +91338,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)/responses/503`.
             ///
@@ -90572,7 +91635,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/401`.
             ///
@@ -90987,7 +92050,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/413`.
             ///
@@ -91103,7 +92166,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/429`.
             ///
@@ -91212,7 +92275,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/503`.
             ///
@@ -91297,11 +92360,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/audit/GET/query/created_before`.
                 public var createdBefore: Swift.String?
-                /// Maximum entries to return (1–200, default 50).
+                /// The maximum number of results to return.
                 ///
                 /// - Remark: Generated from `#/paths/audit/GET/query/limit`.
                 public var limit: Swift.Int?
-                /// Opaque pagination cursor from a previous response.
+                /// The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///
                 /// - Remark: Generated from `#/paths/audit/GET/query/cursor`.
                 public var cursor: Swift.String?
@@ -91313,8 +92376,8 @@ public enum Operations {
                 ///   - resourceId: Filter to a single resource id.
                 ///   - createdAfter: Include entries written strictly after this instant.
                 ///   - createdBefore: Include entries written strictly before this instant.
-                ///   - limit: Maximum entries to return (1–200, default 50).
-                ///   - cursor: Opaque pagination cursor from a previous response.
+                ///   - limit: The maximum number of results to return.
+                ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     action: Swift.String? = nil,
                     resourceType: Swift.String? = nil,
@@ -91657,7 +92720,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Unauthorized
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//audit/get(listAuditLog)/responses/401`.
             ///
@@ -91882,7 +92945,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//audit/get(listAuditLog)/responses/429`.
             ///
@@ -91991,7 +93054,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//audit/get(listAuditLog)/responses/503`.
             ///
@@ -92240,9 +93303,11 @@ public enum Operations {
     ///
     /// Opens a Server-Sent Events stream of item and edge changes the caller can read. Send `Last-Event-ID` to replay events missed across a reconnect.
     ///
+    /// For a certified working copy, use exactly `?edges=all&copy=1`. Bootstrap omits both resume headers; resumption sends both `Last-Event-ID` and `X-Marfa-Read-View`. Copy mode refuses other or duplicate query keys, empty or malformed headers, and unpaired resume headers. Its no-id `stream_cursor` and `stream_live` markers contain exact string fields `type`, `cursor`, `instance_id` and `read_view`. A known coherent head is required; failed opening reads end incomplete without a certificate. Only completed replay and held-frame delivery produce `stream_live`. Copy item and metadata frames additionally carry boolean `listed`, classifying item-set membership independently of direct-ID read authority. A changed view before opening answers 409 `read_view_changed`; after opening it sends only the no-id terminal `read_view_changed` with data `{"type":"read_view_changed"}` and closes. Copy markers use body certificates, never the HTTP response certificate header. The remaining ordinary-stream rules apply except where these copy guarantees are stricter.
+    ///
     /// The stream opens with a `stream_cursor` frame, carrying `{ "type": "stream_cursor", "cursor": "<event id>" }` — the log position the stream opened at. It does not wait for anything to happen, so a client that subscribes and then reads a snapshot holds a resume point from the first moment rather than waiting for an event to tell it where it is. The frame deliberately carries no SSE `id:` field: on a reconnect it precedes the backlog, and a client adopting it as its cursor there would discard exactly the events it reconnected for.
     ///
-    /// Treat the frame as the first one delivered rather than as guaranteed. Reading the head is bounded, so a stream opened while the database is not answering carries no cursor instead of holding its events back, and a client that receives none proceeds with no cursor of its own. Do not gate hydration on its arrival.
+    /// For an ordinary stream, treat the frame as the first one delivered rather than as guaranteed. Reading the head is bounded, so a stream opened while the database is not answering carries no cursor instead of holding its events back, and a client that receives none proceeds with no cursor of its own. Do not gate hydration on its arrival.
     ///
     /// Once the replay is done, and the live frames held while it ran are drained, the stream sends a `stream_live` frame, carrying `{ "type": "stream_live", "cursor": "<event id>" | null }` and no SSE `id:`. It says the prologue is over: everything up to `cursor` has been sent or withheld, and what follows is live. A frame the `type` filter or the credential withholds is not written at all, so a client cannot otherwise tell that it has caught up, and its cursor is one a client may resume from without being sent again what the replay covered. It is null only where no position is known: a head read that outran its budget with nothing to replay. A stream that ends short never sends it.
     ///
@@ -92250,7 +93315,7 @@ public enum Operations {
     ///
     /// An item frame carries `type` and `item`, and an edge frame `type`, `edge` and `source_type`, the type of the edge's source item when the event was published. An edge frame reaches a subscriber that may read its edge type and that `source_type`, on a replay as on a live frame, so the edges a purge takes reach only a subscriber that could read the purged item. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
     ///
-    /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame — `{ "type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }` — and closes. `reason` is one of `replay_failed` (the catch-up failed), `backlog_overflow` (the frames held while the stream opened outgrew their buffer), `live_delivery_failed` (the subscription or a read of the credential failed), `credential_ended` (the credential no longer stands: a key revoked, deleted or past its expiry, a sign-in token revoked or expired, or its app disconnected) or `reader_behind` (a live frame found 4 MiB of frames unread, or the client took no frame for 30 seconds while a replay, which waits for room before every frame, waited for it). Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
+    /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame — `{ "type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }` — and closes. `reason` is one of `replay_failed` (the catch-up failed), `backlog_overflow` (the frames held while the stream opened outgrew their buffer), `live_delivery_failed` (the subscription or a read of the credential failed), `credential_ended` (the credential no longer stands: a key revoked, deleted or past its expiry, a sign-in token revoked or expired, or its app disconnected), `reader_behind` (a live frame found 4 MiB of frames unread, or the client took no frame for 30 seconds while a replay, which waits for room before every frame, waited for it) or `server_stopping` (the instance is stopping, and sends this to every stream it has open before it closes them). Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
     ///
     /// The stream answers to the credential as it stands: it reads it again before each batch of frames and at each heartbeat, every 30 seconds. A key narrowed meanwhile narrows the stream; one that no longer stands ends it with `stream_incomplete` and `credential_ended`, and nothing written after the change is sent. A reconnect with a revoked key is refused `401`; an app reconnects with the token it refreshed to.
     ///
@@ -92263,6 +93328,14 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/events/GET/query`.
             public struct Query: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/events/GET/query/copy`.
+                @frozen public enum CopyPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case _1 = "1"
+                }
+                /// Select certified copy mode; requires explicit edges=all and forbids every other query key.
+                ///
+                /// - Remark: Generated from `#/paths/events/GET/query/copy`.
+                public var copy: Operations.StreamEvents.Input.Query.CopyPayload?
                 /// Comma-separated item types, up to 10 entries, resolved exactly as the same parameter on `/items`, `/search` and `/export`. A named type covers its subtree, so `core.media` delivers `core.media.song`, and a type that declares `core.media` as its parent answers too even when its identifier sits in another namespace. The explicit `core.media.*` spelling means the same thing. The global `*` is rejected rather than accepted, as it is on those surfaces — to receive everything, omit the parameter — and so is any entry outside the type-identifier grammar. Edge events are unaffected: they carry no item type, so this parameter says nothing about them.
                 ///
                 /// - Remark: Generated from `#/paths/events/GET/query/type`.
@@ -92279,12 +93352,15 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
+                ///   - copy: Select certified copy mode; requires explicit edges=all and forbids every other query key.
                 ///   - _type: Comma-separated item types, up to 10 entries, resolved exactly as the same parameter on `/items`, `/search` and `/export`. A named type covers its subtree, so `core.media` delivers `core.media.song`, and a type that declares `core.media` as its parent answers too even when its identifier sits in another namespace. The explicit `core.media.*` spelling means the same thing. The global `*` is rejected rather than accepted, as it is on those surfaces — to receive everything, omit the parameter — and so is any entry outside the type-identifier grammar. Edge events are unaffected: they carry no item type, so this parameter says nothing about them.
                 ///   - edges: Whether edge lifecycle events reach this stream. Defaults to `all`, including under a `type` filter. Any other value is rejected rather than ignored. It is your own parameter and narrows nothing else: every edge frame is separately held to the two permissions `GET /edges/{id}` asks for, read on the edge type and read on the source item's type, on a replay exactly as on a live frame.
                 public init(
+                    copy: Operations.StreamEvents.Input.Query.CopyPayload? = nil,
                     _type: Swift.String? = nil,
                     edges: Operations.StreamEvents.Input.Query.EdgesPayload? = nil
                 ) {
+                    self.copy = copy
                     self._type = _type
                     self.edges = edges
                 }
@@ -92292,7 +93368,11 @@ public enum Operations {
             public var query: Operations.StreamEvents.Input.Query
             /// - Remark: Generated from `#/paths/events/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// Resume from this event id, replaying events the client missed. It must be an id the log issued, written as a decimal number with no sign, spaces or leading zeros; anything else is refused `400 validation_error`, and an id past the log's head is answered with a terminal `cursor_ahead` frame. Empty is no cursor.
+                /// In copy mode, send one certificate together with Last-Event-ID to resume. Bootstrap omits both headers. This header is invalid on an ordinary stream.
+                ///
+                /// - Remark: Generated from `#/paths/events/GET/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
+                /// Resume from this event id, replaying events the client missed. It must be an id the log issued, written as a decimal number with no sign, spaces or leading zeros; anything else is refused `400 validation_error`, and an id past the log's head is answered with a terminal `cursor_ahead` frame. Empty is no cursor only for an ordinary stream; copy mode refuses it.
                 ///
                 /// - Remark: Generated from `#/paths/events/GET/header/Last-Event-ID`.
                 public var lastEventID: Swift.String?
@@ -92300,12 +93380,15 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - lastEventID: Resume from this event id, replaying events the client missed. It must be an id the log issued, written as a decimal number with no sign, spaces or leading zeros; anything else is refused `400 validation_error`, and an id past the log's head is answered with a terminal `cursor_ahead` frame. Empty is no cursor.
+                ///   - xMarfaReadView: In copy mode, send one certificate together with Last-Event-ID to resume. Bootstrap omits both headers. This header is invalid on an ordinary stream.
+                ///   - lastEventID: Resume from this event id, replaying events the client missed. It must be an id the log issued, written as a decimal number with no sign, spaces or leading zeros; anything else is refused `400 validation_error`, and an id past the log's head is answered with a terminal `cursor_ahead` frame. Empty is no cursor only for an ordinary stream; copy mode refuses it.
                 ///   - accept:
                 public init(
+                    xMarfaReadView: Swift.String? = nil,
                     lastEventID: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StreamEvents.AcceptableContentType>] = .defaultValues()
                 ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.lastEventID = lastEventID
                     self.accept = accept
                 }
@@ -92622,7 +93705,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// No credential, or one this server does not accept. Every operation that declares a security scheme answers this before it reads the path, the query or the body.
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
             ///
             /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/401`.
             ///
@@ -92754,6 +93837,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/events/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.StreamEvents.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/events/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/events/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.StreamEvents.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.StreamEvents.Output.Conflict.Headers = .init(),
+                    body: Operations.StreamEvents.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.StreamEvents.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.StreamEvents.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/events/GET/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -92847,7 +94039,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/429`.
             ///
@@ -93654,7 +94846,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The request body is over the cap this deployment sets. Refused by the body-size guard before the handler reads anything, from `Content-Length` when the request declares one and from a streaming counter when it does not.
+            /// `request_too_large`: the request body is larger than this instance accepts.
             ///
             /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)/responses/413`.
             ///
@@ -93770,7 +94962,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Refused by the request limiter: the credential has spent its allowance for the current window, and `Retry-After` says how long to wait. The limiter is only mounted on a deployment that enables rate limiting.
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
             ///
             /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)/responses/429`.
             ///
@@ -93879,7 +95071,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The write met the database's write lock and did not get it inside the instance's busy budget, which `details.budget_ms` names. Nothing was written, and nothing about the request needs changing: retry it.
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)/responses/503`.
             ///

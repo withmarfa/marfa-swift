@@ -56,6 +56,8 @@ struct Closing {
 
         await refused("status") { _ = try await copy.status() }
         await refused("hydrate") { _ = try await copy.hydrate(types: ["core.note"], tier: .feed) }
+        await refused("declareTypes") { try await copy.declareTypes([]) }
+        await refused("declaredTypes") { _ = try await copy.declaredTypes() }
         await refused("catchUp") { _ = try await copy.catchUp() }
         await refused("search") { _ = try await copy.search("a") }
         await refused("items.list") { _ = try await copy.items.list() }

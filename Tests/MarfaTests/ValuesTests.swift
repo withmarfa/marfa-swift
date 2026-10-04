@@ -138,18 +138,18 @@ struct Errors {
             .ContractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m"),
             .contractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m")
         ),
+        (.Canceled(message: "m"), .canceled(message: "m")),
         (.Invalid(message: "m"), .invalid(message: "m")),
     ]
 
     @Test(arguments: cases)
     func eachCoreErrorArrivesAsItsOwnCase(core: CoreMarfaError, expected: Marfa.MarfaError) {
         #expect(throws: expected) { try translated { throw core } }
+        #expect(expected.code() == core.code())
         #expect(expected.message == "m")
         #expect(expected.localizedDescription == "m")
     }
 
-    /// The copy was never hydrated, so `invalid` rather than
-    /// `hydrationIncomplete` shows the package refused the value first.
     @Test func aValueJSONCannotHoldIsRefusedAsInvalid() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         let unwritable: [String: JSONValue] = ["r": .number(.nan)]
@@ -172,11 +172,9 @@ struct Errors {
                 return message.contains("r cannot be written as JSON")
             }
         }
-        await #expect {
-            _ = try await copy.items.create(Draft(type: "core.note", properties: ["r": .number(1)]))
-        } throws: { error in
-            if case Marfa.MarfaError.hydrationIncomplete = error { true } else { false }
-        }
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Writable", "body": ""]))
+        #expect(try await copy.queue.all().count == 1)
+        await copy.close()
     }
 }
 
@@ -255,7 +253,9 @@ struct OwnValueTypes {
             stopped: "s", unclaimedSources: ["u"], retryAfterSeconds: 4)
         #expect(DrainReport(report.core) == report)
         let hydrated = HydrateReport(
-            types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, cursor: "c")
+            types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, cursor: "c",
+            registeredTypes: ["app.new"],
+            unregisteredTypes: [UnregisteredType(id: "app.no", code: "forbidden", message: "m")])
         #expect(HydrateReport(hydrated.core) == hydrated)
         let caught = CatchUpReport(applied: 1, skipped: 2, cursor: "c", reachedHead: false)
         #expect(CatchUpReport(caught.core) == caught)
@@ -349,26 +349,13 @@ struct CatalogTypes {
         }
     }
 
-    /// An empty list would read as an instance with no types at all.
-    @Test func aCopyThatNeverHeldACatalogSaysSoForEveryRead() async throws {
+    @Test func aFreshCopyReadsTheBuiltInCatalogWithoutHydration() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         #expect(try await copy.status().catalogVersion == nil)
-        let reads: [(String, @Sendable () async throws -> Void)] = [
-            ("item types", { _ = try await copy.catalog.itemTypes() }),
-            ("item type", { _ = try await copy.catalog.itemType("core.note") }),
-            ("edge types", { _ = try await copy.catalog.edgeTypes() }),
-            ("edge type", { _ = try await copy.catalog.edgeType("references") }),
-        ]
-        for (name, read) in reads {
-            await #expect {
-                try await read()
-            } throws: { error in
-                guard case Marfa.MarfaError.noCatalog = error else {
-                    Issue.record("\(name) threw \(error)")
-                    return false
-                }
-                return true
-            }
-        }
+        #expect(try await copy.catalog.itemTypes().contains { $0.id == "core.note" })
+        #expect(try await copy.catalog.itemType("core.note").id == "core.note")
+        #expect(try await copy.catalog.edgeTypes().contains { $0.id == "references" })
+        #expect(try await copy.catalog.edgeType("references").id == "references")
+        await copy.close()
     }
 }

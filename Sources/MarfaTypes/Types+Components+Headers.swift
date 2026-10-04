@@ -16,6 +16,10 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/headers/X-Marfa-Contract`.
         public typealias XMarfaContract = Swift.Int
+        /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+        ///
+        /// - Remark: Generated from `#/components/headers/X-Marfa-Read-View`.
+        public typealias XMarfaReadView = Swift.String
         /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
         ///
         /// - Remark: Generated from `#/components/headers/X-Request-ID`.

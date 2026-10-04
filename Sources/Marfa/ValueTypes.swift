@@ -562,6 +562,27 @@ public struct DrainReport: Sendable, Hashable {
     }
 }
 
+/// A declared type the instance refused to register during hydration.
+public struct UnregisteredType: Sendable, Hashable, Identifiable {
+    public var id: String
+    public var code: String
+    public var message: String
+
+    public init(id: String, code: String, message: String) {
+        self.id = id
+        self.code = code
+        self.message = message
+    }
+
+    init(_ core: CoreUnregisteredType) {
+        self.init(id: core.id, code: core.code, message: core.message)
+    }
+
+    var core: CoreUnregisteredType {
+        CoreUnregisteredType(id: id, code: code, message: message)
+    }
+}
+
 public struct HydrateReport: Sendable, Hashable {
     public var types: [String]
     public var tier: Tier
@@ -570,10 +591,12 @@ public struct HydrateReport: Sendable, Hashable {
     public var edges: UInt64
     public var pages: UInt64
     public var cursor: String
+    public var registeredTypes: [String]
+    public var unregisteredTypes: [UnregisteredType]
 
     public init(
         types: [String], tier: Tier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64,
-        cursor: String
+        cursor: String, registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
     ) {
         self.types = types
         self.tier = tier
@@ -582,18 +605,21 @@ public struct HydrateReport: Sendable, Hashable {
         self.edges = edges
         self.pages = pages
         self.cursor = cursor
+        self.registeredTypes = registeredTypes
+        self.unregisteredTypes = unregisteredTypes
     }
 
     init(_ core: CoreHydrateReport) {
         self.init(
             types: core.types, tier: Tier(core.tier), edgeTypes: core.edgeTypes, items: core.items,
-            edges: core.edges, pages: core.pages, cursor: core.cursor)
+            edges: core.edges, pages: core.pages, cursor: core.cursor,
+            registeredTypes: core.registeredTypes, unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
     }
 
     var core: CoreHydrateReport {
         CoreHydrateReport(
             types: types, tier: tier.core, edgeTypes: edgeTypes, items: items, edges: edges, pages: pages,
-            cursor: cursor)
+            cursor: cursor, registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core))
     }
 }
 
@@ -645,8 +671,10 @@ public struct Status: Sendable, Hashable {
     public var hydration: Hydration
     public var items: UInt64
     public var edges: UInt64
-    /// Moves each time a refresh changes the item type or edge type catalog,
-    /// and at no other time; `nil` until the copy first holds a catalog.
+    /// Moves each time a refresh changes the server's item type or edge type
+    /// catalog; `nil` until the copy first holds the server's catalog.
+    ///
+    /// Local built-in and declared types do not assign a version.
     public var catalogVersion: UInt64?
 
     public init(
