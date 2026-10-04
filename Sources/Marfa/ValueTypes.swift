@@ -1,19 +1,18 @@
 import Foundation
 import MarfaCore
-import MarfaCoreNames
 
 public enum Tier: Sendable, Hashable, CaseIterable {
     case library
     case feed
 
-    init(_ core: CoreTier) {
+    init(_ core: MarfaCore.Tier) {
         switch core {
         case .library: self = .library
         case .feed: self = .feed
         }
     }
 
-    var core: CoreTier {
+    var core: MarfaCore.Tier {
         switch self {
         case .library: .library
         case .feed: .feed
@@ -27,7 +26,7 @@ public enum ItemState: Sendable, Hashable, CaseIterable {
     case trashed
     case revoked
 
-    init(_ core: CoreItemState) {
+    init(_ core: MarfaCore.ItemState) {
         switch core {
         case .active: self = .active
         case .archived: self = .archived
@@ -36,7 +35,7 @@ public enum ItemState: Sendable, Hashable, CaseIterable {
         }
     }
 
-    var core: CoreItemState {
+    var core: MarfaCore.ItemState {
         switch self {
         case .active: .active
         case .archived: .archived
@@ -63,7 +62,7 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
     case deleteExtension
     case uploadBlob
 
-    init(_ core: CoreWriteKind) {
+    init(_ core: MarfaCore.WriteKind) {
         switch core {
         case .createItem: self = .createItem
         case .updateItem: self = .updateItem
@@ -83,7 +82,7 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
         }
     }
 
-    var core: CoreWriteKind {
+    var core: MarfaCore.WriteKind {
         switch self {
         case .createItem: .createItem
         case .updateItem: .updateItem
@@ -115,7 +114,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     /// set instead.
     case awaitingDependency
 
-    init(_ core: CoreBlockedReason) {
+    init(_ core: MarfaCore.BlockedReason) {
         switch core {
         case .credentialRefused: self = .credentialRefused
         case .keySpent: self = .keySpent
@@ -125,7 +124,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         }
     }
 
-    var core: CoreBlockedReason {
+    var core: MarfaCore.BlockedReason {
         switch self {
         case .credentialRefused: .credentialRefused
         case .keySpent: .keySpent
@@ -153,7 +152,7 @@ public enum Verdict: Sendable, Hashable {
     /// the last answer it got.
     case dead
 
-    init(_ core: CoreVerdict) {
+    init(_ core: MarfaCore.Verdict) {
         switch core {
         case .accepted: self = .accepted
         case .merged(let fields): self = .merged(fields: fields)
@@ -165,7 +164,7 @@ public enum Verdict: Sendable, Hashable {
         }
     }
 
-    var core: CoreVerdict {
+    var core: MarfaCore.Verdict {
         switch self {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
@@ -204,17 +203,17 @@ public struct Refusal: Sendable, Hashable {
         self.grant = grant
     }
 
-    init(_ core: CoreRefusal) {
+    init(_ core: MarfaCore.Refusal) {
         self.init(
             reason: core.reason, code: core.code, message: core.message,
             fields: core.fields.map { FieldRefusal(field: $0.field, message: $0.message) }, trashed: core.trashed,
             grant: core.grant.map(MissingGrant.init))
     }
 
-    var core: CoreRefusal {
-        CoreRefusal(
+    var core: MarfaCore.Refusal {
+        MarfaCore.Refusal(
             reason: reason, code: code, message: message,
-            fields: fields.map { CoreFieldRefusal(field: $0.field, message: $0.message) }, trashed: trashed,
+            fields: fields.map { MarfaCore.FieldRefusal(field: $0.field, message: $0.message) }, trashed: trashed,
             grant: grant?.core)
     }
 }
@@ -241,11 +240,11 @@ public struct MissingGrant: Sendable, Hashable {
         self.level = level
     }
 
-    init(_ core: CoreMissingGrant) {
+    init(_ core: MarfaCore.MissingGrant) {
         self.init(kind: GrantKind(core.kind), name: core.name, level: GrantLevel(core.level))
     }
 
-    var core: CoreMissingGrant { CoreMissingGrant(kind: kind.core, name: name, level: level.core) }
+    var core: MarfaCore.MissingGrant { MarfaCore.MissingGrant(kind: kind.core, name: name, level: level.core) }
 }
 
 public enum GrantKind: Sendable, Hashable, CaseIterable {
@@ -253,7 +252,7 @@ public enum GrantKind: Sendable, Hashable, CaseIterable {
     case edgeType
     case `extension`
 
-    init(_ core: CoreGrantKind) {
+    init(_ core: MarfaCore.GrantKind) {
         switch core {
         case .type: self = .type
         case .edgeType: self = .edgeType
@@ -261,7 +260,7 @@ public enum GrantKind: Sendable, Hashable, CaseIterable {
         }
     }
 
-    var core: CoreGrantKind {
+    var core: MarfaCore.GrantKind {
         switch self {
         case .type: .type
         case .edgeType: .edgeType
@@ -274,14 +273,14 @@ public enum GrantLevel: Sendable, Hashable, CaseIterable {
     case read
     case write
 
-    init(_ core: CoreGrantLevel) {
+    init(_ core: MarfaCore.GrantLevel) {
         switch core {
         case .read: self = .read
         case .write: self = .write
         }
     }
 
-    var core: CoreGrantLevel {
+    var core: MarfaCore.GrantLevel {
         switch self {
         case .read: .read
         case .write: .write
@@ -294,14 +293,14 @@ public enum Handle: Sendable, Hashable, CaseIterable {
     case writer
     case reader
 
-    init(_ core: CoreHandle) {
+    init(_ core: MarfaCore.Handle) {
         switch core {
         case .writer: self = .writer
         case .reader: self = .reader
         }
     }
 
-    var core: CoreHandle {
+    var core: MarfaCore.Handle {
         switch self {
         case .writer: .writer
         case .reader: .reader
@@ -315,7 +314,7 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
     case complete
     case expired
 
-    init(_ core: CoreHydration) {
+    init(_ core: MarfaCore.Hydration) {
         switch core {
         case .never: self = .never
         case .inProgress: self = .inProgress
@@ -324,7 +323,7 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
         }
     }
 
-    var core: CoreHydration {
+    var core: MarfaCore.Hydration {
         switch self {
         case .never: .never
         case .inProgress: .inProgress
@@ -339,7 +338,7 @@ public enum SortField: Sendable, Hashable, CaseIterable {
     case updatedAt
     case occurredAt
 
-    init(_ core: CoreSortField) {
+    init(_ core: MarfaCore.SortField) {
         switch core {
         case .createdAt: self = .createdAt
         case .updatedAt: self = .updatedAt
@@ -347,7 +346,7 @@ public enum SortField: Sendable, Hashable, CaseIterable {
         }
     }
 
-    var core: CoreSortField {
+    var core: MarfaCore.SortField {
         switch self {
         case .createdAt: .createdAt
         case .updatedAt: .updatedAt
@@ -360,14 +359,14 @@ public enum SortDirection: Sendable, Hashable, CaseIterable {
     case ascending
     case descending
 
-    init(_ core: CoreSortDirection) {
+    init(_ core: MarfaCore.SortDirection) {
         switch core {
         case .ascending: self = .ascending
         case .descending: self = .descending
         }
     }
 
-    var core: CoreSortDirection {
+    var core: MarfaCore.SortDirection {
         switch self {
         case .ascending: .ascending
         case .descending: .descending
@@ -384,11 +383,11 @@ public struct Sort: Sendable, Hashable {
         self.direction = direction
     }
 
-    init(_ core: CoreSort) {
+    init(_ core: MarfaCore.Sort) {
         self.init(field: SortField(core.field), direction: SortDirection(core.direction))
     }
 
-    var core: CoreSort { CoreSort(field: field.core, direction: direction.core) }
+    var core: MarfaCore.Sort { MarfaCore.Sort(field: field.core, direction: direction.core) }
 }
 
 public struct QueuedWrite: Sendable, Hashable {
@@ -451,7 +450,7 @@ public struct QueuedWrite: Sendable, Hashable {
         self.answeredAt = answeredAt
     }
 
-    init(_ core: CoreQueuedWrite) throws {
+    init(_ core: MarfaCore.QueuedWrite) throws {
         self.init(
             id: core.id, kind: WriteKind(core.kind), itemId: core.itemId, targetId: core.targetId,
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,
@@ -461,8 +460,8 @@ public struct QueuedWrite: Sendable, Hashable {
             queuedAt: core.queuedAt, answeredAt: core.answeredAt)
     }
 
-    func core() throws -> CoreQueuedWrite {
-        CoreQueuedWrite(
+    func core() throws -> MarfaCore.QueuedWrite {
+        MarfaCore.QueuedWrite(
             id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
@@ -497,14 +496,14 @@ public struct DrainVerdict: Sendable, Hashable {
         self.replayed = replayed
     }
 
-    init(_ core: CoreDrainVerdict) {
+    init(_ core: MarfaCore.DrainVerdict) {
         self.init(
             id: core.id, kind: WriteKind(core.kind), itemId: core.itemId, edgeId: core.edgeId,
             verdict: core.verdict.map(Verdict.init), refusals: core.refusals, replayed: core.replayed)
     }
 
-    var core: CoreDrainVerdict {
-        CoreDrainVerdict(
+    var core: MarfaCore.DrainVerdict {
+        MarfaCore.DrainVerdict(
             id: id, kind: kind.core, itemId: itemId, edgeId: edgeId, verdict: verdict?.core, refusals: refusals,
             replayed: replayed)
     }
@@ -546,7 +545,7 @@ public struct DrainReport: Sendable, Hashable {
         self.retryAfterSeconds = retryAfterSeconds
     }
 
-    init(_ core: CoreDrainReport) {
+    init(_ core: MarfaCore.DrainReport) {
         self.init(
             answered: core.answered, held: core.held, undelivered: core.undelivered, unsent: core.unsent,
             unmade: core.unmade, unavailable: core.unavailable, verdicts: core.verdicts.map(DrainVerdict.init),
@@ -554,8 +553,8 @@ public struct DrainReport: Sendable, Hashable {
             retryAfterSeconds: core.retryAfterSeconds)
     }
 
-    var core: CoreDrainReport {
-        CoreDrainReport(
+    var core: MarfaCore.DrainReport {
+        MarfaCore.DrainReport(
             answered: answered, held: held, undelivered: undelivered, unsent: unsent, unmade: unmade,
             unavailable: unavailable, verdicts: verdicts.map(\.core), stopped: stopped,
             unclaimedSources: unclaimedSources, retryAfterSeconds: retryAfterSeconds)
@@ -574,12 +573,12 @@ public struct UnregisteredType: Sendable, Hashable, Identifiable {
         self.message = message
     }
 
-    init(_ core: CoreUnregisteredType) {
+    init(_ core: MarfaCore.UnregisteredType) {
         self.init(id: core.id, code: core.code, message: core.message)
     }
 
-    var core: CoreUnregisteredType {
-        CoreUnregisteredType(id: id, code: code, message: message)
+    var core: MarfaCore.UnregisteredType {
+        MarfaCore.UnregisteredType(id: id, code: code, message: message)
     }
 }
 
@@ -609,15 +608,15 @@ public struct HydrateReport: Sendable, Hashable {
         self.unregisteredTypes = unregisteredTypes
     }
 
-    init(_ core: CoreHydrateReport) {
+    init(_ core: MarfaCore.HydrateReport) {
         self.init(
             types: core.types, tier: Tier(core.tier), edgeTypes: core.edgeTypes, items: core.items,
             edges: core.edges, pages: core.pages, cursor: core.cursor,
             registeredTypes: core.registeredTypes, unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
     }
 
-    var core: CoreHydrateReport {
-        CoreHydrateReport(
+    var core: MarfaCore.HydrateReport {
+        MarfaCore.HydrateReport(
             types: types, tier: tier.core, edgeTypes: edgeTypes, items: items, edges: edges, pages: pages,
             cursor: cursor, registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core))
     }
@@ -632,7 +631,7 @@ public struct PinReport: Sendable, Hashable {
         self.wasPinned = wasPinned
     }
 
-    init(_ core: CorePinReport) {
+    init(_ core: MarfaCore.PinReport) {
         self.init(pinned: core.pinned, wasPinned: core.wasPinned)
     }
 }
@@ -650,13 +649,13 @@ public struct CatchUpReport: Sendable, Hashable {
         self.reachedHead = reachedHead
     }
 
-    init(_ core: CoreCatchUpReport) {
+    init(_ core: MarfaCore.CatchUpReport) {
         self.init(
             applied: core.applied, skipped: core.skipped, cursor: core.cursor, reachedHead: core.reachedHead)
     }
 
-    var core: CoreCatchUpReport {
-        CoreCatchUpReport(applied: applied, skipped: skipped, cursor: cursor, reachedHead: reachedHead)
+    var core: MarfaCore.CatchUpReport {
+        MarfaCore.CatchUpReport(applied: applied, skipped: skipped, cursor: cursor, reachedHead: reachedHead)
     }
 }
 
@@ -696,7 +695,7 @@ public struct Status: Sendable, Hashable {
         self.catalogVersion = catalogVersion
     }
 
-    init(_ core: CoreStatus) {
+    init(_ core: MarfaCore.Status) {
         self.init(
             serverOrigin: core.serverOrigin, sliceTypes: core.sliceTypes, sliceTier: core.sliceTier.map(Tier.init),
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
@@ -704,8 +703,8 @@ public struct Status: Sendable, Hashable {
             catalogVersion: core.catalogVersion, instanceId: core.instanceId)
     }
 
-    var core: CoreStatus {
-        CoreStatus(
+    var core: MarfaCore.Status {
+        MarfaCore.Status(
             serverOrigin: serverOrigin, instanceId: instanceId, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
             sliceEdgeTypes: sliceEdgeTypes, pinned: pinned, eventCursor: eventCursor, hydration: hydration.core,
             items: items, edges: edges, catalogVersion: catalogVersion)
@@ -726,8 +725,8 @@ public struct Attachment: Sendable, Hashable {
         self.tier = tier
     }
 
-    var core: CoreAttachment {
-        CoreAttachment(mimeType: mimeType, title: title, type: type, tier: tier?.core)
+    var core: MarfaCore.Attachment {
+        MarfaCore.Attachment(mimeType: mimeType, title: title, type: type, tier: tier?.core)
     }
 }
 
@@ -742,7 +741,7 @@ public struct Attached: Sendable, Hashable {
         self.edge = edge
     }
 
-    init(_ core: CoreAttached) throws {
+    init(_ core: MarfaCore.Attached) throws {
         self.init(
             upload: try QueuedWrite(core.upload), item: try QueuedWrite(core.item), edge: try QueuedWrite(core.edge))
     }
@@ -757,7 +756,7 @@ public struct Thumbnail: Sendable, Hashable {
         self.bytes = bytes
     }
 
-    init(_ core: CoreThumbnail) {
+    init(_ core: MarfaCore.Thumbnail) {
         self.init(mimeType: core.mimeType, bytes: core.bytes)
     }
 }

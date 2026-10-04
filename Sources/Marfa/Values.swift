@@ -1,6 +1,5 @@
 import Foundation
 import MarfaCore
-import MarfaCoreNames
 
 /// Every way the core refuses or fails. `code` is the server's, where the
 /// server answered.
@@ -72,7 +71,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     ///
     /// Associated `code` values remain the server's refusal codes.
     public func code() -> String {
-        let core: CoreMarfaError
+        let core: MarfaCore.MarfaError
         switch self {
         case .notFound(let code, let message): core = .NotFound(code: code, message: message)
         case .unauthorized(let code, let message): core = .Unauthorized(code: code, message: message)
@@ -117,7 +116,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
 
     public var errorDescription: String? { message }
 
-    init(_ error: CoreMarfaError) {
+    init(_ error: MarfaCore.MarfaError) {
         switch error {
         case .NotFound(let code, let message): self = .notFound(code: code, message: message)
         case .Unauthorized(let code, let message): self = .unauthorized(code: code, message: message)
@@ -196,7 +195,7 @@ public struct Item: Sendable, Hashable, Identifiable {
         self.tags = tags
     }
 
-    init(_ item: CoreItem) throws {
+    init(_ item: MarfaCore.Item) throws {
         id = item.id
         type = item.type
         properties = try Properties.object(item.propertiesJson)
@@ -240,7 +239,7 @@ public struct Edge: Sendable, Hashable, Identifiable {
         self.updatedAt = updatedAt
     }
 
-    init(_ edge: CoreEdge) throws {
+    init(_ edge: MarfaCore.Edge) throws {
         id = edge.id
         sourceId = edge.sourceId
         targetId = edge.targetId
@@ -257,7 +256,7 @@ public struct SearchHit: Sendable, Hashable {
     public let score: Double
     public let snippet: String
 
-    init(_ hit: CoreSearchHit) throws {
+    init(_ hit: MarfaCore.SearchHit) throws {
         item = try Item(hit.item)
         score = hit.score
         snippet = hit.snippet
@@ -298,8 +297,8 @@ public struct Draft: Sendable, Hashable {
         self.baseVersion = baseVersion
     }
 
-    func core() throws -> CoreDraft {
-        CoreDraft(
+    func core() throws -> MarfaCore.Draft {
+        MarfaCore.Draft(
             type: type, id: id, propertiesJson: try Properties.text(properties), tags: tags, tier: tier?.core,
             source: source, sourceId: sourceId, occurredAt: occurredAt, baseVersion: baseVersion)
     }
@@ -317,8 +316,8 @@ public struct Edit: Sendable, Hashable {
         self.sourceId = sourceId
     }
 
-    func core() throws -> CoreEdit {
-        CoreEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion, sourceId: sourceId)
+    func core() throws -> MarfaCore.Edit {
+        MarfaCore.Edit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion, sourceId: sourceId)
     }
 }
 
@@ -357,8 +356,8 @@ public struct ListFilters: Sendable, Hashable {
         self.offset = offset
     }
 
-    var core: CoreListFilters {
-        CoreListFilters(
+    var core: MarfaCore.ListFilters {
+        MarfaCore.ListFilters(
             type: type, state: state?.core, allStates: allStates, tier: tier?.core, tags: tags,
             occurredAfter: occurredAfter, occurredBefore: occurredBefore, filter: filter, beneath: beneath,
             limit: limit, offset: offset)
@@ -387,8 +386,8 @@ public struct SearchFilters: Sendable, Hashable {
         self.beneath = beneath
     }
 
-    var core: CoreSearchFilters {
-        CoreSearchFilters(
+    var core: MarfaCore.SearchFilters {
+        MarfaCore.SearchFilters(
             state: state?.core, allStates: allStates, type: type, tags: tags, filter: filter, beneath: beneath)
     }
 }

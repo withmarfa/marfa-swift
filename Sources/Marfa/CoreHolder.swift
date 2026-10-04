@@ -1,4 +1,4 @@
-import MarfaCoreNames
+import MarfaCore
 import Synchronization
 
 /// The one place a working copy and all its parts reach the core, so the copy
@@ -60,9 +60,9 @@ final class CoreHolder: Sendable {
     }
 
     func runUntilCanceled<T: Sendable>(
-        _ work: @escaping @Sendable (Core, CoreStop) throws -> T
+        _ work: @escaping @Sendable (Core, MarfaCore.Stop) throws -> T
     ) async throws -> T {
-        let stop = CoreStop()
+        let stop = MarfaCore.Stop()
         return try await withTaskCancellationHandler {
             let alreadyCanceled = Task.isCancelled
             return try await background { [self] in

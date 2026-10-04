@@ -1,6 +1,5 @@
 import Foundation
 import MarfaCore
-import MarfaCoreNames
 import Synchronization
 
 /// A local copy of a slice of one server, and the queue of writes it holds
@@ -335,7 +334,7 @@ public struct Items: Sendable {
         return attached
     }
 
-    private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
+    private func write(_ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite) async throws -> QueuedWrite {
         try await queued(holder, feed, work)
     }
 }
@@ -369,7 +368,7 @@ public struct Edges: Sendable {
     ) async throws -> QueuedWrite {
         try await write { core in
             try core.createEdge(
-                draft: CoreEdgeDraft(
+                draft: MarfaCore.EdgeDraft(
                     sourceId: source, targetId: target, edgeType: type,
                     propertiesJson: try Properties.text(properties), id: id))
         }
@@ -378,7 +377,8 @@ public struct Edges: Sendable {
     public func update(_ id: String, properties: [String: JSONValue], baseVersion: Int64) async throws -> QueuedWrite {
         try await write { core in
             try core.updateEdge(
-                id: id, edit: CoreEdgeEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion))
+                id: id,
+                edit: MarfaCore.EdgeEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion))
         }
     }
 
@@ -386,7 +386,7 @@ public struct Edges: Sendable {
         try await write { core in try core.deleteEdge(id: id) }
     }
 
-    private func write(_ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite) async throws -> QueuedWrite {
+    private func write(_ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite) async throws -> QueuedWrite {
         try await queued(holder, feed, work)
     }
 }
@@ -526,7 +526,7 @@ public struct Queue: Sendable {
 }
 
 /// Queues one write and tells every held stream of it.
-func queued(_ holder: CoreHolder, _ feed: Feed, _ work: @escaping @Sendable (Core) throws -> CoreQueuedWrite)
+func queued(_ holder: CoreHolder, _ feed: Feed, _ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite)
     async throws -> QueuedWrite
 {
     let written = try await holder.run { try QueuedWrite(work($0)) }
@@ -563,7 +563,7 @@ private final class Job<T: Sendable>: Sendable {
 func translated<T>(_ work: () throws -> T) throws -> T {
     do {
         return try work()
-    } catch let error as CoreMarfaError {
+    } catch let error as MarfaCore.MarfaError {
         throw MarfaError(error)
     } catch let error as DecodingError {
         throw MarfaError.decoding(message: "\(error)")
@@ -586,7 +586,7 @@ final class Feed: Sendable {
 
     private enum Phase {
         case idle
-        case following(generation: Int, CoreSubscription)
+        case following(generation: Int, MarfaCore.Subscription)
         /// The core lets go of its stream only as the follow ends, so nothing
         /// that takes the stream may start until then.
         case stopping(generation: Int)
@@ -943,7 +943,7 @@ final class Feed: Sendable {
 
 /// Weak on the feed, which holds the core holder and with it the writer's claim on
 /// the store: the core's thread holds the listener until `ended` returns.
-final class Listener: CoreChangeListener, Sendable {
+final class Listener: MarfaCore.ChangeListener, Sendable {
     private struct Weak {
         weak var feed: Feed?
     }
@@ -958,7 +958,7 @@ final class Listener: CoreChangeListener, Sendable {
 
     private var feed: Feed? { held.withLock { $0.feed } }
 
-    func changed(change: CoreChange) {
+    func changed(change: MarfaCore.Change) {
         let origin: Change.Origin =
             change.event == Self.catalogChanged
             ? .refreshed(.catalog) : .server(event: change.event, cursor: change.cursor)
@@ -973,11 +973,11 @@ final class Listener: CoreChangeListener, Sendable {
 
     /// Resumes waiters only once nothing on this thread holds the feed, since
     /// one may drop the working copy and open the store again at once.
-    func ended(error: CoreMarfaError?) {
+    func ended(error: MarfaCore.MarfaError?) {
         for continuation in stop(error) { continuation.resume() }
     }
 
-    private func stop(_ error: CoreMarfaError?) -> [CheckedContinuation<Void, Never>] {
+    private func stop(_ error: MarfaCore.MarfaError?) -> [CheckedContinuation<Void, Never>] {
         feed?.ended(generation: generation, error: error.map(MarfaError.init)) ?? []
     }
 }

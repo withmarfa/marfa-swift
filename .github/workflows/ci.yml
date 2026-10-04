@@ -93,7 +93,7 @@ jobs:
       - name: Lint
         run: |
           swift format lint --strict --configuration .swift-format -r \
-            Package.swift Sources/Marfa Sources/MarfaCoreNames Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
+            Package.swift Sources/Marfa Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
 
       # A skipped job passes its required check, and a draft skips the rest of
       # this one, so a draft's results would let a pull request merge in the

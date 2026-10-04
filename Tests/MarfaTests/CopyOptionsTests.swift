@@ -1,4 +1,4 @@
-import MarfaCoreNames
+import MarfaCore
 import Testing
 
 @testable import Marfa
@@ -33,14 +33,14 @@ struct CopyOptions {
         let core = FakeCore.writer()
         core.state.withLock {
             $0.registrationRefusals = [
-                CoreUnregisteredType(id: "app.entry", code: "forbidden", message: "metadata.types:write required")
+                MarfaCore.UnregisteredType(id: "app.entry", code: "forbidden", message: "metadata.types:write required")
             ]
         }
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let report = try await copy.hydrate(types: ["core.note"], tier: .library)
         #expect(
             report.unregisteredTypes == [
-                UnregisteredType(id: "app.entry", code: "forbidden", message: "metadata.types:write required")
+                Marfa.UnregisteredType(id: "app.entry", code: "forbidden", message: "metadata.types:write required")
             ])
         await copy.close()
     }
@@ -49,11 +49,11 @@ struct CopyOptions {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
-        #expect(try await copy.pin("outside") == PinReport(pinned: true, wasPinned: false))
-        #expect(try await copy.pin("outside") == PinReport(pinned: true, wasPinned: true))
+        #expect(try await copy.pin("outside") == Marfa.PinReport(pinned: true, wasPinned: false))
+        #expect(try await copy.pin("outside") == Marfa.PinReport(pinned: true, wasPinned: true))
         #expect(core.state.withLock { $0.pins } == ["outside"])
-        #expect(try await copy.unpin("outside") == PinReport(pinned: false, wasPinned: true))
-        #expect(try await copy.unpin("outside") == PinReport(pinned: false, wasPinned: false))
+        #expect(try await copy.unpin("outside") == Marfa.PinReport(pinned: false, wasPinned: true))
+        #expect(try await copy.unpin("outside") == Marfa.PinReport(pinned: false, wasPinned: false))
         try await eventually("pin changes were told") { heard.all.count == 4 }
         #expect(
             heard.all.map(\.origin) == [
@@ -68,7 +68,8 @@ struct CopyOptions {
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.change(
-            0, CoreChange(event: "copy.expired", itemId: nil, edgeId: nil, cursor: "3", reason: "instance_changed"))
+            0,
+            MarfaCore.Change(event: "copy.expired", itemId: nil, edgeId: nil, cursor: "3", reason: "instance_changed"))
         try await eventually("expiry was told") { heard.all.count == 1 }
         #expect(heard.all.first?.reason == "instance_changed")
         #expect(heard.all.first?.origin == .server(event: "copy.expired", cursor: "3"))
