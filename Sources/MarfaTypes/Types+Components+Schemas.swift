@@ -415,10 +415,16 @@ extension Components {
                 case extensions
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
         public struct EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeConstraintViolation = "edge_constraint_violation"
@@ -429,10 +435,16 @@ extension Components {
                     case unknownType = "unknown_type"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -451,14 +463,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -474,12 +488,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -487,18 +503,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal`.
         public struct UnauthorizedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case unauthorized = "unauthorized"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error/code`.
                 public var code: Components.Schemas.UnauthorizedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -517,14 +545,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error/details`.
                 public var details: Components.Schemas.UnauthorizedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.UnauthorizedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -540,12 +570,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/UnauthorizedRefusal/error`.
             public var error: Components.Schemas.UnauthorizedRefusal._ErrorPayload
             /// Creates a new `UnauthorizedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.UnauthorizedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -553,20 +585,32 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal`.
         public struct EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgePermissionDenied = "edge_permission_denied"
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -585,14 +629,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -608,12 +654,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -621,19 +669,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal`.
         public struct EdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeTypeNotFound = "edge_type_not_found"
                     case itemNotFound = "item_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -652,14 +712,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -675,12 +737,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public var error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
             /// Creates a new `EdgeTypeNotFoundOrItemNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -973,10 +1037,16 @@ extension Components {
                 case message
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal`.
         public struct ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case conflict = "conflict"
@@ -984,10 +1054,16 @@ extension Components {
                     case linkTaken = "link_taken"
                     case typeMismatch = "type_mismatch"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/code`.
                 public var code: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1006,14 +1082,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/details`.
                 public var details: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1029,12 +1107,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error`.
             public var error: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload
             /// Creates a new `ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1042,19 +1122,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal`.
         public struct UnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case unknownType = "unknown_type"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1073,14 +1165,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1096,12 +1190,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/UnknownTypeOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `UnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.UnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1109,19 +1205,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal`.
         public struct EdgePermissionDeniedOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgePermissionDenied = "edge_permission_denied"
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1140,14 +1248,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1163,12 +1273,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `EdgePermissionDeniedOrTypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1201,14 +1313,14 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
-        /// An `Item`, or, when `include` names `metadata`, an `ItemWithMetadata`; every row of one page is the same shape.
+        /// An `Item`, or, when `include` names `metadata`, an `ItemReadWithMetadata`; every row of one page is the same shape.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemListRow`.
         @frozen public enum ItemListRow: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ItemListRow/case1`.
             case Item(Components.Schemas.Item)
             /// - Remark: Generated from `#/components/schemas/ItemListRow/case2`.
-            case ItemWithMetadata(Components.Schemas.ItemWithMetadata)
+            case ItemReadWithMetadata(Components.Schemas.ItemReadWithMetadata)
             public init(from decoder: any Swift.Decoder) throws {
                 var errors: [any Swift.Error] = []
                 do {
@@ -1218,7 +1330,7 @@ extension Components {
                     errors.append(error)
                 }
                 do {
-                    self = .ItemWithMetadata(try .init(from: decoder))
+                    self = .ItemReadWithMetadata(try .init(from: decoder))
                     return
                 } catch {
                     errors.append(error)
@@ -1233,25 +1345,81 @@ extension Components {
                 switch self {
                 case let .Item(value):
                     try value.encode(to: encoder)
-                case let .ItemWithMetadata(value):
+                case let .ItemReadWithMetadata(value):
                     try value.encode(to: encoder)
                 }
             }
         }
+        /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata`.
+        public struct ItemReadWithMetadata: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata/value1`.
+            public var value1: Components.Schemas.ItemWithMetadata
+            /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// Required on conditional copy reads. Whether this item belongs to the effective source-filtered item set, before local type and tier selection.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata/value2/listed`.
+                public var listed: Swift.Bool?
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - listed: Required on conditional copy reads. Whether this item belongs to the effective source-filtered item set, before local type and tier selection.
+                public init(listed: Swift.Bool? = nil) {
+                    self.listed = listed
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case listed
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata/value2`.
+            public var value2: Components.Schemas.ItemReadWithMetadata.Value2Payload
+            /// Creates a new `ItemReadWithMetadata`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.ItemWithMetadata,
+                value2: Components.Schemas.ItemReadWithMetadata.Value2Payload
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
+            }
+        }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
         public struct MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case missingRequiredField = "missing_required_field"
                     case unknownType = "unknown_type"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1270,14 +1438,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1293,12 +1463,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1332,8 +1504,12 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/ItemDetail/backrefs`.
             public var backrefs: Components.Schemas.ItemDetail.BackrefsPayload?
+            /// Required on conditional copy reads; direct authority is independent of this item-set membership.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemDetail/listed`.
+            public var listed: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/ItemDetail/neighbors`.
-            public var neighbors: [Components.Schemas.ItemWithMetadata]?
+            public var neighbors: [Components.Schemas.ItemReadWithMetadata]?
             /// - Remark: Generated from `#/components/schemas/ItemDetail/neighbors_truncated`.
             public var neighborsTruncated: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/ItemDetail/neighbors_omitted`.
@@ -1346,6 +1522,7 @@ extension Components {
             ///   - item:
             ///   - metadata:
             ///   - backrefs:
+            ///   - listed: Required on conditional copy reads; direct authority is independent of this item-set membership.
             ///   - neighbors:
             ///   - neighborsTruncated:
             ///   - neighborsOmitted:
@@ -1354,7 +1531,8 @@ extension Components {
                 item: Components.Schemas.Item,
                 metadata: Components.Schemas.Metadata,
                 backrefs: Components.Schemas.ItemDetail.BackrefsPayload? = nil,
-                neighbors: [Components.Schemas.ItemWithMetadata]? = nil,
+                listed: Swift.Bool? = nil,
+                neighbors: [Components.Schemas.ItemReadWithMetadata]? = nil,
                 neighborsTruncated: Swift.Bool? = nil,
                 neighborsOmitted: Swift.Int? = nil,
                 versions: Components.Schemas.VersionPage? = nil
@@ -1362,6 +1540,7 @@ extension Components {
                 self.item = item
                 self.metadata = metadata
                 self.backrefs = backrefs
+                self.listed = listed
                 self.neighbors = neighbors
                 self.neighborsTruncated = neighborsTruncated
                 self.neighborsOmitted = neighborsOmitted
@@ -1371,6 +1550,7 @@ extension Components {
                 case item
                 case metadata
                 case backrefs
+                case listed
                 case neighbors
                 case neighborsTruncated = "neighbors_truncated"
                 case neighborsOmitted = "neighbors_omitted"
@@ -1487,18 +1667,30 @@ extension Components {
                 case createdAt = "created_at"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal`.
         public struct InvalidIdRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1517,14 +1709,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1540,12 +1734,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error`.
             public var error: Components.Schemas.InvalidIdRefusal._ErrorPayload
             /// Creates a new `InvalidIdRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1553,18 +1749,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal`.
         public struct TypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1583,14 +1791,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1606,12 +1816,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `TypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.TypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1619,18 +1831,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal`.
         public struct ItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case itemNotFound = "item_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.ItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1649,14 +1873,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.ItemNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ItemNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1672,12 +1898,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ItemNotFoundRefusal/error`.
             public var error: Components.Schemas.ItemNotFoundRefusal._ErrorPayload
             /// Creates a new `ItemNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1708,20 +1936,32 @@ extension Components {
                 case current
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal`.
         public struct LinkTakenOrSourceIdConflictOrTypeMismatchRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case linkTaken = "link_taken"
                     case sourceIdConflict = "source_id_conflict"
                     case typeMismatch = "type_mismatch"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/code`.
                 public var code: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1740,14 +1980,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error/details`.
                 public var details: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1763,12 +2005,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/LinkTakenOrSourceIdConflictOrTypeMismatchRefusal/error`.
             public var error: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload
             /// Creates a new `LinkTakenOrSourceIdConflictOrTypeMismatchRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1799,20 +2043,32 @@ extension Components {
                 case ok
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal`.
         public struct EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeConstraintViolation = "edge_constraint_violation"
                     case invalidId = "invalid_id"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1831,14 +2087,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1854,12 +2112,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1867,20 +2127,32 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal`.
         public struct InvalidIdOrInvalidTransitionOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
                     case invalidTransition = "invalid_transition"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1899,14 +2171,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1922,12 +2196,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidIdOrInvalidTransitionOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -1935,10 +2211,16 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeConstraintViolation = "edge_constraint_violation"
@@ -1947,10 +2229,16 @@ extension Components {
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -1969,14 +2257,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -1992,12 +2282,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2005,19 +2297,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal`.
         public struct InvalidIdOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2036,14 +2340,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2059,12 +2365,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidIdOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2087,20 +2395,32 @@ extension Components {
                 case metadata
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2119,14 +2439,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2142,12 +2464,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2155,19 +2479,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal`.
         public struct ForbiddenOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.ForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2186,14 +2522,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.ForbiddenOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2209,12 +2547,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ForbiddenOrTypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.ForbiddenOrTypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `ForbiddenOrTypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ForbiddenOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2290,8 +2630,19 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/id`.
             public var id: Swift.String?
+            /// Why a `skipped` entry wrote nothing. `duplicate_source`: under `create_only`, an item with this `source` and `source_id` exists. `duplicate_id`: under `create_only`, an item with this `id` exists. `duplicate_edge`: under `create_only`, an edge with this `source_id`, `target_id` and `edge_type` exists. `trashed`: under `upsert`, the `source` and `source_id` match an item in the trash, which stays there.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/reason`.
-            public var reason: Swift.String?
+            @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case duplicateEdge = "duplicate_edge"
+                case duplicateId = "duplicate_id"
+                case duplicateSource = "duplicate_source"
+                case trashed = "trashed"
+            }
+            /// Why a `skipped` entry wrote nothing. `duplicate_source`: under `create_only`, an item with this `source` and `source_id` exists. `duplicate_id`: under `create_only`, an item with this `id` exists. `duplicate_edge`: under `create_only`, an edge with this `source_id`, `target_id` and `edge_type` exists. `trashed`: under `upsert`, the `source` and `source_id` match an item in the trash, which stays there.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkResultEntry/reason`.
+            public var reason: Components.Schemas.BulkResultEntry.ReasonPayload?
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/error`.
             public var error: Components.Schemas.BulkEntryError?
             /// Creates a new `BulkResultEntry`.
@@ -2300,13 +2651,13 @@ extension Components {
             ///   - index:
             ///   - outcome:
             ///   - id: The id of what the entry wrote or resolved. Absent where an item entry's natural key resolved a row of a type the credential may not read: the entry learns that its key is taken and nothing of the row.
-            ///   - reason:
+            ///   - reason: Why a `skipped` entry wrote nothing. `duplicate_source`: under `create_only`, an item with this `source` and `source_id` exists. `duplicate_id`: under `create_only`, an item with this `id` exists. `duplicate_edge`: under `create_only`, an edge with this `source_id`, `target_id` and `edge_type` exists. `trashed`: under `upsert`, the `source` and `source_id` match an item in the trash, which stays there.
             ///   - error:
             public init(
                 index: Swift.Int,
                 outcome: Components.Schemas.BulkResultOutcome,
                 id: Swift.String? = nil,
-                reason: Swift.String? = nil,
+                reason: Components.Schemas.BulkResultEntry.ReasonPayload? = nil,
                 error: Components.Schemas.BulkEntryError? = nil
             ) {
                 self.index = index
@@ -2377,20 +2728,32 @@ extension Components {
                 case details
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkAtomicRollback = "bulk_atomic_rollback"
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2409,14 +2772,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2432,12 +2797,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2445,20 +2812,32 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal`.
         public struct BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkAtomicRollback = "bulk_atomic_rollback"
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2477,14 +2856,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2500,12 +2881,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BulkAtomicRollbackOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2513,18 +2896,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal`.
         public struct BulkAtomicRollbackRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkAtomicRollback = "bulk_atomic_rollback"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error/code`.
                 public var code: Components.Schemas.BulkAtomicRollbackRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2543,14 +2938,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error/details`.
                 public var details: Components.Schemas.BulkAtomicRollbackRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BulkAtomicRollbackRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2566,12 +2963,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackRefusal/error`.
             public var error: Components.Schemas.BulkAtomicRollbackRefusal._ErrorPayload
             /// Creates a new `BulkAtomicRollbackRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BulkAtomicRollbackRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2776,10 +3175,16 @@ extension Components {
             case failed = "failed"
             case canceled = "canceled"
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkCapExceeded = "bulk_cap_exceeded"
@@ -2787,10 +3192,16 @@ extension Components {
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2809,14 +3220,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2832,12 +3245,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -2936,18 +3351,30 @@ extension Components {
                 case filter
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal`.
         public struct ForbiddenRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case forbidden = "forbidden"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/code`.
                 public var code: Components.Schemas.ForbiddenRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -2966,14 +3393,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error/details`.
                 public var details: Components.Schemas.ForbiddenRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ForbiddenRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -2989,12 +3418,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ForbiddenRefusal/error`.
             public var error: Components.Schemas.ForbiddenRefusal._ErrorPayload
             /// Creates a new `ForbiddenRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ForbiddenRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3002,18 +3433,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal`.
         public struct BulkJobNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkJobNotFound = "bulk_job_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.BulkJobNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3032,14 +3475,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.BulkJobNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BulkJobNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3055,12 +3500,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkJobNotFoundRefusal/error`.
             public var error: Components.Schemas.BulkJobNotFoundRefusal._ErrorPayload
             /// Creates a new `BulkJobNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BulkJobNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3103,10 +3550,16 @@ extension Components {
                 case settledAt = "settled_at"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
         public struct InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
@@ -3114,10 +3567,16 @@ extension Components {
                     case unknownType = "unknown_type"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3136,14 +3595,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3159,12 +3620,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3223,18 +3686,30 @@ extension Components {
                 case extensions
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
         public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3253,14 +3728,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3276,12 +3753,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
             public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
             /// Creates a new `ValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3304,10 +3783,16 @@ extension Components {
                 case edge
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeConstraintViolation = "edge_constraint_violation"
@@ -3316,10 +3801,16 @@ extension Components {
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3338,14 +3829,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3361,12 +3854,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3374,18 +3869,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/IdReusedRefusal`.
         public struct IdReusedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case idReused = "id_reused"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error/code`.
                 public var code: Components.Schemas.IdReusedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3404,14 +3911,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error/details`.
                 public var details: Components.Schemas.IdReusedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.IdReusedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3427,12 +3936,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/IdReusedRefusal/error`.
             public var error: Components.Schemas.IdReusedRefusal._ErrorPayload
             /// Creates a new `IdReusedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.IdReusedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3440,18 +3951,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal`.
         public struct EdgeNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeNotFound = "edge_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3470,14 +3993,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3493,12 +4018,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeNotFoundRefusal/error`.
             public var error: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload
             /// Creates a new `EdgeNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3506,20 +4033,32 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
         public struct EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeNotFound = "edge_not_found"
                     case edgeTypeNotFound = "edge_type_not_found"
                     case itemNotFound = "item_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3538,14 +4077,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3561,12 +4102,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public var error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
             /// Creates a new `EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3597,10 +4140,16 @@ extension Components {
                 case current
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal`.
         public struct BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkAtomicRollback = "bulk_atomic_rollback"
@@ -3608,10 +4157,16 @@ extension Components {
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3630,14 +4185,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3653,12 +4210,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3834,20 +4393,32 @@ extension Components {
                 case format
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidSchema = "invalid_schema"
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3866,14 +4437,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3889,12 +4462,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidSchemaOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3902,19 +4477,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal`.
         public struct EdgePermissionDeniedOrForbiddenRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgePermissionDenied = "edge_permission_denied"
                     case forbidden = "forbidden"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/code`.
                 public var code: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3933,14 +4520,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/details`.
                 public var details: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -3956,12 +4545,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error`.
             public var error: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload
             /// Creates a new `EdgePermissionDeniedOrForbiddenRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgePermissionDeniedOrForbiddenRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -3969,18 +4560,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConflictRefusal`.
         public struct ConflictRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case conflict = "conflict"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error/code`.
                 public var code: Components.Schemas.ConflictRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -3999,14 +4602,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error/details`.
                 public var details: Components.Schemas.ConflictRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConflictRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -4022,12 +4627,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConflictRefusal/error`.
             public var error: Components.Schemas.ConflictRefusal._ErrorPayload
             /// Creates a new `ConflictRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConflictRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -4173,18 +4780,30 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal`.
         public struct EdgeTypeNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeTypeNotFound = "edge_type_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -4203,14 +4822,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -4226,12 +4847,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error`.
             public var error: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload
             /// Creates a new `EdgeTypeNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -4239,18 +4862,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal`.
         public struct EdgeTypeInUseRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeTypeInUse = "edge_type_in_use"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error/code`.
                 public var code: Components.Schemas.EdgeTypeInUseRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -4269,14 +4904,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error/details`.
                 public var details: Components.Schemas.EdgeTypeInUseRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.EdgeTypeInUseRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -4292,12 +4929,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeInUseRefusal/error`.
             public var error: Components.Schemas.EdgeTypeInUseRefusal._ErrorPayload
             /// Creates a new `EdgeTypeInUseRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeTypeInUseRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -4738,18 +5377,30 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal`.
         public struct TypeNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case typeNotFound = "type_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.TypeNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -4768,14 +5419,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.TypeNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.TypeNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -4791,12 +5444,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeNotFoundRefusal/error`.
             public var error: Components.Schemas.TypeNotFoundRefusal._ErrorPayload
             /// Creates a new `TypeNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.TypeNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -4804,18 +5459,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal`.
         public struct TypeChainUnresolvableRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case typeChainUnresolvable = "type_chain_unresolvable"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error/code`.
                 public var code: Components.Schemas.TypeChainUnresolvableRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -4834,14 +5501,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error/details`.
                 public var details: Components.Schemas.TypeChainUnresolvableRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.TypeChainUnresolvableRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -4857,12 +5526,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeChainUnresolvableRefusal/error`.
             public var error: Components.Schemas.TypeChainUnresolvableRefusal._ErrorPayload
             /// Creates a new `TypeChainUnresolvableRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.TypeChainUnresolvableRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -4885,10 +5556,16 @@ extension Components {
                 case _type = "type"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal`.
         public struct InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case inheritanceViolation = "inheritance_violation"
@@ -4897,10 +5574,16 @@ extension Components {
                     case propertyShadowsField = "property_shadows_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -4919,14 +5602,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -4942,12 +5627,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InheritanceViolationOrInvalidSchemaOrMissingRequiredFieldOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -4955,19 +5642,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal`.
         public struct LinkTakenOrTypeAlreadyExistsRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case linkTaken = "link_taken"
                     case typeAlreadyExists = "type_already_exists"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
                 public var code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -4986,14 +5685,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
                 public var details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -5009,12 +5710,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
             public var error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload
             /// Creates a new `LinkTakenOrTypeAlreadyExistsRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -5022,18 +5725,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal`.
         public struct CompatibleWithViolationRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case compatibleWithViolation = "compatible_with_violation"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/code`.
                 public var code: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -5052,14 +5767,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/details`.
                 public var details: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -5075,12 +5792,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error`.
             public var error: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload
             /// Creates a new `CompatibleWithViolationRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -5385,10 +6104,16 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal`.
         public struct InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case inheritanceViolation = "inheritance_violation"
@@ -5396,10 +6121,16 @@ extension Components {
                     case propertyShadowsField = "property_shadows_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -5418,14 +6149,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -5441,12 +6174,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -5454,20 +6189,32 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal`.
         public struct CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case coreTypeImmutable = "core_type_immutable"
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 public var code: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -5486,14 +6233,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error/details`.
                 public var details: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -5509,12 +6258,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal/error`.
             public var error: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload
             /// Creates a new `CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.CoreTypeImmutableOrForbiddenOrTypeNotPermittedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -5522,18 +6273,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal`.
         public struct LinkTakenRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case linkTaken = "link_taken"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/code`.
                 public var code: Components.Schemas.LinkTakenRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -5552,14 +6315,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error/details`.
                 public var details: Components.Schemas.LinkTakenRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.LinkTakenRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -5575,12 +6340,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/LinkTakenRefusal/error`.
             public var error: Components.Schemas.LinkTakenRefusal._ErrorPayload
             /// Creates a new `LinkTakenRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.LinkTakenRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -5870,19 +6637,31 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal`.
         public struct TypeHasSubtypesOrTypeInUseRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case typeHasSubtypes = "type_has_subtypes"
                     case typeInUse = "type_in_use"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error/code`.
                 public var code: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -5901,14 +6680,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error/details`.
                 public var details: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -5924,12 +6705,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeHasSubtypesOrTypeInUseRefusal/error`.
             public var error: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal._ErrorPayload
             /// Creates a new `TypeHasSubtypesOrTypeInUseRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -6224,19 +7007,31 @@ extension Components {
                 case replaces
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
         public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -6255,14 +7050,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -6278,12 +7075,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -6482,18 +7281,30 @@ extension Components {
                 case detachedAt = "detached_at"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal`.
         public struct BlobNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case blobNotFound = "blob_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.BlobNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -6512,14 +7323,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.BlobNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BlobNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -6535,12 +7348,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobNotFoundRefusal/error`.
             public var error: Components.Schemas.BlobNotFoundRefusal._ErrorPayload
             /// Creates a new `BlobNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BlobNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -6548,18 +7363,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal`.
         public struct RangeNotSatisfiableRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case rangeNotSatisfiable = "range_not_satisfiable"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error/code`.
                 public var code: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -6578,14 +7405,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error/details`.
                 public var details: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -6601,12 +7430,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/RangeNotSatisfiableRefusal/error`.
             public var error: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload
             /// Creates a new `RangeNotSatisfiableRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -6691,19 +7522,31 @@ extension Components {
                 case verifiedAt = "verified_at"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal`.
         public struct BlobLocationNotFoundOrBlobNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case blobLocationNotFound = "blob_location_not_found"
                     case blobNotFound = "blob_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.BlobLocationNotFoundOrBlobNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -6722,14 +7565,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.BlobLocationNotFoundOrBlobNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.BlobLocationNotFoundOrBlobNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -6745,12 +7590,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocationNotFoundOrBlobNotFoundRefusal/error`.
             public var error: Components.Schemas.BlobLocationNotFoundOrBlobNotFoundRefusal._ErrorPayload
             /// Creates a new `BlobLocationNotFoundOrBlobNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.BlobLocationNotFoundOrBlobNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -6758,18 +7605,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal`.
         public struct CopiesBelowMinimumRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case copiesBelowMinimum = "copies_below_minimum"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error/code`.
                 public var code: Components.Schemas.CopiesBelowMinimumRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -6788,14 +7647,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error/details`.
                 public var details: Components.Schemas.CopiesBelowMinimumRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.CopiesBelowMinimumRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -6811,12 +7672,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/CopiesBelowMinimumRefusal/error`.
             public var error: Components.Schemas.CopiesBelowMinimumRefusal._ErrorPayload
             /// Creates a new `CopiesBelowMinimumRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.CopiesBelowMinimumRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -6968,18 +7831,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal`.
         public struct HousekeepingJobNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case housekeepingJobNotFound = "housekeeping_job_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -6998,14 +7873,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -7021,12 +7898,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error`.
             public var error: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload
             /// Creates a new `HousekeepingJobNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -7034,18 +7913,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal`.
         public struct HousekeepingJobRunningRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case housekeepingJobRunning = "housekeeping_job_running"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/code`.
                 public var code: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -7064,14 +7955,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/details`.
                 public var details: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -7087,12 +7980,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error`.
             public var error: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload
             /// Creates a new `HousekeepingJobRunningRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -7262,18 +8157,30 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal`.
         public struct ConnectorNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case connectorNotFound = "connector_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.ConnectorNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -7292,14 +8199,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.ConnectorNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConnectorNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -7315,12 +8224,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundRefusal/error`.
             public var error: Components.Schemas.ConnectorNotFoundRefusal._ErrorPayload
             /// Creates a new `ConnectorNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConnectorNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -7435,19 +8346,31 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal`.
         public struct ConnectorNotFoundOrEndpointNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case connectorNotFound = "connector_not_found"
                     case endpointNotFound = "endpoint_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -7466,14 +8389,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -7489,12 +8414,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrEndpointNotFoundRefusal/error`.
             public var error: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload
             /// Creates a new `ConnectorNotFoundOrEndpointNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConnectorNotFoundOrEndpointNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -7643,19 +8570,31 @@ extension Components {
                 case outcome
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal`.
         public struct ConnectorNotFoundOrDeliveryNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case connectorNotFound = "connector_not_found"
                     case deliveryNotFound = "delivery_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -7674,14 +8613,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -7697,12 +8638,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorNotFoundOrDeliveryNotFoundRefusal/error`.
             public var error: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload
             /// Creates a new `ConnectorNotFoundOrDeliveryNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConnectorNotFoundOrDeliveryNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -7710,18 +8653,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal`.
         public struct ConnectorHeldRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case connectorHeld = "connector_held"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/code`.
                 public var code: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -7740,14 +8695,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error/details`.
                 public var details: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConnectorHeldRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -7763,12 +8720,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConnectorHeldRefusal/error`.
             public var error: Components.Schemas.ConnectorHeldRefusal._ErrorPayload
             /// Creates a new `ConnectorHeldRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConnectorHeldRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -8178,10 +9137,16 @@ extension Components {
                 ])
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
         public struct InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
@@ -8190,10 +9155,16 @@ extension Components {
                     case unknownType = "unknown_type"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -8212,14 +9183,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -8235,12 +9208,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -8248,19 +9223,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal`.
         public struct InvalidIdOrInvalidTransitionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
                     case invalidTransition = "invalid_transition"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/code`.
                 public var code: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -8279,14 +9266,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/details`.
                 public var details: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -8302,12 +9291,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error`.
             public var error: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload
             /// Creates a new `InvalidIdOrInvalidTransitionRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -8763,7 +9754,7 @@ extension Components {
             public var enforcementOverride: Components.Schemas.EnforcementOverride?
             /// - Remark: Generated from `#/components/schemas/ApiKey/created_at`.
             public var createdAt: Swift.String
-            /// Hard lifetime bound, and NULL on every key a door mints. A key past this instant is refused at the bearer gate exactly like a revoked one.
+            /// Hard lifetime bound, and NULL on every key a door mints. A key past this instant is refused at the bearer gate exactly like a revoked one. The key listing omits it, and the change and revoke doors answer `404 api_key_not_found` for it.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/expires_at`.
             public var expiresAt: Swift.String?
@@ -8787,7 +9778,7 @@ extension Components {
             ///   - profilePermissions:
             ///   - enforcementOverride:
             ///   - createdAt:
-            ///   - expiresAt: Hard lifetime bound, and NULL on every key a door mints. A key past this instant is refused at the bearer gate exactly like a revoked one.
+            ///   - expiresAt: Hard lifetime bound, and NULL on every key a door mints. A key past this instant is refused at the bearer gate exactly like a revoked one. The key listing omits it, and the change and revoke doors answer `404 api_key_not_found` for it.
             ///   - lastUsedAt:
             public init(
                 id: Swift.String,
@@ -8846,18 +9837,30 @@ extension Components {
                 case lastUsedAt = "last_used_at"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal`.
         public struct ApiKeyNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case apiKeyNotFound = "api_key_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.ApiKeyNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -8876,14 +9879,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.ApiKeyNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ApiKeyNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -8899,12 +9904,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error`.
             public var error: Components.Schemas.ApiKeyNotFoundRefusal._ErrorPayload
             /// Creates a new `ApiKeyNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ApiKeyNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9057,19 +10064,31 @@ extension Components {
                 ])
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal`.
         public struct InvalidPropertiesOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidProperties = "invalid_properties"
                     case validationError = "validation_error"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/code`.
                 public var code: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9088,14 +10107,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/details`.
                 public var details: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9111,12 +10132,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error`.
             public var error: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload
             /// Creates a new `InvalidPropertiesOrValidationErrorRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9124,19 +10147,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal`.
         public struct ConflictOrLinkTakenRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case conflict = "conflict"
                     case linkTaken = "link_taken"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/code`.
                 public var code: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9155,14 +10190,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error/details`.
                 public var details: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9178,12 +10215,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/ConflictOrLinkTakenRefusal/error`.
             public var error: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload
             /// Creates a new `ConflictOrLinkTakenRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.ConflictOrLinkTakenRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9251,19 +10290,31 @@ extension Components {
                 case removable
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal`.
         public struct NotFoundOrTypeNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case notFound = "not_found"
                     case typeNotFound = "type_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9282,14 +10333,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9305,12 +10358,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error`.
             public var error: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload
             /// Creates a new `NotFoundOrTypeNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9355,18 +10410,30 @@ extension Components {
                 case createdAt = "created_at"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal`.
         public struct OwnerNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case ownerNotFound = "owner_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.OwnerNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9385,14 +10452,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.OwnerNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.OwnerNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9408,12 +10477,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/OwnerNotFoundRefusal/error`.
             public var error: Components.Schemas.OwnerNotFoundRefusal._ErrorPayload
             /// Creates a new `OwnerNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.OwnerNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9421,18 +10492,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal`.
         public struct OwnerExistsRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case ownerExists = "owner_exists"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error/code`.
                 public var code: Components.Schemas.OwnerExistsRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9451,14 +10534,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error/details`.
                 public var details: Components.Schemas.OwnerExistsRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.OwnerExistsRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9474,12 +10559,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/OwnerExistsRefusal/error`.
             public var error: Components.Schemas.OwnerExistsRefusal._ErrorPayload
             /// Creates a new `OwnerExistsRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.OwnerExistsRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9571,18 +10658,30 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal`.
         public struct WebhookNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case webhookNotFound = "webhook_not_found"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error/code`.
                 public var code: Components.Schemas.WebhookNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9601,14 +10700,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error/details`.
                 public var details: Components.Schemas.WebhookNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.WebhookNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9624,12 +10725,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/WebhookNotFoundRefusal/error`.
             public var error: Components.Schemas.WebhookNotFoundRefusal._ErrorPayload
             /// Creates a new `WebhookNotFoundRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.WebhookNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9838,18 +10941,30 @@ extension Components {
                 case details
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal`.
         public struct RequestTooLargeRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case requestTooLarge = "request_too_large"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/code`.
                 public var code: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9868,14 +10983,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/details`.
                 public var details: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9891,12 +11008,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error`.
             public var error: Components.Schemas.RequestTooLargeRefusal._ErrorPayload
             /// Creates a new `RequestTooLargeRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.RequestTooLargeRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9904,18 +11023,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal`.
         public struct RateLimitedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case rateLimited = "rate_limited"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/code`.
                 public var code: Components.Schemas.RateLimitedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -9934,14 +11065,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
                 public var details: Components.Schemas.RateLimitedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.RateLimitedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -9957,12 +11090,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error`.
             public var error: Components.Schemas.RateLimitedRefusal._ErrorPayload
             /// Creates a new `RateLimitedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.RateLimitedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -9970,18 +11105,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal`.
         public struct WriteContentionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case writeContention = "write_contention"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/code`.
                 public var code: Components.Schemas.WriteContentionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -10000,14 +11147,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details`.
                 public var details: Components.Schemas.WriteContentionRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.WriteContentionRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -10023,12 +11172,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error`.
             public var error: Components.Schemas.WriteContentionRefusal._ErrorPayload
             /// Creates a new `WriteContentionRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.WriteContentionRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -10036,18 +11187,112 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal`.
+        public struct ReadViewChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case readViewChanged = "read_view_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/code`.
+                public var code: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/details`.
+                public var details: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error`.
+            public var error: Components.Schemas.ReadViewChangedRefusal._ErrorPayload
+            /// Creates a new `ReadViewChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ReadViewChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal`.
         public struct IdempotencyKeyInFlightRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case idempotencyKeyInFlight = "idempotency_key_in_flight"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error/code`.
                 public var code: Components.Schemas.IdempotencyKeyInFlightRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -10066,14 +11311,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error/details`.
                 public var details: Components.Schemas.IdempotencyKeyInFlightRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.IdempotencyKeyInFlightRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -10089,12 +11336,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/IdempotencyKeyInFlightRefusal/error`.
             public var error: Components.Schemas.IdempotencyKeyInFlightRefusal._ErrorPayload
             /// Creates a new `IdempotencyKeyInFlightRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.IdempotencyKeyInFlightRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -10102,19 +11351,31 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal`.
         public struct IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case idempotencyKeyReused = "idempotency_key_reused"
                     case idempotencyResultNotRetained = "idempotency_result_not_retained"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/code`.
                 public var code: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -10133,14 +11394,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/details`.
                 public var details: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -10156,12 +11419,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error`.
             public var error: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload
             /// Creates a new `IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload) {
                 self.error = error
             }
@@ -10169,18 +11434,30 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal`.
         public struct StreamCapacityExhaustedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case streamCapacityExhausted = "stream_capacity_exhausted"
                 }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
                 /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error/code`.
                 public var code: Components.Schemas.StreamCapacityExhaustedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
                 /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error/message`.
                 public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
@@ -10199,14 +11476,16 @@ extension Components {
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
                 /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error/details`.
                 public var details: Components.Schemas.StreamCapacityExhaustedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
-                ///   - code:
-                ///   - message:
-                ///   - details:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
                     code: Components.Schemas.StreamCapacityExhaustedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
@@ -10222,12 +11501,14 @@ extension Components {
                     case details
                 }
             }
+            /// What went wrong.
+            ///
             /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedRefusal/error`.
             public var error: Components.Schemas.StreamCapacityExhaustedRefusal._ErrorPayload
             /// Creates a new `StreamCapacityExhaustedRefusal`.
             ///
             /// - Parameters:
-            ///   - error:
+            ///   - error: What went wrong.
             public init(error: Components.Schemas.StreamCapacityExhaustedRefusal._ErrorPayload) {
                 self.error = error
             }

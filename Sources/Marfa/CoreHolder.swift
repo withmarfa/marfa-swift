@@ -59,6 +59,23 @@ final class CoreHolder: Sendable {
         try await background { [self] in try with(work) }
     }
 
+    func runUntilCanceled<T: Sendable>(
+        _ work: @escaping @Sendable (Core, CoreStop) throws -> T
+    ) async throws -> T {
+        let stop = CoreStop()
+        return try await withTaskCancellationHandler {
+            let alreadyCanceled = Task.isCancelled
+            return try await background { [self] in
+                try with { core in
+                    if alreadyCanceled { throw MarfaError.canceled(message: "the call was canceled") }
+                    return try work(core, stop)
+                }
+            }
+        } onCancel: {
+            stop.raise()
+        }
+    }
+
     /// Runs `work` on this thread against the core, translating the core's errors.
     func with<T>(_ work: (Core) throws -> T) throws -> T {
         var core: Core? = try lease()

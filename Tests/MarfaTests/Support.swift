@@ -144,6 +144,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
         var catchUpFails: CoreMarfaError?
+        var declarations: [String] = []
+        var registrationRefusals: [CoreUnregisteredType] = []
         var hydrationOptions: (types: [String], tier: CoreTier, edgeTypes: [String])?
         var pins: Set<String> = []
         var probe: DropProbe?
@@ -212,11 +214,22 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.follows[index].listener }.changed(change: change)
     }
 
-    override func hydrateWith(types: [String], tier: CoreTier, edgeTypes: [String]) throws -> CoreHydrateReport {
+    override func hydrateWith(types: [String], tier: CoreTier, edgeTypes: [String], stop: CoreStop?) throws
+        -> CoreHydrateReport
+    {
         try refreshing()
         state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
         return CoreHydrateReport(
-            types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "1")
+            types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "1",
+            registeredTypes: [], unregisteredTypes: state.withLock { $0.registrationRefusals })
+    }
+
+    override func declareTypes(types: [String]) {
+        state.withLock { $0.declarations = types }
+    }
+
+    override func declaredTypes() -> [String] {
+        state.withLock { $0.declarations }
     }
 
     override func pin(id: String) throws -> CorePinReport {
@@ -229,7 +242,7 @@ final class FakeCore: Core, @unchecked Sendable {
         return CorePinReport(pinned: false, wasPinned: removed)
     }
 
-    override func catchUp() throws -> CoreCatchUpReport {
+    override func catchUp(stop: CoreStop?) throws -> CoreCatchUpReport {
         try refreshing()
         return try state.withLock { state in
             if state.catchUpChangesCatalog { state.catalogVersion = (state.catalogVersion ?? 0) + 1 }
@@ -249,7 +262,7 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.withdrawable.remove(id) != nil }
     }
 
-    override func drain() throws -> CoreDrainReport {
+    override func drain(stop: CoreStop?) throws -> CoreDrainReport {
         state.withLock { $0.drained }
     }
 
@@ -343,6 +356,7 @@ func write(_ kind: WriteKind, item: String?, target: String? = nil, edge: String
 ///
 /// Every answer names `contract`.
 struct LocalServer: Sendable {
+    static let readView = String(repeating: "a", count: 64)
     typealias Answer = (status: Int, type: String, body: String)
 
     let url: URL
@@ -352,6 +366,7 @@ struct LocalServer: Sendable {
 
     final class RequestLog: Sendable {
         let heads = Mutex<[String]>([])
+        let connections = Mutex<[NWConnection]>([])
         var all: [String] { heads.withLock { $0 } }
     }
 
@@ -363,7 +378,9 @@ struct LocalServer: Sendable {
     }
 
     static func start(
-        contract: Int, headers: String = "",
+        contract: Int,
+        headers: String = "x-marfa-read-view: \(LocalServer.readView)\r\ncache-control: no-store\r\n",
+        holdsResponse: Bool = false,
         answer: @escaping @Sendable (_ method: String, _ path: String) -> Answer = emptyPage
     ) async throws -> LocalServer {
         let parameters = NWParameters.tcp
@@ -371,6 +388,7 @@ struct LocalServer: Sendable {
         let listener = try NWListener(using: parameters)
         let log = RequestLog()
         listener.newConnectionHandler = { connection in
+            log.connections.withLock { $0.append(connection) }
             connection.start(queue: .global())
             connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
                 let head = String(decoding: data ?? Data(), as: UTF8.self)
@@ -378,6 +396,7 @@ struct LocalServer: Sendable {
                 let line = head.prefix { $0 != "\r" }.split(separator: " ")
                 let method = line.first.map(String.init) ?? ""
                 let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
+                if holdsResponse { return }
                 let (status, type, body) = answer(method, path)
                 let response = Data(
                     ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
@@ -405,5 +424,6 @@ struct LocalServer: Sendable {
 
     func stop() {
         listener.cancel()
+        for connection in log.connections.withLock({ $0 }) { connection.cancel() }
     }
 }

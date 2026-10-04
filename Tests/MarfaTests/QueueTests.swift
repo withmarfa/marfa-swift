@@ -10,7 +10,13 @@ struct Waiting {
     static func hydrating(_ method: String, _ path: String) -> LocalServer.Answer {
         switch path {
         case "/events":
-            (200, "text/event-stream", "event: stream_cursor\ndata: {\"type\":\"stream_cursor\",\"cursor\":\"10\"}\n\n")
+            (
+                200, "text/event-stream",
+                ["stream_cursor", "stream_live"].map { kind in
+                    "event: \(kind)\ndata: {\"type\":\"\(kind)\",\"cursor\":\"10\","
+                        + "\"instance_id\":\"test-instance\",\"read_view\":\"\(LocalServer.readView)\"}\n\n"
+                }.joined()
+            )
         case "/types":
             (
                 200, "application/json",

@@ -19,6 +19,7 @@ struct ContractTests {
             #expect(status == 200)
             #expect(!writeSent)
         }
+        await copy.close()
     }
 
     @Test(arguments: ["/next", nil] as [String?])
@@ -42,15 +43,13 @@ struct ContractTests {
         await copy.close()
     }
 
-    /// The empty page names no event cursor, so `noCursor` shows the
-    /// contract check passed.
     @Test func aServerOnTheContractTheTypesDescribeIsReadPastTheCheck() async throws {
-        let server = try await LocalServer.start(contract: marfaContractVersion)
+        let server = try await LocalServer.start(contract: marfaContractVersion, answer: Waiting.hydrating)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
-        do {
-            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-            Issue.record("an empty page hydrated")
-        } catch MarfaError.noCursor {}
+        let report = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        #expect(report.types == ["core.note"])
+        #expect(report.cursor == "10")
+        await copy.close()
     }
 }
