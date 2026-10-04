@@ -89,7 +89,9 @@ import Testing
     let listed = ListedFolder(directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f")
     #expect(listed.folderId == "f")
     let status = FolderStatus(
-        files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: PausedRemoval(disk: 2))
+        files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: PausedRemoval(disk: 2),
+        firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0)))
+    #expect(status.firstSync?.plan?.send == 2)
     #expect(status.paused.isPaused)
     #expect(!PausedRemoval().isPaused)
     let read: Bool =
@@ -97,6 +99,12 @@ import Testing
         case .inStep, .waiting, .held, .unmatched, .unreached, .outside: true
         }
     #expect(read)
+    let sync = FolderSyncResult.awaitingConfirmation(FirstSyncPlan(write: 1, send: 2, beside: 0))
+    let syncRead: Bool =
+        switch sync {
+        case .synced, .awaitingConfirmation: true
+        }
+    #expect(syncRead)
     let event = FolderEvent.retrying(.network(message: "m"), after: .seconds(1))
     let told: Bool =
         switch event {
@@ -123,7 +131,8 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
             .unnamed, .decoding, .store, .storageFull, .signedOut, .noKeychain, .redirected, .noServer, .noCursor,
             .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle,
-            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .canceled, .invalid,
+            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .canceled,
+            .firstSyncWaiting, .invalid,
             .closed:
             true
         }

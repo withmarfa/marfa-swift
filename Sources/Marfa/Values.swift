@@ -44,6 +44,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// `status` is nil when the failure carries no HTTP status.
     case contractMismatch(served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String)
     case canceled(message: String)
+    /// A folder's first sync waits for the person to confirm it, so the call that would write or send for it
+    /// was refused.
+    case firstSyncWaiting(message: String)
     case invalid(message: String)
     /// The working copy was closed, or failed to reopen its store with a new
     /// key; it is gone for good, and the app opens the store again.
@@ -61,7 +64,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .copyExpired(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
-            .contractMismatch(_, _, _, _, let message), .canceled(let message), .invalid(let message),
+            .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
+            .invalid(let message),
             .closed(let message):
             message
         }
@@ -108,6 +112,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             core = .ContractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message)
         case .canceled(let message): core = .Canceled(message: message)
+        case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
         case .closed: return "closed"
         }
@@ -154,6 +159,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .contractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message)
         case .Canceled(let message): self = .canceled(message: message)
+        case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
         case .Invalid(let message): self = .invalid(message: message)
         }
     }

@@ -28,7 +28,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/headers/X-Error-Code`.
         public typealias XErrorCode = Swift.String
-        /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged — so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+        /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
         ///
         /// - Remark: Generated from `#/components/headers/X-RateLimit-Limit`.
         public typealias XRateLimitLimit = Swift.Int
@@ -44,7 +44,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/headers/Retry-After`.
         public typealias RetryAfter = Swift.Int
-        /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read — the header says where the answer came from, not that anything went wrong.
+        /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
         ///
         /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
         @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
