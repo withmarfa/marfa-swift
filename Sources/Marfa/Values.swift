@@ -12,16 +12,20 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case unknownType(message: String)
     case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?)
     case server(status: UInt16, code: String, message: String)
+    case io(message: String)
     case network(message: String)
     /// A response from something in front of the server, without its contract.
     case unnamed(status: UInt16, message: String)
     case decoding(message: String)
     case store(message: String)
+    case storageFull(message: String)
+    case signedOut(origin: String, message: String)
+    case noKeychain(message: String)
+    case redirected(origin: String, status: UInt16, location: String?, message: String)
     case noServer(message: String)
     case noCursor(message: String)
     case hydrationIncomplete(message: String)
-    /// The copy has never held the server's type catalog; a hydration reads
-    /// it.
+    /// The copy holds no type catalog; a hydration reads the server's catalog.
     case noCatalog(message: String)
     /// The store at `path` has a shape this build cannot read. `unsent`
     /// names the writes another build can still send, where the queue is readable.
@@ -38,7 +42,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// where a success named none. Where `writeSent`, the answer was to a
     /// write, which may have taken effect: it stays queued, and goes again
     /// under its idempotency key once the app speaks the server's contract.
-    case contractMismatch(served: String?, expected: UInt64, status: UInt16, writeSent: Bool, message: String)
+    /// `status` is nil when the failure carries no HTTP status.
+    case contractMismatch(served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String)
+    case canceled(message: String)
     case invalid(message: String)
     /// The working copy was closed, or failed to reopen its store with a new
     /// key; it is gone for good, and the app opens the store again.
@@ -49,14 +55,64 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         switch self {
         case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
             .validation(_, let message), .unknownType(let message), .rateLimited(_, let message, _),
-            .server(_, _, let message), .network(let message), .unnamed(_, let message), .decoding(let message),
-            .store(let message),
+            .server(_, _, let message), .io(let message), .network(let message), .unnamed(_, let message),
+            .decoding(let message),
+            .store(let message), .storageFull(let message), .signedOut(_, let message),
+            .noKeychain(let message), .redirected(_, _, _, let message),
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .copyExpired(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
-            .contractMismatch(_, _, _, _, let message), .invalid(let message), .closed(let message):
+            .contractMismatch(_, _, _, _, let message), .canceled(let message), .invalid(let message),
+            .closed(let message):
             message
         }
+    }
+
+    /// The canonical error name shared with the core and CLI.
+    ///
+    /// Associated `code` values remain the server's refusal codes.
+    public func code() -> String {
+        let core: CoreMarfaError
+        switch self {
+        case .notFound(let code, let message): core = .NotFound(code: code, message: message)
+        case .unauthorized(let code, let message): core = .Unauthorized(code: code, message: message)
+        case .forbidden(let code, let message): core = .Forbidden(code: code, message: message)
+        case .validation(let code, let message): core = .Validation(code: code, message: message)
+        case .unknownType(let message): core = .UnknownType(message: message)
+        case .rateLimited(let code, let message, let retryAfterSeconds):
+            core = .RateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
+        case .server(let status, let code, let message): core = .Server(status: status, code: code, message: message)
+        case .io(let message): core = .Io(message: message)
+        case .network(let message): core = .Network(message: message)
+        case .unnamed(let status, let message): core = .Unnamed(status: status, message: message)
+        case .decoding(let message): core = .Decoding(message: message)
+        case .store(let message): core = .Store(message: message)
+        case .storageFull(let message): core = .StorageFull(message: message)
+        case .signedOut(let origin, let message): core = .SignedOut(origin: origin, message: message)
+        case .noKeychain(let message): core = .NoKeychain(message: message)
+        case .redirected(let origin, let status, let location, let message):
+            core = .Redirected(origin: origin, status: status, location: location, message: message)
+        case .noServer(let message): core = .NoServer(message: message)
+        case .noCursor(let message): core = .NoCursor(message: message)
+        case .hydrationIncomplete(let message): core = .HydrationIncomplete(message: message)
+        case .noCatalog(let message): core = .NoCatalog(message: message)
+        case .wrongSchema(let path, let reason, let unsent, let message):
+            core = .WrongSchema(path: path, reason: reason, unsent: unsent, message: message)
+        case .readingHandle(let message): core = .ReadingHandle(message: message)
+        case .copyExpired(let reason, let message): core = .CopyExpired(reason: reason, message: message)
+        case .streamIncomplete(let reason, let message): core = .StreamIncomplete(reason: reason, message: message)
+        case .wrongServer(let expected, let got, let message):
+            core = .WrongServer(expected: expected, got: got, message: message)
+        case .bytesAbsent(let hash, let reason, let message):
+            core = .BytesAbsent(hash: hash, reason: reason, message: message)
+        case .contractMismatch(let served, let expected, let status, let writeSent, let message):
+            core = .ContractMismatch(
+                served: served, expected: expected, status: status, writeSent: writeSent, message: message)
+        case .canceled(let message): core = .Canceled(message: message)
+        case .invalid(let message): core = .Invalid(message: message)
+        case .closed: return "closed"
+        }
+        return core.code()
     }
 
     public var errorDescription: String? { message }
@@ -71,10 +127,16 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .RateLimited(let code, let message, let retryAfterSeconds):
             self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
         case .Server(let status, let code, let message): self = .server(status: status, code: code, message: message)
+        case .Io(let message): self = .io(message: message)
         case .Network(let message): self = .network(message: message)
         case .Unnamed(let status, let message): self = .unnamed(status: status, message: message)
         case .Decoding(let message): self = .decoding(message: message)
         case .Store(let message): self = .store(message: message)
+        case .StorageFull(let message): self = .storageFull(message: message)
+        case .SignedOut(let origin, let message): self = .signedOut(origin: origin, message: message)
+        case .NoKeychain(let message): self = .noKeychain(message: message)
+        case .Redirected(let origin, let status, let location, let message):
+            self = .redirected(origin: origin, status: status, location: location, message: message)
         case .NoServer(let message): self = .noServer(message: message)
         case .NoCursor(let message): self = .noCursor(message: message)
         case .HydrationIncomplete(let message): self = .hydrationIncomplete(message: message)
@@ -92,6 +154,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .ContractMismatch(let served, let expected, let status, let writeSent, let message):
             self = .contractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message)
+        case .Canceled(let message): self = .canceled(message: message)
         case .Invalid(let message): self = .invalid(message: message)
         }
     }
@@ -205,9 +268,9 @@ public struct SearchHit: Sendable, Hashable {
 ///
 /// The tags are queued as writes of their own. Where `sourceId` names a row
 /// the server already holds, the create lands on it, and `baseVersion` makes
-/// that conditional on the version it was read at. With no `tier`, the key's
-/// default tier decides, which may be outside the copy's slice: the copy
-/// then drops the item once the server's event for it arrives.
+/// that conditional on the version it was read at. With no `tier`, the copy
+/// uses its slice's tier, or `library` before its first hydration, and sends
+/// that tier explicitly. A create outside the slice is held as a pin.
 public struct Draft: Sendable, Hashable {
     public var type: String
     public var properties: [String: JSONValue]

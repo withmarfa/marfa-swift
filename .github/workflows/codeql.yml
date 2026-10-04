@@ -1,17 +1,32 @@
 name: CodeQL
 
-# A pull request that changes only documentation or agent settings starts no
-# run. CodeQL is not a required check, so a run that never starts leaves no
-# check pending. Every push to `main` and a weekly run analyze the whole tree.
+# A pull request or a push to `main` that changes only documentation or agent
+# instructions starts no run. CodeQL is not a required check, so a run that
+# never starts leaves no check pending. A draft pull request is analyzed once
+# it is marked ready for review, and on every push after that. A weekly run
+# analyzes the whole tree.
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
     paths-ignore:
       - "**/*.md"
       - LICENSE
       - ".claude/**"
+      - ".agents/**"
+      - ".codex/**"
+      - ".githooks/**"
+      - ".github/ISSUE_TEMPLATE/**"
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "**/*.md"
+      - LICENSE
+      - ".claude/**"
+      - ".agents/**"
+      - ".codex/**"
+      - ".githooks/**"
+      - ".github/ISSUE_TEMPLATE/**"
   schedule:
     - cron: "41 4 * * 1"
 
@@ -25,6 +40,7 @@ permissions:
 jobs:
   actions:
     name: Analyze (actions)
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -45,6 +61,7 @@ jobs:
   # built here when that has gone.
   swift:
     name: Analyze (swift)
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: xcode-27
     timeout-minutes: 60
     permissions:

@@ -29,6 +29,22 @@ struct CopyOptions {
         await copy.close()
     }
 
+    @Test func hydrationPreservesRegistrationRefusals() async throws {
+        let core = FakeCore.writer()
+        core.state.withLock {
+            $0.registrationRefusals = [
+                CoreUnregisteredType(id: "app.entry", code: "forbidden", message: "metadata.types:write required")
+            ]
+        }
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let report = try await copy.hydrate(types: ["core.note"], tier: .library)
+        #expect(
+            report.unregisteredTypes == [
+                UnregisteredType(id: "app.entry", code: "forbidden", message: "metadata.types:write required")
+            ])
+        await copy.close()
+    }
+
     @Test func pinsCarryTheirItemAndNotifyListeners() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)

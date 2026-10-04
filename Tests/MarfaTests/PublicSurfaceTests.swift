@@ -66,6 +66,9 @@ import Testing
         let hydrated = HydrateReport(
             types: ["core.note"], tier: .library, edgeTypes: [], items: 1, edges: 0, pages: 1, cursor: "1")
         #expect(hydrated.tier == .library)
+        #expect(UnregisteredType(id: "app.no", code: "forbidden", message: "m").code == "forbidden")
+        #expect(MarfaError.canceled(message: "m").code() == "canceled")
+        #expect(MarfaError.closed(message: "m").code() == "closed")
         #expect(PinReport(pinned: true, wasPinned: false).pinned)
         #expect(ListFilters(state: .archived, tier: .feed).state == .archived)
         #expect(SearchFilters(state: .trashed).state == .trashed)
@@ -93,10 +96,12 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         }
     let errorRead: Bool =
         switch error {
-        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .network,
-            .unnamed, .decoding, .store, .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema,
+        case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .io, .network,
+            .unnamed, .decoding, .store, .storageFull, .signedOut, .noKeychain, .redirected, .noServer, .noCursor,
+            .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle,
-            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .invalid, .closed:
+            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .canceled, .invalid,
+            .closed:
             true
         }
     return [verdictRead, originRead, errorRead].filter { $0 }.count

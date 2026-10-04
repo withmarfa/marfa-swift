@@ -38,8 +38,6 @@ final class Model {
         }
     }
 
-    /// A first launch with the server away has nothing to show until a
-    /// hydration lands.
     private func hydrate(_ copy: WorkingCopy) async {
         guard configuration.server != nil else { return }
         while !Task.isCancelled {

@@ -2,8 +2,7 @@ import Foundation
 import MarfaCore
 import MarfaCoreNames
 
-/// The server's item type and edge type definitions, as the copy holds them,
-/// custom types included.
+/// The item type and edge type definitions the copy holds, custom types included.
 ///
 /// Every read answers from the store alone, with no request, so a copy
 /// answers offline and a reader answers as the writer does. A hydration
@@ -13,8 +12,8 @@ import MarfaCoreNames
 /// stream is told `.refreshed(.catalog)`, or `.refreshed(.hydrated)` for a
 /// hydration, which replaces the catalogs with everything else.
 ///
-/// On a copy that has never held a catalog every read throws `noCatalog`,
-/// never an empty list. An id the catalog does not hold throws `notFound`,
+/// Before its first hydration, a copy holds Marfa's built-in catalog and the
+/// app's declared item types. An id the catalog does not hold throws `notFound`,
 /// with the code `type_not_found` or `edge_type_not_found`.
 public struct Catalog: Sendable {
     let holder: CoreHolder

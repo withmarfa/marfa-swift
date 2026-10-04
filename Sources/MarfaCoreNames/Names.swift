@@ -47,3 +47,6 @@ public typealias CoreFieldRefusal = FieldRefusal
 public typealias CoreMissingGrant = MissingGrant
 public typealias CoreGrantKind = GrantKind
 public typealias CoreGrantLevel = GrantLevel
+
+public typealias CoreStop = Stop
+public typealias CoreUnregisteredType = UnregisteredType
