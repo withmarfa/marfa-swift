@@ -16,14 +16,19 @@ permissions:
   contents: read
 
 jobs:
-  # `Build + test` runs only when `scripts/ci-changes.sh` says the pull
-  # request can affect it. A skipped job satisfies a required check, where a
-  # workflow filtered out by `paths` would leave it pending, so a draft always
-  # runs it, to stop after the lint.
+  # `Build + test` runs only when `scripts/ci-changes.sh` says the change can
+  # affect it, on a pull request and on a push to main alike. A skipped job
+  # satisfies a required check, where a workflow filtered out by `paths` would
+  # leave it pending, so a draft always runs it, to stop after the lint. A
+  # push is classified only when the commit before it had a green run of this
+  # workflow, which the script asks the API for, hence `actions: read`.
   changes:
     name: Classify changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
       validate: ${{ steps.classify.outputs.validate }}
     steps:
@@ -32,9 +37,10 @@ jobs:
           fetch-depth: 0
       - id: classify
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           DRAFT: ${{ github.event.pull_request.draft }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/ci-changes.sh
 
   # On every change, since `Build + test` skips one only to `.github/`, and
