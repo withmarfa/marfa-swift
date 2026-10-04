@@ -1,6 +1,5 @@
 import Foundation
 import MarfaCore
-import MarfaCoreNames
 
 /// The item type and edge type definitions the copy holds, custom types included.
 ///
@@ -77,7 +76,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.compatibleWith = compatibleWith
     }
 
-    init(_ core: CoreItemType) throws {
+    init(_ core: MarfaCore.ItemType) throws {
         self.init(
             id: core.id, label: core.label, description: core.description, parent: core.parent,
             version: core.version, fields: try core.fields.map(TypeField.init), titleField: core.titleField,
@@ -114,7 +113,7 @@ public struct TypeField: Sendable, Hashable, Identifiable {
         self.definition = definition
     }
 
-    init(_ core: CoreTypeField) throws {
+    init(_ core: MarfaCore.TypeField) throws {
         self.init(
             name: core.name, type: core.fieldType, required: core.required, description: core.description,
             declaredBy: core.declaredBy, definition: try Properties.object(core.definitionJson))
@@ -126,14 +125,14 @@ public enum EdgeEnd: Sendable, Hashable, CaseIterable {
     case source
     case target
 
-    init(_ core: CoreEdgeEnd) {
+    init(_ core: MarfaCore.EdgeEnd) {
         switch core {
         case .source: self = .source
         case .target: self = .target
         }
     }
 
-    var core: CoreEdgeEnd {
+    var core: MarfaCore.EdgeEnd {
         switch self {
         case .source: .source
         case .target: .target
@@ -181,7 +180,7 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
         self.shipped = shipped
     }
 
-    init(_ core: CoreEdgeType) throws {
+    init(_ core: MarfaCore.EdgeType) throws {
         self.init(
             id: core.id, label: core.label, description: core.description, cardinality: core.cardinality,
             reverseName: core.reverseName, writtenAt: EdgeEnd(core.writtenAt),

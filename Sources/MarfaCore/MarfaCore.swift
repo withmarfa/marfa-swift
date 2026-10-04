@@ -829,7 +829,7 @@ public func FfiConverterTypeChangeListener_lower(_ value: ChangeListener) -> UIn
  * A local copy of a slice of one server. Every method blocks; call from off
  * the main thread.
  */
-public protocol MarfaCoreProtocol: AnyObject, Sendable {
+public protocol CoreProtocol: AnyObject, Sendable {
     
     /**
      * Puts one tag on an item, as its own write.
@@ -1064,7 +1064,7 @@ public protocol MarfaCoreProtocol: AnyObject, Sendable {
  * A local copy of a slice of one server. Every method blocks; call from off
  * the main thread.
  */
-open class MarfaCore: MarfaCoreProtocol, @unchecked Sendable {
+open class Core: CoreProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
 
     /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
@@ -1101,7 +1101,7 @@ open class MarfaCore: MarfaCoreProtocol, @unchecked Sendable {
     @_documentation(visibility: private)
 #endif
     public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_marfa_core_ffi_fn_clone_marfacore(self.handle, $0) }
+        return try! rustCall { uniffi_marfa_core_ffi_fn_clone_core(self.handle, $0) }
     }
     // No primary constructor declared for this class.
 
@@ -1111,7 +1111,7 @@ open class MarfaCore: MarfaCoreProtocol, @unchecked Sendable {
             return
         }
 
-        try! rustCall { uniffi_marfa_core_ffi_fn_free_marfacore(handle, $0) }
+        try! rustCall { uniffi_marfa_core_ffi_fn_free_core(handle, $0) }
     }
 
     
@@ -1119,9 +1119,9 @@ open class MarfaCore: MarfaCoreProtocol, @unchecked Sendable {
      * Opens the file at `path`, creating it when absent. `url` and `key`
      * go together; without them only local reads work.
      */
-public static func `open`(path: String, url: String?, key: String?)throws  -> MarfaCore  {
-    return try  FfiConverterTypeMarfaCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_constructor_marfacore_open(
+public static func `open`(path: String, url: String?, key: String?)throws  -> Core  {
+    return try  FfiConverterTypeCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_constructor_core_open(
         FfiConverterString.lower(path),
         FfiConverterOptionString.lower(url),
         FfiConverterOptionString.lower(key),$0
@@ -1133,9 +1133,9 @@ public static func `open`(path: String, url: String?, key: String?)throws  -> Ma
      * Opens a store another process writes, to read it only: never the
      * writer, never a write, and a path with no store is refused.
      */
-public static func openReader(path: String)throws  -> MarfaCore  {
-    return try  FfiConverterTypeMarfaCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_constructor_marfacore_open_reader(
+public static func openReader(path: String)throws  -> Core  {
+    return try  FfiConverterTypeCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_constructor_core_open_reader(
         FfiConverterString.lower(path),$0
     )
 })
@@ -1148,7 +1148,7 @@ public static func openReader(path: String)throws  -> MarfaCore  {
      */
 open func addTag(id: String, tag: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_add_tag(
+    uniffi_marfa_core_ffi_fn_method_core_add_tag(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(tag),$0
@@ -1162,7 +1162,7 @@ open func addTag(id: String, tag: String)throws  -> QueuedWrite  {
      */
 open func attach(id: String, path: String, attachment: Attachment)throws  -> Attached  {
     return try  FfiConverterTypeAttached_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_attach(
+    uniffi_marfa_core_ffi_fn_method_core_attach(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(path),
@@ -1178,7 +1178,7 @@ open func attach(id: String, path: String, attachment: Attachment)throws  -> Att
      */
 open func blob(hash: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_blob(
+    uniffi_marfa_core_ffi_fn_method_core_blob(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(hash),$0
     )
@@ -1190,7 +1190,7 @@ open func blob(hash: String)throws  -> String  {
      */
 open func blobHeld(hash: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_blob_held(
+    uniffi_marfa_core_ffi_fn_method_core_blob_held(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(hash),$0
     )
@@ -1199,7 +1199,7 @@ open func blobHeld(hash: String)throws  -> Bool  {
     
 open func catchUp(stop: Stop?)throws  -> CatchUpReport  {
     return try  FfiConverterTypeCatchUpReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_catch_up(
+    uniffi_marfa_core_ffi_fn_method_core_catch_up(
             self.uniffiCloneHandle(),
         FfiConverterOptionTypeStop.lower(stop),$0
     )
@@ -1211,7 +1211,7 @@ open func catchUp(stop: Stop?)throws  -> CatchUpReport  {
      */
 open func createEdge(draft: EdgeDraft)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_create_edge(
+    uniffi_marfa_core_ffi_fn_method_core_create_edge(
             self.uniffiCloneHandle(),
         FfiConverterTypeEdgeDraft_lower(draft),$0
     )
@@ -1223,7 +1223,7 @@ open func createEdge(draft: EdgeDraft)throws  -> QueuedWrite  {
      */
 open func createItem(draft: Draft)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_create_item(
+    uniffi_marfa_core_ffi_fn_method_core_create_item(
             self.uniffiCloneHandle(),
         FfiConverterTypeDraft_lower(draft),$0
     )
@@ -1235,7 +1235,7 @@ open func createItem(draft: Draft)throws  -> QueuedWrite  {
      */
 open func dataVersion()throws  -> Int64  {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_data_version(
+    uniffi_marfa_core_ffi_fn_method_core_data_version(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1249,7 +1249,7 @@ open func dataVersion()throws  -> Int64  {
      * lacks, where the key may. The call is the app's whole set and replaces every earlier declaration.
      */
 open func declareTypes(types: [String])throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_declare_types(
+    uniffi_marfa_core_ffi_fn_method_core_declare_types(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(types),$0
     )
@@ -1263,7 +1263,7 @@ open func declareTypes(types: [String])throws   {try rustCallWithError(FfiConver
      */
 open func declaredTypes()throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_declared_types(
+    uniffi_marfa_core_ffi_fn_method_core_declared_types(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1271,7 +1271,7 @@ open func declaredTypes()throws  -> [String]  {
     
 open func deleteEdge(id: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_delete_edge(
+    uniffi_marfa_core_ffi_fn_method_core_delete_edge(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1280,7 +1280,7 @@ open func deleteEdge(id: String)throws  -> QueuedWrite  {
     
 open func deleteExtension(id: String, namespace: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_delete_extension(
+    uniffi_marfa_core_ffi_fn_method_core_delete_extension(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(namespace),$0
@@ -1293,7 +1293,7 @@ open func deleteExtension(id: String, namespace: String)throws  -> QueuedWrite  
      */
 open func deleteItem(id: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_delete_item(
+    uniffi_marfa_core_ffi_fn_method_core_delete_item(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1307,7 +1307,7 @@ open func deleteItem(id: String)throws  -> QueuedWrite  {
      */
 open func discard(id: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_discard(
+    uniffi_marfa_core_ffi_fn_method_core_discard(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1319,7 +1319,7 @@ open func discard(id: String)throws  -> Bool  {
      */
 open func drain(stop: Stop?)throws  -> DrainReport  {
     return try  FfiConverterTypeDrainReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_drain(
+    uniffi_marfa_core_ffi_fn_method_core_drain(
             self.uniffiCloneHandle(),
         FfiConverterOptionTypeStop.lower(stop),$0
     )
@@ -1331,7 +1331,7 @@ open func drain(stop: Stop?)throws  -> DrainReport  {
      */
 open func edgeType(id: String)throws  -> EdgeType  {
     return try  FfiConverterTypeEdgeType_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_edge_type(
+    uniffi_marfa_core_ffi_fn_method_core_edge_type(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1343,7 +1343,7 @@ open func edgeType(id: String)throws  -> EdgeType  {
      */
 open func edgeTypes()throws  -> [EdgeType]  {
     return try  FfiConverterSequenceTypeEdgeType.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_edge_types(
+    uniffi_marfa_core_ffi_fn_method_core_edge_types(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1351,7 +1351,7 @@ open func edgeTypes()throws  -> [EdgeType]  {
     
 open func edgesFrom(id: String)throws  -> [Edge]  {
     return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_edges_from(
+    uniffi_marfa_core_ffi_fn_method_core_edges_from(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1360,7 +1360,7 @@ open func edgesFrom(id: String)throws  -> [Edge]  {
     
 open func edgesOfType(edgeType: String)throws  -> [Edge]  {
     return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_edges_of_type(
+    uniffi_marfa_core_ffi_fn_method_core_edges_of_type(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(edgeType),$0
     )
@@ -1369,7 +1369,7 @@ open func edgesOfType(edgeType: String)throws  -> [Edge]  {
     
 open func edgesTo(id: String)throws  -> [Edge]  {
     return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_edges_to(
+    uniffi_marfa_core_ffi_fn_method_core_edges_to(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1382,7 +1382,7 @@ open func edgesTo(id: String)throws  -> [Edge]  {
      */
 open func follow(listener: ChangeListener) -> Subscription  {
     return try!  FfiConverterTypeSubscription_lift(try! rustCall() {
-    uniffi_marfa_core_ffi_fn_method_marfacore_follow(
+    uniffi_marfa_core_ffi_fn_method_core_follow(
             self.uniffiCloneHandle(),
         FfiConverterTypeChangeListener_lower(listener),$0
     )
@@ -1395,7 +1395,7 @@ open func follow(listener: ChangeListener) -> Subscription  {
      */
 open func forgetAnswered()throws  -> UInt64  {
     return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_forget_answered(
+    uniffi_marfa_core_ffi_fn_method_core_forget_answered(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1403,7 +1403,7 @@ open func forgetAnswered()throws  -> UInt64  {
     
 open func get(id: String)throws  -> Item?  {
     return try  FfiConverterOptionTypeItem.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_get(
+    uniffi_marfa_core_ffi_fn_method_core_get(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1417,7 +1417,7 @@ open func get(id: String)throws  -> Item?  {
      */
 open func heldHandle() -> Handle  {
     return try!  FfiConverterTypeHandle_lift(try! rustCall() {
-    uniffi_marfa_core_ffi_fn_method_marfacore_held_handle(
+    uniffi_marfa_core_ffi_fn_method_core_held_handle(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1425,7 +1425,7 @@ open func heldHandle() -> Handle  {
     
 open func hydrate(types: [String], tier: Tier, stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_hydrate(
+    uniffi_marfa_core_ffi_fn_method_core_hydrate(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(types),
         FfiConverterTypeTier_lower(tier),
@@ -1440,7 +1440,7 @@ open func hydrate(types: [String], tier: Tier, stop: Stop?)throws  -> HydrateRep
      */
 open func hydrateWith(types: [String], tier: Tier, edgeTypes: [String], stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_hydrate_with(
+    uniffi_marfa_core_ffi_fn_method_core_hydrate_with(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(types),
         FfiConverterTypeTier_lower(tier),
@@ -1455,7 +1455,7 @@ open func hydrateWith(types: [String], tier: Tier, edgeTypes: [String], stop: St
      */
 open func itemType(id: String)throws  -> ItemType  {
     return try  FfiConverterTypeItemType_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_item_type(
+    uniffi_marfa_core_ffi_fn_method_core_item_type(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1467,7 +1467,7 @@ open func itemType(id: String)throws  -> ItemType  {
      */
 open func itemTypes()throws  -> [ItemType]  {
     return try  FfiConverterSequenceTypeItemType.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_item_types(
+    uniffi_marfa_core_ffi_fn_method_core_item_types(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1475,7 +1475,7 @@ open func itemTypes()throws  -> [ItemType]  {
     
 open func list(filters: ListFilters, sort: Sort)throws  -> [Item]  {
     return try  FfiConverterSequenceTypeItem.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_list(
+    uniffi_marfa_core_ffi_fn_method_core_list(
             self.uniffiCloneHandle(),
         FfiConverterTypeListFilters_lower(filters),
         FfiConverterTypeSort_lower(sort),$0
@@ -1488,7 +1488,7 @@ open func list(filters: ListFilters, sort: Sort)throws  -> [Item]  {
      */
 open func mergeMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_merge_metadata(
+    uniffi_marfa_core_ffi_fn_method_core_merge_metadata(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterSequenceString.lower(tags),$0
@@ -1501,7 +1501,7 @@ open func mergeMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
      */
 open func pin(id: String)throws  -> PinReport  {
     return try  FfiConverterTypePinReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_pin(
+    uniffi_marfa_core_ffi_fn_method_core_pin(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1513,7 +1513,7 @@ open func pin(id: String)throws  -> PinReport  {
      */
 open func putBlob(path: String, mimeType: String?)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_put_blob(
+    uniffi_marfa_core_ffi_fn_method_core_put_blob(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(path),
         FfiConverterOptionString.lower(mimeType),$0
@@ -1526,7 +1526,7 @@ open func putBlob(path: String, mimeType: String?)throws  -> QueuedWrite  {
      */
 open func queue()throws  -> [QueuedWrite]  {
     return try  FfiConverterSequenceTypeQueuedWrite.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_queue(
+    uniffi_marfa_core_ffi_fn_method_core_queue(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1538,7 +1538,7 @@ open func queue()throws  -> [QueuedWrite]  {
      */
 open func release(id: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_release(
+    uniffi_marfa_core_ffi_fn_method_core_release(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1550,7 +1550,7 @@ open func release(id: String)throws  -> Bool  {
      */
 open func releaseReason(reason: BlockedReason)throws  -> UInt64  {
     return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_release_reason(
+    uniffi_marfa_core_ffi_fn_method_core_release_reason(
             self.uniffiCloneHandle(),
         FfiConverterTypeBlockedReason_lower(reason),$0
     )
@@ -1559,7 +1559,7 @@ open func releaseReason(reason: BlockedReason)throws  -> UInt64  {
     
 open func removeTag(id: String, tag: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_remove_tag(
+    uniffi_marfa_core_ffi_fn_method_core_remove_tag(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(tag),$0
@@ -1572,7 +1572,7 @@ open func removeTag(id: String, tag: String)throws  -> QueuedWrite  {
      */
 open func replaceMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_replace_metadata(
+    uniffi_marfa_core_ffi_fn_method_core_replace_metadata(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterSequenceString.lower(tags),$0
@@ -1585,7 +1585,7 @@ open func replaceMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
      */
 open func restoreItem(id: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_restore_item(
+    uniffi_marfa_core_ffi_fn_method_core_restore_item(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1594,7 +1594,7 @@ open func restoreItem(id: String)throws  -> QueuedWrite  {
     
 open func search(query: String, filters: SearchFilters, limit: UInt32)throws  -> [SearchHit]  {
     return try  FfiConverterSequenceTypeSearchHit.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_search(
+    uniffi_marfa_core_ffi_fn_method_core_search(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(query),
         FfiConverterTypeSearchFilters_lower(filters),
@@ -1605,7 +1605,7 @@ open func search(query: String, filters: SearchFilters, limit: UInt32)throws  ->
     
 open func status()throws  -> Status  {
     return try  FfiConverterTypeStatus_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_status(
+    uniffi_marfa_core_ffi_fn_method_core_status(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -1619,7 +1619,7 @@ open func status()throws  -> Status  {
      */
 open func thumbnail(id: String)throws  -> Thumbnail?  {
     return try  FfiConverterOptionTypeThumbnail.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_thumbnail(
+    uniffi_marfa_core_ffi_fn_method_core_thumbnail(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1631,7 +1631,7 @@ open func thumbnail(id: String)throws  -> Thumbnail?  {
      */
 open func transitionItem(id: String, state: ItemState)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_transition_item(
+    uniffi_marfa_core_ffi_fn_method_core_transition_item(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeItemState_lower(state),$0
@@ -1645,7 +1645,7 @@ open func transitionItem(id: String, state: ItemState)throws  -> QueuedWrite  {
      */
 open func unpin(id: String)throws  -> PinReport  {
     return try  FfiConverterTypePinReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_unpin(
+    uniffi_marfa_core_ffi_fn_method_core_unpin(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1654,7 +1654,7 @@ open func unpin(id: String)throws  -> PinReport  {
     
 open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_update_edge(
+    uniffi_marfa_core_ffi_fn_method_core_update_edge(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeEdgeEdit_lower(edit),$0
@@ -1667,7 +1667,7 @@ open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite  {
      */
 open func updateItem(id: String, edit: Edit)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_update_item(
+    uniffi_marfa_core_ffi_fn_method_core_update_item(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeEdit_lower(edit),$0
@@ -1682,7 +1682,7 @@ open func updateItem(id: String, edit: Edit)throws  -> QueuedWrite  {
      */
 open func updateItemAsRead(id: String, edit: Edit)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_update_item_as_read(
+    uniffi_marfa_core_ffi_fn_method_core_update_item_as_read(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeEdit_lower(edit),$0
@@ -1698,7 +1698,7 @@ open func updateItemAsRead(id: String, edit: Edit)throws  -> QueuedWrite  {
      */
 open func withdraw(id: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_withdraw(
+    uniffi_marfa_core_ffi_fn_method_core_withdraw(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
     )
@@ -1711,7 +1711,7 @@ open func withdraw(id: String)throws  -> Bool  {
      */
 open func writeExtension(id: String, namespace: String, bodyJson: String)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_marfacore_write_extension(
+    uniffi_marfa_core_ffi_fn_method_core_write_extension(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(namespace),
@@ -1728,24 +1728,24 @@ open func writeExtension(id: String, namespace: String, bodyJson: String)throws 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeMarfaCore: FfiConverter {
+public struct FfiConverterTypeCore: FfiConverter {
     typealias FfiType = UInt64
-    typealias SwiftType = MarfaCore
+    typealias SwiftType = Core
 
-    public static func lift(_ handle: UInt64) throws -> MarfaCore {
-        return MarfaCore(unsafeFromHandle: handle)
+    public static func lift(_ handle: UInt64) throws -> Core {
+        return Core(unsafeFromHandle: handle)
     }
 
-    public static func lower(_ value: MarfaCore) -> UInt64 {
+    public static func lower(_ value: Core) -> UInt64 {
         return value.uniffiCloneHandle()
     }
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MarfaCore {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Core {
         let handle: UInt64 = try readInt(&buf)
         return try lift(handle)
     }
 
-    public static func write(_ value: MarfaCore, into buf: inout [UInt8]) {
+    public static func write(_ value: Core, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
@@ -1754,15 +1754,15 @@ public struct FfiConverterTypeMarfaCore: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeMarfaCore_lift(_ handle: UInt64) throws -> MarfaCore {
-    return try FfiConverterTypeMarfaCore.lift(handle)
+public func FfiConverterTypeCore_lift(_ handle: UInt64) throws -> Core {
+    return try FfiConverterTypeCore.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeMarfaCore_lower(_ value: MarfaCore) -> UInt64 {
-    return FfiConverterTypeMarfaCore.lower(value)
+public func FfiConverterTypeCore_lower(_ value: Core) -> UInt64 {
+    return FfiConverterTypeCore.lower(value)
 }
 
 
@@ -6543,148 +6543,148 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_changelistener_ended() != 39692) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_add_tag() != 4023) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_add_tag() != 54886) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_attach() != 3069) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_attach() != 30567) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_blob() != 30828) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_blob() != 18413) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_blob_held() != 40038) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_blob_held() != 47878) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_catch_up() != 37038) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_catch_up() != 44200) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_create_edge() != 28689) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_create_edge() != 21597) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_create_item() != 52614) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_create_item() != 3651) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_data_version() != 33511) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_data_version() != 13314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_declare_types() != 11671) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 64631) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_declared_types() != 43312) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_declared_types() != 278) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_delete_edge() != 24775) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_delete_edge() != 50291) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_delete_extension() != 46025) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_delete_extension() != 2704) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_delete_item() != 322) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_delete_item() != 27931) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_discard() != 12257) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_discard() != 13602) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_drain() != 55975) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_drain() != 37997) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edge_type() != 6087) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_edge_type() != 13055) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edge_types() != 60631) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_edge_types() != 38333) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_from() != 44341) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_edges_from() != 41642) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_of_type() != 4381) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_edges_of_type() != 45157) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_edges_to() != 44283) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_edges_to() != 56298) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_follow() != 58729) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 24722) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_forget_answered() != 55451) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_forget_answered() != 62545) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_get() != 56150) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_get() != 61377) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_held_handle() != 3337) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_held_handle() != 31292) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_hydrate() != 41873) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 6926) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_hydrate_with() != 869) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 32687) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_item_type() != 11196) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_item_type() != 51576) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_item_types() != 39521) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_item_types() != 15133) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_list() != 50227) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 38444) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_merge_metadata() != 63766) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_merge_metadata() != 31075) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_pin() != 2902) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_pin() != 44956) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_put_blob() != 30480) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_put_blob() != 34935) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_queue() != 1069) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_queue() != 63256) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_release() != 1608) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_release() != 25231) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_release_reason() != 45449) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_release_reason() != 2563) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_remove_tag() != 47899) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_remove_tag() != 65124) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_replace_metadata() != 48337) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_replace_metadata() != 16791) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_restore_item() != 39876) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_restore_item() != 60344) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_search() != 37665) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_search() != 11561) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_status() != 15439) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_status() != 27928) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_thumbnail() != 60315) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_thumbnail() != 9618) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_transition_item() != 15207) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_transition_item() != 52263) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_unpin() != 44346) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_unpin() != 56069) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_edge() != 11632) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_update_edge() != 37231) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_item() != 16520) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_update_item() != 30971) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_update_item_as_read() != 46194) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_update_item_as_read() != 6005) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_withdraw() != 9729) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 24491) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_marfacore_write_extension() != 8223) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 22789) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_stop_raise() != 50331) {
@@ -6693,10 +6693,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_subscription_stop() != 64667) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_marfacore_open() != 37008) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 16044) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_marfacore_open_reader() != 52709) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_core_open_reader() != 60011) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {

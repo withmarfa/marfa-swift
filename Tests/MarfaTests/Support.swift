@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCoreNames
+import MarfaCore
 import Network
 import Synchronization
 import Testing
@@ -122,31 +122,31 @@ final class Heard: Sendable {
 /// while a follow holds the stream.
 final class FakeCore: Core, @unchecked Sendable {
     struct Follow {
-        let listener: any CoreChangeListener
+        let listener: any MarfaCore.ChangeListener
         let holdsStream: Bool
         var stopped = false
         var ended = false
     }
 
     struct State {
-        var handle = CoreHandle.writer
+        var handle = MarfaCore.Handle.writer
         var follows: [Follow] = []
         var streamHeld = false
-        var caughtUp = CoreCatchUpReport(applied: 0, skipped: 0, cursor: "1", reachedHead: true)
-        var drained = CoreDrainReport(
+        var caughtUp = MarfaCore.CatchUpReport(applied: 0, skipped: 0, cursor: "1", reachedHead: true)
+        var drained = MarfaCore.DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
             unclaimedSources: [], retryAfterSeconds: nil)
         var dataVersion: Int64 = 0
         var gate: DispatchSemaphore?
         var gated = false
-        var readsFail: CoreMarfaError?
+        var readsFail: MarfaCore.MarfaError?
         var withdrawable: Set<String> = []
         var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
-        var catchUpFails: CoreMarfaError?
+        var catchUpFails: MarfaCore.MarfaError?
         var declarations: [String] = []
-        var registrationRefusals: [CoreUnregisteredType] = []
-        var hydrationOptions: (types: [String], tier: CoreTier, edgeTypes: [String])?
+        var registrationRefusals: [MarfaCore.UnregisteredType] = []
+        var hydrationOptions: (types: [String], tier: MarfaCore.Tier, edgeTypes: [String])?
         var pins: Set<String> = []
         var probe: DropProbe?
     }
@@ -179,11 +179,11 @@ final class FakeCore: Core, @unchecked Sendable {
 
     var follows: [Follow] { state.withLock { $0.follows } }
 
-    override func heldHandle() -> CoreHandle {
+    override func heldHandle() -> MarfaCore.Handle {
         state.withLock { $0.handle }
     }
 
-    override func follow(listener: any CoreChangeListener) -> CoreSubscription {
+    override func follow(listener: any MarfaCore.ChangeListener) -> MarfaCore.Subscription {
         let (index, refused) = state.withLock { state in
             let refused = state.streamHeld
             state.follows.append(Follow(listener: listener, holdsStream: !refused))
@@ -201,25 +201,25 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
-    func fail(_ index: Int, with error: CoreMarfaError) {
+    func fail(_ index: Int, with error: MarfaCore.MarfaError) {
         end(index, with: error)
     }
 
     /// No real core ends a follow twice; the feed must ignore it.
-    func endAgain(_ index: Int, with error: CoreMarfaError?) {
+    func endAgain(_ index: Int, with error: MarfaCore.MarfaError?) {
         state.withLock { $0.follows[index].listener }.ended(error: error)
     }
 
-    func change(_ index: Int, _ change: CoreChange) {
+    func change(_ index: Int, _ change: MarfaCore.Change) {
         state.withLock { $0.follows[index].listener }.changed(change: change)
     }
 
-    override func hydrateWith(types: [String], tier: CoreTier, edgeTypes: [String], stop: CoreStop?) throws
-        -> CoreHydrateReport
+    override func hydrateWith(types: [String], tier: MarfaCore.Tier, edgeTypes: [String], stop: MarfaCore.Stop?) throws
+        -> MarfaCore.HydrateReport
     {
         try refreshing()
         state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
-        return CoreHydrateReport(
+        return MarfaCore.HydrateReport(
             types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "1",
             registeredTypes: [], unregisteredTypes: state.withLock { $0.registrationRefusals })
     }
@@ -232,17 +232,17 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.declarations }
     }
 
-    override func pin(id: String) throws -> CorePinReport {
+    override func pin(id: String) throws -> MarfaCore.PinReport {
         let added = state.withLock { $0.pins.insert(id).inserted }
-        return CorePinReport(pinned: true, wasPinned: !added)
+        return MarfaCore.PinReport(pinned: true, wasPinned: !added)
     }
 
-    override func unpin(id: String) throws -> CorePinReport {
+    override func unpin(id: String) throws -> MarfaCore.PinReport {
         let removed = state.withLock { $0.pins.remove(id) != nil }
-        return CorePinReport(pinned: false, wasPinned: removed)
+        return MarfaCore.PinReport(pinned: false, wasPinned: removed)
     }
 
-    override func catchUp(stop: CoreStop?) throws -> CoreCatchUpReport {
+    override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
         try refreshing()
         return try state.withLock { state in
             if state.catchUpChangesCatalog { state.catalogVersion = (state.catalogVersion ?? 0) + 1 }
@@ -251,8 +251,8 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
-    override func status() throws -> CoreStatus {
-        CoreStatus(
+    override func status() throws -> MarfaCore.Status {
+        MarfaCore.Status(
             serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
             eventCursor: nil,
             hydration: .complete, items: 0, edges: 0, catalogVersion: state.withLock { $0.catalogVersion })
@@ -262,7 +262,7 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.withdrawable.remove(id) != nil }
     }
 
-    override func drain(stop: CoreStop?) throws -> CoreDrainReport {
+    override func drain(stop: MarfaCore.Stop?) throws -> MarfaCore.DrainReport {
         state.withLock { $0.drained }
     }
 
@@ -297,12 +297,12 @@ final class FakeCore: Core, @unchecked Sendable {
     private func refreshing() throws {
         let held = state.withLock { $0.streamHeld }
         if held {
-            throw CoreMarfaError.Invalid(message: Self.refusal)
+            throw MarfaCore.MarfaError.Invalid(message: Self.refusal)
         }
     }
 
-    private func end(_ index: Int, with error: CoreMarfaError?) {
-        let listener = state.withLock { state -> (any CoreChangeListener)? in
+    private func end(_ index: Int, with error: MarfaCore.MarfaError?) {
+        let listener = state.withLock { state -> (any MarfaCore.ChangeListener)? in
             guard !state.follows[index].ended else { return nil }
             state.follows[index].ended = true
             if state.follows[index].holdsStream { state.streamHeld = false }
@@ -328,7 +328,7 @@ final class DropProbe: Sendable {
     }
 }
 
-final class FakeSubscription: CoreSubscription, @unchecked Sendable {
+final class FakeSubscription: MarfaCore.Subscription, @unchecked Sendable {
     private let onStop: @Sendable () -> Void
 
     init(onStop: @escaping @Sendable () -> Void) {
@@ -345,8 +345,8 @@ final class FakeSubscription: CoreSubscription, @unchecked Sendable {
     }
 }
 
-func write(_ kind: WriteKind, item: String?, target: String? = nil, edge: String? = nil) -> QueuedWrite {
-    QueuedWrite(
+func write(_ kind: Marfa.WriteKind, item: String?, target: String? = nil, edge: String? = nil) -> Marfa.QueuedWrite {
+    Marfa.QueuedWrite(
         id: "q-\(UUID())", kind: kind, itemId: item, targetId: target, edgeId: edge, namespace: nil, tag: nil,
         blob: nil, baseVersion: nil, idempotencyKey: "k", dependsOn: [], follows: nil, verdict: nil, answer: nil,
         refusals: 0, queuedAt: "", answeredAt: nil)

@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCoreNames
+import MarfaCore
 import Testing
 
 @testable import Marfa
@@ -26,7 +26,7 @@ struct Changes {
             }
         })
     func aStoppedStreamPreservesEveryFailureForExistingAndNewListeners(
-        coreError: CoreMarfaError, expected: Marfa.MarfaError
+        coreError: MarfaCore.MarfaError, expected: Marfa.MarfaError
     ) async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
@@ -114,7 +114,7 @@ struct Changes {
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
         #expect(core.follows.count == 1)
-        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7", reason: nil))
+        core.change(0, MarfaCore.Change(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7", reason: nil))
         let told = Marfa.Change(origin: .server(event: "item.created", cursor: "7"), itemId: "n1", edgeId: nil)
         try await eventually("both streams were told") { first.all == [told] && second.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -124,7 +124,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, CoreChange(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42", reason: nil))
+        core.change(0, MarfaCore.Change(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42", reason: nil))
         let told = Marfa.Change(origin: .server(event: "edge.created", cursor: "42"), itemId: "a", edgeId: "e1")
         try await eventually("the change was told") { heard.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -134,8 +134,8 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, CoreChange(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9", reason: nil))
-        core.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10", reason: nil))
+        core.change(0, MarfaCore.Change(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9", reason: nil))
+        core.change(0, MarfaCore.Change(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10", reason: nil))
         let item = Marfa.Change(origin: .server(event: "item.created", cursor: "10"), itemId: "n1", edgeId: nil)
         try await eventually("both changes were told") { heard.all.count == 2 }
         #expect(heard.all == [refreshed(.catalog), item])
@@ -171,8 +171,9 @@ struct Changes {
         try await eventually("a second follow started") { core.follows.count == 2 }
 
         core.endAgain(0, with: .Network(message: "late"))
-        core.change(0, CoreChange(event: "item.created", itemId: "late", edgeId: nil, cursor: "1", reason: nil))
-        core.change(1, CoreChange(event: "item.created", itemId: "current", edgeId: nil, cursor: "2", reason: nil))
+        core.change(0, MarfaCore.Change(event: "item.created", itemId: "late", edgeId: nil, cursor: "1", reason: nil))
+        core.change(
+            1, MarfaCore.Change(event: "item.created", itemId: "current", edgeId: nil, cursor: "2", reason: nil))
         try await eventually("the running follow's change was told") { !heard.all.isEmpty }
         #expect(heard.all.map(\.itemId) == ["current"])
         heard.stop()
@@ -199,7 +200,7 @@ struct Changes {
     /// An app that listens at launch, before its first hydration, is told
     /// nothing until there is something to follow.
     @Test func aStoreWithNoHydrationLetsItsStreamsWaitForOne() async throws {
-        for error: CoreMarfaError in [.HydrationIncomplete(message: "m"), .NoCursor(message: "m")] {
+        for error: MarfaCore.MarfaError in [.HydrationIncomplete(message: "m"), .NoCursor(message: "m")] {
             let core = FakeCore.writer()
             let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
             let first = Heard(copy.changes())
@@ -297,18 +298,18 @@ struct Changes {
         let heard = Heard(copy.changes())
         core.fail(0, with: .Network(message: "gone"))
         _ = try await copy.queue.drain()
-        let refusal = CoreRefusal(
+        let refusal = MarfaCore.Refusal(
             reason: "validation_error", code: "validation_error", message: "m",
-            fields: [CoreFieldRefusal(field: "title", message: "too long")], trashed: false, grant: nil)
+            fields: [MarfaCore.FieldRefusal(field: "title", message: "too long")], trashed: false, grant: nil)
         core.state.withLock {
             $0.drained.verdicts = [
-                CoreDrainVerdict(
+                MarfaCore.DrainVerdict(
                     id: "q", kind: .createItem, itemId: "n1", edgeId: nil, verdict: .accepted, refusals: 0,
                     replayed: false),
-                CoreDrainVerdict(
+                MarfaCore.DrainVerdict(
                     id: "r", kind: .createEdge, itemId: "n1", edgeId: "e1", verdict: .refused(refusal: refusal),
                     refusals: 1, replayed: false),
-                CoreDrainVerdict(
+                MarfaCore.DrainVerdict(
                     id: "w", kind: .updateItem, itemId: "n2", edgeId: nil, verdict: nil, refusals: 0,
                     replayed: false),
             ]
@@ -323,7 +324,7 @@ struct Changes {
             Issue.record("the refused edge write was not told with its refusal: \(heard.all)")
             return
         }
-        #expect(refused.fields == [FieldRefusal(field: "title", message: "too long")])
+        #expect(refused.fields == [Marfa.FieldRefusal(field: "title", message: "too long")])
         #expect(heard.all[2].edgeId == "e1")
         #expect(core.follows.count == 1, "a drain started the failed follow again")
         _ = try await bounded("the catch-up") { try await copy.catchUp() }

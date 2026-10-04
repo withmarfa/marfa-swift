@@ -20,13 +20,8 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
-            name: "MarfaCoreNames",
-            dependencies: ["MarfaCore"],
-            swiftSettings: [.swiftLanguageMode(.v6)]
-        ),
-        .target(
             name: "Marfa",
-            dependencies: ["MarfaCore", "MarfaCoreNames"],
+            dependencies: ["MarfaCore"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
@@ -36,7 +31,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MarfaTests",
-            dependencies: ["Marfa", "MarfaCore", "MarfaCoreNames", "MarfaTypes"],
+            dependencies: ["Marfa", "MarfaCore", "MarfaTypes"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

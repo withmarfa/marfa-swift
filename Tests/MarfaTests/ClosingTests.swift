@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCoreNames
+import MarfaCore
 import MarfaTypes
 import Synchronization
 import Testing
@@ -7,7 +7,7 @@ import Testing
 @testable import Marfa
 
 private func isClosed(_ error: any Error) -> Bool {
-    if case MarfaError.closed = error { true } else { false }
+    if case Marfa.MarfaError.closed = error { true } else { false }
 }
 
 private func refused(_ what: String, _ call: () async throws -> Void) async {
@@ -64,7 +64,7 @@ struct Closing {
         await refused("items.get") { _ = try await copy.items.get("a") }
         await refused("items.thumbnail") { _ = try await copy.items.thumbnail("a") }
         await refused("items.create") {
-            _ = try await copy.items.create(Draft(type: "core.note", properties: [:], tier: .feed))
+            _ = try await copy.items.create(Marfa.Draft(type: "core.note", properties: [:], tier: .feed))
         }
         await refused("items.delete") { _ = try await copy.items.delete("a") }
         await refused("edges.from") { _ = try await copy.edges.from("a") }
@@ -187,7 +187,8 @@ struct ChangingTheKey {
         let store = temporaryStore()
         let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "old-key"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-        let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "a"], tier: .feed))
+        let created = try await copy.items.create(
+            Marfa.Draft(type: "core.note", properties: ["title": "a"], tier: .feed))
         #expect(try await copy.queue.all().map(\.id) == [created.id])
 
         try await bounded("useKey") { try await copy.useKey("new-key") }
@@ -256,7 +257,7 @@ struct ChangingTheKey {
         do {
             try await copy.useKey("k")
             Issue.record("a copy with no server took a key")
-        } catch MarfaError.noServer {
+        } catch Marfa.MarfaError.noServer {
         }
         _ = try await copy.queue.all()
         await copy.close()
@@ -282,7 +283,7 @@ struct ChangingTheKey {
 
         #expect(keys.withLock { $0 } == ["new-key"])
         try await eventually("the follow started on the new core") { new.follows.count == 1 }
-        new.change(0, CoreChange(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2", reason: nil))
+        new.change(0, MarfaCore.Change(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2", reason: nil))
         try await eventually("the stream heard the new core") { heard.all.count == 1 }
         #expect(heard.stops.isEmpty, "the stream was told the follow stopped")
         try await bounded("close") { await copy.close() }
@@ -320,14 +321,14 @@ struct ChangingTheKey {
     @Test func aCopyThatCannotReopenIsClosedAndItsStreamsEnd() async throws {
         let copy = WorkingCopy(
             holder: CoreHolder(
-                FakeCore.writer(), reopen: { _ in throw CoreMarfaError.Store(message: "cannot open") }),
+                FakeCore.writer(), reopen: { _ in throw MarfaCore.MarfaError.Store(message: "cannot open") }),
             hasServer: true)
         var heard = copy.changes().makeAsyncIterator()
 
         do {
             try await bounded("useKey") { try await copy.useKey("k") }
             Issue.record("a store that could not be opened was reported opened")
-        } catch let error as MarfaError {
+        } catch let error as Marfa.MarfaError {
             #expect(error == .store(message: "cannot open"))
         }
         #expect(await heard.next() == nil)
@@ -349,7 +350,7 @@ struct ChangingTheKey {
             do {
                 _ = try await copy.status()
                 return false
-            } catch MarfaError.invalid {
+            } catch Marfa.MarfaError.invalid {
                 return true
             }
         }
@@ -408,7 +409,7 @@ struct ChangingTheKey {
                 reopen: { _ in
                     reopening.begin()
                     reopening.gate.wait()
-                    throw CoreMarfaError.Store(message: "cannot open")
+                    throw MarfaCore.MarfaError.Store(message: "cannot open")
                 }),
             hasServer: true)
         let changing = Task { try await copy.useKey("k") }
