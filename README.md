@@ -125,6 +125,48 @@ The package is not built for library evolution, so its enums are exhaustive: swi
 
 A blocked verdict can carry the structured refusal and missing grant. Drain reports preserve the core’s retry delay, including when an intermediary answers without the server’s contract header.
 
+## Sync a folder on a Mac
+
+A folder is a directory whose files Marfa keeps in step with the search a `system.folder` item on the server describes. `Folders` manages them on macOS through the same core and the same registry as `marfa folders`, so a folder added from an app appears in `marfa folders list`, and one added from the command line appears in `folders.list()`.
+
+1. Create the folder's settings on the server, for example with `marfa folders create --title Notes --search '{"types":["core.note"]}'`, and note the returned item ID.
+1. Add the directory and sync it:
+
+    ```swift
+    import Marfa
+
+    let folders = Folders(server: Server(url: serverURL, key: key))
+    let notes = URL(filePath: "/path/to/Notes", directoryHint: .isDirectory)
+    _ = try await folders.add(notes, following: folderID)
+    let synced = try await folders.sync(notes)
+    if synced.catchUpError != nil {
+        // The server was out of reach; local edits wait and go at the next sync.
+    }
+    ```
+
+1. Read where each file stands. `status(of:)` reads the folder's own store and asks the server nothing:
+
+    ```swift
+    let status = try await folders.status(of: notes)
+    for file in status.files where file.state != .inStep {
+        print(file.path, file.state, file.reason ?? "")
+    }
+    if status.paused.isPaused {
+        // A large removal waits: call confirmRemoval(in:) or restoreRemoval(in:).
+    }
+    ```
+
+To keep a folder in step while the app runs, as `marfa folders watch` does, iterate `watch(_:)`, and call `stop()` when you're done. The sequence ends after `stop()`, or throws a `MarfaError` when the watch fails, such as `unauthorized` when the server refuses the key:
+
+```swift
+let watch = try await folders.watch(notes)
+for try await event in watch {
+    if case .passed(let pass) = event { print(pass.scan.created, "created") }
+}
+```
+
+One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, and keeps the files when it removes the folder. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
+
 ## Keys
 
 `Server.fromEnvironment()` reads `MARFA_API_URL` and `MARFA_API_KEY`, for agents and tests, and throws when only one is set. An app keeps a person's key between launches with `Keychain.system` (`save`, `key`, `delete`), under a service and account it chooses. The working copy never writes the key to its store.

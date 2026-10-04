@@ -180,6 +180,34 @@ jobs:
         if: ${{ steps.core.outputs.cache-hit != 'true' }}
         run: scripts/core.sh
 
+      # The folder tests hold the package's registry to the one `marfa folders list` reads. Its own target
+      # directory and cache, so it never starts cold behind a core cache hit or swells the core's cache.
+      - name: Restore the command line the pin builds
+        id: cli
+        uses: actions/cache@v6
+        with:
+          path: .build/marfa-cli
+          key: marfa-cli-${{ runner.os }}-${{ hashFiles('core.pin') }}
+      - name: Cache the command line's build
+        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ${{ github.workspace }}/.build/cli-target
+          key: cli-build-${{ runner.os }}-${{ hashFiles('core.pin') }}
+          restore-keys: cli-build-${{ runner.os }}-
+      - name: Build the command line at the pin
+        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/.build/cli-target
+        run: |
+          cargo build --locked -p marfa-cli --manifest-path "${MARFA_MONOREPO}/core/Cargo.toml"
+          mkdir -p .build/marfa-cli
+          cp "${CARGO_TARGET_DIR}/debug/marfa" .build/marfa-cli/marfa
+
       - name: Test wire generation
         run: |
           if [[ -x "${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator" ]]; then
@@ -215,6 +243,7 @@ jobs:
           server_env="$("${MARFA_MONOREPO}/core/scripts/server-up.sh")"
           eval "${server_env}"
           export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
+          export MARFA_CLI="${GITHUB_WORKSPACE}/.build/marfa-cli/marfa"
           swift build 2>&1 | tee "${RUNNER_TEMP}/swift-build.log"
           # What the package writes by hand builds without a warning. The generated wire types are out of
           # this check: their warnings come from the pinned generator, and `scripts/core.sh` rewrites them.

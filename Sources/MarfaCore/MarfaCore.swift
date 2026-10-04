@@ -1771,6 +1771,530 @@ public func FfiConverterTypeCore_lower(_ value: Core) -> UInt64 {
 
 
 /**
+ * What an app hands `watch`: told of each event on a thread of the core's,
+ * and once when the watch ends, with the error that ended it or none where
+ * it was stopped.
+ */
+public protocol FolderListener: AnyObject, Sendable {
+    
+    func told(event: FolderEvent) 
+    
+    func ended(error: MarfaError?) 
+    
+}
+/**
+ * What an app hands `watch`: told of each event on a thread of the core's,
+ * and once when the watch ends, with the error that ended it or none where
+ * it was stopped.
+ */
+open class FolderListenerImpl: FolderListener, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_marfa_core_ffi_fn_clone_folderlistener(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_marfa_core_ffi_fn_free_folderlistener(handle, $0) }
+    }
+
+    
+
+    
+open func told(event: FolderEvent)  {try! rustCall() {
+    uniffi_marfa_core_ffi_fn_method_folderlistener_told(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeFolderEvent_lower(event),$0
+    )
+}
+}
+    
+open func ended(error: MarfaError?)  {try! rustCall() {
+    uniffi_marfa_core_ffi_fn_method_folderlistener_ended(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionTypeMarfaError.lower(error),$0
+    )
+}
+}
+    
+
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceFolderListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceFolderListener = UniffiVTableCallbackInterfaceFolderListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeFolderListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface FolderListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeFolderListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface FolderListener: handle missing in uniffiClone")
+            }
+        },
+        told: { (
+            uniffiHandle: UInt64,
+            event: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeFolderListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.told(
+                     event: try FfiConverterTypeFolderEvent_lift(event)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        ended: { (
+            uniffiHandle: UInt64,
+            error: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterTypeFolderListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.ended(
+                     error: try FfiConverterOptionTypeMarfaError.lift(error)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceFolderListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceFolderListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitFolderListener() {
+    uniffi_marfa_core_ffi_fn_init_callback_vtable_folderlistener(UniffiCallbackInterfaceFolderListener.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderListener: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<FolderListener>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = FolderListener
+
+    public static func lift(_ handle: UInt64) throws -> FolderListener {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return FolderListenerImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: FolderListener) -> UInt64 {
+         if let rustImpl = value as? FolderListenerImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderListener {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: FolderListener, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderListener_lift(_ handle: UInt64) throws -> FolderListener {
+    return try FfiConverterTypeFolderListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderListener_lower(_ value: FolderListener) -> UInt64 {
+    return FfiConverterTypeFolderListener.lower(value)
+}
+
+
+
+
+
+
+/**
+ * The folders on this machine, worked with one server's credential. Every
+ * method blocks; call from off the main thread.
+ */
+public protocol FoldersProtocol: AnyObject, Sendable {
+    
+    /**
+     * Makes `dir` a folder that follows the `system.folder` `folder`, and
+     * lists it in the machine's registry. The directory is made if it is
+     * not there. Its files are written at the first sync.
+     */
+    func add(dir: String, folder: String) throws  -> ListedFolder
+    
+    /**
+     * Lets a paused large removal go: its deletes are queued, and files
+     * whose items left elsewhere are taken away.
+     */
+    func confirm(dir: String) throws  -> ConfirmedRemoval
+    
+    /**
+     * The folders the machine's registry lists, the command line's among
+     * them.
+     */
+    func list() throws  -> [ListedFolder]
+    
+    /**
+     * Takes the folder off this machine: its state under `.marfa` goes and
+     * its files stay. Refused while writes wait. A folder whose directory is
+     * gone is only taken off the registry.
+     */
+    func remove(dir: String) throws 
+    
+    /**
+     * Cancels a paused large removal: files gone from the disk are written
+     * back, and items that left elsewhere are restored.
+     */
+    func restore(dir: String) throws  -> RestoredRemoval
+    
+    /**
+     * Where every file stands, read from the folder's store without asking
+     * the server, and beside a watch that holds the folder.
+     */
+    func status(dir: String) throws  -> FolderStatus
+    
+    /**
+     * Everything a folder does, once: sends what changed on disk, catches
+     * up with the server and writes out what its search matches.
+     */
+    func sync(dir: String) throws  -> FolderSync
+    
+    /**
+     * Keeps the folder in step on a thread of its own, as the command
+     * line's watch does, until the subscription is stopped or let go. The
+     * folder is held while it runs, so another process cannot work it. A
+     * pass under way when it is stopped finishes before `ended` is called.
+     */
+    func watch(dir: String, listener: FolderListener) throws  -> Subscription
+    
+}
+/**
+ * The folders on this machine, worked with one server's credential. Every
+ * method blocks; call from off the main thread.
+ */
+open class Folders: FoldersProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_marfa_core_ffi_fn_clone_folders(self.handle, $0) }
+    }
+    /**
+     * `url` and `key` go together; without them only `list`, `status`,
+     * `confirm`, `restore` and `remove` work.
+     */
+public convenience init(url: String?, key: String?)throws  {
+    let handle =
+        try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_constructor_folders_new(
+        FfiConverterOptionString.lower(url),
+        FfiConverterOptionString.lower(key),$0
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_marfa_core_ffi_fn_free_folders(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Makes `dir` a folder that follows the `system.folder` `folder`, and
+     * lists it in the machine's registry. The directory is made if it is
+     * not there. Its files are written at the first sync.
+     */
+open func add(dir: String, folder: String)throws  -> ListedFolder  {
+    return try  FfiConverterTypeListedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_add(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),
+        FfiConverterString.lower(folder),$0
+    )
+})
+}
+    
+    /**
+     * Lets a paused large removal go: its deletes are queued, and files
+     * whose items left elsewhere are taken away.
+     */
+open func confirm(dir: String)throws  -> ConfirmedRemoval  {
+    return try  FfiConverterTypeConfirmedRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_confirm(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * The folders the machine's registry lists, the command line's among
+     * them.
+     */
+open func list()throws  -> [ListedFolder]  {
+    return try  FfiConverterSequenceTypeListedFolder.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_list(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Takes the folder off this machine: its state under `.marfa` goes and
+     * its files stay. Refused while writes wait. A folder whose directory is
+     * gone is only taken off the registry.
+     */
+open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_remove(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+}
+}
+    
+    /**
+     * Cancels a paused large removal: files gone from the disk are written
+     * back, and items that left elsewhere are restored.
+     */
+open func restore(dir: String)throws  -> RestoredRemoval  {
+    return try  FfiConverterTypeRestoredRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_restore(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Where every file stands, read from the folder's store without asking
+     * the server, and beside a watch that holds the folder.
+     */
+open func status(dir: String)throws  -> FolderStatus  {
+    return try  FfiConverterTypeFolderStatus_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_status(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Everything a folder does, once: sends what changed on disk, catches
+     * up with the server and writes out what its search matches.
+     */
+open func sync(dir: String)throws  -> FolderSync  {
+    return try  FfiConverterTypeFolderSync_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_sync(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Keeps the folder in step on a thread of its own, as the command
+     * line's watch does, until the subscription is stopped or let go. The
+     * folder is held while it runs, so another process cannot work it. A
+     * pass under way when it is stopped finishes before `ended` is called.
+     */
+open func watch(dir: String, listener: FolderListener)throws  -> Subscription  {
+    return try  FfiConverterTypeSubscription_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_watch(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),
+        FfiConverterTypeFolderListener_lower(listener),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolders: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = Folders
+
+    public static func lift(_ handle: UInt64) throws -> Folders {
+        return Folders(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: Folders) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Folders {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: Folders, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolders_lift(_ handle: UInt64) throws -> Folders {
+    return try FfiConverterTypeFolders.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolders_lower(_ value: Folders) -> UInt64 {
+    return FfiConverterTypeFolders.lower(value)
+}
+
+
+
+
+
+
+/**
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
  * a hydration left unfinished refuses reads, a catch-up keeps the cursor it
@@ -1907,8 +2431,9 @@ public func FfiConverterTypeStop_lower(_ value: Stop) -> UInt64 {
 
 
 /**
- * A held stream, stopped by `stop` or by letting it go. The follow ends
- * within a quarter second of either, and `ended` is called once it has.
+ * A held stream or a folder's watch, stopped by `stop` or by letting it go.
+ * A follow ends within a quarter second of either; a watch within about a
+ * second, or once the pass under way is done. `ended` is called once it has.
  */
 public protocol SubscriptionProtocol: AnyObject, Sendable {
     
@@ -1916,8 +2441,9 @@ public protocol SubscriptionProtocol: AnyObject, Sendable {
     
 }
 /**
- * A held stream, stopped by `stop` or by letting it go. The follow ends
- * within a quarter second of either, and `ended` is called once it has.
+ * A held stream or a folder's watch, stopped by `stop` or by letting it go.
+ * A follow ends within a quarter second of either; a watch within about a
+ * second, or once the pass under way is done. `ended` is called once it has.
  */
 open class Subscription: SubscriptionProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -2288,6 +2814,95 @@ public func FfiConverterTypeChange_lift(_ buf: RustBuffer) throws -> Change {
 #endif
 public func FfiConverterTypeChange_lower(_ value: Change) -> RustBuffer {
     return FfiConverterTypeChange.lower(value)
+}
+
+
+/**
+ * What letting a paused removal go did.
+ */
+public struct ConfirmedRemoval: Equatable, Hashable {
+    /**
+     * Deletes queued, sent at the next sync.
+     */
+    public var deleted: UInt64
+    /**
+     * Files found in another folder on this machine, whose items stay.
+     */
+    public var moved: UInt64
+    /**
+     * Files taken away whose items left elsewhere.
+     */
+    public var removed: UInt64
+    /**
+     * Files not let go, because the other folders could not all be read.
+     */
+    public var unsure: [UnsureFile]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Deletes queued, sent at the next sync.
+         */deleted: UInt64, 
+        /**
+         * Files found in another folder on this machine, whose items stay.
+         */moved: UInt64, 
+        /**
+         * Files taken away whose items left elsewhere.
+         */removed: UInt64, 
+        /**
+         * Files not let go, because the other folders could not all be read.
+         */unsure: [UnsureFile]) {
+        self.deleted = deleted
+        self.moved = moved
+        self.removed = removed
+        self.unsure = unsure
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ConfirmedRemoval: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeConfirmedRemoval: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ConfirmedRemoval {
+        return
+            try ConfirmedRemoval(
+                deleted: FfiConverterUInt64.read(from: &buf), 
+                moved: FfiConverterUInt64.read(from: &buf), 
+                removed: FfiConverterUInt64.read(from: &buf), 
+                unsure: FfiConverterSequenceTypeUnsureFile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ConfirmedRemoval, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.deleted, into: &buf)
+        FfiConverterUInt64.write(value.moved, into: &buf)
+        FfiConverterUInt64.write(value.removed, into: &buf)
+        FfiConverterSequenceTypeUnsureFile.write(value.unsure, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeConfirmedRemoval_lift(_ buf: RustBuffer) throws -> ConfirmedRemoval {
+    return try FfiConverterTypeConfirmedRemoval.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeConfirmedRemoval_lower(_ value: ConfirmedRemoval) -> RustBuffer {
+    return FfiConverterTypeConfirmedRemoval.lower(value)
 }
 
 
@@ -3074,6 +3689,647 @@ public func FfiConverterTypeFieldRefusal_lower(_ value: FieldRefusal) -> RustBuf
 }
 
 
+public struct FileStatus: Equatable, Hashable {
+    public var path: String
+    public var itemId: String?
+    public var state: FileState
+    public var waits: [String]
+    public var flag: String?
+    public var reason: String?
+    public var warning: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, itemId: String?, state: FileState, waits: [String], flag: String?, reason: String?, warning: String?) {
+        self.path = path
+        self.itemId = itemId
+        self.state = state
+        self.waits = waits
+        self.flag = flag
+        self.reason = reason
+        self.warning = warning
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FileStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFileStatus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileStatus {
+        return
+            try FileStatus(
+                path: FfiConverterString.read(from: &buf), 
+                itemId: FfiConverterOptionString.read(from: &buf), 
+                state: FfiConverterTypeFileState.read(from: &buf), 
+                waits: FfiConverterSequenceString.read(from: &buf), 
+                flag: FfiConverterOptionString.read(from: &buf), 
+                reason: FfiConverterOptionString.read(from: &buf), 
+                warning: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FileStatus, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterOptionString.write(value.itemId, into: &buf)
+        FfiConverterTypeFileState.write(value.state, into: &buf)
+        FfiConverterSequenceString.write(value.waits, into: &buf)
+        FfiConverterOptionString.write(value.flag, into: &buf)
+        FfiConverterOptionString.write(value.reason, into: &buf)
+        FfiConverterOptionString.write(value.warning, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileStatus_lift(_ buf: RustBuffer) throws -> FileStatus {
+    return try FfiConverterTypeFileStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileStatus_lower(_ value: FileStatus) -> RustBuffer {
+    return FfiConverterTypeFileStatus.lower(value)
+}
+
+
+/**
+ * A file a pass held or warned about, with why.
+ */
+public struct FlaggedFile: Equatable, Hashable {
+    public var path: String
+    public var flag: String
+    public var reason: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, flag: String, reason: String) {
+        self.path = path
+        self.flag = flag
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FlaggedFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFlaggedFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FlaggedFile {
+        return
+            try FlaggedFile(
+                path: FfiConverterString.read(from: &buf), 
+                flag: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FlaggedFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterString.write(value.flag, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFlaggedFile_lift(_ buf: RustBuffer) throws -> FlaggedFile {
+    return try FfiConverterTypeFlaggedFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFlaggedFile_lower(_ value: FlaggedFile) -> RustBuffer {
+    return FfiConverterTypeFlaggedFile.lower(value)
+}
+
+
+/**
+ * One pass: the settings file's edit, the scan, the drain and the pull.
+ */
+public struct FolderPass: Equatable, Hashable {
+    public var settings: SettingsFileOutcome
+    public var scan: FolderScan
+    public var drain: DrainReport
+    /**
+     * Edits written from a version the server no longer holds, sent again.
+     */
+    public var rebased: UInt64
+    /**
+     * Placements another machine made first, followed instead.
+     */
+    public var gaveWay: UInt64
+    /**
+     * `None` where the catch-up failed after the copy expired, leaving
+     * nothing to pull from.
+     */
+    public var pull: FolderPull?
+    /**
+     * The files the scan and the pull held, each once.
+     */
+    public var flagged: [FlaggedFile]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(settings: SettingsFileOutcome, scan: FolderScan, drain: DrainReport, 
+        /**
+         * Edits written from a version the server no longer holds, sent again.
+         */rebased: UInt64, 
+        /**
+         * Placements another machine made first, followed instead.
+         */gaveWay: UInt64, 
+        /**
+         * `None` where the catch-up failed after the copy expired, leaving
+         * nothing to pull from.
+         */pull: FolderPull?, 
+        /**
+         * The files the scan and the pull held, each once.
+         */flagged: [FlaggedFile]) {
+        self.settings = settings
+        self.scan = scan
+        self.drain = drain
+        self.rebased = rebased
+        self.gaveWay = gaveWay
+        self.pull = pull
+        self.flagged = flagged
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderPass: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderPass: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderPass {
+        return
+            try FolderPass(
+                settings: FfiConverterTypeSettingsFileOutcome.read(from: &buf), 
+                scan: FfiConverterTypeFolderScan.read(from: &buf), 
+                drain: FfiConverterTypeDrainReport.read(from: &buf), 
+                rebased: FfiConverterUInt64.read(from: &buf), 
+                gaveWay: FfiConverterUInt64.read(from: &buf), 
+                pull: FfiConverterOptionTypeFolderPull.read(from: &buf), 
+                flagged: FfiConverterSequenceTypeFlaggedFile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderPass, into buf: inout [UInt8]) {
+        FfiConverterTypeSettingsFileOutcome.write(value.settings, into: &buf)
+        FfiConverterTypeFolderScan.write(value.scan, into: &buf)
+        FfiConverterTypeDrainReport.write(value.drain, into: &buf)
+        FfiConverterUInt64.write(value.rebased, into: &buf)
+        FfiConverterUInt64.write(value.gaveWay, into: &buf)
+        FfiConverterOptionTypeFolderPull.write(value.pull, into: &buf)
+        FfiConverterSequenceTypeFlaggedFile.write(value.flagged, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderPass_lift(_ buf: RustBuffer) throws -> FolderPass {
+    return try FfiConverterTypeFolderPass.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderPass_lower(_ value: FolderPass) -> RustBuffer {
+    return FfiConverterTypeFolderPass.lower(value)
+}
+
+
+public struct FolderPull: Equatable, Hashable {
+    public var written: UInt64
+    public var rewritten: UInt64
+    public var moved: UInt64
+    public var unchanged: UInt64
+    public var skipped: UInt64
+    /**
+     * Files of items trashed or gone from the search's states, removed.
+     */
+    public var removed: UInt64
+    /**
+     * Files of items gone from the search, kept with the person's changes.
+     */
+    public var kept: UInt64
+    /**
+     * Files the folder did not write, and would not write over.
+     */
+    public var unwritten: UInt64
+    /**
+     * Items whose bytes could not be fetched.
+     */
+    public var absent: UInt64
+    /**
+     * Placements the server refused.
+     */
+    public var unplaced: UInt64
+    /**
+     * Files left in place whose items the search no longer matches.
+     */
+    public var unmatched: UInt64
+    /**
+     * Files a large removal holds back.
+     */
+    public var paused: UInt64
+    /**
+     * Why the pull wrote nothing, where the folder's directory is gone.
+     */
+    public var rootGone: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(written: UInt64, rewritten: UInt64, moved: UInt64, unchanged: UInt64, skipped: UInt64, 
+        /**
+         * Files of items trashed or gone from the search's states, removed.
+         */removed: UInt64, 
+        /**
+         * Files of items gone from the search, kept with the person's changes.
+         */kept: UInt64, 
+        /**
+         * Files the folder did not write, and would not write over.
+         */unwritten: UInt64, 
+        /**
+         * Items whose bytes could not be fetched.
+         */absent: UInt64, 
+        /**
+         * Placements the server refused.
+         */unplaced: UInt64, 
+        /**
+         * Files left in place whose items the search no longer matches.
+         */unmatched: UInt64, 
+        /**
+         * Files a large removal holds back.
+         */paused: UInt64, 
+        /**
+         * Why the pull wrote nothing, where the folder's directory is gone.
+         */rootGone: String?) {
+        self.written = written
+        self.rewritten = rewritten
+        self.moved = moved
+        self.unchanged = unchanged
+        self.skipped = skipped
+        self.removed = removed
+        self.kept = kept
+        self.unwritten = unwritten
+        self.absent = absent
+        self.unplaced = unplaced
+        self.unmatched = unmatched
+        self.paused = paused
+        self.rootGone = rootGone
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderPull: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderPull: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderPull {
+        return
+            try FolderPull(
+                written: FfiConverterUInt64.read(from: &buf), 
+                rewritten: FfiConverterUInt64.read(from: &buf), 
+                moved: FfiConverterUInt64.read(from: &buf), 
+                unchanged: FfiConverterUInt64.read(from: &buf), 
+                skipped: FfiConverterUInt64.read(from: &buf), 
+                removed: FfiConverterUInt64.read(from: &buf), 
+                kept: FfiConverterUInt64.read(from: &buf), 
+                unwritten: FfiConverterUInt64.read(from: &buf), 
+                absent: FfiConverterUInt64.read(from: &buf), 
+                unplaced: FfiConverterUInt64.read(from: &buf), 
+                unmatched: FfiConverterUInt64.read(from: &buf), 
+                paused: FfiConverterUInt64.read(from: &buf), 
+                rootGone: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderPull, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.written, into: &buf)
+        FfiConverterUInt64.write(value.rewritten, into: &buf)
+        FfiConverterUInt64.write(value.moved, into: &buf)
+        FfiConverterUInt64.write(value.unchanged, into: &buf)
+        FfiConverterUInt64.write(value.skipped, into: &buf)
+        FfiConverterUInt64.write(value.removed, into: &buf)
+        FfiConverterUInt64.write(value.kept, into: &buf)
+        FfiConverterUInt64.write(value.unwritten, into: &buf)
+        FfiConverterUInt64.write(value.absent, into: &buf)
+        FfiConverterUInt64.write(value.unplaced, into: &buf)
+        FfiConverterUInt64.write(value.unmatched, into: &buf)
+        FfiConverterUInt64.write(value.paused, into: &buf)
+        FfiConverterOptionString.write(value.rootGone, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderPull_lift(_ buf: RustBuffer) throws -> FolderPull {
+    return try FfiConverterTypeFolderPull.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderPull_lower(_ value: FolderPull) -> RustBuffer {
+    return FfiConverterTypeFolderPull.lower(value)
+}
+
+
+public struct FolderScan: Equatable, Hashable {
+    public var created: UInt64
+    public var updated: UInt64
+    public var renamed: UInt64
+    public var unchanged: UInt64
+    public var missing: UInt64
+    public var deleted: UInt64
+    public var skipped: UInt64
+    /**
+     * Files moved to another folder on this machine, so nothing was trashed.
+     */
+    public var movedAway: UInt64
+    /**
+     * Deletes a large removal holds back.
+     */
+    public var paused: UInt64
+    /**
+     * Files found in no folder on this machine, whose items were trashed.
+     */
+    public var trashed: [String]
+    /**
+     * Files not taken because their names are ones secrets go by.
+     */
+    public var secrets: [String]
+    public var warnings: [FlaggedFile]
+    /**
+     * Why the scan read nothing, where the folder's directory is gone.
+     */
+    public var rootGone: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(created: UInt64, updated: UInt64, renamed: UInt64, unchanged: UInt64, missing: UInt64, deleted: UInt64, skipped: UInt64, 
+        /**
+         * Files moved to another folder on this machine, so nothing was trashed.
+         */movedAway: UInt64, 
+        /**
+         * Deletes a large removal holds back.
+         */paused: UInt64, 
+        /**
+         * Files found in no folder on this machine, whose items were trashed.
+         */trashed: [String], 
+        /**
+         * Files not taken because their names are ones secrets go by.
+         */secrets: [String], warnings: [FlaggedFile], 
+        /**
+         * Why the scan read nothing, where the folder's directory is gone.
+         */rootGone: String?) {
+        self.created = created
+        self.updated = updated
+        self.renamed = renamed
+        self.unchanged = unchanged
+        self.missing = missing
+        self.deleted = deleted
+        self.skipped = skipped
+        self.movedAway = movedAway
+        self.paused = paused
+        self.trashed = trashed
+        self.secrets = secrets
+        self.warnings = warnings
+        self.rootGone = rootGone
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderScan: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderScan {
+        return
+            try FolderScan(
+                created: FfiConverterUInt64.read(from: &buf), 
+                updated: FfiConverterUInt64.read(from: &buf), 
+                renamed: FfiConverterUInt64.read(from: &buf), 
+                unchanged: FfiConverterUInt64.read(from: &buf), 
+                missing: FfiConverterUInt64.read(from: &buf), 
+                deleted: FfiConverterUInt64.read(from: &buf), 
+                skipped: FfiConverterUInt64.read(from: &buf), 
+                movedAway: FfiConverterUInt64.read(from: &buf), 
+                paused: FfiConverterUInt64.read(from: &buf), 
+                trashed: FfiConverterSequenceString.read(from: &buf), 
+                secrets: FfiConverterSequenceString.read(from: &buf), 
+                warnings: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
+                rootGone: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderScan, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.created, into: &buf)
+        FfiConverterUInt64.write(value.updated, into: &buf)
+        FfiConverterUInt64.write(value.renamed, into: &buf)
+        FfiConverterUInt64.write(value.unchanged, into: &buf)
+        FfiConverterUInt64.write(value.missing, into: &buf)
+        FfiConverterUInt64.write(value.deleted, into: &buf)
+        FfiConverterUInt64.write(value.skipped, into: &buf)
+        FfiConverterUInt64.write(value.movedAway, into: &buf)
+        FfiConverterUInt64.write(value.paused, into: &buf)
+        FfiConverterSequenceString.write(value.trashed, into: &buf)
+        FfiConverterSequenceString.write(value.secrets, into: &buf)
+        FfiConverterSequenceTypeFlaggedFile.write(value.warnings, into: &buf)
+        FfiConverterOptionString.write(value.rootGone, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderScan_lift(_ buf: RustBuffer) throws -> FolderScan {
+    return try FfiConverterTypeFolderScan.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderScan_lower(_ value: FolderScan) -> RustBuffer {
+    return FfiConverterTypeFolderScan.lower(value)
+}
+
+
+public struct FolderStatus: Equatable, Hashable {
+    public var files: [FileStatus]
+    public var paused: PausedRemoval
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(files: [FileStatus], paused: PausedRemoval) {
+        self.files = files
+        self.paused = paused
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderStatus: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderStatus {
+        return
+            try FolderStatus(
+                files: FfiConverterSequenceTypeFileStatus.read(from: &buf), 
+                paused: FfiConverterTypePausedRemoval.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderStatus, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeFileStatus.write(value.files, into: &buf)
+        FfiConverterTypePausedRemoval.write(value.paused, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderStatus_lift(_ buf: RustBuffer) throws -> FolderStatus {
+    return try FfiConverterTypeFolderStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderStatus_lower(_ value: FolderStatus) -> RustBuffer {
+    return FfiConverterTypeFolderStatus.lower(value)
+}
+
+
+/**
+ * What a sync did.
+ */
+public struct FolderSync: Equatable, Hashable {
+    /**
+     * The hydration a copy that did not answer for its slice took first.
+     */
+    public var hydrated: HydrateReport?
+    /**
+     * Why the server's changes could not be caught up, where they could not;
+     * the sync still wrote out the copy it holds.
+     */
+    public var catchUpError: MarfaError?
+    public var pass: FolderPass
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The hydration a copy that did not answer for its slice took first.
+         */hydrated: HydrateReport?, 
+        /**
+         * Why the server's changes could not be caught up, where they could not;
+         * the sync still wrote out the copy it holds.
+         */catchUpError: MarfaError?, pass: FolderPass) {
+        self.hydrated = hydrated
+        self.catchUpError = catchUpError
+        self.pass = pass
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderSync: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderSync: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderSync {
+        return
+            try FolderSync(
+                hydrated: FfiConverterOptionTypeHydrateReport.read(from: &buf), 
+                catchUpError: FfiConverterOptionTypeMarfaError.read(from: &buf), 
+                pass: FfiConverterTypeFolderPass.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderSync, into buf: inout [UInt8]) {
+        FfiConverterOptionTypeHydrateReport.write(value.hydrated, into: &buf)
+        FfiConverterOptionTypeMarfaError.write(value.catchUpError, into: &buf)
+        FfiConverterTypeFolderPass.write(value.pass, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderSync_lift(_ buf: RustBuffer) throws -> FolderSync {
+    return try FfiConverterTypeFolderSync.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderSync_lower(_ value: FolderSync) -> RustBuffer {
+    return FfiConverterTypeFolderSync.lower(value)
+}
+
+
 public struct HydrateReport: Equatable, Hashable {
     public var types: [String]
     public var tier: Tier
@@ -3477,6 +4733,75 @@ public func FfiConverterTypeListFilters_lower(_ value: ListFilters) -> RustBuffe
 }
 
 
+/**
+ * A folder as the machine's registry lists it.
+ */
+public struct ListedFolder: Equatable, Hashable {
+    /**
+     * The directory, resolved as far as it exists.
+     */
+    public var dir: String
+    /**
+     * The id of the `system.folder` whose settings it follows.
+     */
+    public var folder: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The directory, resolved as far as it exists.
+         */dir: String, 
+        /**
+         * The id of the `system.folder` whose settings it follows.
+         */folder: String) {
+        self.dir = dir
+        self.folder = folder
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ListedFolder: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeListedFolder: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListedFolder {
+        return
+            try ListedFolder(
+                dir: FfiConverterString.read(from: &buf), 
+                folder: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ListedFolder, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterString.write(value.folder, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeListedFolder_lift(_ buf: RustBuffer) throws -> ListedFolder {
+    return try FfiConverterTypeListedFolder.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeListedFolder_lower(_ value: ListedFolder) -> RustBuffer {
+    return FfiConverterTypeListedFolder.lower(value)
+}
+
+
 public struct MissingGrant: Equatable, Hashable {
     public var kind: GrantKind
     /**
@@ -3538,6 +4863,75 @@ public func FfiConverterTypeMissingGrant_lift(_ buf: RustBuffer) throws -> Missi
 #endif
 public func FfiConverterTypeMissingGrant_lower(_ value: MissingGrant) -> RustBuffer {
     return FfiConverterTypeMissingGrant.lower(value)
+}
+
+
+/**
+ * A large removal waiting for `confirm` or `restore`.
+ */
+public struct PausedRemoval: Equatable, Hashable {
+    /**
+     * Files gone from the disk whose deletes are not sent.
+     */
+    public var disk: UInt64
+    /**
+     * Files left in place whose items left the search elsewhere.
+     */
+    public var pull: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Files gone from the disk whose deletes are not sent.
+         */disk: UInt64, 
+        /**
+         * Files left in place whose items left the search elsewhere.
+         */pull: UInt64) {
+        self.disk = disk
+        self.pull = pull
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PausedRemoval: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePausedRemoval: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PausedRemoval {
+        return
+            try PausedRemoval(
+                disk: FfiConverterUInt64.read(from: &buf), 
+                pull: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PausedRemoval, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.disk, into: &buf)
+        FfiConverterUInt64.write(value.pull, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePausedRemoval_lift(_ buf: RustBuffer) throws -> PausedRemoval {
+    return try FfiConverterTypePausedRemoval.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePausedRemoval_lower(_ value: PausedRemoval) -> RustBuffer {
+    return FfiConverterTypePausedRemoval.lower(value)
 }
 
 
@@ -3889,6 +5283,79 @@ public func FfiConverterTypeRefusal_lower(_ value: Refusal) -> RustBuffer {
 
 
 /**
+ * What cancelling a paused removal did.
+ */
+public struct RestoredRemoval: Equatable, Hashable {
+    /**
+     * Files gone from the disk, written back.
+     */
+    public var putBack: UInt64
+    /**
+     * Items that left elsewhere, restored at the next sync.
+     */
+    public var restored: UInt64
+    public var pull: FolderPull
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Files gone from the disk, written back.
+         */putBack: UInt64, 
+        /**
+         * Items that left elsewhere, restored at the next sync.
+         */restored: UInt64, pull: FolderPull) {
+        self.putBack = putBack
+        self.restored = restored
+        self.pull = pull
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RestoredRemoval: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRestoredRemoval: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RestoredRemoval {
+        return
+            try RestoredRemoval(
+                putBack: FfiConverterUInt64.read(from: &buf), 
+                restored: FfiConverterUInt64.read(from: &buf), 
+                pull: FfiConverterTypeFolderPull.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RestoredRemoval, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.putBack, into: &buf)
+        FfiConverterUInt64.write(value.restored, into: &buf)
+        FfiConverterTypeFolderPull.write(value.pull, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRestoredRemoval_lift(_ buf: RustBuffer) throws -> RestoredRemoval {
+    return try FfiConverterTypeRestoredRemoval.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRestoredRemoval_lower(_ value: RestoredRemoval) -> RustBuffer {
+    return FfiConverterTypeRestoredRemoval.lower(value)
+}
+
+
+/**
  * Narrowing for a search: the state rule a list takes, a type with its
  * subtree, tags, a listing-grammar expression and `beneath`, each read as
  * the list reads it.
@@ -4042,6 +5509,95 @@ public func FfiConverterTypeSearchHit_lift(_ buf: RustBuffer) throws -> SearchHi
 #endif
 public func FfiConverterTypeSearchHit_lower(_ value: SearchHit) -> RustBuffer {
     return FfiConverterTypeSearchHit.lower(value)
+}
+
+
+/**
+ * What became of the folder's settings file in a pass.
+ */
+public struct SettingsFileOutcome: Equatable, Hashable {
+    /**
+     * Its edit went to the server.
+     */
+    public var sent: Bool
+    /**
+     * It was written from the settings in force.
+     */
+    public var written: Bool
+    /**
+     * Why its edit is not in force, where it is not.
+     */
+    public var flagged: String?
+    /**
+     * Why it could not be written; the next pass writes it.
+     */
+    public var unwritten: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Its edit went to the server.
+         */sent: Bool, 
+        /**
+         * It was written from the settings in force.
+         */written: Bool, 
+        /**
+         * Why its edit is not in force, where it is not.
+         */flagged: String?, 
+        /**
+         * Why it could not be written; the next pass writes it.
+         */unwritten: String?) {
+        self.sent = sent
+        self.written = written
+        self.flagged = flagged
+        self.unwritten = unwritten
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SettingsFileOutcome: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSettingsFileOutcome: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SettingsFileOutcome {
+        return
+            try SettingsFileOutcome(
+                sent: FfiConverterBool.read(from: &buf), 
+                written: FfiConverterBool.read(from: &buf), 
+                flagged: FfiConverterOptionString.read(from: &buf), 
+                unwritten: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SettingsFileOutcome, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.sent, into: &buf)
+        FfiConverterBool.write(value.written, into: &buf)
+        FfiConverterOptionString.write(value.flagged, into: &buf)
+        FfiConverterOptionString.write(value.unwritten, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSettingsFileOutcome_lift(_ buf: RustBuffer) throws -> SettingsFileOutcome {
+    return try FfiConverterTypeSettingsFileOutcome.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSettingsFileOutcome_lower(_ value: SettingsFileOutcome) -> RustBuffer {
+    return FfiConverterTypeSettingsFileOutcome.lower(value)
 }
 
 
@@ -4419,6 +5975,60 @@ public func FfiConverterTypeUnregisteredType_lower(_ value: UnregisteredType) ->
     return FfiConverterTypeUnregisteredType.lower(value)
 }
 
+
+public struct UnsureFile: Equatable, Hashable {
+    public var path: String
+    public var reason: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, reason: String) {
+        self.path = path
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnsureFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnsureFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnsureFile {
+        return
+            try UnsureFile(
+                path: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnsureFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsureFile_lift(_ buf: RustBuffer) throws -> UnsureFile {
+    return try FfiConverterTypeUnsureFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsureFile_lower(_ value: UnsureFile) -> RustBuffer {
+    return FfiConverterTypeUnsureFile.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -4577,6 +6187,269 @@ public func FfiConverterTypeEdgeEnd_lift(_ buf: RustBuffer) throws -> EdgeEnd {
 #endif
 public func FfiConverterTypeEdgeEnd_lower(_ value: EdgeEnd) -> RustBuffer {
     return FfiConverterTypeEdgeEnd.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Where one file stands, from the folder's own store.
+ */
+
+public enum FileState: Equatable, Hashable {
+    
+    /**
+     * The file and its item agree.
+     */
+    case inStep
+    /**
+     * A write for it waits to be sent; `waits` names each kind.
+     */
+    case waiting
+    /**
+     * It is not sent; `reason` says why.
+     */
+    case held
+    /**
+     * Its item no longer matches the folder's search.
+     */
+    case unmatched
+    /**
+     * The scan did not reach it, so it is held rather than deleted.
+     */
+    case unreached
+    /**
+     * It lies where the folder does not take files.
+     */
+    case outside
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FileState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFileState: FfiConverterRustBuffer {
+    typealias SwiftType = FileState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .inStep
+        
+        case 2: return .waiting
+        
+        case 3: return .held
+        
+        case 4: return .unmatched
+        
+        case 5: return .unreached
+        
+        case 6: return .outside
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FileState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .inStep:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .waiting:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .held:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .unmatched:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .unreached:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .outside:
+            writeInt(&buf, Int32(6))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileState_lift(_ buf: RustBuffer) throws -> FileState {
+    return try FfiConverterTypeFileState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileState_lower(_ value: FileState) -> RustBuffer {
+    return FfiConverterTypeFileState.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * What a watch tells its listener, each when it happens.
+ */
+
+public enum FolderEvent: Equatable, Hashable {
+    
+    /**
+     * The directory is watched, and passes begin.
+     */
+    case watching(dir: String
+    )
+    /**
+     * The filesystem reported an error; the watch goes on.
+     */
+    case watcherFailed(message: String
+    )
+    /**
+     * A hydration failed, and is tried again after `wait_ms`. Told once for
+     * each run of failures.
+     */
+    case retrying(error: MarfaError, waitMs: UInt64
+    )
+    /**
+     * The server cannot be reached; writes wait. Told when it changes.
+     */
+    case unreachable(reason: String
+    )
+    /**
+     * The server answers again. Told when it changes.
+     */
+    case reachable
+    /**
+     * The folder's directory is gone, and the watch waits for it. Told once
+     * for as long as it stays gone.
+     */
+    case waiting(reason: String
+    )
+    /**
+     * A pass that did something, or whose standing conditions changed.
+     */
+    case passed(pass: FolderPass
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FolderEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
+    typealias SwiftType = FolderEvent
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderEvent {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .watching(dir: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .watcherFailed(message: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .retrying(error: try FfiConverterTypeMarfaError.read(from: &buf), waitMs: try FfiConverterUInt64.read(from: &buf)
+        )
+        
+        case 4: return .unreachable(reason: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 5: return .reachable
+        
+        case 6: return .waiting(reason: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 7: return .passed(pass: try FfiConverterTypeFolderPass.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FolderEvent, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .watching(dir):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(dir, into: &buf)
+            
+        
+        case let .watcherFailed(message):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .retrying(error,waitMs):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeMarfaError.write(error, into: &buf)
+            FfiConverterUInt64.write(waitMs, into: &buf)
+            
+        
+        case let .unreachable(reason):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(reason, into: &buf)
+            
+        
+        case .reachable:
+            writeInt(&buf, Int32(5))
+        
+        
+        case let .waiting(reason):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(reason, into: &buf)
+            
+        
+        case let .passed(pass):
+            writeInt(&buf, Int32(7))
+            FfiConverterTypeFolderPass.write(pass, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderEvent_lift(_ buf: RustBuffer) throws -> FolderEvent {
+    return try FfiConverterTypeFolderEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderEvent_lower(_ value: FolderEvent) -> RustBuffer {
+    return FfiConverterTypeFolderEvent.lower(value)
 }
 
 
@@ -6058,6 +7931,54 @@ fileprivate struct FfiConverterOptionTypeStop: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeFolderPull: FfiConverterRustBuffer {
+    typealias SwiftType = FolderPull?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFolderPull.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFolderPull.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeHydrateReport: FfiConverterRustBuffer {
+    typealias SwiftType = HydrateReport?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeHydrateReport.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeHydrateReport.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeItem: FfiConverterRustBuffer {
     typealias SwiftType = Item?
 
@@ -6375,6 +8296,56 @@ fileprivate struct FfiConverterSequenceTypeFieldRefusal: FfiConverterRustBuffer 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFileStatus: FfiConverterRustBuffer {
+    typealias SwiftType = [FileStatus]
+
+    public static func write(_ value: [FileStatus], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFileStatus.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FileStatus] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FileStatus]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFileStatus.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFlaggedFile: FfiConverterRustBuffer {
+    typealias SwiftType = [FlaggedFile]
+
+    public static func write(_ value: [FlaggedFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFlaggedFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FlaggedFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FlaggedFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFlaggedFile.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
     typealias SwiftType = [Item]
 
@@ -6417,6 +8388,31 @@ fileprivate struct FfiConverterSequenceTypeItemType: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeItemType.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeListedFolder: FfiConverterRustBuffer {
+    typealias SwiftType = [ListedFolder]
+
+    public static func write(_ value: [ListedFolder], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeListedFolder.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ListedFolder] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ListedFolder]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeListedFolder.read(from: &buf))
         }
         return seq
     }
@@ -6517,6 +8513,31 @@ fileprivate struct FfiConverterSequenceTypeUnregisteredType: FfiConverterRustBuf
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeUnregisteredType.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeUnsureFile: FfiConverterRustBuffer {
+    typealias SwiftType = [UnsureFile]
+
+    public static func write(_ value: [UnsureFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeUnsureFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UnsureFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UnsureFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeUnsureFile.read(from: &buf))
         }
         return seq
     }
@@ -6693,6 +8714,36 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_subscription_stop() != 64667) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_folderlistener_told() != 52103) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folderlistener_ended() != 28733) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 11293) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 61265) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 3579) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 37532) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_status() != 56073) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 51762) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 22567) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 16044) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6702,8 +8753,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 53558) {
+        return InitializationResult.apiChecksumMismatch
+    }
 
     uniffiCallbackInitChangeListener()
+    uniffiCallbackInitFolderListener()
     return InitializationResult.ok
 }()
 
