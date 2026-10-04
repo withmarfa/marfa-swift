@@ -39,9 +39,10 @@ public final class WorkingCopy: Sendable {
 
     /// Opens the store at `store`, making it when absent.
     ///
-    /// Reads of items and edges, and every write, are refused until the store
-    /// holds a completed hydration; after that a copy without a server reads
-    /// and queues writes. A server lets the copy hydrate, catch up and drain
+    /// A new store reads and queues writes before its first hydration. A store
+    /// whose hydration was interrupted or whose read view expired requires a
+    /// completed hydration before reads and writes resume.
+    /// A server lets the copy hydrate, catch up and drain
     /// when the app calls them, and lets a held `changes()` follow its
     /// events. A second opener of one store gets a reading handle,
     /// and its `changes()` watch for the writer's saves.
@@ -141,7 +142,7 @@ public final class WorkingCopy: Sendable {
         return report
     }
 
-    /// Full-text search over titles, bodies and tags, best match first.
+    /// Full-text search over indexed fields and tags, best match first.
     public func search(_ query: String, filters: SearchFilters = SearchFilters(), limit: Int = 20) async throws
         -> [SearchHit]
     {
@@ -252,9 +253,8 @@ public struct Change: Sendable, Hashable {
         case withdrawn
         case pinned
         case unpinned
-        /// A catch-up or a held stream read an item type or edge type
-        /// catalog that differs from the one the copy held; read `catalog`
-        /// again.
+        /// The app replaced its declarations, or a refresh read a changed
+        /// item type or edge type catalog; read `catalog` again.
         case catalog
     }
 

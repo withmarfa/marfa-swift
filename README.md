@@ -76,10 +76,9 @@ let copy = try await WorkingCopy.open(store: storeURL, server: Server(url: serve
 try await copy.declareTypes([
     #"{"id":"app.readinglist.entry","fields":{"title":{"type":"string","required":true}}}"#
 ])
-let hydrated = try await copy.hydrate(types: ["app.readinglist.entry"], tier: .library)
-
 _ = try await copy.items.create(
     Draft(type: "app.readinglist.entry", properties: ["title": "Read this"], tier: .library))
+let hydrated = try await copy.hydrate(types: ["app.readinglist.entry"], tier: .library)
 let items = try await copy.items.list()
 if let item = items.first {
     _ = try await copy.items.update(item.id, Edit(properties: ["title": "Read next"], baseVersion: item.version))
