@@ -2432,8 +2432,8 @@ public func FfiConverterTypeStop_lower(_ value: Stop) -> UInt64 {
 
 /**
  * A held stream or a folder's watch, stopped by `stop` or by letting it go.
- * A follow ends within a quarter second of either, and a watch once the
- * pass under way is done; `ended` is called once it has.
+ * A follow ends within a quarter second of either; a watch within about a
+ * second, or once the pass under way is done. `ended` is called once it has.
  */
 public protocol SubscriptionProtocol: AnyObject, Sendable {
     
@@ -2442,8 +2442,8 @@ public protocol SubscriptionProtocol: AnyObject, Sendable {
 }
 /**
  * A held stream or a folder's watch, stopped by `stop` or by letting it go.
- * A follow ends within a quarter second of either, and a watch once the
- * pass under way is done; `ended` is called once it has.
+ * A follow ends within a quarter second of either; a watch within about a
+ * second, or once the pass under way is done. `ended` is called once it has.
  */
 open class Subscription: SubscriptionProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
