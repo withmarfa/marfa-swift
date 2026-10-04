@@ -215,7 +215,13 @@ jobs:
           server_env="$("${MARFA_MONOREPO}/core/scripts/server-up.sh")"
           eval "${server_env}"
           export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
-          swift build
+          swift build 2>&1 | tee "${RUNNER_TEMP}/swift-build.log"
+          # What the package writes by hand builds without a warning. The generated wire types are out of
+          # this check: their warnings come from the pinned generator, and `scripts/core.sh` rewrites them.
+          if grep -E '^[^ ]+: warning: ' "${RUNNER_TEMP}/swift-build.log" | grep -v '/Sources/MarfaTypes/'; then
+            echo "::error::The package builds with warnings."
+            exit 1
+          fi
           # The service is read from the tests, so the two cannot differ.
           service="$(sed -n 's/^ *let service = "\(.*\)"$/\1/p' Tests/MarfaTests/CredentialTests.swift)"
           [[ "${service}" =~ ^[a-z.-]+$ ]] || { echo "::error::CredentialTests.swift names no one service"; exit 1; }

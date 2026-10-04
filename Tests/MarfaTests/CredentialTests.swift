@@ -39,20 +39,6 @@ import Testing
     }
 }
 
-func inIsolatedKeychain(_ body: (Keychain) throws -> Void) throws {
-    let keychain = try Keychain.isolated()
-    var allowed: DarwinBoolean = true
-    SecKeychainGetUserInteractionAllowed(&allowed)
-    precondition(!allowed.boolValue, "a keychain call in this process could wait on a person")
-    do {
-        try body(keychain)
-    } catch {
-        try? keychain.discard()
-        throw error
-    }
-    try keychain.discard()
-}
-
 @Suite(.timeLimit(.minutes(1)))
 struct KeychainKeys {
     /// CI reads this line to compare the login keychain under this service before and after the suite.
@@ -60,7 +46,7 @@ struct KeychainKeys {
     let account = "https://\(UUID().uuidString.lowercased()).invalid"
 
     @Test func savingAgainReplacesTheKey() throws {
-        try inIsolatedKeychain { keychain in
+        try inIsolatedKeychain { keychain, _ in
             try keychain.save(key: "first", service: service, account: account)
             #expect(try keychain.key(service: service, account: account) == "first")
             try keychain.save(key: "second", service: service, account: account)
@@ -69,7 +55,7 @@ struct KeychainKeys {
     }
 
     @Test func aKeyNeverKeptIsNothing() throws {
-        try inIsolatedKeychain { keychain in
+        try inIsolatedKeychain { keychain, _ in
             #expect(try keychain.key(service: service, account: "never") == nil)
             try keychain.save(key: "k", service: service, account: account)
             #expect(try keychain.key(service: service, account: account) == "k")
@@ -77,7 +63,7 @@ struct KeychainKeys {
     }
 
     @Test func deletingAKeyNeverKeptIsNoError() throws {
-        try inIsolatedKeychain { keychain in
+        try inIsolatedKeychain { keychain, _ in
             try keychain.delete(service: service, account: "never")
             try keychain.save(key: "k", service: service, account: account)
             try keychain.delete(service: service, account: account)
@@ -87,10 +73,10 @@ struct KeychainKeys {
 
     /// Reads the search list, never an item of the login keychain.
     @Test func anIsolatedKeychainIsOutsideTheSearchList() throws {
-        try inIsolatedKeychain { keychain in
+        try inIsolatedKeychain { keychain, file in
             try keychain.save(key: "k", service: service, account: account)
             #expect(try keychain.holds(service: service, account: account))
-            let file = try #require(keychain.file).resolvingSymlinksInPath().path
+            let resolved = file.resolvingSymlinksInPath().path
             var list: CFArray?
             try #require(SecKeychainCopySearchList(&list) == errSecSuccess)
             let searched = try #require(list as? [SecKeychain]).map { searched -> String in
@@ -100,15 +86,15 @@ struct KeychainKeys {
                 return URL(fileURLWithPath: String(cString: path)).resolvingSymlinksInPath().path
             }
             #expect(!searched.isEmpty)
-            #expect(!searched.contains(file), "\(searched)")
+            #expect(!searched.contains(resolved), "\(searched)")
         }
     }
 
     @Test func aKeychainThatLockedItselfIsUnlockedWithoutAskingAnyone() throws {
-        try inIsolatedKeychain { keychain in
+        try inIsolatedKeychain { keychain, file in
             try keychain.save(key: "k", service: service, account: account)
             var opened: SecKeychain?
-            #expect(SecKeychainOpen(try #require(keychain.file).path, &opened) == errSecSuccess)
+            #expect(SecKeychainOpen(file.path, &opened) == errSecSuccess)
             #expect(SecKeychainLock(try #require(opened)) == errSecSuccess)
             var status = SecKeychainStatus()
             SecKeychainGetStatus(opened, &status)
@@ -119,8 +105,7 @@ struct KeychainKeys {
 
     @Test func aDiscardedKeychainLeavesNothingBehind() throws {
         var folder: URL?
-        try inIsolatedKeychain { keychain in
-            let file = try #require(keychain.file)
+        try inIsolatedKeychain { _, file in
             folder = file.deletingLastPathComponent()
             #expect(FileManager.default.fileExists(atPath: file.path))
         }
