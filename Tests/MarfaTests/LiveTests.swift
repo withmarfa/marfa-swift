@@ -257,7 +257,9 @@ extension LiveWorkingCopies {
             let bodied = try await copy.items.create(
                 Draft(type: "core.note", properties: ["title": "other", "body": "first"], tier: .feed))
             let refused = try await copy.items.create(
-                Draft(type: "system.connection", properties: ["name": "not a connection's to write"]))
+                Draft(
+                    type: "system.connection",
+                    properties: ["kind": "app", "status": "active", "granted_at": "2026-01-01T00:00:00Z"]))
             var report = try await copy.queue.drain()
             #expect(report.verdicts.first { $0.id == titled.id }?.verdict == .accepted)
             guard case .refused(let refusal) = report.verdicts.first(where: { $0.id == refused.id })?.verdict else {
@@ -669,13 +671,18 @@ extension LiveWorkingCopies {
         @Test func aRefusedWriteKeepsItsTypedRefusalAndContentUntilDiscarded() async throws {
             let type = "user.dish\(UUID().uuidString.prefix(8).lowercased())"
             try await Live.writeDefinition([
-                "id": type, "fields": ["title": ["type": "string"], "serves": ["type": "integer"]],
+                "id": type, "fields": ["title": ["type": "string"], "serves": ["type": "string"]],
             ])
             let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
             _ = try await copy.hydrate(types: [type], tier: .feed)
             let heard = Heard(copy.changes())
             let refused = try await copy.items.create(
                 Draft(type: type, properties: ["title": "Too many", "serves": "many"], tier: .feed))
+            // A field change preserves the read view, but the server validates
+            // queued content against its current schema when it arrives.
+            try await Live.writeDefinition(
+                ["id": type, "fields": ["title": ["type": "string"], "serves": ["type": "integer"]]],
+                at: "types/" + type, method: "PUT")
             let report = try await copy.queue.drain()
             let answer = try #require(report.verdicts.first { $0.id == refused.id })
             guard case .refused(let refusal) = answer.verdict else {
