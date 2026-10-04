@@ -51,13 +51,24 @@ enum FolderFixture {
         return try #require(made["item"]?["id"]?.string)
     }
 
-    /// A folder added and synced once, so its copy holds its settings.
+    /// A folder added, its first sync confirmed and synced once, so its copy holds its settings.
     static func synced(removalThreshold: [String: Any]? = nil) async throws -> URL {
         let directory = directory()
         _ = try await folders.add(directory, following: try await settings(removalThreshold: removalThreshold))
-        _ = try await folders.sync(directory)
+        try await folders.confirmFirstSync(in: directory)
+        _ = try await sync(directory)
         return directory
     }
+
+    /// A sync that ran, not one waiting for the first sync to be confirmed.
+    static func sync(_ directory: URL) async throws -> FolderSync {
+        switch try await folders.sync(directory) {
+        case .synced(let sync): return sync
+        case .awaitingConfirmation(let plan): throw FirstSyncWaits(plan: plan)
+        }
+    }
+
+    struct FirstSyncWaits: Error { let plan: FirstSyncPlan }
 
     static func note(_ name: String, in directory: URL) throws {
         try Data("---\ntitle: \(name)\n---\nWritten by a test.\n".utf8)
@@ -155,7 +166,7 @@ extension LiveWorkingCopies {
 
             let theirs = FolderFixture.directory()
             let id = try await FolderFixture.settings()
-            _ = try FolderFixture.run(["folders", "add", theirs.path(percentEncoded: false), "--folder", id])
+            _ = try FolderFixture.run(["folders", "add", theirs.path(percentEncoded: false), "--folder", id, "--yes"])
             let seen = try await folders.list()
             #expect(FolderFixture.listed(theirs, in: seen))
             #expect(seen.first { $0.directory.lastPathComponent == theirs.lastPathComponent }?.folderId == id)
@@ -165,16 +176,44 @@ extension LiveWorkingCopies {
             let directory = FolderFixture.directory()
             _ = try await folders.add(directory, following: try await FolderFixture.settings())
             try FolderFixture.note("First", in: directory)
-            let synced = try await folders.sync(directory)
-            #expect(synced.hydrated != nil)
+            // The first sync reads the folder and waits; nothing is sent.
+            let waiting = try await folders.sync(directory)
+            guard case .awaitingConfirmation(let plan) = waiting else {
+                Issue.record("the first sync ran without being confirmed: \(waiting)")
+                return
+            }
+            #expect(plan == FirstSyncPlan(write: 0, send: 1, beside: 0))
+            #expect(try await folders.status(of: directory).firstSync?.plan == plan)
+            await #expect {
+                try await folders.watch(directory)
+            } throws: { error in
+                if case .firstSyncWaiting = error as? MarfaError { true } else { false }
+            }
+            #expect(try await folders.confirmFirstSync(in: directory))
+            #expect(!(try await folders.confirmFirstSync(in: directory)))
+            #expect(try await folders.status(of: directory).firstSync == nil)
+            let synced = try await FolderFixture.sync(directory)
             #expect(synced.catchUpError == nil)
-            #expect(synced.pass.scan.created == 1)
             #expect(synced.pass.drain.answered >= 1)
             #expect(synced.pass.pull != nil)
             let status = try await folders.status(of: directory)
             #expect(status.files.map(\.path) == ["First.md"])
             #expect(status.files.allSatisfy { $0.state == .inStep }, "\(status.files)")
             #expect(!status.paused.isPaused)
+        }
+
+        @Test func aFirstSyncStillWaitingIsCancelledByRemovingTheFolderAndTheFilesStay() async throws {
+            let directory = FolderFixture.directory()
+            _ = try await folders.add(directory, following: try await FolderFixture.settings())
+            try FolderFixture.note("Kept", in: directory)
+            guard case .awaitingConfirmation = try await folders.sync(directory) else {
+                Issue.record("the first sync ran without being confirmed")
+                return
+            }
+            try await folders.remove(directory)
+            #expect(!FolderFixture.listed(directory, in: try await folders.list()))
+            #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Kept.md").path()))
+            #expect(!FileManager.default.fileExists(atPath: directory.appending(path: ".marfa").path()))
         }
 
         @Test func aFolderIsNotRemovedWhileWritesWaitAndIsOnceTheyAreSent() async throws {
@@ -215,11 +254,11 @@ extension LiveWorkingCopies {
             let directory = try await FolderFixture.synced(removalThreshold: ["files": 1, "fraction": 0.1])
             let names = ["One", "Two", "Three"]
             for name in names { try FolderFixture.note(name, in: directory) }
-            #expect(try await folders.sync(directory).pass.drain.answered >= 3)
+            #expect(try await FolderFixture.sync(directory).pass.drain.answered >= 3)
 
             func removeAll() async throws -> FolderSync {
                 for name in names { try FileManager.default.removeItem(at: directory.appending(path: "\(name).md")) }
-                return try await folders.sync(directory)
+                return try await FolderFixture.sync(directory)
             }
             #expect(try await removeAll().pass.scan.paused == 3)
             #expect(try await folders.status(of: directory).paused == PausedRemoval(disk: 3))
@@ -235,7 +274,7 @@ extension LiveWorkingCopies {
             let confirmed = try await folders.confirmRemoval(in: directory)
             #expect(confirmed.deleted == 3)
             #expect(confirmed.unsure.isEmpty)
-            let sent = try await folders.sync(directory)
+            let sent = try await FolderFixture.sync(directory)
             #expect(sent.pass.drain.answered >= 3)
             #expect(try await folders.status(of: directory) == FolderStatus(files: []))
         }

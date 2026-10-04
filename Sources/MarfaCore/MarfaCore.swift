@@ -2016,15 +2016,23 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     /**
      * Makes `dir` a folder that follows the `system.folder` `folder`, and
      * lists it in the machine's registry. The directory is made if it is
-     * not there. Its files are written at the first sync.
+     * not there. Its first sync waits: `sync` says what it will do, and
+     * `confirm_first_sync` lets it go.
      */
     func add(dir: String, folder: String) throws  -> ListedFolder
     
     /**
      * Lets a paused large removal go: its deletes are queued, and files
-     * whose items left elsewhere are taken away.
+     * whose items left elsewhere are taken away. Refused while the first
+     * sync waits.
      */
     func confirm(dir: String) throws  -> ConfirmedRemoval
+    
+    /**
+     * Lets a folder's first sync go, at the next sync or watch. Answers
+     * whether it was waiting. A paused removal is not touched.
+     */
+    func confirmFirstSync(dir: String) throws  -> Bool
     
     /**
      * The folders the machine's registry lists, the command line's among
@@ -2034,8 +2042,9 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
-     * its files stay. Refused while writes wait. A folder whose directory is
-     * gone is only taken off the registry.
+     * its files stay. Refused while writes wait, except for a first sync
+     * still waiting to be confirmed, which this cancels. A folder whose
+     * directory is gone is only taken off the registry.
      */
     func remove(dir: String) throws 
     
@@ -2053,9 +2062,11 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     
     /**
      * Everything a folder does, once: sends what changed on disk, catches
-     * up with the server and writes out what its search matches.
+     * up with the server and writes out what its search matches. A folder
+     * whose first sync waits to be confirmed is only read, and `Waiting`
+     * says what the sync will do.
      */
-    func sync(dir: String) throws  -> FolderSync
+    func sync(dir: String) throws  -> FolderSyncOutcome
     
     /**
      * Keeps the folder in step on a thread of its own, as the command
@@ -2111,7 +2122,7 @@ open class Folders: FoldersProtocol, @unchecked Sendable {
     }
     /**
      * `url` and `key` go together; without them only `list`, `status`,
-     * `confirm`, `restore` and `remove` work.
+     * `confirm_first_sync`, `confirm`, `restore` and `remove` work.
      */
 public convenience init(url: String?, key: String?)throws  {
     let handle =
@@ -2139,7 +2150,8 @@ public convenience init(url: String?, key: String?)throws  {
     /**
      * Makes `dir` a folder that follows the `system.folder` `folder`, and
      * lists it in the machine's registry. The directory is made if it is
-     * not there. Its files are written at the first sync.
+     * not there. Its first sync waits: `sync` says what it will do, and
+     * `confirm_first_sync` lets it go.
      */
 open func add(dir: String, folder: String)throws  -> ListedFolder  {
     return try  FfiConverterTypeListedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2153,11 +2165,25 @@ open func add(dir: String, folder: String)throws  -> ListedFolder  {
     
     /**
      * Lets a paused large removal go: its deletes are queued, and files
-     * whose items left elsewhere are taken away.
+     * whose items left elsewhere are taken away. Refused while the first
+     * sync waits.
      */
 open func confirm(dir: String)throws  -> ConfirmedRemoval  {
     return try  FfiConverterTypeConfirmedRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_confirm(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Lets a folder's first sync go, at the next sync or watch. Answers
+     * whether it was waiting. A paused removal is not touched.
+     */
+open func confirmFirstSync(dir: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_confirm_first_sync(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
     )
@@ -2178,8 +2204,9 @@ open func list()throws  -> [ListedFolder]  {
     
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
-     * its files stay. Refused while writes wait. A folder whose directory is
-     * gone is only taken off the registry.
+     * its files stay. Refused while writes wait, except for a first sync
+     * still waiting to be confirmed, which this cancels. A folder whose
+     * directory is gone is only taken off the registry.
      */
 open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_remove(
@@ -2217,10 +2244,12 @@ open func status(dir: String)throws  -> FolderStatus  {
     
     /**
      * Everything a folder does, once: sends what changed on disk, catches
-     * up with the server and writes out what its search matches.
+     * up with the server and writes out what its search matches. A folder
+     * whose first sync waits to be confirmed is only read, and `Waiting`
+     * says what the sync will do.
      */
-open func sync(dir: String)throws  -> FolderSync  {
-    return try  FfiConverterTypeFolderSync_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func sync(dir: String)throws  -> FolderSyncOutcome  {
+    return try  FfiConverterTypeFolderSyncOutcome_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_sync(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
@@ -3764,6 +3793,91 @@ public func FfiConverterTypeFileStatus_lower(_ value: FileStatus) -> RustBuffer 
 
 
 /**
+ * What a folder's first sync will do, read from the folder as it stands.
+ */
+public struct FirstSyncPlan: Equatable, Hashable {
+    /**
+     * Files it will write into the directory.
+     */
+    public var write: UInt64
+    /**
+     * Files in the directory it will send, as new items or as the edits of
+     * the items they name.
+     */
+    public var send: UInt64
+    /**
+     * Of the files it will write, those whose path a file already in the
+     * directory has. Both end up in the folder, and one of the two takes a
+     * number in its name; none is written over.
+     */
+    public var beside: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Files it will write into the directory.
+         */write: UInt64, 
+        /**
+         * Files in the directory it will send, as new items or as the edits of
+         * the items they name.
+         */send: UInt64, 
+        /**
+         * Of the files it will write, those whose path a file already in the
+         * directory has. Both end up in the folder, and one of the two takes a
+         * number in its name; none is written over.
+         */beside: UInt64) {
+        self.write = write
+        self.send = send
+        self.beside = beside
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FirstSyncPlan: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFirstSyncPlan: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FirstSyncPlan {
+        return
+            try FirstSyncPlan(
+                write: FfiConverterUInt64.read(from: &buf), 
+                send: FfiConverterUInt64.read(from: &buf), 
+                beside: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FirstSyncPlan, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.write, into: &buf)
+        FfiConverterUInt64.write(value.send, into: &buf)
+        FfiConverterUInt64.write(value.beside, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFirstSyncPlan_lift(_ buf: RustBuffer) throws -> FirstSyncPlan {
+    return try FfiConverterTypeFirstSyncPlan.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFirstSyncPlan_lower(_ value: FirstSyncPlan) -> RustBuffer {
+    return FfiConverterTypeFirstSyncPlan.lower(value)
+}
+
+
+/**
  * A file a pass held or warned about, with why.
  */
 public struct FlaggedFile: Equatable, Hashable {
@@ -4204,12 +4318,20 @@ public func FfiConverterTypeFolderScan_lower(_ value: FolderScan) -> RustBuffer 
 public struct FolderStatus: Equatable, Hashable {
     public var files: [FileStatus]
     public var paused: PausedRemoval
+    /**
+     * Set while the folder's first sync waits to be confirmed.
+     */
+    public var firstSync: WaitingFirstSync?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(files: [FileStatus], paused: PausedRemoval) {
+    public init(files: [FileStatus], paused: PausedRemoval, 
+        /**
+         * Set while the folder's first sync waits to be confirmed.
+         */firstSync: WaitingFirstSync?) {
         self.files = files
         self.paused = paused
+        self.firstSync = firstSync
     }
 
     
@@ -4229,13 +4351,15 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
         return
             try FolderStatus(
                 files: FfiConverterSequenceTypeFileStatus.read(from: &buf), 
-                paused: FfiConverterTypePausedRemoval.read(from: &buf)
+                paused: FfiConverterTypePausedRemoval.read(from: &buf), 
+                firstSync: FfiConverterOptionTypeWaitingFirstSync.read(from: &buf)
         )
     }
 
     public static func write(_ value: FolderStatus, into buf: inout [UInt8]) {
         FfiConverterSequenceTypeFileStatus.write(value.files, into: &buf)
         FfiConverterTypePausedRemoval.write(value.paused, into: &buf)
+        FfiConverterOptionTypeWaitingFirstSync.write(value.firstSync, into: &buf)
     }
 }
 
@@ -6029,6 +6153,66 @@ public func FfiConverterTypeUnsureFile_lower(_ value: UnsureFile) -> RustBuffer 
     return FfiConverterTypeUnsureFile.lower(value)
 }
 
+
+/**
+ * A first sync that waits for `confirm_first_sync`, and what the last read of the
+ * folder said it will do.
+ */
+public struct WaitingFirstSync: Equatable, Hashable {
+    /**
+     * `None` until `sync` has read the folder.
+     */
+    public var plan: FirstSyncPlan?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * `None` until `sync` has read the folder.
+         */plan: FirstSyncPlan?) {
+        self.plan = plan
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension WaitingFirstSync: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeWaitingFirstSync: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> WaitingFirstSync {
+        return
+            try WaitingFirstSync(
+                plan: FfiConverterOptionTypeFirstSyncPlan.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: WaitingFirstSync, into buf: inout [UInt8]) {
+        FfiConverterOptionTypeFirstSyncPlan.write(value.plan, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeWaitingFirstSync_lift(_ buf: RustBuffer) throws -> WaitingFirstSync {
+    return try FfiConverterTypeWaitingFirstSync.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeWaitingFirstSync_lower(_ value: WaitingFirstSync) -> RustBuffer {
+    return FfiConverterTypeWaitingFirstSync.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -6450,6 +6634,90 @@ public func FfiConverterTypeFolderEvent_lift(_ buf: RustBuffer) throws -> Folder
 #endif
 public func FfiConverterTypeFolderEvent_lower(_ value: FolderEvent) -> RustBuffer {
     return FfiConverterTypeFolderEvent.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * What a sync came to: it ran, or the folder's first sync waits to be
+ * confirmed and nothing was written or sent.
+ */
+
+public enum FolderSyncOutcome: Equatable, Hashable {
+    
+    /**
+     * The sync ran.
+     */
+    case done(sync: FolderSync
+    )
+    /**
+     * The first sync waits. `confirm_first_sync` lets it go, and `remove`
+     * drops the folder, leaving its files.
+     */
+    case waiting(plan: FirstSyncPlan
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FolderSyncOutcome: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderSyncOutcome: FfiConverterRustBuffer {
+    typealias SwiftType = FolderSyncOutcome
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderSyncOutcome {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .done(sync: try FfiConverterTypeFolderSync.read(from: &buf)
+        )
+        
+        case 2: return .waiting(plan: try FfiConverterTypeFirstSyncPlan.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FolderSyncOutcome, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .done(sync):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeFolderSync.write(sync, into: &buf)
+            
+        
+        case let .waiting(plan):
+            writeInt(&buf, Int32(2))
+            FfiConverterTypeFirstSyncPlan.write(plan, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderSyncOutcome_lift(_ buf: RustBuffer) throws -> FolderSyncOutcome {
+    return try FfiConverterTypeFolderSyncOutcome.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderSyncOutcome_lower(_ value: FolderSyncOutcome) -> RustBuffer {
+    return FfiConverterTypeFolderSyncOutcome.lower(value)
 }
 
 
@@ -6927,6 +7195,12 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
      */
     case Canceled(message: String
     )
+    /**
+     * A folder's first sync waits for confirmation, so the call that would
+     * write or send for it was refused.
+     */
+    case FirstSyncWaiting(message: String
+    )
     case Invalid(message: String
     )
 
@@ -7080,7 +7354,10 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 28: return .Canceled(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 29: return .Invalid(
+        case 29: return .FirstSyncWaiting(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 30: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -7261,8 +7538,13 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Invalid(message):
+        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(29))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Invalid(message):
+            writeInt(&buf, Int32(30))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -7931,6 +8213,30 @@ fileprivate struct FfiConverterOptionTypeStop: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeFirstSyncPlan: FfiConverterRustBuffer {
+    typealias SwiftType = FirstSyncPlan?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFirstSyncPlan.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFirstSyncPlan.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeFolderPull: FfiConverterRustBuffer {
     typealias SwiftType = FolderPull?
 
@@ -8067,6 +8373,30 @@ fileprivate struct FfiConverterOptionTypeThumbnail: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeThumbnail.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeWaitingFirstSync: FfiConverterRustBuffer {
+    typealias SwiftType = WaitingFirstSync?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeWaitingFirstSync.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeWaitingFirstSync.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -8720,16 +9050,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folderlistener_ended() != 28733) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 11293) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 58916) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 61265) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 13317) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm_first_sync() != 16667) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 3579) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 52626) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 37532) {
@@ -8738,7 +9071,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_status() != 56073) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 51762) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 4778) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 22567) {
@@ -8753,7 +9086,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 53558) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 38220) {
         return InitializationResult.apiChecksumMismatch
     }
 

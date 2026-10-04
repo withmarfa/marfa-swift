@@ -139,6 +139,7 @@ struct Errors {
             .contractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m")
         ),
         (.Canceled(message: "m"), .canceled(message: "m")),
+        (.FirstSyncWaiting(message: "m"), .firstSyncWaiting(message: "m")),
         (.Invalid(message: "m"), .invalid(message: "m")),
     ]
 

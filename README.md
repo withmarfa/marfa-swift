@@ -130,7 +130,7 @@ A blocked verdict can carry the structured refusal and missing grant. Drain repo
 A folder is a directory whose files Marfa keeps in step with the search a `system.folder` item on the server describes. `Folders` manages them on macOS through the same core and the same registry as `marfa folders`, so a folder added from an app appears in `marfa folders list`, and one added from the command line appears in `folders.list()`.
 
 1. Create the folder's settings on the server, for example with `marfa folders create --title Notes --search '{"types":["core.note"]}'`, and note the returned item ID.
-1. Add the directory and sync it:
+1. Add the directory. A new folder's first sync waits for you to confirm it, so `sync(_:)` reads the folder and says what it will do, and nothing is written into the directory or sent until `confirmFirstSync(in:)`:
 
     ```swift
     import Marfa
@@ -138,7 +138,23 @@ A folder is a directory whose files Marfa keeps in step with the search a `syste
     let folders = Folders(server: Server(url: serverURL, key: key))
     let notes = URL(filePath: "/path/to/Notes", directoryHint: .isDirectory)
     _ = try await folders.add(notes, following: folderID)
-    let synced = try await folders.sync(notes)
+
+    switch try await folders.sync(notes) {
+    case .awaitingConfirmation(let plan):
+        // `plan.write` files go into the directory and `plan.send` go to the server. Of the files written,
+        // `plan.beside` take a path a file already has: both stay, and one gets a number in its name.
+        try await folders.confirmFirstSync(in: notes)
+    case .synced:
+        break
+    }
+    ```
+
+    To cancel instead, call `remove(_:)`, which leaves the files where they are.
+
+1. Sync it:
+
+    ```swift
+    guard case .synced(let synced) = try await folders.sync(notes) else { return }
     if synced.catchUpError != nil {
         // The server was out of reach; local edits wait and go at the next sync.
     }
@@ -165,7 +181,7 @@ for try await event in watch {
 }
 ```
 
-One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, and keeps the files when it removes the folder. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
+One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
 
 ## Keys
 

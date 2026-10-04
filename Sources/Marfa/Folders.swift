@@ -8,17 +8,21 @@ import Synchronization
 /// Folders work through the same core and the same registry as the `marfa` command-line tool, so a folder
 /// added here appears in `marfa folders list`, and one added there appears in `list()`.
 ///
+/// A new folder's first sync waits for the person to confirm it: `sync(_:)` reads the folder and returns
+/// ``FolderSyncResult/awaitingConfirmation(_:)`` with what the sync will do, and nothing is written into the
+/// directory or sent until `confirmFirstSync(in:)`. `remove(_:)` cancels it and leaves the files.
+///
 /// One process works a folder at a time. While the command-line tool or a watch holds a folder, `sync(_:)`,
-/// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)` and `watch(_:)` throw `MarfaError.readingHandle`;
-/// `status(of:)` still answers. Every call runs off the caller's thread.
+/// `confirmFirstSync(in:)`, `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)` and `watch(_:)` throw
+/// `MarfaError.readingHandle`; `status(of:)` still answers. Every call runs off the caller's thread.
 public struct Folders: Sendable {
     /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)` and `watch(_:)` reach.
     public let server: Server?
 
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
     ///
-    /// Without a server, only `list()`, `status(of:)`, `confirmRemoval(in:)`, `restoreRemoval(in:)` and
-    /// `remove(_:)` work.
+    /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
+    /// `restoreRemoval(in:)` and `remove(_:)` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -26,7 +30,8 @@ public struct Folders: Sendable {
     /// Makes a directory a folder that follows the settings of the `system.folder` item `folderId`, and lists
     /// it in the Mac's registry.
     ///
-    /// The directory is made if it isn't there. Its files are sent and written at the first sync.
+    /// The directory is made if it isn't there. Its first sync waits: `sync(_:)` says what it will do, and
+    /// `confirmFirstSync(in:)` lets it go.
     public func add(_ directory: URL, following folderId: String) async throws -> ListedFolder {
         let dir = directory.path(percentEncoded: false)
         return ListedFolder(try await run { folders in try folders.add(dir: dir, folder: folderId) })
@@ -46,11 +51,23 @@ public struct Folders: Sendable {
     /// Syncs the folder once: sends what changed on disk, catches up with the server, and writes out what the
     /// folder's search matches.
     ///
+    /// While the folder's first sync waits to be confirmed, it only reads the folder and returns
+    /// ``FolderSyncResult/awaitingConfirmation(_:)``: nothing was written or sent.
+    ///
     /// When the server can't be reached, the sync still writes out the copy it holds, and `catchUpError` says
     /// why it couldn't catch up.
-    public func sync(_ directory: URL) async throws -> FolderSync {
+    public func sync(_ directory: URL) async throws -> FolderSyncResult {
         let dir = directory.path(percentEncoded: false)
-        return FolderSync(try await run { folders in try folders.sync(dir: dir) })
+        return FolderSyncResult(try await run { folders in try folders.sync(dir: dir) })
+    }
+
+    /// Lets the folder's first sync go.
+    ///
+    /// The next `sync(_:)` or `watch(_:)` runs it. Returns whether it was waiting. Asks nothing of the server.
+    @discardableResult
+    public func confirmFirstSync(in directory: URL) async throws -> Bool {
+        let dir = directory.path(percentEncoded: false)
+        return try await run { folders in try folders.confirmFirstSync(dir: dir) }
     }
 
     /// Lets a paused large removal go: its deletes are queued for the next sync, and files whose items left
@@ -69,6 +86,8 @@ public struct Folders: Sendable {
 
     /// Takes the folder off this Mac, and leaves its files as plain files.
     ///
+    /// On a folder whose first sync waits, it cancels that sync.
+    ///
     /// Throws `MarfaError.invalid` while writes wait to be sent; sync first. A folder whose directory is gone is
     /// only taken off the registry.
     public func remove(_ directory: URL) async throws {
@@ -78,8 +97,9 @@ public struct Folders: Sendable {
 
     /// Starts keeping the folder in step while the app runs, as `marfa folders watch` does.
     ///
-    /// Throws at once when the folder can't be opened, such as when another process holds it. Once started,
-    /// the watch holds the folder until it ends.
+    /// Throws at once when the folder can't be opened, such as when another process holds it, and throws
+    /// `MarfaError.firstSyncWaiting` while the folder's first sync waits to be confirmed. Once started, the
+    /// watch holds the folder until it ends.
     public func watch(_ directory: URL) async throws -> FolderWatch {
         let dir = directory.path(percentEncoded: false)
         let (events, continuation) = AsyncThrowingStream<FolderEvent, any Error>.makeStream()
@@ -247,14 +267,19 @@ public struct FolderStatus: Sendable, Hashable {
     public var files: [FileStatus]
     /// A large removal waiting for `confirmRemoval(in:)` or `restoreRemoval(in:)`.
     public var paused: PausedRemoval
+    /// Set while the folder's first sync waits for `confirmFirstSync(in:)`.
+    public var firstSync: WaitingFirstSync?
 
-    public init(files: [FileStatus], paused: PausedRemoval = PausedRemoval()) {
+    public init(files: [FileStatus], paused: PausedRemoval = PausedRemoval(), firstSync: WaitingFirstSync? = nil) {
         self.files = files
         self.paused = paused
+        self.firstSync = firstSync
     }
 
     init(_ core: MarfaCore.FolderStatus) {
-        self.init(files: core.files.map(FileStatus.init), paused: PausedRemoval(core.paused))
+        self.init(
+            files: core.files.map(FileStatus.init), paused: PausedRemoval(core.paused),
+            firstSync: core.firstSync.map(WaitingFirstSync.init))
     }
 }
 
@@ -333,6 +358,59 @@ public struct PausedRemoval: Sendable, Hashable {
 
     init(_ core: MarfaCore.PausedRemoval) {
         self.init(disk: core.disk, pull: core.pull)
+    }
+}
+
+/// What a sync came to.
+public enum FolderSyncResult: Sendable, Hashable {
+    /// The sync ran.
+    case synced(FolderSync)
+    /// The folder's first sync waits for `confirmFirstSync(in:)`, so nothing was written or sent.
+    case awaitingConfirmation(FirstSyncPlan)
+
+    init(_ core: MarfaCore.FolderSyncOutcome) {
+        switch core {
+        case .done(let sync): self = .synced(FolderSync(sync))
+        case .waiting(let plan): self = .awaitingConfirmation(FirstSyncPlan(plan))
+        }
+    }
+}
+
+/// What a folder's first sync will do, read from the folder as it stands.
+public struct FirstSyncPlan: Sendable, Hashable {
+    /// Files it will write into the directory.
+    public let write: UInt64
+    /// Files in the directory it will send, as new items or as the edits of the items they name.
+    public let send: UInt64
+    /// How many of the files it will write take a path a file already in the directory has.
+    ///
+    /// Both end up in the folder, one of the two with a number in its name, and none is written over.
+    public let beside: UInt64
+
+    public init(write: UInt64, send: UInt64, beside: UInt64) {
+        self.write = write
+        self.send = send
+        self.beside = beside
+    }
+
+    init(_ core: MarfaCore.FirstSyncPlan) {
+        write = core.write
+        send = core.send
+        beside = core.beside
+    }
+}
+
+/// A first sync that waits for the person's go-ahead.
+public struct WaitingFirstSync: Sendable, Hashable {
+    /// What the last read of the folder said it will do, and `nil` until `sync(_:)` has read it.
+    public let plan: FirstSyncPlan?
+
+    public init(plan: FirstSyncPlan? = nil) {
+        self.plan = plan
+    }
+
+    init(_ core: MarfaCore.WaitingFirstSync) {
+        plan = core.plan.map(FirstSyncPlan.init)
     }
 }
 
