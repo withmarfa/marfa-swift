@@ -83,6 +83,29 @@ import Testing
     }
 }
 
+#if os(macOS)
+/// A Mac app's previews make folder values with only `Marfa` imported.
+@Test func anAppMakesItsOwnFolderValues() {
+    let listed = ListedFolder(directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f")
+    #expect(listed.folderId == "f")
+    let status = FolderStatus(
+        files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: PausedRemoval(disk: 2))
+    #expect(status.paused.isPaused)
+    #expect(!PausedRemoval().isPaused)
+    let read: Bool =
+        switch status.files[0].state {
+        case .inStep, .waiting, .held, .unmatched, .unreached, .outside: true
+        }
+    #expect(read)
+    let event = FolderEvent.retrying(.network(message: "m"), after: .seconds(1))
+    let told: Bool =
+        switch event {
+        case .watching, .watcherFailed, .retrying, .unreachable, .reachable, .waiting, .passed: true
+        }
+    #expect(told)
+}
+#endif
+
 /// Compiles only while these switches are exhaustive with no `@unknown
 /// default`, as the README tells apps to write them.
 private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: MarfaError) -> Int {
