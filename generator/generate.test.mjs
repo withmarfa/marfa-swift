@@ -13,7 +13,7 @@ import { generate, prepare } from "./generate.mjs";
 
 const nullable = {
   anyOf: [
-    { $ref: "#/components/schemas/HousekeepingReport" },
+    { $ref: "#/components/schemas/BackgroundJobReport" },
     { type: "null" },
   ],
 };
@@ -22,7 +22,7 @@ const document = (schema) => ({
   info: { title: "Fixture", version: "1" },
   paths: {},
   components: {
-    schemas: { Fixture: schema, HousekeepingReport: { type: "object" } },
+    schemas: { Fixture: schema, BackgroundJobReport: { type: "object" } },
   },
 });
 
@@ -36,7 +36,7 @@ test("normalizes null schemas without changing examples or the source", () => {
   const before = JSON.stringify(input);
   const { document: output } = prepare(input);
   assert.deepEqual(output.components.schemas.Fixture.properties.result, {
-    $ref: "#/components/schemas/MarfaNullableHousekeepingReport",
+    $ref: "#/components/schemas/MarfaNullableBackgroundJobReport",
   });
   assert.deepEqual(output.components.schemas.MarfaNull, { enum: [null] });
   assert.deepEqual(output.components.schemas.Fixture.example, example);
@@ -76,14 +76,14 @@ test("visits inline request and response schemas and preserves constraints", () 
     output.paths["/rows"].post.requestBody.content["application/json"].schema
       .properties.value,
     {
-      $ref: "#/components/schemas/MarfaNullableHousekeepingReport",
+      $ref: "#/components/schemas/MarfaNullableBackgroundJobReport",
       description: "clear",
     },
   );
   assert.deepEqual(
     output.paths["/rows"].post.responses[200].content["application/json"].schema
       .items,
-    { $ref: "#/components/schemas/MarfaNullableHousekeepingReport" },
+    { $ref: "#/components/schemas/MarfaNullableBackgroundJobReport" },
   );
 });
 
