@@ -6,4 +6,4 @@ namingStrategy: idiomatic
 # values are any of several scalars or null.
 typeOverrides:
   schemas:
-    HousekeepingReport: OpenAPIRuntime.OpenAPIObjectContainer
+    BackgroundJobReport: OpenAPIRuntime.OpenAPIObjectContainer

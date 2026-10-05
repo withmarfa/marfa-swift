@@ -13,7 +13,7 @@ struct Waiting {
             (
                 200, "text/event-stream",
                 ["stream_cursor", "stream_live"].map { kind in
-                    "event: \(kind)\ndata: {\"type\":\"\(kind)\",\"cursor\":\"10\","
+                    "event: \(kind)\ndata: {\"event_type\":\"\(kind)\",\"cursor\":\"10\","
                         + "\"instance_id\":\"test-instance\",\"read_view\":\"\(LocalServer.readView)\"}\n\n"
                 }.joined()
             )

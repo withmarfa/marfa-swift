@@ -273,16 +273,28 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An edge is a typed, directed relationship from a source item to a target item.
+        ///
         /// - Remark: Generated from `#/components/schemas/Edge`.
         public struct Edge: Codable, Hashable, Sendable {
+            /// Unique identifier for the edge.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/id`.
             public var id: Swift.String
+            /// The ID of the item the edge starts from.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/source_id`.
             public var sourceId: Swift.String
+            /// The ID of the item the edge points to.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/target_id`.
             public var targetId: Swift.String
+            /// The identifier of the edge type, such as `parent-of`.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/edge_type`.
             public var edgeType: Swift.String
+            /// The edge's properties, by name.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/properties`.
             public struct PropertiesPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -301,25 +313,33 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The edge's properties, by name.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/properties`.
             public var properties: Components.Schemas.Edge.PropertiesPayload
+            /// When the edge was created, in UTC.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/created_at`.
             public var createdAt: Swift.String
+            /// When the edge last changed, in UTC.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/updated_at`.
             public var updatedAt: Swift.String
+            /// The edge's version. It goes up by one on every update, including one that changes nothing.
+            ///
             /// - Remark: Generated from `#/components/schemas/Edge/version`.
             public var version: Swift.Double
             /// Creates a new `Edge`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - sourceId:
-            ///   - targetId:
-            ///   - edgeType:
-            ///   - properties:
-            ///   - createdAt:
-            ///   - updatedAt:
-            ///   - version:
+            ///   - id: Unique identifier for the edge.
+            ///   - sourceId: The ID of the item the edge starts from.
+            ///   - targetId: The ID of the item the edge points to.
+            ///   - edgeType: The identifier of the edge type, such as `parent-of`.
+            ///   - properties: The edge's properties, by name.
+            ///   - createdAt: When the edge was created, in UTC.
+            ///   - updatedAt: When the edge last changed, in UTC.
+            ///   - version: The edge's version. It goes up by one on every update, including one that changes nothing.
             public init(
                 id: Swift.String,
                 sourceId: Swift.String,
@@ -897,8 +917,12 @@ extension Components {
                 case _type = "type"
             }
         }
+        /// How Marfa merges conflicting edits to the items of a type: a strategy for each named field, and a default for the rest.
+        ///
         /// - Remark: Generated from `#/components/schemas/MergePolicy`.
         public struct MergePolicy: Codable, Hashable, Sendable {
+            /// The strategy for each field the policy names.
+            ///
             /// - Remark: Generated from `#/components/schemas/MergePolicy/fields`.
             public struct FieldsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -917,21 +941,51 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The strategy for each field the policy names.
+            ///
             /// - Remark: Generated from `#/components/schemas/MergePolicy/fields`.
             public var fields: Components.Schemas.MergePolicy.FieldsPayload?
             /// - Remark: Generated from `#/components/schemas/MergePolicy/default`.
-            public var _default: Components.Schemas.MergeStrategy?
+            public struct DefaultPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/MergePolicy/default/value1`.
+                public var value1: Components.Schemas.MergeStrategy
+                /// The strategy for a field `fields` doesn't name. Leave it out for `last_writer_wins`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MergePolicy/default/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `DefaultPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The strategy for a field `fields` doesn't name. Leave it out for `last_writer_wins`.
+                public init(
+                    value1: Components.Schemas.MergeStrategy,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try decoder.decodeFromSingleValueContainer()
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeToSingleValueContainer(self.value1)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/MergePolicy/default`.
+            public var _default: Components.Schemas.MergePolicy.DefaultPayload?
             /// A container of undocumented properties.
             public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `MergePolicy`.
             ///
             /// - Parameters:
-            ///   - fields:
+            ///   - fields: The strategy for each field the policy names.
             ///   - _default:
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 fields: Components.Schemas.MergePolicy.FieldsPayload? = nil,
-                _default: Components.Schemas.MergeStrategy? = nil,
+                _default: Components.Schemas.MergePolicy.DefaultPayload? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.fields = fields
@@ -949,7 +1003,7 @@ extension Components {
                     forKey: .fields
                 )
                 self._default = try container.decodeIfPresent(
-                    Components.Schemas.MergeStrategy.self,
+                    Components.Schemas.MergePolicy.DefaultPayload.self,
                     forKey: ._default
                 )
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
@@ -970,6 +1024,8 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// How Marfa resolves a conflict on one field. `last_writer_wins` takes the later write. `keep_both_copies` keeps the losing value in a new item tagged `conflicted-copy`.
+        ///
         /// - Remark: Generated from `#/components/schemas/MergeStrategy`.
         @frozen public enum MergeStrategy: String, Codable, Hashable, Sendable, CaseIterable {
             case lastWriterWins = "last_writer_wins"
@@ -1669,29 +1725,30 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal`.
-        public struct InvalidIdRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal`.
+        public struct InvalidIdOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
+                    case validationError = "validation_error"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/code`.
-                public var code: Components.Schemas.InvalidIdRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -1711,8 +1768,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error/details`.
-                public var details: Components.Schemas.InvalidIdRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -1720,9 +1777,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.InvalidIdRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.InvalidIdRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -1736,13 +1793,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdRefusal/error`.
-            public var error: Components.Schemas.InvalidIdRefusal._ErrorPayload
-            /// Creates a new `InvalidIdRefusal`.
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.InvalidIdRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -2020,7 +2077,7 @@ extension Components {
                 case error
             }
         }
-        /// Who resolves a version conflict. `auto` resolves it here, in this write's transaction, by the type's merge policy: a `last_writer_wins` field takes this write's value, a `keep_both_copies` field leaves the server's value on the item and the losing value lands on a sibling tagged `conflicted-copy` beside the original's tags, with a copy of the edges that are the original's own, those its own file would write, that a second item may hold and the writer could have made. The sibling carries neither the item's natural key nor its link, so where the type requires its `link_field`, itself or through a parent, nothing is resolved and the write answers the 409 envelope. `manual` and `callback` return the 409 envelope for the caller to resolve. Omitted means `manual`.
+        /// Who resolves a version conflict. `auto` has Marfa resolve it by the type's merge policy. `manual` and `callback` return the conflict for you to resolve. Defaults to `manual`.
         ///
         /// - Remark: Generated from `#/components/schemas/ConflictMode`.
         @frozen public enum ConflictMode: String, Codable, Hashable, Sendable, CaseIterable {
@@ -2291,89 +2348,6 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal`.
-        public struct InvalidIdOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case invalidId = "invalid_id"
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `InvalidIdOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.InvalidIdOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -3262,6 +3236,8 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/BulkActionFilter`.
         public struct BulkActionFilter: Codable, Hashable, Sendable {
+            /// Restrict to one type, subtypes included. A type the credential cannot read, with nothing readable under it, is refused `403 type_not_permitted`; one it can read and not write matches nothing. A type nothing registers is accepted.
+            ///
             /// - Remark: Generated from `#/components/schemas/BulkActionFilter/type`.
             public var _type: Swift.String?
             /// - Remark: Generated from `#/components/schemas/BulkActionFilter/state`.
@@ -3313,7 +3289,7 @@ extension Components {
             /// Creates a new `BulkActionFilter`.
             ///
             /// - Parameters:
-            ///   - _type:
+            ///   - _type: Restrict to one type, subtypes included. A type the credential cannot read, with nothing readable under it, is refused `403 type_not_permitted`; one it can read and not write matches nothing. A type nothing registers is accepted.
             ///   - state:
             ///   - source:
             ///   - tier:
@@ -3349,6 +3325,88 @@ extension Components {
                 case occurredAfter = "occurred_after"
                 case occurredBefore = "occurred_before"
                 case filter
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
+        public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+            public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
+            /// Creates a new `ValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// An error response.
@@ -3525,7 +3583,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Tombstone/purged_at`.
             public var purgedAt: Swift.String
-            /// The purge time, or the later time of the vendor's own change a connector made in carrying the purge out, moved by `POST /items/tombstones`; a vendor change after it is a new row.
+            /// When the purge happened, or the later time of the vendor's change a connector made to carry it out. Set with `POST /items/tombstones`. A vendor change after this time is a new item.
             ///
             /// - Remark: Generated from `#/components/schemas/Tombstone/settled_at`.
             public var settledAt: Swift.String
@@ -3534,7 +3592,7 @@ extension Components {
             /// - Parameters:
             ///   - key: The link value, or the natural key's `source_id`.
             ///   - purgedAt: When the row holding the key was purged.
-            ///   - settledAt: The purge time, or the later time of the vendor's own change a connector made in carrying the purge out, moved by `POST /items/tombstones`; a vendor change after it is a new row.
+            ///   - settledAt: When the purge happened, or the later time of the vendor's change a connector made to carry it out. Set with `POST /items/tombstones`. A vendor change after this time is a new item.
             public init(
                 key: Swift.String,
                 purgedAt: Swift.String,
@@ -3686,97 +3744,46 @@ extension Components {
                 case extensions
             }
         }
-        /// An error response.
+        /// One edge.
         ///
-        /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
-        public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
-            public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
-            /// Creates a new `ValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
         /// - Remark: Generated from `#/components/schemas/EdgeResponse`.
         public struct EdgeResponse: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/EdgeResponse/edge`.
-            public var edge: Components.Schemas.Edge
+            public struct EdgePayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/EdgeResponse/edge/value1`.
+                public var value1: Components.Schemas.Edge
+                /// The edge.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeResponse/edge/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `EdgePayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The edge.
+                public init(
+                    value1: Components.Schemas.Edge,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/EdgeResponse/edge`.
+            public var edge: Components.Schemas.EdgeResponse.EdgePayload
             /// Creates a new `EdgeResponse`.
             ///
             /// - Parameters:
             ///   - edge:
-            public init(edge: Components.Schemas.Edge) {
+            public init(edge: Components.Schemas.EdgeResponse.EdgePayload) {
                 self.edge = edge
             }
             public enum CodingKeys: String, CodingKey {
@@ -4117,12 +4124,43 @@ extension Components {
                 case error
             }
         }
+        /// A stale update's answer: the refusal and the current edge.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeVersionConflict`.
         public struct EdgeVersionConflict: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/EdgeVersionConflict/error`.
             public var error: Components.Schemas.VersionConflictError
             /// - Remark: Generated from `#/components/schemas/EdgeVersionConflict/current`.
-            public var current: Components.Schemas.Edge
+            public struct CurrentPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/EdgeVersionConflict/current/value1`.
+                public var value1: Components.Schemas.Edge
+                /// The edge as it stands now. Merge your change over it and try again.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeVersionConflict/current/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `CurrentPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The edge as it stands now. Merge your change over it and try again.
+                public init(
+                    value1: Components.Schemas.Edge,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/EdgeVersionConflict/current`.
+            public var current: Components.Schemas.EdgeVersionConflict.CurrentPayload
             /// Creates a new `EdgeVersionConflict`.
             ///
             /// - Parameters:
@@ -4130,7 +4168,7 @@ extension Components {
             ///   - current:
             public init(
                 error: Components.Schemas.VersionConflictError,
-                current: Components.Schemas.Edge
+                current: Components.Schemas.EdgeVersionConflict.CurrentPayload
             ) {
                 self.error = error
                 self.current = current
@@ -4225,14 +4263,24 @@ extension Components {
                 case error
             }
         }
+        /// An edge type says how edges of that type behave: its cardinality, what a delete does to the items they join, and which item types they can join.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeType`.
         public struct EdgeType: Codable, Hashable, Sendable {
+            /// Unique identifier for the edge type.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/id`.
             public var id: Swift.String
+            /// A name for people to read.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/label`.
             public var label: Swift.String?
+            /// What the edge type is for.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/description`.
             public var description: Swift.String?
+            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
             @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case oneToOne = "one-to-one"
@@ -4240,20 +4288,32 @@ extension Components {
                 case manyToOne = "many-to-one"
                 case manyToMany = "many-to-many"
             }
+            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
             public var cardinality: Components.Schemas.EdgeType.CardinalityPayload
+            /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/source_type_constraints`.
             public var sourceTypeConstraints: [Swift.String]
+            /// The types an edge's target item can have, in the same form as `source_type_constraints`.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/target_type_constraints`.
             public var targetTypeConstraints: [Swift.String]
+            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case cascade = "cascade"
                 case orphan = "orphan"
                 case block = "block"
             }
+            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload
+            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -4272,35 +4332,43 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public var propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
+            /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_name`.
             public var reverseName: Swift.String?
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
             @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case source = "source"
                 case target = "target"
             }
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
             public var writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
-            /// Whether Marfa ships the edge type. A shipped edge type resolves on every instance and cannot be registered or deleted; `false` for one registered through `POST /edge-types`.
+            /// `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/shipped`.
             public var shipped: Swift.Bool
             /// Creates a new `EdgeType`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - label:
-            ///   - description:
-            ///   - cardinality:
-            ///   - sourceTypeConstraints:
-            ///   - targetTypeConstraints:
-            ///   - cascadeOnDelete:
-            ///   - propertySchema:
-            ///   - reverseName:
-            ///   - writtenAt:
-            ///   - shipped: Whether Marfa ships the edge type. A shipped edge type resolves on every instance and cannot be registered or deleted; `false` for one registered through `POST /edge-types`.
+            ///   - id: Unique identifier for the edge type.
+            ///   - label: A name for people to read.
+            ///   - description: What the edge type is for.
+            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
+            ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`.
+            ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///   - propertySchema: The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it.
+            ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
+            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
@@ -4340,35 +4408,43 @@ extension Components {
                 case shipped
             }
         }
+        /// One property an edge of an edge type can carry.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition`.
         public struct EdgePropertyDefinition: Codable, Hashable, Sendable {
-            /// A field type's name, and never `thumbnail`: an edge carries no thumbnail. As a property's `type` it is one of the field types a type's `fields` take, and any other name is refused `400 invalid_schema`, as a type's field would be.
+            /// The property's type: one of the field types a type's `fields` take, except `thumbnail`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/type`.
             public var _type: Swift.String
+            /// What the property holds.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/description`.
             public var description: Swift.String?
+            /// `true` if every edge of the type should have the property.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/required`.
             public var required: Swift.Bool?
+            /// The values an `enum` property takes.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/enum_values`.
             public var enumValues: [Swift.String]?
-            /// A field type's name, and never `thumbnail`: an edge carries no thumbnail. As a property's `type` it is one of the field types a type's `fields` take, and any other name is refused `400 invalid_schema`, as a type's field would be.
+            /// The type of each element of an `array` property. It can't be `thumbnail`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
             public var itemsType: Swift.String?
-            /// A refinement of a string property, stored as given, and never `thumbnail`: an edge carries no thumbnail.
+            /// A refinement of a `string` property, such as `bcp47`. It can't be `thumbnail`: an edge carries no thumbnail.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
             public var format: Swift.String?
             /// Creates a new `EdgePropertyDefinition`.
             ///
             /// - Parameters:
-            ///   - _type: A field type's name, and never `thumbnail`: an edge carries no thumbnail. As a property's `type` it is one of the field types a type's `fields` take, and any other name is refused `400 invalid_schema`, as a type's field would be.
-            ///   - description:
-            ///   - required:
-            ///   - enumValues:
-            ///   - itemsType: A field type's name, and never `thumbnail`: an edge carries no thumbnail. As a property's `type` it is one of the field types a type's `fields` take, and any other name is refused `400 invalid_schema`, as a type's field would be.
-            ///   - format: A refinement of a string property, stored as given, and never `thumbnail`: an edge carries no thumbnail.
+            ///   - _type: The property's type: one of the field types a type's `fields` take, except `thumbnail`.
+            ///   - description: What the property holds.
+            ///   - required: `true` if every edge of the type should have the property.
+            ///   - enumValues: The values an `enum` property takes.
+            ///   - itemsType: The type of each element of an `array` property. It can't be `thumbnail`.
+            ///   - format: A refinement of a `string` property, such as `bcp47`. It can't be `thumbnail`: an edge carries no thumbnail.
             public init(
                 _type: Swift.String,
                 description: Swift.String? = nil,
@@ -4642,14 +4718,24 @@ extension Components {
                 case error
             }
         }
+        /// An edge type to register.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest`.
         public struct EdgeTypeRequest: Codable, Hashable, Sendable {
+            /// The identifier of the edge type, such as `acme.list-member`.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/id`.
             public var id: Swift.String
+            /// A name for people to read.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/label`.
             public var label: Swift.String?
+            /// What the edge type is for.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/description`.
             public var description: Swift.String?
+            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cardinality`.
             @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case oneToOne = "one-to-one"
@@ -4657,20 +4743,32 @@ extension Components {
                 case manyToOne = "many-to-one"
                 case manyToMany = "many-to-many"
             }
+            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cardinality`.
             public var cardinality: Components.Schemas.EdgeTypeRequest.CardinalityPayload
+            /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/source_type_constraints`.
             public var sourceTypeConstraints: [Swift.String]?
+            /// The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/target_type_constraints`.
             public var targetTypeConstraints: [Swift.String]?
+            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case cascade = "cascade"
                 case orphan = "orphan"
                 case block = "block"
             }
+            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeTypeRequest.CascadeOnDeletePayload?
+            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it. Leave it out for none.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -4689,36 +4787,38 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it. Leave it out for none.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
             public var propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload?
-            /// The name the edge goes by read from its target, such as `child-of` for `parent-of`. It takes the edge-type identifier grammar, and no other edge type may hold it as an id or a reverse name.
+            /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/reverse_name`.
             public var reverseName: Swift.String?
-            /// The end whose file writes an edge of this type, `source` unless named. Where the file at that end cannot carry frontmatter, the other end writes it under the name read from there. `target` needs a `reverse_name`.
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/written_at`.
             @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case source = "source"
                 case target = "target"
             }
-            /// The end whose file writes an edge of this type, `source` unless named. Where the file at that end cannot carry frontmatter, the other end writes it under the name read from there. `target` needs a `reverse_name`.
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/written_at`.
             public var writtenAt: Components.Schemas.EdgeTypeRequest.WrittenAtPayload?
             /// Creates a new `EdgeTypeRequest`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - label:
-            ///   - description:
-            ///   - cardinality:
-            ///   - sourceTypeConstraints:
-            ///   - targetTypeConstraints:
-            ///   - cascadeOnDelete:
-            ///   - propertySchema:
-            ///   - reverseName: The name the edge goes by read from its target, such as `child-of` for `parent-of`. It takes the edge-type identifier grammar, and no other edge type may hold it as an id or a reverse name.
-            ///   - writtenAt: The end whose file writes an edge of this type, `source` unless named. Where the file at that end cannot carry frontmatter, the other end writes it under the name read from there. `target` needs a `reverse_name`.
+            ///   - id: The identifier of the edge type, such as `acme.list-member`.
+            ///   - label: A name for people to read.
+            ///   - description: What the edge type is for.
+            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
+            ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
+            ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
+            ///   - propertySchema: The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it. Leave it out for none.
+            ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
+            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
@@ -4755,19 +4855,23 @@ extension Components {
                 case writtenAt = "written_at"
             }
         }
+        /// A page holding every edge type.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeTypePage`.
         public struct EdgeTypePage: Codable, Hashable, Sendable {
+            /// Every edge type.
+            ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypePage/data`.
             public var data: [Components.Schemas.EdgeType]
-            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            /// Always `null`: Marfa returns every edge type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypePage/next_cursor`.
             public var nextCursor: Swift.String?
             /// Creates a new `EdgeTypePage`.
             ///
             /// - Parameters:
-            ///   - data:
-            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///   - data: Every edge type.
+            ///   - nextCursor: Always `null`: Marfa returns every edge type in one page.
             public init(
                 data: [Components.Schemas.EdgeType],
                 nextCursor: Swift.String? = nil
@@ -4944,19 +5048,23 @@ extension Components {
                 case error
             }
         }
+        /// A page holding every type.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage`.
         public struct TypeDefinitionPage: Codable, Hashable, Sendable {
+            /// Every type.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/data`.
             public var data: [Components.Schemas.TypeDefinition]
-            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            /// Always `null`: Marfa returns every type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/next_cursor`.
             public var nextCursor: Swift.String?
             /// Creates a new `TypeDefinitionPage`.
             ///
             /// - Parameters:
-            ///   - data:
-            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///   - data: Every type.
+            ///   - nextCursor: Always `null`: Marfa returns every type in one page.
             public init(
                 data: [Components.Schemas.TypeDefinition],
                 nextCursor: Swift.String? = nil
@@ -4969,20 +5077,36 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// A type says which fields the items of that type hold, and what else Marfa does for them.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeDefinition`.
         public struct TypeDefinition: Codable, Hashable, Sendable {
+            /// Unique identifier for the type.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/id`.
             public var id: Swift.String
+            /// The type's name for people to read.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/label`.
             public var label: Swift.String?
+            /// What the type is for.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/description`.
             public var description: Swift.String?
+            /// The identifier of the type this one inherits from.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/parent`.
             public var parent: Swift.String?
+            /// The types this one is a structural superset of.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/compatible_with`.
             public var compatibleWith: [Swift.String]?
+            /// The structural roles the type plays, including those it inherits.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/roles`.
             public var roles: [Components.Schemas.TypeRole]?
+            /// The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
             public struct FieldsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -5001,33 +5125,66 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
             public var fields: Components.Schemas.TypeDefinition.FieldsPayload
+            /// The version number the type was last saved with.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
             public var version: Swift.Double
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
-            /// The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            /// The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/link_field`.
             public var linkField: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version_policy`.
             public var versionPolicy: Components.Schemas.VersionPolicy?
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy`.
-            public var mergePolicy: Components.Schemas.MergePolicy?
+            public struct MergePolicyPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy/value1`.
+                public var value1: Components.Schemas.MergePolicy
+                /// How Marfa merges conflicting edits to the type's items.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `MergePolicyPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: How Marfa merges conflicting edits to the type's items.
+                public init(
+                    value1: Components.Schemas.MergePolicy,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy`.
+            public var mergePolicy: Components.Schemas.TypeDefinition.MergePolicyPayload?
             /// Creates a new `TypeDefinition`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - label:
-            ///   - description:
-            ///   - parent:
-            ///   - compatibleWith:
-            ///   - roles:
-            ///   - fields:
-            ///   - version:
+            ///   - id: Unique identifier for the type.
+            ///   - label: The type's name for people to read.
+            ///   - description: What the type is for.
+            ///   - parent: The identifier of the type this one inherits from.
+            ///   - compatibleWith: The types this one is a structural superset of.
+            ///   - roles: The structural roles the type plays, including those it inherits.
+            ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///   - version: The version number the type was last saved with.
             ///   - displayHints:
-            ///   - linkField: The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy:
             ///   - mergePolicy:
             public init(
@@ -5042,7 +5199,7 @@ extension Components {
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
-                mergePolicy: Components.Schemas.MergePolicy? = nil
+                mergePolicy: Components.Schemas.TypeDefinition.MergePolicyPayload? = nil
             ) {
                 self.id = id
                 self.label = label
@@ -5072,13 +5229,17 @@ extension Components {
                 case mergePolicy = "merge_policy"
             }
         }
+        /// A structural role a type plays. `container`: the type can be the target of an `in-collection` edge.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeRole`.
         @frozen public enum TypeRole: String, Codable, Hashable, Sendable, CaseIterable {
             case container = "container"
         }
+        /// One field of a type: its type, and how items may fill it.
+        ///
         /// - Remark: Generated from `#/components/schemas/FieldDefinition`.
         public struct FieldDefinition: Codable, Hashable, Sendable {
-            /// `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
+            /// The field's type. A `thumbnail` holds an image of at most 16 KiB, as a base64 `data:` URI of type `image/png`, `image/jpeg` or `image/webp`. A type has at most one, never as an array's `items_type` or under `title`, `body`, `description` or `name`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
             @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -5095,19 +5256,27 @@ extension Components {
                 case object = "object"
                 case thumbnail = "thumbnail"
             }
-            /// `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
+            /// The field's type. A `thumbnail` holds an image of at most 16 KiB, as a base64 `data:` URI of type `image/png`, `image/jpeg` or `image/webp`. A type has at most one, never as an array's `items_type` or under `title`, `body`, `description` or `name`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
             public var _type: Components.Schemas.FieldDefinition._TypePayload
+            /// What the field holds.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/description`.
             public var description: Swift.String?
+            /// `true` if an item of the type must have a value for it.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/required`.
             public var required: Swift.Bool?
+            /// The values an `enum` field allows.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/enum_values`.
             public var enumValues: [Swift.String]?
+            /// The type of each element of an `array` field.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_type`.
             public var itemsType: Swift.String?
-            /// Semantic refinement of a `string` field, or of an array of strings. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`, or into `items_type` on an array of strings.
+            /// A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
             @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -5119,14 +5288,20 @@ extension Components {
                 case bcp47 = "bcp47"
                 case iso3166 = "iso3166"
             }
-            /// Semantic refinement of a `string` field, or of an array of strings. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`, or into `items_type` on an array of strings.
+            /// A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
             public var format: Components.Schemas.FieldDefinition.FormatPayload?
+            /// `false` if full-text search should skip the field. Items still return it.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/searchable`.
             public var searchable: Swift.Bool?
+            /// The longest value a `string` or `enum` field allows.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxLength`.
             public var maxLength: Swift.Int?
+            /// The most elements an `array` field allows.
+            ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxItems`.
             public var maxItems: Swift.Int?
             /// A container of undocumented properties.
@@ -5134,15 +5309,15 @@ extension Components {
             /// Creates a new `FieldDefinition`.
             ///
             /// - Parameters:
-            ///   - _type: `thumbnail` holds a small image the writer supplies: `data:image/png;base64,…`, `image/jpeg` or `image/webp`, canonical base64, at most 16 KiB decoded, beginning with that format's signature. A type carries at most one, never under a name search indexes whatever its type (`title`, `body`, `description`, `name`), and never as an array's `items_type`.
-            ///   - description:
-            ///   - required:
-            ///   - enumValues:
-            ///   - itemsType:
-            ///   - format: Semantic refinement of a `string` field, or of an array of strings. Only the annotation-only formats reach the registry: those with a field type of their own normalize into `type`, or into `items_type` on an array of strings.
-            ///   - searchable:
-            ///   - maxLength:
-            ///   - maxItems:
+            ///   - _type: The field's type. A `thumbnail` holds an image of at most 16 KiB, as a base64 `data:` URI of type `image/png`, `image/jpeg` or `image/webp`. A type has at most one, never as an array's `items_type` or under `title`, `body`, `description` or `name`.
+            ///   - description: What the field holds.
+            ///   - required: `true` if an item of the type must have a value for it.
+            ///   - enumValues: The values an `enum` field allows.
+            ///   - itemsType: The type of each element of an `array` field.
+            ///   - format: A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
+            ///   - searchable: `false` if full-text search should skip the field. Items still return it.
+            ///   - maxLength: The longest value a `string` or `enum` field allows.
+            ///   - maxItems: The most elements an `array` field allows.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 _type: Components.Schemas.FieldDefinition._TypePayload,
@@ -5269,17 +5444,23 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// Which fields of a type clients show as an item's title and body.
+        ///
         /// - Remark: Generated from `#/components/schemas/DisplayHints`.
         public struct DisplayHints: Codable, Hashable, Sendable {
+            /// The field that holds an item's title for display.
+            ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/title_field`.
             public var titleField: Swift.String?
+            /// The field that holds an item's body for display.
+            ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
             /// Creates a new `DisplayHints`.
             ///
             /// - Parameters:
-            ///   - titleField:
-            ///   - bodyField:
+            ///   - titleField: The field that holds an item's title for display.
+            ///   - bodyField: The field that holds an item's body for display.
             public init(
                 titleField: Swift.String? = nil,
                 bodyField: Swift.String? = nil
@@ -5292,14 +5473,24 @@ extension Components {
                 case bodyField = "body_field"
             }
         }
+        /// How long Marfa keeps the versions of a type's items. A field you leave out comes from the parent type, then from the instance defaults.
+        ///
         /// - Remark: Generated from `#/components/schemas/VersionPolicy`.
         public struct VersionPolicy: Codable, Hashable, Sendable {
+            /// How many days back Marfa keeps every version of an item. Counts from now.
+            ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/recent_days`.
             public var recentDays: Swift.Double?
+            /// How many days back Marfa keeps one version per day, after the recent window.
+            ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/daily_snapshot_days`.
             public var dailySnapshotDays: Swift.Double?
+            /// How many days back Marfa keeps one version per week, after the daily window. Marfa deletes older versions, but always keeps the latest.
+            ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/weekly_snapshot_days`.
             public var weeklySnapshotDays: Swift.Double?
+            /// The most versions Marfa keeps for an item. Past it, Marfa drops the oldest first.
+            ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/max_versions`.
             public var maxVersions: Swift.Double?
             /// A container of undocumented properties.
@@ -5307,10 +5498,10 @@ extension Components {
             /// Creates a new `VersionPolicy`.
             ///
             /// - Parameters:
-            ///   - recentDays:
-            ///   - dailySnapshotDays:
-            ///   - weeklySnapshotDays:
-            ///   - maxVersions:
+            ///   - recentDays: How many days back Marfa keeps every version of an item. Counts from now.
+            ///   - dailySnapshotDays: How many days back Marfa keeps one version per day, after the recent window.
+            ///   - weeklySnapshotDays: How many days back Marfa keeps one version per week, after the daily window. Marfa deletes older versions, but always keeps the latest.
+            ///   - maxVersions: The most versions Marfa keeps for an item. Past it, Marfa drops the oldest first.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 recentDays: Swift.Double? = nil,
@@ -5541,15 +5732,46 @@ extension Components {
                 case error
             }
         }
+        /// One type.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeResponse`.
         public struct TypeResponse: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/TypeResponse/type`.
-            public var _type: Components.Schemas.TypeDefinition
+            public struct _TypePayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/TypeResponse/type/value1`.
+                public var value1: Components.Schemas.TypeDefinition
+                /// The type.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeResponse/type/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `_TypePayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The type.
+                public init(
+                    value1: Components.Schemas.TypeDefinition,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TypeResponse/type`.
+            public var _type: Components.Schemas.TypeResponse._TypePayload
             /// Creates a new `TypeResponse`.
             ///
             /// - Parameters:
             ///   - _type:
-            public init(_type: Components.Schemas.TypeDefinition) {
+            public init(_type: Components.Schemas.TypeResponse._TypePayload) {
                 self._type = _type
             }
             public enum CodingKeys: String, CodingKey {
@@ -5807,8 +6029,12 @@ extension Components {
                 case error
             }
         }
+        /// A type to register.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput`.
         public struct TypeDefinitionInput: Codable, Hashable, Sendable {
+            /// The type's own fields, by name.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/fields`.
             public struct FieldsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -5827,27 +6053,35 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The type's own fields, by name.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/fields`.
             public var fields: Components.Schemas.TypeDefinitionInput.FieldsPayload
-            /// Omit it to default to 0. A replacement keeps the version it is given.
+            /// A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/version`.
             public var version: Swift.Int?
+            /// The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/parent`.
             public var parent: Swift.String?
+            /// A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/label`.
             public var label: Swift.String?
+            /// What the type is for.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/description`.
             public var description: Swift.String?
-            /// Structural roles this type plays, drawn from the closed vocabulary container. An entry outside it is refused `400 invalid_schema` naming `roles`.
+            /// The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/roles`.
             public var roles: [Swift.String]?
-            /// Field names this type requires, the alternative to `required: true` on each field. Both forms are taken and mean the same thing.
+            /// The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/required`.
             public var required: [Swift.String]?
-            /// Sibling types this one asserts a structural superset of. A bare string names one.
+            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with`.
             public struct CompatibleWithPayload: Codable, Hashable, Sendable {
@@ -5896,20 +6130,51 @@ extension Components {
                     ])
                 }
             }
-            /// Sibling types this one asserts a structural superset of. A bare string names one.
+            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with`.
             public var compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
-            /// The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            /// The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/link_field`.
             public var linkField: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/version_policy`.
             public var versionPolicy: Components.Schemas.VersionPolicy?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/merge_policy`.
-            public var mergePolicy: Components.Schemas.MergePolicy?
+            public struct MergePolicyPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/merge_policy/value1`.
+                public var value1: Components.Schemas.MergePolicy
+                /// How Marfa merges conflicting edits to the type's items.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/merge_policy/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `MergePolicyPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: How Marfa merges conflicting edits to the type's items.
+                public init(
+                    value1: Components.Schemas.MergePolicy,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/merge_policy`.
+            public var mergePolicy: Components.Schemas.TypeDefinitionInput.MergePolicyPayload?
+            /// The type's identifier, such as `acme.deal` or `user.recipe`.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/id`.
             public var id: Swift.String
             /// A container of undocumented properties.
@@ -5917,19 +6182,19 @@ extension Components {
             /// Creates a new `TypeDefinitionInput`.
             ///
             /// - Parameters:
-            ///   - fields:
-            ///   - version: Omit it to default to 0. A replacement keeps the version it is given.
-            ///   - parent:
-            ///   - label:
-            ///   - description:
-            ///   - roles: Structural roles this type plays, drawn from the closed vocabulary container. An entry outside it is refused `400 invalid_schema` naming `roles`.
-            ///   - required: Field names this type requires, the alternative to `required: true` on each field. Both forms are taken and mean the same thing.
-            ///   - compatibleWith: Sibling types this one asserts a structural superset of. A bare string names one.
+            ///   - fields: The type's own fields, by name.
+            ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
+            ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
+            ///   - label: A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            ///   - description: What the type is for.
+            ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
+            ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
+            ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///   - displayHints:
-            ///   - linkField: The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy:
             ///   - mergePolicy:
-            ///   - id:
+            ///   - id: The type's identifier, such as `acme.deal` or `user.recipe`.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 fields: Components.Schemas.TypeDefinitionInput.FieldsPayload,
@@ -5943,7 +6208,7 @@ extension Components {
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
-                mergePolicy: Components.Schemas.MergePolicy? = nil,
+                mergePolicy: Components.Schemas.TypeDefinitionInput.MergePolicyPayload? = nil,
                 id: Swift.String,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
@@ -6024,7 +6289,7 @@ extension Components {
                     forKey: .versionPolicy
                 )
                 self.mergePolicy = try container.decodeIfPresent(
-                    Components.Schemas.MergePolicy.self,
+                    Components.Schemas.TypeDefinitionInput.MergePolicyPayload.self,
                     forKey: .mergePolicy
                 )
                 self.id = try container.decode(
@@ -6102,91 +6367,6 @@ extension Components {
                     forKey: .id
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal`.
-        public struct InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case inheritanceViolation = "inheritance_violation"
-                    case invalidSchema = "invalid_schema"
-                    case propertyShadowsField = "property_shadows_field"
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.InheritanceViolationOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
             }
         }
         /// An error response.
@@ -6355,8 +6535,12 @@ extension Components {
                 case error
             }
         }
+        /// The schema that replaces a type's stored one.
+        ///
         /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate`.
         public struct TypeDefinitionUpdate: Codable, Hashable, Sendable {
+            /// The type's own fields, by name.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/fields`.
             public struct FieldsPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -6375,27 +6559,35 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// The type's own fields, by name.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/fields`.
             public var fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload
-            /// Omit it to default to 0. A replacement keeps the version it is given.
+            /// A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/version`.
             public var version: Swift.Int?
+            /// The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/parent`.
             public var parent: Swift.String?
+            /// A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/label`.
             public var label: Swift.String?
+            /// What the type is for.
+            ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/description`.
             public var description: Swift.String?
-            /// Structural roles this type plays, drawn from the closed vocabulary container. An entry outside it is refused `400 invalid_schema` naming `roles`.
+            /// The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/roles`.
             public var roles: [Swift.String]?
-            /// Field names this type requires, the alternative to `required: true` on each field. Both forms are taken and mean the same thing.
+            /// The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/required`.
             public var required: [Swift.String]?
-            /// Sibling types this one asserts a structural superset of. A bare string names one.
+            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with`.
             public struct CompatibleWithPayload: Codable, Hashable, Sendable {
@@ -6444,35 +6636,64 @@ extension Components {
                     ])
                 }
             }
-            /// Sibling types this one asserts a structural superset of. A bare string names one.
+            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with`.
             public var compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
-            /// The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            /// The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/link_field`.
             public var linkField: Swift.String?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/version_policy`.
             public var versionPolicy: Components.Schemas.VersionPolicy?
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy`.
-            public var mergePolicy: Components.Schemas.MergePolicy?
+            public struct MergePolicyPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy/value1`.
+                public var value1: Components.Schemas.MergePolicy
+                /// How Marfa merges conflicting edits to the type's items.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `MergePolicyPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: How Marfa merges conflicting edits to the type's items.
+                public init(
+                    value1: Components.Schemas.MergePolicy,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy`.
+            public var mergePolicy: Components.Schemas.TypeDefinitionUpdate.MergePolicyPayload?
             /// A container of undocumented properties.
             public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `TypeDefinitionUpdate`.
             ///
             /// - Parameters:
-            ///   - fields:
-            ///   - version: Omit it to default to 0. A replacement keeps the version it is given.
-            ///   - parent:
-            ///   - label:
-            ///   - description:
-            ///   - roles: Structural roles this type plays, drawn from the closed vocabulary container. An entry outside it is refused `400 invalid_schema` naming `roles`.
-            ///   - required: Field names this type requires, the alternative to `required: true` on each field. Both forms are taken and mean the same thing.
-            ///   - compatibleWith: Sibling types this one asserts a structural superset of. A bare string names one.
+            ///   - fields: The type's own fields, by name.
+            ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
+            ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
+            ///   - label: A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            ///   - description: What the type is for.
+            ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
+            ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
+            ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///   - displayHints:
-            ///   - linkField: The string field, declared or inherited, holding each row's own id at the vendor that writes this type. The server keeps a value to one row of the type in every state, answers `409 link_taken` to a write giving a second row a value another holds, and records the value as a tombstone when the row is purged. It applies to rows of exactly this type: a subtype names its own. The field's name holds neither a double quote nor a backslash.
+            ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy:
             ///   - mergePolicy:
             ///   - additionalProperties: A container of undocumented properties.
@@ -6488,7 +6709,7 @@ extension Components {
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
-                mergePolicy: Components.Schemas.MergePolicy? = nil,
+                mergePolicy: Components.Schemas.TypeDefinitionUpdate.MergePolicyPayload? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.fields = fields
@@ -6566,7 +6787,7 @@ extension Components {
                     forKey: .versionPolicy
                 )
                 self.mergePolicy = try container.decodeIfPresent(
-                    Components.Schemas.MergePolicy.self,
+                    Components.Schemas.TypeDefinitionUpdate.MergePolicyPayload.self,
                     forKey: .mergePolicy
                 )
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
@@ -6720,8 +6941,12 @@ extension Components {
                 case error
             }
         }
+        /// One page of search results.
+        ///
         /// - Remark: Generated from `#/components/schemas/SearchResultPage`.
         public struct SearchResultPage: Codable, Hashable, Sendable {
+            /// The results, best match first.
+            ///
             /// - Remark: Generated from `#/components/schemas/SearchResultPage/data`.
             public var data: [Components.Schemas.SearchResult]
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
@@ -6731,7 +6956,7 @@ extension Components {
             /// Creates a new `SearchResultPage`.
             ///
             /// - Parameters:
-            ///   - data:
+            ///   - data: The results, best match first.
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.SearchResult],
@@ -6745,14 +6970,78 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// A search result is an item that matches the query, with its metadata and how well it matches.
+        ///
         /// - Remark: Generated from `#/components/schemas/SearchResult`.
         public struct SearchResult: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/SearchResult/item`.
-            public var item: Components.Schemas.Item
+            public struct ItemPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/SearchResult/item/value1`.
+                public var value1: Components.Schemas.Item
+                /// The matching item.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SearchResult/item/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `ItemPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The matching item.
+                public init(
+                    value1: Components.Schemas.Item,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/SearchResult/item`.
+            public var item: Components.Schemas.SearchResult.ItemPayload
             /// - Remark: Generated from `#/components/schemas/SearchResult/metadata`.
-            public var metadata: Components.Schemas.Metadata
+            public struct MetadataPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/SearchResult/metadata/value1`.
+                public var value1: Components.Schemas.Metadata
+                /// The item's tags and the extensions you can read.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SearchResult/metadata/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `MetadataPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The item's tags and the extensions you can read.
+                public init(
+                    value1: Components.Schemas.Metadata,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                    try self.value2.encode(to: encoder)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/SearchResult/metadata`.
+            public var metadata: Components.Schemas.SearchResult.MetadataPayload
+            /// How well the item matches `q`: the absolute value of its BM25 score, so higher is better. Scores depend on the rows indexed, so compare them only within one search.
+            ///
             /// - Remark: Generated from `#/components/schemas/SearchResult/relevance_score`.
             public var relevanceScore: Swift.Double
+            /// An excerpt of at most 32 words from the text that matches best, with each matched word in `<mark>` tags and `...` where the text is cut. Absent if there is none.
+            ///
             /// - Remark: Generated from `#/components/schemas/SearchResult/snippet_html`.
             public var snippetHtml: Swift.String?
             /// Creates a new `SearchResult`.
@@ -6760,11 +7049,11 @@ extension Components {
             /// - Parameters:
             ///   - item:
             ///   - metadata:
-            ///   - relevanceScore:
-            ///   - snippetHtml:
+            ///   - relevanceScore: How well the item matches `q`: the absolute value of its BM25 score, so higher is better. Scores depend on the rows indexed, so compare them only within one search.
+            ///   - snippetHtml: An excerpt of at most 32 words from the text that matches best, with each matched word in `<mark>` tags and `...` where the text is cut. Absent if there is none.
             public init(
-                item: Components.Schemas.Item,
-                metadata: Components.Schemas.Metadata,
+                item: Components.Schemas.SearchResult.ItemPayload,
+                metadata: Components.Schemas.SearchResult.MetadataPayload,
                 relevanceScore: Swift.Double,
                 snippetHtml: Swift.String? = nil
             ) {
@@ -7007,89 +7296,6 @@ extension Components {
                 case replaces
             }
         }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
-        public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case missingRequiredField = "missing_required_field"
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
         /// - Remark: Generated from `#/components/schemas/TagCountPage`.
         public struct TagCountPage: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/TagCountPage/data`.
@@ -7138,19 +7344,23 @@ extension Components {
                 case count
             }
         }
+        /// A page holding every orphan.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobOrphanPage`.
         public struct BlobOrphanPage: Codable, Hashable, Sendable {
+            /// Every orphan.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphanPage/data`.
             public var data: [Components.Schemas.BlobOrphan]
-            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            /// Always `null`: Marfa returns every orphan in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphanPage/next_cursor`.
             public var nextCursor: Swift.String?
             /// Creates a new `BlobOrphanPage`.
             ///
             /// - Parameters:
-            ///   - data:
-            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///   - data: Every orphan.
+            ///   - nextCursor: Always `null`: Marfa returns every orphan in one page.
             public init(
                 data: [Components.Schemas.BlobOrphan],
                 nextCursor: Swift.String? = nil
@@ -7163,23 +7373,33 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An orphan is a blob that nothing references, waiting to be purged.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobOrphan`.
         public struct BlobOrphan: Codable, Hashable, Sendable {
+            /// The blob's hash.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphan/hash`.
             public var hash: Swift.String
+            /// The MIME type Marfa serves the blob with.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphan/mime_type`.
             public var mimeType: Swift.String
+            /// The blob's size in bytes.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphan/size_bytes`.
             public var sizeBytes: Swift.Int
+            /// When a run of the `blob-orphans` background job first found nothing referencing the blob, in UTC.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphan/reported_at`.
             public var reportedAt: Swift.String
             /// Creates a new `BlobOrphan`.
             ///
             /// - Parameters:
-            ///   - hash:
-            ///   - mimeType:
-            ///   - sizeBytes:
-            ///   - reportedAt:
+            ///   - hash: The blob's hash.
+            ///   - mimeType: The MIME type Marfa serves the blob with.
+            ///   - sizeBytes: The blob's size in bytes.
+            ///   - reportedAt: When a run of the `blob-orphans` background job first found nothing referencing the blob, in UTC.
             public init(
                 hash: Swift.String,
                 mimeType: Swift.String,
@@ -7198,22 +7418,28 @@ extension Components {
                 case reportedAt = "reported_at"
             }
         }
+        /// A page holding every store.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobStorePage`.
         public struct BlobStorePage: Codable, Hashable, Sendable {
+            /// Every store.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStorePage/data`.
             public var data: [Components.Schemas.BlobStore]
-            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            /// Always `null`: Marfa returns every store in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStorePage/next_cursor`.
             public var nextCursor: Swift.String?
+            /// The fewest live copies Marfa keeps of each blob. `DELETE /blobs/{hash}/locations/{store}` won't delete a copy that would leave fewer.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStorePage/min_copies`.
             public var minCopies: Swift.Int
             /// Creates a new `BlobStorePage`.
             ///
             /// - Parameters:
-            ///   - data:
-            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
-            ///   - minCopies:
+            ///   - data: Every store.
+            ///   - nextCursor: Always `null`: Marfa returns every store in one page.
+            ///   - minCopies: The fewest live copies Marfa keeps of each blob. `DELETE /blobs/{hash}/locations/{store}` won't delete a copy that would leave fewer.
             public init(
                 data: [Components.Schemas.BlobStore],
                 nextCursor: Swift.String? = nil,
@@ -7229,34 +7455,50 @@ extension Components {
                 case minCopies = "min_copies"
             }
         }
+        /// A store is a place a blob's bytes live: the disk beside the server, or an S3-compatible bucket.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobStore`.
         public struct BlobStore: Codable, Hashable, Sendable {
+            /// Unique identifier for the store.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/id`.
             public var id: Swift.String
+            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case disk = "disk"
                 case s3 = "s3"
             }
+            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/kind`.
             public var kind: Components.Schemas.BlobStore.KindPayload
+            /// Where the store is: its directory for a `disk` store, `s3://<bucket>/<prefix>` for an `s3` store.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/locator`.
             public var locator: Swift.String
+            /// Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/policy`.
             public var policy: Swift.String
+            /// When the instance first attached the store, in UTC.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/attached_at`.
             public var attachedAt: Swift.String
+            /// When the instance's configuration stopped naming the store, in UTC, or `null` while it names it.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/detached_at`.
             public var detachedAt: Swift.String?
             /// Creates a new `BlobStore`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - kind:
-            ///   - locator:
-            ///   - policy:
-            ///   - attachedAt:
-            ///   - detachedAt:
+            ///   - id: Unique identifier for the store.
+            ///   - kind: The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///   - locator: Where the store is: its directory for a `disk` store, `s3://<bucket>/<prefix>` for an `s3` store.
+            ///   - policy: Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
+            ///   - attachedAt: When the instance first attached the store, in UTC.
+            ///   - detachedAt: When the instance's configuration stopped naming the store, in UTC, or `null` while it names it.
             public init(
                 id: Swift.String,
                 kind: Components.Schemas.BlobStore.KindPayload,
@@ -7445,19 +7687,23 @@ extension Components {
                 case error
             }
         }
+        /// A page holding every location.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobLocationPage`.
         public struct BlobLocationPage: Codable, Hashable, Sendable {
+            /// Every location.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocationPage/data`.
             public var data: [Components.Schemas.BlobLocation]
-            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            /// Always `null`: Marfa returns every location in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobLocationPage/next_cursor`.
             public var nextCursor: Swift.String?
             /// Creates a new `BlobLocationPage`.
             ///
             /// - Parameters:
-            ///   - data:
-            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///   - data: Every location.
+            ///   - nextCursor: Always `null`: Marfa returns every location in one page.
             public init(
                 data: [Components.Schemas.BlobLocation],
                 nextCursor: Swift.String? = nil
@@ -7470,34 +7716,50 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// A location is one store's copy of a blob.
+        ///
         /// - Remark: Generated from `#/components/schemas/BlobLocation`.
         public struct BlobLocation: Codable, Hashable, Sendable {
+            /// The ID of the store that holds the copy.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/store_id`.
             public var storeId: Swift.String
+            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case disk = "disk"
                 case s3 = "s3"
             }
+            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/kind`.
             public var kind: Components.Schemas.BlobLocation.KindPayload
+            /// Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/policy`.
             public var policy: Swift.String
+            /// `true` if the instance's configuration no longer names the store. A copy in a detached store doesn't count toward `min_copies`.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/detached`.
             public var detached: Swift.Bool
+            /// When Marfa recorded the copy, in UTC.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/recorded_at`.
             public var recordedAt: Swift.String
+            /// When a check last found the copy present and intact, in UTC, or `null` if none has.
+            ///
             /// - Remark: Generated from `#/components/schemas/BlobLocation/verified_at`.
             public var verifiedAt: Swift.String?
             /// Creates a new `BlobLocation`.
             ///
             /// - Parameters:
-            ///   - storeId:
-            ///   - kind:
-            ///   - policy:
-            ///   - detached:
-            ///   - recordedAt:
-            ///   - verifiedAt:
+            ///   - storeId: The ID of the store that holds the copy.
+            ///   - kind: The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///   - policy: Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
+            ///   - detached: `true` if the instance's configuration no longer names the store. A copy in a detached store doesn't count toward `min_copies`.
+            ///   - recordedAt: When Marfa recorded the copy, in UTC.
+            ///   - verifiedAt: When a check last found the copy present and intact, in UTC, or `null` if none has.
             public init(
                 storeId: Swift.String,
                 kind: Components.Schemas.BlobLocation.KindPayload,
@@ -7687,21 +7949,21 @@ extension Components {
                 case error
             }
         }
-        /// - Remark: Generated from `#/components/schemas/HousekeepingJobPage`.
-        public struct HousekeepingJobPage: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJobPage/data`.
-            public var data: [Components.Schemas.HousekeepingJob]
+        /// - Remark: Generated from `#/components/schemas/BackgroundJobPage`.
+        public struct BackgroundJobPage: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobPage/data`.
+            public var data: [Components.Schemas.BackgroundJob]
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJobPage/next_cursor`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobPage/next_cursor`.
             public var nextCursor: Swift.String?
-            /// Creates a new `HousekeepingJobPage`.
+            /// Creates a new `BackgroundJobPage`.
             ///
             /// - Parameters:
             ///   - data:
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
-                data: [Components.Schemas.HousekeepingJob],
+                data: [Components.Schemas.BackgroundJob],
                 nextCursor: Swift.String? = nil
             ) {
                 self.data = data
@@ -7712,27 +7974,27 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
-        /// - Remark: Generated from `#/components/schemas/HousekeepingJob`.
-        public struct HousekeepingJob: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/name`.
+        /// - Remark: Generated from `#/components/schemas/BackgroundJob`.
+        public struct BackgroundJob: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/name`.
             public var name: Swift.String
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/interval_ms`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/interval_ms`.
             public var intervalMs: Swift.Int
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/next_run_at`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/next_run_at`.
             public var nextRunAt: Swift.String
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/running_since`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/running_since`.
             public var runningSince: Swift.String?
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_started_at`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/last_started_at`.
             public var lastStartedAt: Swift.String?
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_finished_at`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/last_finished_at`.
             public var lastFinishedAt: Swift.String?
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_outcome`.
-            public var lastOutcome: Components.Schemas.MarfaNullableHousekeepingOutcome
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_error`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/last_outcome`.
+            public var lastOutcome: Components.Schemas.MarfaNullableBackgroundJobOutcome
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/last_error`.
             public var lastError: Swift.String?
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_result`.
-            public var lastResult: Components.Schemas.MarfaNullableHousekeepingReport
-            /// Creates a new `HousekeepingJob`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJob/last_result`.
+            public var lastResult: Components.Schemas.MarfaNullableBackgroundJobReport
+            /// Creates a new `BackgroundJob`.
             ///
             /// - Parameters:
             ///   - name:
@@ -7751,9 +8013,9 @@ extension Components {
                 runningSince: Swift.String? = nil,
                 lastStartedAt: Swift.String? = nil,
                 lastFinishedAt: Swift.String? = nil,
-                lastOutcome: Components.Schemas.MarfaNullableHousekeepingOutcome,
+                lastOutcome: Components.Schemas.MarfaNullableBackgroundJobOutcome,
                 lastError: Swift.String? = nil,
-                lastResult: Components.Schemas.MarfaNullableHousekeepingReport
+                lastResult: Components.Schemas.MarfaNullableBackgroundJobReport
             ) {
                 self.name = name
                 self.intervalMs = intervalMs
@@ -7777,28 +8039,28 @@ extension Components {
                 case lastResult = "last_result"
             }
         }
-        /// - Remark: Generated from `#/components/schemas/HousekeepingOutcome`.
-        @frozen public enum HousekeepingOutcome: String, Codable, Hashable, Sendable, CaseIterable {
+        /// - Remark: Generated from `#/components/schemas/BackgroundJobOutcome`.
+        @frozen public enum BackgroundJobOutcome: String, Codable, Hashable, Sendable, CaseIterable {
             case ok = "ok"
             case error = "error"
         }
-        /// - Remark: Generated from `#/components/schemas/HousekeepingReport`.
-        public typealias HousekeepingReport = OpenAPIRuntime.OpenAPIObjectContainer
-        /// - Remark: Generated from `#/components/schemas/HousekeepingRun`.
-        public struct HousekeepingRun: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/name`.
+        /// - Remark: Generated from `#/components/schemas/BackgroundJobReport`.
+        public typealias BackgroundJobReport = OpenAPIRuntime.OpenAPIObjectContainer
+        /// - Remark: Generated from `#/components/schemas/BackgroundJobRun`.
+        public struct BackgroundJobRun: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRun/name`.
             public var name: Swift.String
-            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/started_at`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRun/started_at`.
             public var startedAt: Swift.String
-            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/finished_at`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRun/finished_at`.
             public var finishedAt: Swift.String
-            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/outcome`.
-            public var outcome: Components.Schemas.HousekeepingOutcome
-            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/result`.
-            public var result: Components.Schemas.MarfaNullableHousekeepingReport
-            /// - Remark: Generated from `#/components/schemas/HousekeepingRun/error`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRun/outcome`.
+            public var outcome: Components.Schemas.BackgroundJobOutcome
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRun/result`.
+            public var result: Components.Schemas.MarfaNullableBackgroundJobReport
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRun/error`.
             public var error: Swift.String?
-            /// Creates a new `HousekeepingRun`.
+            /// Creates a new `BackgroundJobRun`.
             ///
             /// - Parameters:
             ///   - name:
@@ -7811,8 +8073,8 @@ extension Components {
                 name: Swift.String,
                 startedAt: Swift.String,
                 finishedAt: Swift.String,
-                outcome: Components.Schemas.HousekeepingOutcome,
-                result: Components.Schemas.MarfaNullableHousekeepingReport,
+                outcome: Components.Schemas.BackgroundJobOutcome,
+                result: Components.Schemas.MarfaNullableBackgroundJobReport,
                 error: Swift.String? = nil
             ) {
                 self.name = name
@@ -7833,29 +8095,29 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal`.
-        public struct HousekeepingJobNotFoundRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal`.
+        public struct BackgroundJobNotFoundRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case housekeepingJobNotFound = "housekeeping_job_not_found"
+                    case backgroundJobNotFound = "background_job_not_found"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.BackgroundJobNotFoundRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -7875,8 +8137,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.BackgroundJobNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -7884,9 +8146,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.BackgroundJobNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.BackgroundJobNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -7900,13 +8162,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJobNotFoundRefusal/error`.
-            public var error: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload
-            /// Creates a new `HousekeepingJobNotFoundRefusal`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobNotFoundRefusal/error`.
+            public var error: Components.Schemas.BackgroundJobNotFoundRefusal._ErrorPayload
+            /// Creates a new `BackgroundJobNotFoundRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.HousekeepingJobNotFoundRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.BackgroundJobNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -7915,29 +8177,29 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal`.
-        public struct HousekeepingJobRunningRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal`.
+        public struct BackgroundJobRunningRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case housekeepingJobRunning = "housekeeping_job_running"
+                    case backgroundJobRunning = "background_job_running"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/code`.
-                public var code: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error/code`.
+                public var code: Components.Schemas.BackgroundJobRunningRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -7957,8 +8219,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error/details`.
-                public var details: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error/details`.
+                public var details: Components.Schemas.BackgroundJobRunningRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -7966,9 +8228,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.BackgroundJobRunningRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.BackgroundJobRunningRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -7982,13 +8244,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJobRunningRefusal/error`.
-            public var error: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload
-            /// Creates a new `HousekeepingJobRunningRefusal`.
+            /// - Remark: Generated from `#/components/schemas/BackgroundJobRunningRefusal/error`.
+            public var error: Components.Schemas.BackgroundJobRunningRefusal._ErrorPayload
+            /// Creates a new `BackgroundJobRunningRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.HousekeepingJobRunningRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.BackgroundJobRunningRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -8130,6 +8392,89 @@ extension Components {
                 case summary
                 case error
                 case reportedAt = "reported_at"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
+        public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case missingRequiredField = "missing_required_field"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// - Remark: Generated from `#/components/schemas/ConnectorPage`.
@@ -8870,7 +9215,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/FolderSearch`.
         public struct FolderSearch: Codable, Hashable, Sendable {
-            /// Type identifiers, each with its subtypes. Empty or absent holds every type the folder's key reads.
+            /// The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*`.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderSearch/types`.
             public var types: [Swift.String]?
@@ -8878,7 +9223,7 @@ extension Components {
             public struct TierPayload: Codable, Hashable, Sendable {
                 /// - Remark: Generated from `#/components/schemas/FolderSearch/tier/value1`.
                 public var value1: Components.Schemas.Tier
-                /// The one tier the folder holds; absent is `library`.
+                /// The tier the folder holds. Absent means `library`.
                 ///
                 /// - Remark: Generated from `#/components/schemas/FolderSearch/tier/value2`.
                 public var value2: OpenAPIRuntime.OpenAPIValueContainer
@@ -8886,7 +9231,7 @@ extension Components {
                 ///
                 /// - Parameters:
                 ///   - value1:
-                ///   - value2: The one tier the folder holds; absent is `library`.
+                ///   - value2: The tier the folder holds. Absent means `library`.
                 public init(
                     value1: Components.Schemas.Tier,
                     value2: OpenAPIRuntime.OpenAPIValueContainer
@@ -8909,30 +9254,30 @@ extension Components {
                 case active = "active"
                 case archived = "archived"
             }
-            /// The states the folder holds; absent is both.
+            /// The states the folder holds. Absent means both.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderSearch/state`.
             public typealias StatePayload = [Components.Schemas.FolderSearch.StatePayloadPayload]
-            /// The states the folder holds; absent is both.
+            /// The states the folder holds. Absent means both.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderSearch/state`.
             public var state: Components.Schemas.FolderSearch.StatePayload?
-            /// An expression in the listing grammar's `filter`.
+            /// A filter expression, as on `GET /items`, that narrows what the folder holds.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderSearch/filter`.
             public var filter: Swift.String?
-            /// An item id: that item and everything under it by `parent-of`.
+            /// An item ID. The folder holds that item and everything under it by `parent-of`, at any depth.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderSearch/beneath`.
             public var beneath: Swift.String?
             /// Creates a new `FolderSearch`.
             ///
             /// - Parameters:
-            ///   - types: Type identifiers, each with its subtypes. Empty or absent holds every type the folder's key reads.
+            ///   - types: The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*`.
             ///   - tier:
-            ///   - state: The states the folder holds; absent is both.
-            ///   - filter: An expression in the listing grammar's `filter`.
-            ///   - beneath: An item id: that item and everything under it by `parent-of`.
+            ///   - state: The states the folder holds. Absent means both.
+            ///   - filter: A filter expression, as on `GET /items`, that narrows what the folder holds.
+            ///   - beneath: An item ID. The folder holds that item and everything under it by `parent-of`, at any depth.
             public init(
                 types: [Swift.String]? = nil,
                 tier: Components.Schemas.FolderSearch.TierPayload? = nil,
@@ -8988,10 +9333,42 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/FolderDefaults`.
         public struct FolderDefaults: Codable, Hashable, Sendable {
+            /// The type a new file becomes if its frontmatter names none.
+            ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/type`.
             public var _type: Swift.String?
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/tier`.
-            public var tier: Components.Schemas.Tier?
+            public struct TierPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/FolderDefaults/tier/value1`.
+                public var value1: Components.Schemas.Tier
+                /// The tier a new file takes if its frontmatter names none.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderDefaults/tier/value2`.
+                public var value2: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `TierPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2: The tier a new file takes if its frontmatter names none.
+                public init(
+                    value1: Components.Schemas.Tier,
+                    value2: OpenAPIRuntime.OpenAPIValueContainer
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try decoder.decodeFromSingleValueContainer()
+                    self.value2 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeToSingleValueContainer(self.value1)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/FolderDefaults/tier`.
+            public var tier: Components.Schemas.FolderDefaults.TierPayload?
+            /// Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property.
+            ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/properties`.
             public struct PropertiesPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
@@ -9010,11 +9387,15 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
+            /// Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property.
+            ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/properties`.
             public var properties: Components.Schemas.FolderDefaults.PropertiesPayload?
+            /// Tags a new file takes if its frontmatter has no `tags` line.
+            ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/tags`.
             public var tags: [Swift.String]?
-            /// A map from edge type to the item ids a new file takes an edge with: at most 100 edge types, each with at most 100 ids. Each edge runs from the new file to the item named, except `parent-of`, which runs from the item named to the new file, making the new file its child.
+            /// Edges a new file takes, as a map from edge type to item IDs: at most 100 edge types, 100 IDs each. An edge runs from the new file to the item, except `parent-of`, which makes the new file its child.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/edges`.
             public struct EdgesPayload: Codable, Hashable, Sendable {
@@ -9034,21 +9415,21 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// A map from edge type to the item ids a new file takes an edge with: at most 100 edge types, each with at most 100 ids. Each edge runs from the new file to the item named, except `parent-of`, which runs from the item named to the new file, making the new file its child.
+            /// Edges a new file takes, as a map from edge type to item IDs: at most 100 edge types, 100 IDs each. An edge runs from the new file to the item, except `parent-of`, which makes the new file its child.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/edges`.
             public var edges: Components.Schemas.FolderDefaults.EdgesPayload?
             /// Creates a new `FolderDefaults`.
             ///
             /// - Parameters:
-            ///   - _type:
+            ///   - _type: The type a new file becomes if its frontmatter names none.
             ///   - tier:
-            ///   - properties:
-            ///   - tags:
-            ///   - edges: A map from edge type to the item ids a new file takes an edge with: at most 100 edge types, each with at most 100 ids. Each edge runs from the new file to the item named, except `parent-of`, which runs from the item named to the new file, making the new file its child.
+            ///   - properties: Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property.
+            ///   - tags: Tags a new file takes if its frontmatter has no `tags` line.
+            ///   - edges: Edges a new file takes, as a map from edge type to item IDs: at most 100 edge types, 100 IDs each. An edge runs from the new file to the item, except `parent-of`, which makes the new file its child.
             public init(
                 _type: Swift.String? = nil,
-                tier: Components.Schemas.Tier? = nil,
+                tier: Components.Schemas.FolderDefaults.TierPayload? = nil,
                 properties: Components.Schemas.FolderDefaults.PropertiesPayload? = nil,
                 tags: [Swift.String]? = nil,
                 edges: Components.Schemas.FolderDefaults.EdgesPayload? = nil
@@ -9073,7 +9454,7 @@ extension Components {
                     forKey: ._type
                 )
                 self.tier = try container.decodeIfPresent(
-                    Components.Schemas.Tier.self,
+                    Components.Schemas.FolderDefaults.TierPayload.self,
                     forKey: .tier
                 )
                 self.properties = try container.decodeIfPresent(
@@ -9097,19 +9478,23 @@ extension Components {
                 ])
             }
         }
-        /// A removal pauses when it is more than `files` files and more than `fraction` of the folder; absent members are 10 and 0.25.
+        /// A removal waits to be confirmed when it takes more than `files` files and more than `fraction` of the folder's files.
         ///
         /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold`.
         public struct FolderRemovalThreshold: Codable, Hashable, Sendable {
+            /// A removal waits to be confirmed only if it takes more than this many files. Absent means 10.
+            ///
             /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/files`.
             public var files: Swift.Int?
+            /// A removal waits to be confirmed only if it takes more than this fraction of the folder's files. Absent means 0.25.
+            ///
             /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/fraction`.
             public var fraction: Swift.Double?
             /// Creates a new `FolderRemovalThreshold`.
             ///
             /// - Parameters:
-            ///   - files:
-            ///   - fraction:
+            ///   - files: A removal waits to be confirmed only if it takes more than this many files. Absent means 10.
+            ///   - fraction: A removal waits to be confirmed only if it takes more than this fraction of the folder's files. Absent means 0.25.
             public init(
                 files: Swift.Int? = nil,
                 fraction: Swift.Double? = nil
@@ -9217,89 +9602,6 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal`.
-        public struct InvalidIdOrInvalidTransitionRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case invalidId = "invalid_id"
-                    case invalidTransition = "invalid_transition"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/code`.
-                public var code: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error/details`.
-                public var details: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionRefusal/error`.
-            public var error: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload
-            /// Creates a new `InvalidIdOrInvalidTransitionRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -10230,19 +10532,105 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal`.
+        public struct RequestTooLargeRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case requestTooLarge = "request_too_large"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/code`.
+                public var code: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/details`.
+                public var details: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error`.
+            public var error: Components.Schemas.RequestTooLargeRefusal._ErrorPayload
+            /// Creates a new `RequestTooLargeRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.RequestTooLargeRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// A page holding every stale type.
+        ///
         /// - Remark: Generated from `#/components/schemas/DriftedPlatformTypePage`.
         public struct DriftedPlatformTypePage: Codable, Hashable, Sendable {
+            /// Every stale type.
+            ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformTypePage/data`.
             public var data: [Components.Schemas.DriftedPlatformType]
-            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            /// Always `null`: Marfa returns every stale type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformTypePage/next_cursor`.
             public var nextCursor: Swift.String?
             /// Creates a new `DriftedPlatformTypePage`.
             ///
             /// - Parameters:
-            ///   - data:
-            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///   - data: Every stale type.
+            ///   - nextCursor: Always `null`: Marfa returns every stale type in one page.
             public init(
                 data: [Components.Schemas.DriftedPlatformType],
                 nextCursor: Swift.String? = nil
@@ -10255,23 +10643,33 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// A platform type that this build no longer ships.
+        ///
         /// - Remark: Generated from `#/components/schemas/DriftedPlatformType`.
         public struct DriftedPlatformType: Codable, Hashable, Sendable {
+            /// The identifier of the stale type.
+            ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformType/id`.
             public var id: Swift.String
+            /// How many items carry this type, counted when you ask.
+            ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformType/item_count`.
             public var itemCount: Swift.Double
+            /// The types that name this one as their `parent`.
+            ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformType/child_types`.
             public var childTypes: [Swift.String]
+            /// `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it.
+            ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformType/removable`.
             public var removable: Swift.Bool
             /// Creates a new `DriftedPlatformType`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - itemCount:
-            ///   - childTypes:
-            ///   - removable:
+            ///   - id: The identifier of the stale type.
+            ///   - itemCount: How many items carry this type, counted when you ask.
+            ///   - childTypes: The types that name this one as their `parent`.
+            ///   - removable: `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it.
             public init(
                 id: Swift.String,
                 itemCount: Swift.Double,
@@ -10943,88 +11341,6 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal`.
-        public struct RequestTooLargeRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case requestTooLarge = "request_too_large"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/code`.
-                public var code: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error/details`.
-                public var details: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.RequestTooLargeRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RequestTooLargeRefusal/error`.
-            public var error: Components.Schemas.RequestTooLargeRefusal._ErrorPayload
-            /// Creates a new `RequestTooLargeRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.RequestTooLargeRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
         /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal`.
         public struct RateLimitedRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -11520,10 +11836,10 @@ extension Components {
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.
-        public typealias MarfaNullableHousekeepingOutcome = MarfaNullable<Components.Schemas.HousekeepingOutcome>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingReport`.
-        public typealias MarfaNullableHousekeepingReport = MarfaNullable<Components.Schemas.HousekeepingReport>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableBackgroundJobOutcome`.
+        public typealias MarfaNullableBackgroundJobOutcome = MarfaNullable<Components.Schemas.BackgroundJobOutcome>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableBackgroundJobReport`.
+        public typealias MarfaNullableBackgroundJobReport = MarfaNullable<Components.Schemas.BackgroundJobReport>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorRun`.
         public typealias MarfaNullableConnectorRun = MarfaNullable<Components.Schemas.ConnectorRun>
     }

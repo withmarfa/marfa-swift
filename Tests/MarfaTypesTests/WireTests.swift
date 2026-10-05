@@ -82,17 +82,17 @@ func thePinnedServerAnswersInTheseTypes() async throws {
                 .utf8))
     #expect(run.value?.id == "r")
     let job = try decoder.decode(
-        Components.Schemas.HousekeepingJob.self,
+        Components.Schemas.BackgroundJob.self,
         from: Data(
             #"{"name":"j","interval_ms":1,"next_run_at":"now","running_since":null,"last_started_at":null,"last_finished_at":null,"last_outcome":"ok","last_error":null,"last_result":{"count":2}}"#
                 .utf8))
     #expect(job.lastOutcome.value == .ok)
     #expect(job.lastResult.value?.value["count"] as? Int == 2)
-    let houseRun = try decoder.decode(
-        Components.Schemas.HousekeepingRun.self,
+    let backgroundRun = try decoder.decode(
+        Components.Schemas.BackgroundJobRun.self,
         from: Data(
             #"{"name":"j","started_at":"now","finished_at":"now","outcome":"ok","result":null,"error":null}"#.utf8))
-    #expect(houseRun.result == .null)
+    #expect(backgroundRun.result == .null)
     #expect(throws: DecodingError.self) {
         try decoder.decode(MarfaNullValue.self, from: Data("false".utf8))
     }
@@ -135,7 +135,7 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
         return data
     }
     let jobs = try JSONDecoder().decode(
-        Components.Schemas.HousekeepingJobPage.self, from: await send("GET", "housekeeping"))
+        Components.Schemas.BackgroundJobPage.self, from: await send("GET", "background-jobs"))
     #expect(!jobs.data.isEmpty)
     let source = "wire-\(UUID().uuidString.lowercased())"
     let made = try JSONDecoder().decode(
