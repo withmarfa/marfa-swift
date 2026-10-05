@@ -3884,13 +3884,23 @@ public struct FlaggedFile: Equatable, Hashable {
     public var path: String
     public var flag: String
     public var reason: String
+    /**
+     * The item whose file a pull did not write, or could not let go to
+     * another folder.
+     */
+    public var item: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(path: String, flag: String, reason: String) {
+    public init(path: String, flag: String, reason: String, 
+        /**
+         * The item whose file a pull did not write, or could not let go to
+         * another folder.
+         */item: String?) {
         self.path = path
         self.flag = flag
         self.reason = reason
+        self.item = item
     }
 
     
@@ -3911,7 +3921,8 @@ public struct FfiConverterTypeFlaggedFile: FfiConverterRustBuffer {
             try FlaggedFile(
                 path: FfiConverterString.read(from: &buf), 
                 flag: FfiConverterString.read(from: &buf), 
-                reason: FfiConverterString.read(from: &buf)
+                reason: FfiConverterString.read(from: &buf), 
+                item: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -3919,6 +3930,7 @@ public struct FfiConverterTypeFlaggedFile: FfiConverterRustBuffer {
         FfiConverterString.write(value.path, into: &buf)
         FfiConverterString.write(value.flag, into: &buf)
         FfiConverterString.write(value.reason, into: &buf)
+        FfiConverterOptionString.write(value.item, into: &buf)
     }
 }
 
@@ -5578,6 +5590,9 @@ public struct SearchHit: Equatable, Hashable {
      * Higher is a better match.
      */
     public var score: Double
+    /**
+     * An excerpt as HTML: the text escaped and each match in `<mark>` tags.
+     */
     public var snippet: String
 
     // Default memberwise initializers are never public by default, so we
@@ -5585,7 +5600,10 @@ public struct SearchHit: Equatable, Hashable {
     public init(item: Item, 
         /**
          * Higher is a better match.
-         */score: Double, snippet: String) {
+         */score: Double, 
+        /**
+         * An excerpt as HTML: the text escaped and each match in `<mark>` tags.
+         */snippet: String) {
         self.item = item
         self.score = score
         self.snippet = snippet
