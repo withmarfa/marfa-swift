@@ -53,7 +53,46 @@ export function prepare(document) {
         result[key] = schemaValues.has(key) ? schema(child) : child;
       }
     }
-    const union = result.anyOf;
+    if (Array.isArray(result.allOf) && result.allOf.length >= 2) {
+      // A reference with only a description beside it is the reference: the generator would make a pair of
+      // values of it, the second an untyped container.
+      const refs = result.allOf.filter(
+        (member) =>
+          typeof member.$ref === "string" && Object.keys(member).length === 1,
+      );
+      const rest = result.allOf.filter((member) => !refs.includes(member));
+      if (
+        refs.length === 1 &&
+        rest.every((member) =>
+          Object.keys(member).every((key) => key === "description"),
+        )
+      ) {
+        const { allOf, ...others } = result;
+        return { ...others, ...refs[0], ...Object.assign({}, ...rest) };
+      }
+    }
+    if (Array.isArray(result.allOf)) {
+      // The generator skips, with a warning, a name one member requires and another member defines.
+      const defines = (member, name) => {
+        const target = member.$ref?.replace(/^#\/components\/schemas\//, "");
+        const properties = target
+          ? document.components?.schemas?.[target]?.properties
+          : member.properties;
+        return properties !== undefined && name in properties;
+      };
+      for (const member of result.allOf) {
+        if (!Array.isArray(member.required)) continue;
+        member.required = member.required.filter(
+          (name) =>
+            defines(member, name) ||
+            !result.allOf.some(
+              (other) => other !== member && defines(other, name),
+            ),
+        );
+      }
+    }
+    const unionKey = Array.isArray(result.oneOf) ? "oneOf" : "anyOf";
+    const union = result[unionKey];
     if (Array.isArray(union) && union.length === 2) {
       const nulls = union.filter(
         (entry) => entry.type === "null" && Object.keys(entry).length === 1,
@@ -74,7 +113,7 @@ export function prepare(document) {
           target,
           schema: { anyOf: [values[0], { $ref: nullRef }] },
         });
-        delete result.anyOf;
+        delete result[unionKey];
         result.$ref = `#/components/schemas/${name}`;
       }
     }
