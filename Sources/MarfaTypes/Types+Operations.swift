@@ -5205,6 +5205,8 @@ public enum Operations {
                 public var headers: Operations.UpdateItem.Output.Ok.Headers
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/200/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// An item with its metadata.
+                    ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/200/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
                         /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/200/content/json/value1`.
