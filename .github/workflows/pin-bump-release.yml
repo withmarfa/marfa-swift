@@ -1,7 +1,8 @@
 name: Release a pin bump
 
-# A merged bump is released at once, or whenever it merges: a bump that failed
-# its checks and was fixed later is released the same way.
+# Releases a bump when it merges, including one that failed its checks and was
+# fixed by hand. A pull request from another branch that moves the pin starts
+# no release.
 on:
   pull_request:
     types: [closed]

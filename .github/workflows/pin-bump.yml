@@ -3,7 +3,7 @@ name: Bump the core pin
 # Moves `core.pin` to marfa's `main` once a day. The checks on a pull request
 # that the GitHub token opens wait for someone with write access to approve
 # them, so the bump is opened with the token of the WithMarfa Bot app, made
-# after the build and limited to what it does. Merging the bump runs the
+# after the build and limited to contents and pull requests. Merging the bump runs the
 # release (`pin-bump-release.yml`). A bump whose checks fail stays open, and
 # an open pull request that changes `core.pin` stops a second one opening.
 on:
@@ -109,8 +109,8 @@ jobs:
         if: ${{ steps.decide.outputs.bump == 'true' }}
         run: swift build
 
-      # Made only now, so nothing that built the core could read it, and
-      # limited to a branch and a pull request.
+      # Made only now, so no build step runs with it in its environment.
+      # Contents write still reaches every branch and tag in this repository.
       - uses: actions/create-github-app-token@v3
         id: app
         if: ${{ steps.decide.outputs.bump == 'true' && (github.event_name == 'schedule' || !inputs.dry_run) }}
