@@ -198,6 +198,21 @@ The body edit is based on the body and the version the copy holds, as an `update
 
 Where no embed can name the file alone among the item's attachments, the file stays attached with the body unchanged, and the call throws `EmbedFailure`, which carries the `Attached` and the `cause`, an `invalid` error. That happens for a title that contains `[`, `]`, `|`, `#` or `^`, for a title given in `Attachment` that another attachment already has, and for a name that ends in a document extension such as `.txt`, which a body reads as a note and not a file. To put an embed somewhere else in the body, call `attach(to:file:_:)` and write `Attached.embed` into the body yourself with an edit. `embedText(of:in:)` answers the same text for a file that is already attached.
 
+## Conflicted copies
+
+When two devices edit the same `body` or `notes` of an item whose type keeps both texts, such as a note, the server keeps its own text on the item and puts the other edit's text in a new item tagged `conflicted-copy`, with a `derived-from` edge to the original. The drain's verdict names the copy as `.conflicted(siblingId:fields:)`. The copy and its link reach the working copy with a catch-up, not with the verdict. After that, either item leads to the other, offline and after a restart:
+
+```swift
+for conflicted in try await copy.items.conflictedCopies(of: note.id) {
+    print("Also edited elsewhere:", conflicted.body ?? "")
+}
+if let original = try await copy.items.original(ofConflictedCopy: item.id) {
+    showBeside(original)
+}
+```
+
+`original(ofConflictedCopy:)` answers an ID, because the original may be an item the copy doesn't hold; read it with `get(_:)`. It answers `nil` for a copy in the bin, and `conflictedCopies(of:)` leaves out the copies in the bin. The link comes in the event after the copy's, so a catch-up that ends between the two can leave a held copy with no original until the next catch-up. To keep one text, edit the original and delete the copy.
+
 ## Recently deleted
 
 `items.delete(_:)` moves an item to the bin. The bin itself is read from the server, a page at a time, newest change first, and nothing read from it is held in the copy. Offline, `bin` throws `network`; the copy never answers for it. The server answers no time an item went to the bin, so its `updatedAt` stands for it, though a write to an item in the bin moves it too.
