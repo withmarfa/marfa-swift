@@ -1,12 +1,10 @@
 name: Bump the core pin
 
-# Moves `core.pin` to marfa's `main` once a day, when that commit has a green
-# `ci.yml` run, regenerates what the pin generates, opens a pull request, waits
-# for its checks to merge it, then runs the release. A pull request opened with
-# the GitHub token would start no checks, so everything here uses the token of
-# the WithMarfa Bot app. A manual run is a dry run unless it says otherwise: it
-# moves the pin and builds, and pushes nothing. A bump whose checks fail stays
-# open and is the next session's to fix; no second one is opened beside it.
+# Moves `core.pin` to marfa's `main` once a day and releases the result. The
+# checks on a pull request that the GitHub token opens wait for someone with
+# write access to approve them, so the bump is opened with the token of the
+# WithMarfa Bot app. A bump whose checks fail stays open and blocks the next,
+# so two never open side by side.
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -137,7 +135,7 @@ jobs:
             echo
             echo "## Testing"
             echo
-            echo "The core built at the new pin and \`swift build\` passed in this run. The required checks run on this pull request in full, and it merges when they pass."
+            echo "The core built at the new pin and \`swift build\` passed in this run. The required checks run on this pull request in full, and it merges when they pass. It adds no behavior of its own, so it adds no test."
             echo
             echo "## Notes for reviewers"
             echo
