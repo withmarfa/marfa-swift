@@ -150,8 +150,6 @@ for item in try await copy.items.list(ListFilters(type: "core.event")) {
 
 `properties` is a `JSONObject`, which keeps its keys in the order the server answers them. A create puts the fields the type declares first, in the type's order, then the rest in the order they were written. A `.merge` edit moves no key and adds each new one after them, and a `.replace` edit keeps the order it sends. Any key that is an array index, such as `2024`, comes first of all. The copy shows the same order before a write is sent as after the server answers it, unless another device's write reaches the item first. Iterate it, or read `keys`, to lay out an item as a document. `JSONObject(json:)` and `JSONValue(json:)` read JSON text in order, and `json()` writes it back in order; `JSONEncoder` and `JSONDecoder` do not keep key order.
 
-To attach a file to an item, call `copy.items.attach(to:file:)`. It queues an upload, a file item that names the bytes, and an `attached-to` edge. A file item, whose type is `core.file` or inherits from it, carries the length of the bytes as `size_bytes` from the moment it is queued, so a list of files can show each size before the first drain. After the drain, the item holds the size the server set from the bytes it stored. Read it with `item.properties["size_bytes"]?.integer`. An item of a type outside the file family has no `size_bytes`.
-
 An `Edit` says how its properties meet the item's. `.merge` replaces each property it names and leaves the rest; `.replace` makes them the item's whole properties, so a property it leaves out is cleared. **`.replace` is the way to drop a property**: a `null` under `.merge` clears nothing, because the server drops it and the copy does too, and a `null` for an optional field in a `Draft` leaves the field out of the new item. A `.replace` sent through `updateAsRead(_:_:)`, at a version older than the one the copy holds, is merged as `.merge` is. An edit can also move the item to another type or tier:
 
 ```swift
@@ -162,6 +160,8 @@ _ = try await copy.items.update(id, Edit(baseVersion: item.version, type: "core.
 ```
 
 Each edit is queued and shown at once, offline included. A type the copy's catalog does not hold throws `unknownType` and queues nothing. A retype changes what the copy's read view covers, so once the server answers it the drain throws `copyExpired(reason: "read_view_changed", …)`: the write is answered, and the app hydrates again.
+
+To attach a file to an item, call `copy.items.attach(to:file:)`. It queues an upload, a file item that names the bytes, and an `attached-to` edge. A file item, whose type is `core.file` or inherits from it, carries the length of the bytes as `size_bytes` from the moment it is queued, so a list of files can show each size before the first drain. After the drain, the item holds the size the server set from the bytes it stored. Read it with `item.properties["size_bytes"]?.integer`. A file attached under a type outside the file family has no `size_bytes`.
 
 ## Links and embeds in a body
 
