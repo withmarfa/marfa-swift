@@ -111,6 +111,9 @@ jobs:
       - name: Test the release steps
         run: scripts/release.test.sh
 
+      - name: Test the pin bump decision
+        run: scripts/pin-bump.test.sh
+
       - name: Test the pull request description check
         run: scripts/check-pr-description.test.sh
 

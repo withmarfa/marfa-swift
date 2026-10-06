@@ -13,7 +13,8 @@ on:
         default: true
 
 concurrency:
-  group: release
+  # A dry run has a group of its own, so it never cancels the real run waiting behind another.
+  group: release-${{ inputs.dry_run }}
   cancel-in-progress: false
 
 permissions:
