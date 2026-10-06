@@ -147,7 +147,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var catchUpFails: MarfaCore.MarfaError?
         var declarations: [String] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
-        var hydrationOptions: (types: [String], tier: MarfaCore.Tier, edgeTypes: [String])?
+        var hydrationOptions: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         var pins: Set<String> = []
         var probe: DropProbe?
     }
@@ -215,7 +215,9 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.follows[index].listener }.changed(change: change)
     }
 
-    override func hydrateWith(types: [String], tier: MarfaCore.Tier, edgeTypes: [String], stop: MarfaCore.Stop?) throws
+    override func hydrateWith(
+        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], stop: MarfaCore.Stop?
+    ) throws
         -> MarfaCore.HydrateReport
     {
         try refreshing()

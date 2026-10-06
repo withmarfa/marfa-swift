@@ -962,13 +962,13 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func heldHandle()  -> Handle
     
-    func hydrate(types: [String], tier: Tier, stop: Stop?) throws  -> HydrateReport
+    func hydrate(types: [String], tier: SliceTier, stop: Stop?) throws  -> HydrateReport
     
     /**
      * A hydration that also holds every edge of `edge_types` the key reads,
      * whichever ends the copy holds.
      */
-    func hydrateWith(types: [String], tier: Tier, edgeTypes: [String], stop: Stop?) throws  -> HydrateReport
+    func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?) throws  -> HydrateReport
     
     /**
      * `NotFound` where the catalog holds no such type.
@@ -1544,12 +1544,12 @@ open func heldHandle() -> Handle  {
 })
 }
     
-open func hydrate(types: [String], tier: Tier, stop: Stop?)throws  -> HydrateReport  {
+open func hydrate(types: [String], tier: SliceTier, stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_hydrate(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(types),
-        FfiConverterTypeTier_lower(tier),
+        FfiConverterTypeSliceTier_lower(tier),
         FfiConverterOptionTypeStop.lower(stop),$0
     )
 })
@@ -1559,12 +1559,12 @@ open func hydrate(types: [String], tier: Tier, stop: Stop?)throws  -> HydrateRep
      * A hydration that also holds every edge of `edge_types` the key reads,
      * whichever ends the copy holds.
      */
-open func hydrateWith(types: [String], tier: Tier, edgeTypes: [String], stop: Stop?)throws  -> HydrateReport  {
+open func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_hydrate_with(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(types),
-        FfiConverterTypeTier_lower(tier),
+        FfiConverterTypeSliceTier_lower(tier),
         FfiConverterSequenceString.lower(edgeTypes),
         FfiConverterOptionTypeStop.lower(stop),$0
     )
@@ -5258,7 +5258,7 @@ public func FfiConverterTypeFolderSync_lower(_ value: FolderSync) -> RustBuffer 
 
 public struct HydrateReport: Equatable, Hashable {
     public var types: [String]
-    public var tier: Tier
+    public var tier: SliceTier
     public var edgeTypes: [String]
     public var items: UInt64
     public var edges: UInt64
@@ -5275,7 +5275,7 @@ public struct HydrateReport: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(types: [String], tier: Tier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64, cursor: String, 
+    public init(types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64, cursor: String, 
         /**
          * Types the app declared that the instance did not hold and now does.
          */registeredTypes: [String], 
@@ -5310,7 +5310,7 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
         return
             try HydrateReport(
                 types: FfiConverterSequenceString.read(from: &buf), 
-                tier: FfiConverterTypeTier.read(from: &buf), 
+                tier: FfiConverterTypeSliceTier.read(from: &buf), 
                 edgeTypes: FfiConverterSequenceString.read(from: &buf), 
                 items: FfiConverterUInt64.read(from: &buf), 
                 edges: FfiConverterUInt64.read(from: &buf), 
@@ -5323,7 +5323,7 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
 
     public static func write(_ value: HydrateReport, into buf: inout [UInt8]) {
         FfiConverterSequenceString.write(value.types, into: &buf)
-        FfiConverterTypeTier.write(value.tier, into: &buf)
+        FfiConverterTypeSliceTier.write(value.tier, into: &buf)
         FfiConverterSequenceString.write(value.edgeTypes, into: &buf)
         FfiConverterUInt64.write(value.items, into: &buf)
         FfiConverterUInt64.write(value.edges, into: &buf)
@@ -6691,7 +6691,7 @@ public struct Status: Equatable, Hashable {
      */
     public var instanceId: String?
     public var sliceTypes: [String]
-    public var sliceTier: Tier?
+    public var sliceTier: SliceTier?
     public var sliceEdgeTypes: [String]
     public var pinned: [String]
     public var eventCursor: String?
@@ -6709,7 +6709,7 @@ public struct Status: Equatable, Hashable {
     public init(serverOrigin: String?, 
         /**
          * The instance the copy was hydrated from.
-         */instanceId: String?, sliceTypes: [String], sliceTier: Tier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64, 
+         */instanceId: String?, sliceTypes: [String], sliceTier: SliceTier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64, 
         /**
          * Moves each time a refresh changes the catalog; none where the copy has
          * never held one.
@@ -6746,7 +6746,7 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
                 serverOrigin: FfiConverterOptionString.read(from: &buf), 
                 instanceId: FfiConverterOptionString.read(from: &buf), 
                 sliceTypes: FfiConverterSequenceString.read(from: &buf), 
-                sliceTier: FfiConverterOptionTypeTier.read(from: &buf), 
+                sliceTier: FfiConverterOptionTypeSliceTier.read(from: &buf), 
                 sliceEdgeTypes: FfiConverterSequenceString.read(from: &buf), 
                 pinned: FfiConverterSequenceString.read(from: &buf), 
                 eventCursor: FfiConverterOptionString.read(from: &buf), 
@@ -6761,7 +6761,7 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.serverOrigin, into: &buf)
         FfiConverterOptionString.write(value.instanceId, into: &buf)
         FfiConverterSequenceString.write(value.sliceTypes, into: &buf)
-        FfiConverterOptionTypeTier.write(value.sliceTier, into: &buf)
+        FfiConverterOptionTypeSliceTier.write(value.sliceTier, into: &buf)
         FfiConverterSequenceString.write(value.sliceEdgeTypes, into: &buf)
         FfiConverterSequenceString.write(value.pinned, into: &buf)
         FfiConverterOptionString.write(value.eventCursor, into: &buf)
@@ -8473,6 +8473,83 @@ public func FfiConverterTypeMarfaError_lower(_ value: MarfaError) -> RustBuffer 
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The tiers a slice holds: one, or `All` for both.
+ */
+
+public enum SliceTier: Equatable, Hashable {
+    
+    case library
+    case feed
+    case all
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SliceTier: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSliceTier: FfiConverterRustBuffer {
+    typealias SwiftType = SliceTier
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SliceTier {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .library
+        
+        case 2: return .feed
+        
+        case 3: return .all
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SliceTier, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .library:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .feed:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .all:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSliceTier_lift(_ buf: RustBuffer) throws -> SliceTier {
+    return try FfiConverterTypeSliceTier.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSliceTier_lower(_ value: SliceTier) -> RustBuffer {
+    return FfiConverterTypeSliceTier.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum SortDirection: Equatable, Hashable {
     
@@ -9478,6 +9555,30 @@ fileprivate struct FfiConverterOptionTypeMarfaError: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeSliceTier: FfiConverterRustBuffer {
+    typealias SwiftType = SliceTier?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSliceTier.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSliceTier.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeTier: FfiConverterRustBuffer {
     typealias SwiftType = Tier?
 
@@ -10146,10 +10247,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_held_handle() != 31292) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 6926) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 51604) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 32687) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 22476) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_item_type() != 51576) {
