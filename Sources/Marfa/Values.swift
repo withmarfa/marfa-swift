@@ -181,8 +181,10 @@ public struct Item: Sendable, Hashable, Identifiable {
     public let tags: [String]
     /// The text under the property the type's display hints name as its
     /// title, or under `title` where they name none; `nil` where that
-    /// property holds no string. The core resolves it from the catalog the
-    /// copy holds, by the rule a folder names its files by.
+    /// property holds no string.
+    ///
+    /// The core resolves it from the catalog the copy holds, by the rule a
+    /// folder names its files by.
     public let title: String?
     /// The text under the property the type's display hints name as its
     /// body, such as `description` for `core.event`, or under `body` where
@@ -350,6 +352,8 @@ public struct Edit: Sendable, Hashable {
         /// stays as it is.
         case merge(JSONObject)
         /// The item's whole properties: a property left out is cleared.
+        /// Sent at a version older than the one the copy holds, through
+        /// `updateAsRead(_:_:)`, it is merged as `merge` is.
         case replace(JSONObject)
     }
 
@@ -357,8 +361,9 @@ public struct Edit: Sendable, Hashable {
     public var baseVersion: Int64
     /// The natural key to move the item to.
     public var sourceId: String?
-    /// The type to move the item to, sent as the server's retype. The
-    /// properties it ends up with are held to that type.
+    /// The type to move the item to, sent as the server's retype.
+    ///
+    /// The properties it ends up with are held to that type.
     public var type: String?
     /// The tier to move the item to.
     public var tier: Tier?

@@ -359,10 +359,12 @@ public struct Items: Sendable {
     /// copy.
     ///
     /// Each item's `updatedAt` stands for when it went to the bin; the server
-    /// keeps no time of its own for that, and a write to an item in the bin
-    /// moves it too. Pass the page's `nextCursor` as `after` for the next
-    /// page. Offline it throws `network`, and a copy with no server throws
-    /// `noServer`: the copy never answers for the bin. Restore an item with
+    /// answers no time of its own for that, and a write to an item in the bin
+    /// moves it too. `limit` is held to 1 through 100, and a page may come
+    /// back short, or empty, with a `nextCursor` still to follow. Pass the
+    /// page's `nextCursor` as `after` for the next page. Offline it throws
+    /// `network`, and a copy with no server throws `noServer`: the copy never
+    /// answers for the bin. Restore an item with
     /// ``restore(_:)`` and destroy it with ``purge(_:version:)``.
     public func bin(type: String? = nil, after cursor: String? = nil, limit: Int = 50) async throws -> BinPage {
         try await holder.run { core in

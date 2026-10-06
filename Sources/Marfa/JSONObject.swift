@@ -1,9 +1,9 @@
 /// A JSON object that keeps its keys in order.
 ///
-/// The server answers an item's properties in a defined order, the type's
-/// declared fields first and then the rest in the order written, so the order
-/// is information. Equality and hashing are order-sensitive: two objects with
-/// the same pairs in a different order are different.
+/// The server answers an item's properties in a defined order, which a
+/// document laid out from them follows, so the order is information.
+/// Equality and hashing are order-sensitive: two objects with the same pairs
+/// in a different order are different.
 ///
 /// Where pairs repeat a key, as in a dictionary literal or the pairs given to
 /// ``init(_:)``, the last value wins at the key's first position.
