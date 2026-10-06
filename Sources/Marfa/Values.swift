@@ -409,7 +409,7 @@ public struct Edit: Sendable, Hashable {
 /// move the copy cannot judge, such as one that closes a longer cycle, is
 /// queued and refused by the server, and its verdict says why.
 ///
-/// Once the server answers a source move, the drain throws
+/// Once the server accepts a source move, the drain throws
 /// `MarfaError.copyExpired` with the reason `read_view_changed`, as it does
 /// for a retype. The write is answered, and the app hydrates again. A target
 /// move does not expire the copy.
