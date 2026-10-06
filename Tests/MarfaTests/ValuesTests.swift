@@ -34,7 +34,7 @@ struct Values {
     }
 
     @Test func jsonRoundTripsThroughTheTextTheCoreTakes() throws {
-        let properties: [String: JSONValue] = [
+        let properties: JSONObject = [
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
             "tags": ["a", "b"], "nested": ["key": "value"],
         ]
@@ -153,8 +153,8 @@ struct Errors {
 
     @Test func aValueJSONCannotHoldIsRefusedAsInvalid() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
-        let unwritable: [String: JSONValue] = ["r": .number(.nan)]
-        let infinite: [String: JSONValue] = ["r": .number(-.infinity)]
+        let unwritable: JSONObject = ["r": .number(.nan)]
+        let infinite: JSONObject = ["r": .number(-.infinity)]
         let writes: [(String, @Sendable () async throws -> Marfa.QueuedWrite)] = [
             ("create", { try await copy.items.create(Marfa.Draft(type: "core.note", properties: unwritable)) }),
             ("update", { try await copy.items.update("n1", Marfa.Edit(properties: infinite, baseVersion: 1)) }),

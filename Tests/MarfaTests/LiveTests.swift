@@ -51,19 +51,19 @@ enum Live {
     }
 
     /// What the server answers, read past the working copy.
-    static func read(_ path: String, query: [URLQueryItem] = []) async throws -> [String: JSONValue] {
+    static func read(_ path: String, query: [URLQueryItem] = []) async throws -> JSONObject {
         let server = try #require(server)
         var request = URLRequest(url: server.url.appending(path: path).appending(queryItems: query))
         request.setValue("Bearer \(server.key)", forHTTPHeaderField: "Authorization")
         let (body, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode
         try #require(status == 200, "reading \(path) answered \(status ?? 0): \(String(decoding: body, as: UTF8.self))")
-        return try JSONDecoder().decode([String: JSONValue].self, from: body)
+        return try JSONObject(json: String(decoding: body, as: UTF8.self))
     }
 
     /// Every edge type the server lists, by id.
-    static func edgeTypes() async throws -> [String: [String: JSONValue]] {
-        var listed: [String: [String: JSONValue]] = [:]
+    static func edgeTypes() async throws -> [String: JSONObject] {
+        var listed: [String: JSONObject] = [:]
         var cursor: String?
         repeat {
             let page = try await read(
@@ -734,6 +734,18 @@ extension LiveWorkingCopies {
         .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
         .timeLimit(.minutes(2)))
     struct LiveCatalog {
+        /// Each definition's keys in the server's order, whatever order the
+        /// fields themselves come in.
+        private func expect(
+            _ fields: [TypeField], as answered: JSONObject, sourceLocation: SourceLocation = #_sourceLocation
+        ) {
+            #expect(Set(answered.keys) == Set(fields.map(\.name)), sourceLocation: sourceLocation)
+            for field in fields {
+                #expect(
+                    answered[field.name] == .object(field.definition), "\(field.name)", sourceLocation: sourceLocation)
+            }
+        }
+
         @Test func aCustomTypeAndAnEdgeTypeReachTheAppAsTheServerHoldsThem() async throws {
             let suffix = UUID().uuidString.prefix(8).lowercased()
             let dish = "user.dish\(suffix)"
@@ -779,9 +791,7 @@ extension LiveWorkingCopies {
                 }
                 #expect(answered["label"] == .string("Recipe"))
                 #expect(answered["parent"] == .string(dish))
-                #expect(
-                    Dictionary(uniqueKeysWithValues: type.fields.map { ($0.name, JSONValue.object($0.definition)) })
-                        == fields)
+                expect(type.fields, as: fields)
 
                 let listed = try await catalog.itemTypes()
                 #expect(listed.map(\.id) == listed.map(\.id).sorted())
@@ -804,14 +814,7 @@ extension LiveWorkingCopies {
                     server["target_type_constraints"] == .array(edgeType.targetTypeConstraints.map(JSONValue.string)))
                 #expect(server["shipped"] == .bool(edgeType.shipped))
                 #expect(!edgeType.shipped)
-                #expect(
-                    server["property_schema"]
-                        == .object(
-                            Dictionary(
-                                uniqueKeysWithValues: edgeType.properties.map {
-                                    ($0.name, JSONValue.object($0.definition))
-                                }
-                            )))
+                expect(edgeType.properties, as: server["property_schema"]?.object ?? [:])
                 #expect(edgeType.properties.map(\.declaredBy) == [inspired])
                 let edgeTypes = try await catalog.edgeTypes()
                 #expect(edgeTypes.contains { $0.id == inspired })

@@ -113,10 +113,6 @@ extension JSONValue {
     fileprivate subscript(key: String) -> JSONValue? {
         if case .object(let object) = self { object[key] } else { nil }
     }
-
-    fileprivate var array: [JSONValue]? {
-        if case .array(let array) = self { array } else { nil }
-    }
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil), .timeLimit(.minutes(1)))

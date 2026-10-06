@@ -168,7 +168,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
 public struct Item: Sendable, Hashable, Identifiable {
     public let id: String
     public let type: String
-    public let properties: [String: JSONValue]
+    public let properties: JSONObject
     public let state: ItemState
     public let tier: Tier?
     public let version: Int64
@@ -182,7 +182,7 @@ public struct Item: Sendable, Hashable, Identifiable {
 
     /// For an app's previews and tests.
     public init(
-        id: String, type: String, properties: [String: JSONValue], state: ItemState, tier: Tier?, version: Int64,
+        id: String, type: String, properties: JSONObject, state: ItemState, tier: Tier?, version: Int64,
         schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
         updatedAt: String, tags: [String]
     ) {
@@ -225,14 +225,14 @@ public struct Edge: Sendable, Hashable, Identifiable {
     public let sourceId: String
     public let targetId: String
     public let edgeType: String
-    public let properties: [String: JSONValue]
+    public let properties: JSONObject
     public let version: Int64
     public let createdAt: String
     public let updatedAt: String
 
     /// For an app's previews and tests.
     public init(
-        id: String, sourceId: String, targetId: String, edgeType: String, properties: [String: JSONValue],
+        id: String, sourceId: String, targetId: String, edgeType: String, properties: JSONObject,
         version: Int64, createdAt: String, updatedAt: String
     ) {
         self.id = id
@@ -278,7 +278,7 @@ public struct SearchHit: Sendable, Hashable {
 /// that tier explicitly. A create outside the slice is held as a pin.
 public struct Draft: Sendable, Hashable {
     public var type: String
-    public var properties: [String: JSONValue]
+    public var properties: JSONObject
     public var tags: [String]
     public var tier: Tier?
     public var id: String?
@@ -288,7 +288,7 @@ public struct Draft: Sendable, Hashable {
     public var baseVersion: Int64?
 
     public init(
-        type: String, properties: [String: JSONValue] = [:], tags: [String] = [], tier: Tier? = nil,
+        type: String, properties: JSONObject = [:], tags: [String] = [], tier: Tier? = nil,
         id: String? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil,
         baseVersion: Int64? = nil
     ) {
@@ -312,11 +312,11 @@ public struct Draft: Sendable, Hashable {
 
 /// Each property given replaces its whole value.
 public struct Edit: Sendable, Hashable {
-    public var properties: [String: JSONValue]
+    public var properties: JSONObject
     public var baseVersion: Int64
     public var sourceId: String?
 
-    public init(properties: [String: JSONValue], baseVersion: Int64, sourceId: String? = nil) {
+    public init(properties: JSONObject, baseVersion: Int64, sourceId: String? = nil) {
         self.properties = properties
         self.baseVersion = baseVersion
         self.sourceId = sourceId

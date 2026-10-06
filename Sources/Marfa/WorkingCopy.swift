@@ -363,7 +363,7 @@ public struct Edges: Sendable {
     }
 
     public func create(
-        from source: String, to target: String, type: String, properties: [String: JSONValue] = [:],
+        from source: String, to target: String, type: String, properties: JSONObject = [:],
         id: String? = nil
     ) async throws -> QueuedWrite {
         try await write { core in
@@ -374,7 +374,7 @@ public struct Edges: Sendable {
         }
     }
 
-    public func update(_ id: String, properties: [String: JSONValue], baseVersion: Int64) async throws -> QueuedWrite {
+    public func update(_ id: String, properties: JSONObject, baseVersion: Int64) async throws -> QueuedWrite {
         try await write { core in
             try core.updateEdge(
                 id: id,
@@ -421,7 +421,7 @@ public struct Extensions: Sendable {
     let holder: CoreHolder
     let feed: Feed
 
-    public func write(_ namespace: String, _ body: [String: JSONValue], on id: String) async throws -> QueuedWrite {
+    public func write(_ namespace: String, _ body: JSONObject, on id: String) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in
             try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
         }
@@ -565,11 +565,6 @@ func translated<T>(_ work: () throws -> T) throws -> T {
         return try work()
     } catch let error as MarfaCore.MarfaError {
         throw MarfaError(error)
-    } catch let error as DecodingError {
-        throw MarfaError.decoding(message: "\(error)")
-    } catch EncodingError.invalidValue(_, let context) {
-        let path = context.codingPath.map(\.stringValue).joined(separator: ".")
-        throw MarfaError.invalid(message: "\(path) cannot be written as JSON: \(context.debugDescription)")
     }
 }
 

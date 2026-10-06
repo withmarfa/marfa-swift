@@ -415,7 +415,7 @@ public struct QueuedWrite: Sendable, Hashable {
     public var waiting: Bool
     /// What the write sends, or sent; a refused write that carried content
     /// keeps it here, through `forgetAnswered()`, until `discard(_:)`.
-    public var body: [String: JSONValue]
+    public var body: JSONObject
     /// The server's answer, whole, as it arrived.
     public var answer: String?
     public var refusals: Int64
@@ -426,7 +426,7 @@ public struct QueuedWrite: Sendable, Hashable {
         id: String, kind: WriteKind, itemId: String? = nil, targetId: String? = nil, edgeId: String? = nil,
         namespace: String? = nil, tag: String? = nil, blob: String? = nil, baseVersion: Int64? = nil,
         idempotencyKey: String, dependsOn: [String] = [], follows: String? = nil, verdict: Verdict? = nil,
-        waiting: Bool = false, body: [String: JSONValue] = [:], answer: String? = nil, refusals: Int64 = 0,
+        waiting: Bool = false, body: JSONObject = [:], answer: String? = nil, refusals: Int64 = 0,
         queuedAt: String, answeredAt: String? = nil
     ) {
         self.id = id
