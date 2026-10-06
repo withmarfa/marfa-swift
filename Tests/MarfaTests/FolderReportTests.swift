@@ -16,7 +16,7 @@ private func corePass(
             paused: 0, trashed: [], secrets: [], warnings: [], rootGone: nil),
         drain: drain, rebased: 0, gaveWay: 0,
         pull: MarfaCore.FolderPull(
-            written: 0, rewritten: 0, moved: 0, unchanged: 0, skipped: 0, removed: 0, kept: 0, unwritten: 0,
+            written: 0, rewritten: 0, moved: 0, unchanged: 0, skipped: 0, removed: 0, purged: 0, kept: 0, unwritten: 0,
             absent: 0, unplaced: 0, unmatched: 0, paused: 0, rootGone: nil),
         flagged: flagged)
 }
