@@ -21,8 +21,8 @@ decide() { "${bump}" decide "$@" 2>/dev/null || echo refused; }
 
 check "a new, green main with nothing open is bumped" "$(decide "${old}" "${new}" success 0)" bump
 check "a pin that is main already stays" "$(decide "${new}" "${new}" success 0)" "skip: the pin is marfa's main already"
-check "an open bump is left to be settled" "$(decide "${old}" "${new}" success 1)" \
-  "skip: a pin bump is open and waits to be settled"
+check "an open pull request that moves the pin is left to be settled" "$(decide "${old}" "${new}" success 1)" \
+  "skip: a pull request that moves the pin is open"
 check "a red main is not bumped to" "$(decide "${old}" "${new}" failure 0)" "skip: marfa's main is not green"
 check "a cancelled run is not green" "$(decide "${old}" "${new}" cancelled 0)" "skip: marfa's main is not green"
 check "a run still going waits for the next day" "$(decide "${old}" "${new}" pending 0)" \
@@ -32,7 +32,9 @@ check "a main with no run waits for the next day" "$(decide "${old}" "${new}" no
 check "a pin that is not a commit is refused" "$(decide main "${new}" success 0)" refused
 check "a main that is not a commit is refused" "$(decide "${old}" "${new:0:39}" success 0)" refused
 check "a count that is not a number is refused" "$(decide "${old}" "${new}" success many)" refused
-check "a state that is not a run state is refused" "$(decide "${old}" "${new}" skipped 0)" refused
+check "a timed out run is not green" "$(decide "${old}" "${new}" timed_out 0)" "skip: marfa's main is not green"
+check "a skipped run is not green" "$(decide "${old}" "${new}" skipped 0)" "skip: marfa's main is not green"
+check "a state that is not a run state is refused" "$(decide "${old}" "${new}" 'not a state!' 0)" refused
 check "missing arguments are refused" "$(decide "${old}" "${new}")" refused
 
 exit "${failed}"

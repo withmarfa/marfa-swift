@@ -1,0 +1,28 @@
+name: Release a pin bump
+
+# A merged bump is released at once, or whenever it merges: a bump that failed
+# its checks and was fixed later is released the same way.
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Run the release
+    if: >-
+      ${{ github.event.pull_request.merged
+      && github.event.pull_request.head.ref == 'automation/core-pin'
+      && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Run the release from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref main -f dry_run=false

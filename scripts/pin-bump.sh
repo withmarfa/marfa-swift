@@ -4,8 +4,9 @@
 #   scripts/pin-bump.sh decide <current-pin> <marfa-main> <marfa-ci> <open-bumps>
 #
 # <marfa-ci> is the state of marfa's `ci.yml` push run on <marfa-main>:
-# success, failure, cancelled, pending (queued or running) or none.
-# <open-bumps> is how many pull requests this workflow has open.
+# pending (queued or running), none, or the conclusion of a finished run, where
+# only `success` is green.
+# <open-bumps> is how many open pull requests change `core.pin`.
 # Prints `bump`, or `skip: <reason>` where the pin stays as it is.
 set -euo pipefail
 
@@ -20,6 +21,10 @@ decide() {
     echo "pin-bump.sh: '${head}' is not a commit" >&2
     exit 1
   fi
+  if [[ ! "${ci}" =~ ^[a-z_]+$ ]]; then
+    echo "pin-bump.sh: '${ci}' is not a run state" >&2
+    exit 1
+  fi
   if [[ ! "${open}" =~ ^[0-9]+$ ]]; then
     echo "pin-bump.sh: '${open}' is not a count" >&2
     exit 1
@@ -27,16 +32,12 @@ decide() {
   if [[ "${current}" == "${head}" ]]; then
     echo "skip: the pin is marfa's main already"
   elif ((open > 0)); then
-    echo "skip: a pin bump is open and waits to be settled"
+    echo "skip: a pull request that moves the pin is open"
   else
     case "${ci}" in
       success) echo bump ;;
-      failure | cancelled) echo "skip: marfa's main is not green" ;;
       pending | none) echo "skip: marfa's main has no finished run yet" ;;
-      *)
-        echo "pin-bump.sh: '${ci}' is not a run state" >&2
-        exit 1
-        ;;
+      *) echo "skip: marfa's main is not green" ;;
     esac
   fi
 }
