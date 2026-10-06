@@ -20,12 +20,27 @@ struct CopyOptions {
     @Test func hydrationCarriesEdgeTypesAndReportsThem() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        let report = try await copy.hydrate(types: ["core.note"], tier: .feed, edgeTypes: ["attached-to"])
+        let report = try await copy.hydrate(types: ["core.note"], tier: .all, edgeTypes: ["attached-to"])
         let options = try #require(core.state.withLock { $0.hydrationOptions })
         #expect(options.types == ["core.note"])
-        #expect(options.tier == .feed)
+        #expect(options.tier == .all)
+        #expect(report.tier == .all)
         #expect(options.edgeTypes == ["attached-to"])
         #expect(report.edgeTypes == options.edgeTypes)
+        await copy.close()
+    }
+
+    @Test(arguments: [
+        (Marfa.SliceTier.library, MarfaCore.SliceTier.library), (.feed, .feed), (.all, .all),
+    ])
+    func hydrationCarriesEachSliceTier(tier: Marfa.SliceTier, core tierInCore: MarfaCore.SliceTier)
+        async throws
+    {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let report = try await copy.hydrate(types: ["core.note"], tier: tier)
+        #expect(core.state.withLock { $0.hydrationOptions }?.tier == tierInCore)
+        #expect(report.tier == tier)
         await copy.close()
     }
 

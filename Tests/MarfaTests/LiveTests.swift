@@ -157,6 +157,43 @@ extension LiveWorkingCopies {
             await reader.close()
         }
 
+        @Test func aSliceOfBothTiersKeepsAnItemTriagedWithNoServer() async throws {
+            let store = Live.store()
+            let writer = try await WorkingCopy.open(store: store, server: Live.server)
+            let hydrated = try await writer.hydrate(types: ["core.note"], tier: .all)
+            #expect(hydrated.tier == .all)
+            #expect(try await writer.status().sliceTier == .all)
+            let inbox = try #require(try await writer.items.create(Live.note("inbox \(UUID())")).itemId)
+            let record = try #require(
+                try await writer.items.create(
+                    Draft(type: "core.note", properties: ["title": .string("record \(UUID())"), "body": "b"])
+                ).itemId)
+            #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+            #expect(try await writer.items.get(inbox)?.tier == .feed)
+            #expect(try await writer.items.get(record)?.tier == .library)
+            let version = try #require(try await writer.items.get(inbox)).version
+            await writer.close()
+
+            let offline = try await WorkingCopy.open(store: store)
+            _ = try await offline.items.update(inbox, Edit(baseVersion: version, tier: .library))
+            #expect(try await offline.items.get(inbox)?.tier == .library)
+            #expect(try await !offline.items.list(ListFilters(tier: .feed)).contains { $0.id == inbox })
+            #expect(try await offline.items.list(ListFilters(tier: .library)).contains { $0.id == inbox })
+            await offline.close()
+
+            let online = try await WorkingCopy.open(store: store, server: Live.server)
+            #expect(try await online.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+            _ = try await online.catchUp()
+            #expect(try await online.items.get(inbox)?.tier == .library)
+            let answered = try await Live.read("items/\(inbox)")
+            guard case .object(let item) = answered["item"] else {
+                Issue.record("the server answered no item for \(inbox): \(answered)")
+                return
+            }
+            #expect(item["tier"] == "library")
+            await online.close()
+        }
+
         @Test func aWriteMadeHereIsAnsweredAndHeld() async throws {
             let copy = try await Live.hydrated()
             let title = "Live \(UUID())"

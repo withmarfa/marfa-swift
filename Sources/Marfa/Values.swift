@@ -304,8 +304,10 @@ public struct SearchHit: Sendable, Hashable {
 /// The tags are queued as writes of their own. Where `sourceId` names a row
 /// the server already holds, the create lands on it, and `baseVersion` makes
 /// that conditional on the version it was read at. With no `tier`, the copy
-/// uses its slice's tier, or `library` before its first hydration, and sends
-/// that tier explicitly. A create outside the slice is held as a pin.
+/// uses its slice's tier, `library` in a slice of both tiers, or `library`
+/// before its first hydration, and sends that tier explicitly, unless
+/// `source` and `sourceId` name an item the copy holds, which keeps its
+/// tier. A create outside the slice is held as a pin.
 public struct Draft: Sendable, Hashable {
     public var type: String
     public var properties: JSONObject

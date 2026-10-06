@@ -20,6 +20,41 @@ public enum Tier: Sendable, Hashable, CaseIterable {
     }
 }
 
+/// The tiers a working copy's slice holds: one ``Tier``, or both.
+///
+/// An item is in exactly one tier, so an item's `tier` is a ``Tier``. A slice
+/// of both keeps an item whose tier moves, so an inbox at `feed` and the record
+/// at `library` can be read from one copy, offline as well.
+public enum SliceTier: Sendable, Hashable, CaseIterable {
+    case library
+    case feed
+    /// Both tiers. A create that names no tier is sent and shown at `library`.
+    case all
+
+    public init(_ tier: Tier) {
+        switch tier {
+        case .library: self = .library
+        case .feed: self = .feed
+        }
+    }
+
+    init(_ core: MarfaCore.SliceTier) {
+        switch core {
+        case .library: self = .library
+        case .feed: self = .feed
+        case .all: self = .all
+        }
+    }
+
+    var core: MarfaCore.SliceTier {
+        switch self {
+        case .library: .library
+        case .feed: .feed
+        case .all: .all
+        }
+    }
+}
+
 public enum ItemState: Sendable, Hashable, CaseIterable {
     case active
     case archived
@@ -584,7 +619,7 @@ public struct UnregisteredType: Sendable, Hashable, Identifiable {
 
 public struct HydrateReport: Sendable, Hashable {
     public var types: [String]
-    public var tier: Tier
+    public var tier: SliceTier
     public var edgeTypes: [String]
     public var items: UInt64
     public var edges: UInt64
@@ -594,7 +629,7 @@ public struct HydrateReport: Sendable, Hashable {
     public var unregisteredTypes: [UnregisteredType]
 
     public init(
-        types: [String], tier: Tier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64,
+        types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64,
         cursor: String, registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
     ) {
         self.types = types
@@ -610,7 +645,7 @@ public struct HydrateReport: Sendable, Hashable {
 
     init(_ core: MarfaCore.HydrateReport) {
         self.init(
-            types: core.types, tier: Tier(core.tier), edgeTypes: core.edgeTypes, items: core.items,
+            types: core.types, tier: SliceTier(core.tier), edgeTypes: core.edgeTypes, items: core.items,
             edges: core.edges, pages: core.pages, cursor: core.cursor,
             registeredTypes: core.registeredTypes, unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
     }
@@ -663,7 +698,7 @@ public struct Status: Sendable, Hashable {
     public var serverOrigin: String?
     public var instanceId: String?
     public var sliceTypes: [String]
-    public var sliceTier: Tier?
+    public var sliceTier: SliceTier?
     public var sliceEdgeTypes: [String]
     public var pinned: [String]
     public var eventCursor: String?
@@ -677,7 +712,7 @@ public struct Status: Sendable, Hashable {
     public var catalogVersion: UInt64?
 
     public init(
-        serverOrigin: String? = nil, sliceTypes: [String] = [], sliceTier: Tier? = nil,
+        serverOrigin: String? = nil, sliceTypes: [String] = [], sliceTier: SliceTier? = nil,
         sliceEdgeTypes: [String] = [], pinned: [String] = [], eventCursor: String? = nil,
         hydration: Hydration = .never, items: UInt64 = 0, edges: UInt64 = 0, catalogVersion: UInt64? = nil,
         instanceId: String? = nil
@@ -697,7 +732,7 @@ public struct Status: Sendable, Hashable {
 
     init(_ core: MarfaCore.Status) {
         self.init(
-            serverOrigin: core.serverOrigin, sliceTypes: core.sliceTypes, sliceTier: core.sliceTier.map(Tier.init),
+            serverOrigin: core.serverOrigin, sliceTypes: core.sliceTypes, sliceTier: core.sliceTier.map(SliceTier.init),
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
             hydration: Hydration(core.hydration), items: core.items, edges: core.edges,
             catalogVersion: core.catalogVersion, instanceId: core.instanceId)

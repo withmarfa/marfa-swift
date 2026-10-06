@@ -76,10 +76,11 @@ public final class WorkingCopy: Sendable {
         try await holder.run { core in Status(try core.status()) }
     }
 
-    /// Replaces the copy with every item of `types` at `tier`, with their tags
-    /// and the edges going out from them. `edgeTypes` also holds each named
-    /// edge type whole, whichever of its endpoints the item slice holds.
-    public func hydrate(types: [String], tier: Tier, edgeTypes: [String] = []) async throws -> HydrateReport {
+    /// Replaces the copy with every item of `types` at `tier`, one tier or
+    /// `.all` for both, with their tags and the edges going out from them.
+    /// `edgeTypes` also holds each named edge type whole, whichever of its
+    /// endpoints the item slice holds.
+    public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = []) async throws -> HydrateReport {
         await feed.pause()
         defer { feed.unpause() }
         let report = HydrateReport(

@@ -97,7 +97,20 @@ for await change in copy.changes() {
 
 Hydration registers declarations the instance does not hold when the key has write access to the type and `metadata.types:write`. A completed `HydrateReport` lists new registrations in `registeredTypes` and refusals in `unregisteredTypes`, each with its `id`, server `code`, and `message`. A refusal keeps the declaration and queued content. If the requested slice names an exact type the instance still lacks, hydration throws `unknownType`; register that type with the required permissions before requesting it again.
 
-A tier separates lasting material (`library`) from an incoming stream (`feed`). The CLI's default is `library`, so this example hydrates and writes there. The sample app deliberately uses `feed`; to see its notes in CLI results, request that tier. Set the tier on a `Draft` when it should differ from the copy's slice. Without one, the copy uses its slice's tier, or `library` before its first hydration, and sends that tier explicitly. The key's default does not choose a queued create's tier. A create outside the slice remains held as a pin until the app unpins it.
+A tier separates lasting material (`library`) from an incoming stream (`feed`). The CLI's default is `library`, so this example hydrates and writes there. The sample app deliberately uses `feed`; to see its notes in CLI results, request that tier. Set the tier on a `Draft` when it should differ from the copy's slice. Without one, the copy uses its slice's tier, `library` in a slice of both tiers, or `library` before its first hydration, and sends that tier explicitly. A create whose `source` and `sourceId` name an item the copy holds keeps that item's tier instead, so saving it again does not move an item the person triaged. The key's default does not choose a queued create's tier. A create outside the slice remains held as a pin until the app unpins it.
+
+An app that shows an inbox (`feed`) beside the person's record (`library`) holds both in one copy by hydrating with `tier: .all`. An item is in exactly one tier, so `Item.tier` and `Draft.tier` stay a `Tier`; the slice's own setting is a `SliceTier`. Triage is an edit that moves the item's tier, and the item stays in the copy at its new tier, offline too:
+
+```swift
+_ = try await copy.hydrate(types: ["core.note"], tier: .all)
+let inbox = try await copy.items.list(ListFilters(tier: .feed))
+if let item = inbox.first {
+    _ = try await copy.items.update(item.id, Edit(baseVersion: item.version, tier: .library))
+}
+let record = try await copy.items.list(ListFilters(tier: .library))
+```
+
+In a copy that holds one tier, the same item leaves the copy once the server answers the move.
 
 Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does, and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events; if it stops with an error, the next hydration or catch-up starts it again.
 

@@ -78,6 +78,9 @@ import Testing
         let hydrated = HydrateReport(
             types: ["core.note"], tier: .library, edgeTypes: [], items: 1, edges: 0, pages: 1, cursor: "1")
         #expect(hydrated.tier == .library)
+        #expect(Status(sliceTier: .all).sliceTier == .all)
+        #expect(Tier.allCases.map(SliceTier.init) == [.library, .feed])
+        #expect(SliceTier.allCases.count == 3)
         #expect(UnregisteredType(id: "app.no", code: "forbidden", message: "m").code == "forbidden")
         #expect(MarfaError.canceled(message: "m").code() == "canceled")
         #expect(MarfaError.closed(message: "m").code() == "closed")
