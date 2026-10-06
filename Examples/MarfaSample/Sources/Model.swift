@@ -89,7 +89,7 @@ final class Model {
     func rename(_ note: Item, to title: String) async {
         await perform("edited") { copy in
             _ = try await copy.items.update(
-                note.id, Edit(properties: ["title": .string(title)], baseVersion: note.version))
+                note.id, Edit(.merge(["title": .string(title)]), baseVersion: note.version))
         }
     }
 

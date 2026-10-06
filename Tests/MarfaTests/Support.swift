@@ -124,6 +124,7 @@ final class FakeCore: Core, @unchecked Sendable {
     struct Follow {
         let listener: any MarfaCore.ChangeListener
         let holdsStream: Bool
+        let toldUnreachable: Bool
         var stopped = false
         var ended = false
     }
@@ -183,10 +184,10 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.handle }
     }
 
-    override func follow(listener: any MarfaCore.ChangeListener) -> MarfaCore.Subscription {
+    override func follow(toldUnreachable: Bool, listener: any MarfaCore.ChangeListener) -> MarfaCore.Subscription {
         let (index, refused) = state.withLock { state in
             let refused = state.streamHeld
-            state.follows.append(Follow(listener: listener, holdsStream: !refused))
+            state.follows.append(Follow(listener: listener, holdsStream: !refused, toldUnreachable: toldUnreachable))
             state.streamHeld = true
             return (state.follows.count - 1, refused)
         }
@@ -425,5 +426,94 @@ struct LocalServer: Sendable {
     func stop() {
         listener.cancel()
         for connection in log.connections.withLock({ $0 }) { connection.cancel() }
+    }
+}
+
+/// A server of a test's own, booted with marfa's `core/scripts/server-up.sh`
+/// from the checkout `MARFA_MONOREPO` names, so a test can stop it and start
+/// it again under a copy.
+///
+/// Started again, it keeps its port, data and keys.
+final class OwnServer: Sendable {
+    static let monorepo = ProcessInfo.processInfo.environment["MARFA_MONOREPO"].map {
+        URL(filePath: $0, directoryHint: .isDirectory)
+    }
+
+    let state: URL
+    let url: URL
+    let key: String
+    var server: Server { Server(url: url, key: key) }
+    private var env: URL { state.appending(path: "env") }
+
+    private init(state: URL, url: URL, key: String) {
+        self.state = state
+        self.url = url
+        self.key = key
+    }
+
+    static func boot() async throws -> OwnServer {
+        let state = FileManager.default.temporaryDirectory.appending(path: "marfa-own-server-\(UUID())")
+        let exports = try await up(state)
+        let url = try #require(exports["MARFA_TEST_URL"].flatMap(URL.init(string:)))
+        return OwnServer(state: state, url: url, key: try #require(exports["MARFA_TEST_KEY"]))
+    }
+
+    func stop() async throws {
+        _ = try await Self.script("server-down.sh", [env.path], keep: state)
+    }
+
+    func start() async throws {
+        let exports = try await Self.up(state)
+        try #require(exports["MARFA_TEST_URL"] == url.absoluteString, "the server came back at another address")
+    }
+
+    /// Stops it and takes its state away.
+    func end() async throws {
+        try await stop()
+        try? FileManager.default.removeItem(at: state)
+    }
+
+    private static func up(_ state: URL) async throws -> [String: String] {
+        let printed = try await script("server-up.sh", [], keep: state)
+        var exports: [String: String] = [:]
+        for line in printed.split(separator: "\n") where line.hasPrefix("export ") {
+            let pair = line.dropFirst("export ".count).split(separator: "=", maxSplits: 1)
+            guard pair.count == 2 else { continue }
+            exports[String(pair[0])] = String(pair[1]).trimmingCharacters(in: CharacterSet(charactersIn: "'"))
+        }
+        return exports
+    }
+
+    private static func script(_ name: String, _ arguments: [String], keep: URL) async throws -> String {
+        let monorepo = try #require(monorepo, "MARFA_MONOREPO names no checkout")
+        let process = Process()
+        process.executableURL = URL(filePath: "/bin/bash")
+        process.arguments = [monorepo.appending(path: "core/scripts/\(name)").path] + arguments
+        var environment = ProcessInfo.processInfo.environment
+        environment["MARFA_SERVER_KEEP"] = keep.path
+        environment["MARFA_SERVER_ENV"] = keep.appending(path: "env").path
+        environment.removeValue(forKey: "PORT")
+        process.environment = environment
+        let output = Pipe()
+        process.standardOutput = output
+        // A failed boot writes the server's log here, its secret redacted.
+        process.standardError = FileHandle.standardError
+        let ended = AsyncStream<Int32> { continuation in
+            process.terminationHandler = { finished in
+                continuation.yield(finished.terminationStatus)
+                continuation.finish()
+            }
+        }
+        try process.run()
+        // Read off the concurrency pool: a boot can take a while.
+        let printed = await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
+            DispatchQueue.global().async {
+                continuation.resume(returning: output.fileHandleForReading.readDataToEndOfFile())
+            }
+        }
+        var status: Int32 = -1
+        for await code in ended { status = code }
+        try #require(status == 0, "\(name) exited \(status)")
+        return String(decoding: printed, as: UTF8.self)
     }
 }

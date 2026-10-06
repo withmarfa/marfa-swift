@@ -38,7 +38,7 @@ struct Waiting {
 
         let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "a"], tier: .feed))
         let id = try #require(created.itemId)
-        let edited = try await copy.items.update(id, Edit(properties: ["title": "b"], baseVersion: 0))
+        let edited = try await copy.items.update(id, Edit(.merge(["title": "b"]), baseVersion: 0))
         let report = try await copy.queue.drain()
         #expect(report.verdicts.allSatisfy { $0.verdict == nil }, "\(report.verdicts)")
 

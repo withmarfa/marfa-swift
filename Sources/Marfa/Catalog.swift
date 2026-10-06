@@ -96,14 +96,14 @@ public struct TypeField: Sendable, Hashable, Identifiable {
     /// inherits the field from.
     public let declaredBy: String
     /// The definition whole, as the server holds it.
-    public let definition: [String: JSONValue]
+    public let definition: JSONObject
 
     public var id: String { name }
 
     /// For an app's previews and tests.
     public init(
         name: String, type: String, required: Bool = false, description: String? = nil, declaredBy: String,
-        definition: [String: JSONValue] = [:]
+        definition: JSONObject = [:]
     ) {
         self.name = name
         self.type = type
@@ -116,7 +116,7 @@ public struct TypeField: Sendable, Hashable, Identifiable {
     init(_ core: MarfaCore.TypeField) throws {
         self.init(
             name: core.name, type: core.fieldType, required: core.required, description: core.description,
-            declaredBy: core.declaredBy, definition: try Properties.object(core.definitionJson))
+            declaredBy: core.declaredBy, definition: try JSONObject(json: core.definitionJson))
     }
 }
 

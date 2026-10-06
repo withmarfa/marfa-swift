@@ -51,19 +51,19 @@ enum Live {
     }
 
     /// What the server answers, read past the working copy.
-    static func read(_ path: String, query: [URLQueryItem] = []) async throws -> [String: JSONValue] {
+    static func read(_ path: String, query: [URLQueryItem] = []) async throws -> JSONObject {
         let server = try #require(server)
         var request = URLRequest(url: server.url.appending(path: path).appending(queryItems: query))
         request.setValue("Bearer \(server.key)", forHTTPHeaderField: "Authorization")
         let (body, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode
         try #require(status == 200, "reading \(path) answered \(status ?? 0): \(String(decoding: body, as: UTF8.self))")
-        return try JSONDecoder().decode([String: JSONValue].self, from: body)
+        return try JSONObject(json: String(decoding: body, as: UTF8.self))
     }
 
     /// Every edge type the server lists, by id.
-    static func edgeTypes() async throws -> [String: [String: JSONValue]] {
-        var listed: [String: [String: JSONValue]] = [:]
+    static func edgeTypes() async throws -> [String: JSONObject] {
+        var listed: [String: JSONObject] = [:]
         var cursor: String?
         repeat {
             let page = try await read(
@@ -274,13 +274,13 @@ extension LiveWorkingCopies {
             // Two notes, because two edits to one note wait on each other and
             // the second is sent only on the first's answer.
             let elsewhere = try await Live.hydrated()
-            _ = try await copy.items.update(titledId, Edit(properties: ["title": "second"], baseVersion: 1))
-            _ = try await copy.items.update(bodiedId, Edit(properties: ["body": "second"], baseVersion: 1))
+            _ = try await copy.items.update(titledId, Edit(.merge(["title": "second"]), baseVersion: 1))
+            _ = try await copy.items.update(bodiedId, Edit(.merge(["body": "second"]), baseVersion: 1))
             report = try await copy.queue.drain()
             let merged = try await elsewhere.items.update(
-                titledId, Edit(properties: ["title": "third"], baseVersion: 1))
+                titledId, Edit(.merge(["title": "third"]), baseVersion: 1))
             let conflicted = try await elsewhere.items.update(
-                bodiedId, Edit(properties: ["body": "elsewhere"], baseVersion: 1))
+                bodiedId, Edit(.merge(["body": "elsewhere"]), baseVersion: 1))
             report = try await elsewhere.queue.drain()
             #expect(report.verdicts.first { $0.id == merged.id }?.verdict == .merged(fields: ["title"]))
             guard case .conflicted(_, let fields) = report.verdicts.first(where: { $0.id == conflicted.id })?.verdict
@@ -300,13 +300,13 @@ extension LiveWorkingCopies {
 
             let elsewhere = try await Live.hydrated()
             _ = try await elsewhere.items.update(
-                id, Edit(properties: ["title": "retitled elsewhere"], baseVersion: read.version))
+                id, Edit(.merge(["title": "retitled elsewhere"]), baseVersion: read.version))
             _ = try await elsewhere.queue.drain()
             _ = try await copy.catchUp()
             let held = try #require(try await copy.items.get(id))
             #expect(held.version > read.version, "the copy did not take in the retitle")
 
-            let edit = Edit(properties: ["body": "written here"], baseVersion: read.version)
+            let edit = Edit(.merge(["body": "written here"]), baseVersion: read.version)
             await #expect {
                 _ = try await copy.items.update(id, edit)
             } throws: { error in
@@ -315,7 +315,7 @@ extension LiveWorkingCopies {
             }
             let saved = try await copy.items.updateAsRead(id, edit)
             let next = try await copy.items.update(
-                id, Edit(properties: ["body": "written here, then more"], baseVersion: held.version))
+                id, Edit(.merge(["body": "written here, then more"]), baseVersion: held.version))
             let report = try await copy.queue.drain()
             // `merged` names a collision the server resolved, and none happened.
             #expect(report.verdicts.first { $0.id == saved.id }?.verdict == .accepted)
@@ -384,7 +384,7 @@ extension LiveWorkingCopies {
             let b = try #require(record(try await copy.items.create(Live.note("told b"))).itemId)
             let version = try #require(try await copy.items.get(a)).version
             _ = record(
-                try await copy.items.update(a, Edit(properties: ["title": "told a, edited"], baseVersion: version)))
+                try await copy.items.update(a, Edit(.merge(["title": "told a, edited"]), baseVersion: version)))
             _ = record(try await copy.tags.add("told", to: a))
             _ = record(try await copy.tags.remove("told", from: a))
             _ = record(try await copy.metadata.replaceTags(of: a, with: ["x"]))
@@ -476,7 +476,7 @@ extension LiveWorkingCopies {
             func mimeType(_ write: QueuedWrite) throws -> JSONValue? {
                 let row = try #require(answered.first { $0.id == write.id })
                 #expect(row.verdict == .accepted)
-                return try Properties.object(try #require(row.answer))["mime_type"]
+                return try JSONObject(json: try #require(row.answer))["mime_type"]
             }
             #expect(try mimeType(given) == "text/markdown")
             #expect(try mimeType(guessed) == "text/plain")
@@ -699,7 +699,11 @@ extension LiveWorkingCopies {
 
             _ = try await copy.queue.forgetAnswered()
             let kept = try #require(try await copy.queue.all().first { $0.id == refused.id })
-            #expect(kept.body["properties"] == ["title": "Too many", "serves": "many"], "\(kept.body)")
+            // The type was declared through an unordered dictionary, so its
+            // fields' order, and the create's with it, is not fixed here.
+            let sent = try #require(kept.body["properties"]?.object, "\(kept.body)")
+            #expect(Set(sent.keys) == ["title", "serves"])
+            #expect(sent["title"] == "Too many" && sent["serves"] == "many")
             #expect(kept.verdict == .refused(refusal))
             #expect(try await copy.queue.discard(refused.id))
             #expect(try await copy.queue.all().contains { $0.id == refused.id } == false)
@@ -734,6 +738,18 @@ extension LiveWorkingCopies {
         .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
         .timeLimit(.minutes(2)))
     struct LiveCatalog {
+        /// Each definition's keys in the server's order, whatever order the
+        /// fields themselves come in.
+        private func expect(
+            _ fields: [TypeField], as answered: JSONObject, sourceLocation: SourceLocation = #_sourceLocation
+        ) {
+            #expect(Set(answered.keys) == Set(fields.map(\.name)), sourceLocation: sourceLocation)
+            for field in fields {
+                #expect(
+                    answered[field.name] == .object(field.definition), "\(field.name)", sourceLocation: sourceLocation)
+            }
+        }
+
         @Test func aCustomTypeAndAnEdgeTypeReachTheAppAsTheServerHoldsThem() async throws {
             let suffix = UUID().uuidString.prefix(8).lowercased()
             let dish = "user.dish\(suffix)"
@@ -779,9 +795,7 @@ extension LiveWorkingCopies {
                 }
                 #expect(answered["label"] == .string("Recipe"))
                 #expect(answered["parent"] == .string(dish))
-                #expect(
-                    Dictionary(uniqueKeysWithValues: type.fields.map { ($0.name, JSONValue.object($0.definition)) })
-                        == fields)
+                expect(type.fields, as: fields)
 
                 let listed = try await catalog.itemTypes()
                 #expect(listed.map(\.id) == listed.map(\.id).sorted())
@@ -804,14 +818,7 @@ extension LiveWorkingCopies {
                     server["target_type_constraints"] == .array(edgeType.targetTypeConstraints.map(JSONValue.string)))
                 #expect(server["shipped"] == .bool(edgeType.shipped))
                 #expect(!edgeType.shipped)
-                #expect(
-                    server["property_schema"]
-                        == .object(
-                            Dictionary(
-                                uniqueKeysWithValues: edgeType.properties.map {
-                                    ($0.name, JSONValue.object($0.definition))
-                                }
-                            )))
+                expect(edgeType.properties, as: server["property_schema"]?.object ?? [:])
                 #expect(edgeType.properties.map(\.declaredBy) == [inspired])
                 let edgeTypes = try await catalog.edgeTypes()
                 #expect(edgeTypes.contains { $0.id == inspired })

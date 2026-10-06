@@ -1,5 +1,3 @@
-import Foundation
-
 public enum JSONValue: Sendable, Hashable {
     case null
     case bool(Bool)
@@ -10,7 +8,28 @@ public enum JSONValue: Sendable, Hashable {
     case number(Double)
     case string(String)
     case array([JSONValue])
-    case object([String: JSONValue])
+    case object(JSONObject)
+
+    /// The deepest nesting of arrays and objects that ``init(json:)`` and
+    /// ``JSONObject/init(json:)`` read.
+    public static let nestingLimit = 512
+
+    /// Reads strict RFC 8259 JSON text, keeping each object's keys in order.
+    ///
+    /// Refuses, as `MarfaError.decoding`, anything else: comments, trailing
+    /// commas, a number JSON does not allow or a `Double` cannot hold, an
+    /// unescaped control character, a lone surrogate, invalid UTF-8, a key
+    /// repeated in one object, and nesting deeper than ``nestingLimit``.
+    public init(json: String) throws {
+        self = try JSONReader.value(json)
+    }
+
+    /// Compact JSON text with each object's keys in order.
+    ///
+    /// Throws `MarfaError.invalid` for a number that is not finite.
+    public func json() throws -> String {
+        try JSONWriter.text(self)
+    }
 
     public var string: String? {
         if case .string(let value) = self { value } else { nil }
@@ -32,6 +51,22 @@ public enum JSONValue: Sendable, Hashable {
     public var bool: Bool? {
         if case .bool(let value) = self { value } else { nil }
     }
+
+    public var array: [JSONValue]? {
+        if case .array(let value) = self { value } else { nil }
+    }
+
+    public var object: JSONObject? {
+        if case .object(let value) = self { value } else { nil }
+    }
+}
+
+extension JSONValue: CustomStringConvertible {
+    /// JSON text, except that a number that is not finite shows as Swift
+    /// writes it.
+    public var description: String {
+        JSONWriter.description(self)
+    }
 }
 
 extension JSONValue: Codable {
@@ -50,7 +85,7 @@ extension JSONValue: Codable {
         } else if let value = try? container.decode([JSONValue].self) {
             self = .array(value)
         } else {
-            self = .object(try container.decode([String: JSONValue].self))
+            self = .object(try container.decode(JSONObject.self))
         }
     }
 
@@ -79,16 +114,6 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, Expre
     public init(stringLiteral value: String) { self = .string(value) }
     public init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
     public init(dictionaryLiteral elements: (String, JSONValue)...) {
-        self = .object(Dictionary(elements, uniquingKeysWith: { _, last in last }))
-    }
-}
-
-enum Properties {
-    static func text(_ properties: [String: JSONValue]) throws -> String {
-        String(decoding: try JSONEncoder().encode(properties), as: UTF8.self)
-    }
-
-    static func object(_ text: String) throws -> [String: JSONValue] {
-        try JSONDecoder().decode([String: JSONValue].self, from: Data(text.utf8))
+        self = .object(JSONObject(elements))
     }
 }

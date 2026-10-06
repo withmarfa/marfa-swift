@@ -5213,7 +5213,7 @@ public enum Operations {
                         public var value1: Components.Schemas.ItemWithMetadata
                         /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/200/content/json/value2`.
                         public struct Value2Payload: Codable, Hashable, Sendable {
-                            /// What Marfa did to resolve a conflict. Present only when `conflict=auto` resolved one. `conflicted_copy_id` is the ID of the sibling item that holds the losing values.
+                            /// What Marfa did to resolve a conflict. Present only when `conflict=auto` resolved one. `conflicted_copy_id` is the ID of the sibling item that holds the losing values, which has a `derived-from` edge to this item.
                             ///
                             /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/200/content/json/value2/conflict_resolution`.
                             public struct ConflictResolutionPayload: Codable, Hashable, Sendable {
@@ -5262,14 +5262,14 @@ public enum Operations {
                                     case conflictedCopyId = "conflicted_copy_id"
                                 }
                             }
-                            /// What Marfa did to resolve a conflict. Present only when `conflict=auto` resolved one. `conflicted_copy_id` is the ID of the sibling item that holds the losing values.
+                            /// What Marfa did to resolve a conflict. Present only when `conflict=auto` resolved one. `conflicted_copy_id` is the ID of the sibling item that holds the losing values, which has a `derived-from` edge to this item.
                             ///
                             /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/200/content/json/value2/conflict_resolution`.
                             public var conflictResolution: Operations.UpdateItem.Output.Ok.Body.JsonPayload.Value2Payload.ConflictResolutionPayload?
                             /// Creates a new `Value2Payload`.
                             ///
                             /// - Parameters:
-                            ///   - conflictResolution: What Marfa did to resolve a conflict. Present only when `conflict=auto` resolved one. `conflicted_copy_id` is the ID of the sibling item that holds the losing values.
+                            ///   - conflictResolution: What Marfa did to resolve a conflict. Present only when `conflict=auto` resolved one. `conflicted_copy_id` is the ID of the sibling item that holds the losing values, which has a `derived-from` edge to this item.
                             public init(conflictResolution: Operations.UpdateItem.Output.Ok.Body.JsonPayload.Value2Payload.ConflictResolutionPayload? = nil) {
                                 self.conflictResolution = conflictResolution
                             }
@@ -5330,7 +5330,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the updated item and its metadata. If `conflict=auto` resolved a collision, `conflict_resolution` lists the fields and strategies. A `keep_both_copies` field keeps the current value and puts yours on a new sibling tagged `conflicted-copy`.
+            /// Returns the updated item and its metadata. If `conflict=auto` resolved a collision, `conflict_resolution` lists the fields and strategies. A `keep_both_copies` field keeps the current value and puts yours on a new sibling tagged `conflicted-copy`, with a `derived-from` edge to this item.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/200`.
             ///

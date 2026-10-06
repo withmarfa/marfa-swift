@@ -40,7 +40,7 @@ enum Scenario {
                 let firstId = first.itemId ?? ""
                 let held = try await copy.items.get(firstId)
                 _ = try await copy.items.update(
-                    firstId, Edit(properties: ["title": "Sample first, edited"], baseVersion: held?.version ?? 0))
+                    firstId, Edit(.merge(["title": "Sample first, edited"]), baseVersion: held?.version ?? 0))
                 _ = try await copy.tags.add("favorite", to: firstId)
                 _ = try await copy.edges.create(from: firstId, to: second.itemId ?? "", type: "references")
                 let file = FileManager.default.temporaryDirectory.appending(path: "sample-attachment.txt")
@@ -58,7 +58,7 @@ enum Scenario {
                     let read = try await copy.items.get(kept.id)
                     edits.append(
                         try await copy.items.update(
-                            kept.id, Edit(properties: ["body": .string(body)], baseVersion: read?.version ?? 0)))
+                            kept.id, Edit(.merge(["body": .string(body)]), baseVersion: read?.version ?? 0)))
                 }
                 expect(edits.count == 2 && edits[1].follows == edits[0].id, "the second edit does not follow the first")
                 try await checkSearch(first: firstId, kept: kept.id, in: copy, expect)

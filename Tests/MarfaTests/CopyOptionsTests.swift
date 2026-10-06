@@ -63,16 +63,60 @@ struct CopyOptions {
         await copy.close()
     }
 
-    @Test func anExpiredChangeRetainsItsReason() async throws {
+    @Test func theFollowSaysTypedWhenTheServerGoesAndComesBack() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.change(
             0,
-            MarfaCore.Change(event: "copy.expired", itemId: nil, edgeId: nil, cursor: "3", reason: "instance_changed"))
-        try await eventually("expiry was told") { heard.all.count == 1 }
-        #expect(heard.all.first?.reason == "instance_changed")
-        #expect(heard.all.first?.origin == .server(event: "copy.expired", cursor: "3"))
+            MarfaCore.Change(
+                event: "server.unreachable", itemId: nil, edgeId: nil, cursor: "3",
+                reason: .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7)))
+        core.change(
+            0, MarfaCore.Change(event: "server.reachable", itemId: nil, edgeId: nil, cursor: "3", reason: nil))
+        try await eventually("both were told") { heard.all.count == 2 }
+        #expect(
+            heard.all.map(\.origin) == [
+                .serverUnreachable(.rateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7)),
+                .serverReachable,
+            ])
+        await copy.close()
+    }
+
+    @Test func theServersStateOutlastsAFollowAndIsToldOnce() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let heard = Heard(copy.changes())
+        try await eventually("the follow started") { core.follows.count == 1 }
+        let gone = MarfaCore.MarfaError.Network(message: "refused")
+        core.change(
+            0, MarfaCore.Change(event: "server.unreachable", itemId: nil, edgeId: nil, cursor: "3", reason: gone))
+        try await eventually("the server's going was told") { heard.all.count == 1 }
+
+        // A catch-up that fails restarts the follow, which is told it, and a
+        // second word of the same is not told again.
+        core.state.withLock { $0.catchUpFails = gone }
+        _ = try? await copy.catchUp()
+        try await eventually("the follow started again") { core.follows.count == 2 }
+        #expect(core.follows[1].toldUnreachable, "a new follow was not told the server was unreachable")
+        core.change(
+            1, MarfaCore.Change(event: "server.unreachable", itemId: nil, edgeId: nil, cursor: "3", reason: gone))
+
+        // A stream added meanwhile is told where the server stands.
+        let late = Heard(copy.changes())
+        try await eventually("the late stream was told") { late.all.count == 1 }
+        #expect(late.all.map(\.origin) == [.serverUnreachable(.network(message: "refused"))])
+
+        // A catch-up that reaches the server says it came back, once.
+        core.state.withLock { $0.catchUpFails = nil }
+        _ = try await copy.catchUp()
+        try await eventually("the server's return was told") { heard.all.count == 2 }
+        core.change(
+            core.follows.count - 1,
+            MarfaCore.Change(event: "server.reachable", itemId: nil, edgeId: nil, cursor: "3", reason: nil))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all.map(\.origin) == [.serverUnreachable(.network(message: "refused")), .serverReachable])
+        #expect(core.follows.last?.toldUnreachable == false)
         await copy.close()
     }
 }

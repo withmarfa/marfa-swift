@@ -11,6 +11,18 @@ import Testing
             createdAt: "2026-09-26T00:00:00.000Z", updatedAt: "2026-09-26T00:00:00.000Z", tags: ["favorite"])
         #expect(item.properties["body"]?.string == "text")
         #expect(item.version == 3)
+        #expect(item.title == nil)
+        let titled = Item(
+            id: "item", type: "core.event", properties: ["title": "Standup", "description": "Daily"], state: .active,
+            tier: .library, version: 1, schemaVersion: 1, source: "app", sourceId: nil,
+            occurredAt: "2026-09-26T00:00:00.000Z", createdAt: "2026-09-26T00:00:00.000Z",
+            updatedAt: "2026-09-26T00:00:00.000Z", tags: [], title: "Standup", body: "Daily")
+        #expect(titled.body == "Daily")
+        let edits = [
+            Edit(.merge(["title": "a"]), baseVersion: 1), Edit(.replace(["body": "b"]), baseVersion: 1),
+            Edit(baseVersion: 1, type: "core.task", tier: .feed),
+        ]
+        #expect(Set(edits).count == 3)
 
         let edge = Edge(
             id: "edge", sourceId: "reply", targetId: "item", edgeType: "in-thread", properties: ["position": 1],
@@ -80,6 +92,8 @@ import Testing
         #expect(edgeType.writtenAt == .target)
         #expect(Status(catalogVersion: 2).catalogVersion == 2)
         #expect(Change.Refresh.catalog != .hydrated)
+        #expect(Change.Origin.serverUnreachable(.network(message: "m")) != .serverReachable)
+        #expect(Change.Refresh.purged != .unpinned)
     }
 }
 
@@ -123,7 +137,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         }
     let originRead: Bool =
         switch origin {
-        case .local, .server, .answered, .saved, .refreshed, .stopped: true
+        case .local, .server, .serverUnreachable, .serverReachable, .answered, .saved, .refreshed, .stopped: true
         }
     let errorRead: Bool =
         switch error {

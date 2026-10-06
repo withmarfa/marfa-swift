@@ -415,7 +415,7 @@ public struct QueuedWrite: Sendable, Hashable {
     public var waiting: Bool
     /// What the write sends, or sent; a refused write that carried content
     /// keeps it here, through `forgetAnswered()`, until `discard(_:)`.
-    public var body: [String: JSONValue]
+    public var body: JSONObject
     /// The server's answer, whole, as it arrived.
     public var answer: String?
     public var refusals: Int64
@@ -426,7 +426,7 @@ public struct QueuedWrite: Sendable, Hashable {
         id: String, kind: WriteKind, itemId: String? = nil, targetId: String? = nil, edgeId: String? = nil,
         namespace: String? = nil, tag: String? = nil, blob: String? = nil, baseVersion: Int64? = nil,
         idempotencyKey: String, dependsOn: [String] = [], follows: String? = nil, verdict: Verdict? = nil,
-        waiting: Bool = false, body: [String: JSONValue] = [:], answer: String? = nil, refusals: Int64 = 0,
+        waiting: Bool = false, body: JSONObject = [:], answer: String? = nil, refusals: Int64 = 0,
         queuedAt: String, answeredAt: String? = nil
     ) {
         self.id = id
@@ -456,7 +456,7 @@ public struct QueuedWrite: Sendable, Hashable {
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,
             baseVersion: core.baseVersion, idempotencyKey: core.idempotencyKey, dependsOn: core.dependsOn,
             follows: core.follows, verdict: core.verdict.map(Verdict.init), waiting: core.waiting,
-            body: try Properties.object(core.bodyJson), answer: core.answer, refusals: core.refusals,
+            body: try JSONObject(json: core.bodyJson), answer: core.answer, refusals: core.refusals,
             queuedAt: core.queuedAt, answeredAt: core.answeredAt)
     }
 
@@ -465,7 +465,7 @@ public struct QueuedWrite: Sendable, Hashable {
             id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
-            bodyJson: try Properties.text(body), answer: answer, refusals: refusals, queuedAt: queuedAt,
+            bodyJson: try body.json(), answer: answer, refusals: refusals, queuedAt: queuedAt,
             answeredAt: answeredAt)
     }
 }
