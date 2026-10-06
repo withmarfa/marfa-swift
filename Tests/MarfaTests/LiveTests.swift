@@ -8,6 +8,19 @@ enum Live {
     static let named = Result { try Server.fromEnvironment() }
     static var server: Server? { try? named.get() }
 
+    /// A lowercase UUIDv7, the only shape the core accepts for an id an app names itself.
+    static func uuidV7() -> String {
+        var bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max) }
+        let milliseconds = UInt64(Date().timeIntervalSince1970 * 1000)
+        for index in 0..<6 { bytes[index] = UInt8(truncatingIfNeeded: milliseconds >> UInt64(8 * (5 - index))) }
+        bytes[6] = (bytes[6] & 0x0F) | 0x70
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        let hex = bytes.map { String(format: "%02x", $0) }
+        let parts = [hex[0..<4], hex[4..<6], hex[6..<8], hex[8..<10], hex[10..<16]]
+        let groups = parts.map { $0.joined() }
+        return groups.joined(separator: "-")
+    }
+
     static func store() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "marfa-live-\(UUID()).sqlite")
     }
@@ -511,7 +524,7 @@ extension LiveWorkingCopies {
             _ = try await copy.items.restore(b)
             #expect(try await copy.items.get(b)?.state == .active)
 
-            let edgeId = UUID().uuidString.lowercased()
+            let edgeId = Live.uuidV7()
             let linked = try await copy.edges.create(from: a, to: b, type: "references", id: edgeId)
             #expect(linked.edgeId == edgeId)
             let from = try await copy.edges.from(a)
