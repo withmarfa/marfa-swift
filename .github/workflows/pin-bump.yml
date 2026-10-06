@@ -1,0 +1,190 @@
+name: Bump the core pin
+
+# Moves `core.pin` to marfa's `main` once a day, when that commit has a green
+# `ci.yml` run, regenerates what the pin generates, opens a pull request, waits
+# for its checks to merge it, then runs the release. A pull request opened with
+# the GitHub token would start no checks, so everything here uses the token of
+# the WithMarfa Bot app. A manual run is a dry run unless it says otherwise: it
+# moves the pin and builds, and pushes nothing. A bump whose checks fail stays
+# open and is the next session's to fix; no second one is opened beside it.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Move the pin and build in this run, without pushing, opening a pull request or releasing
+        type: boolean
+        default: true
+
+concurrency:
+  group: pin-bump
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BRANCH: automation/core-pin
+
+jobs:
+  bump:
+    name: Open the pin bump
+    runs-on: xcode-27
+    timeout-minutes: 90
+    outputs:
+      number: ${{ steps.open.outputs.number }}
+    env:
+      MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.build/core-target
+      MARFA_GENERATOR_BUILD: ${{ github.workspace }}/.build/generator-build
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          app-id: ${{ vars.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+
+      - name: Decide
+        id: decide
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          current="$(tr -d '[:space:]' < core.pin)"
+          head="$(git ls-remote https://github.com/withmarfa/marfa refs/heads/main | cut -f1)"
+          ci="$(gh run list --repo withmarfa/marfa --workflow ci.yml --branch main --event push \
+            --commit "${head}" --json status,conclusion \
+            --jq 'if length == 0 then "none" elif .[0].status != "completed" then "pending" else .[0].conclusion end')"
+          open="$(gh pr list --repo "${GITHUB_REPOSITORY}" --head "${BRANCH}" --state open --json number --jq length)"
+          result="$(scripts/pin-bump.sh decide "${current}" "${head}" "${ci}" "${open}")"
+          echo "${result}"
+          echo "head=${head}" >> "$GITHUB_OUTPUT"
+          if [[ "${result}" == bump ]]; then
+            echo "bump=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=false" >> "$GITHUB_OUTPUT"
+            echo "${result}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Select Xcode
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        run: |
+          if [[ ! -d /Applications/Xcode.app ]]; then
+            echo "::error::This hosted runner has no /Applications/Xcode.app."
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Add the iOS targets
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - uses: actions/setup-node@v7
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        with:
+          node-version: 22
+
+      - name: Check out the core at the new pin
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        uses: actions/checkout@v7
+        with:
+          repository: withmarfa/marfa
+          ref: ${{ steps.decide.outputs.head }}
+          path: .build/marfa
+          persist-credentials: false
+
+      - name: Move the pin and regenerate
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        env:
+          HEAD: ${{ steps.decide.outputs.head }}
+        run: |
+          echo "${HEAD}" > core.pin
+          scripts/core.sh
+
+      - name: Build
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        run: swift build
+
+      - name: Open the pull request
+        id: open
+        if: ${{ steps.decide.outputs.bump == 'true' && (github.event_name == 'schedule' || !inputs.dry_run) }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          HEAD: ${{ steps.decide.outputs.head }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          short="${HEAD:0:7}"
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          git add -A -- core.pin Sources
+          git commit -q -m "chore(package): build against marfa ${short}"
+          git push -q origin "${BRANCH}"
+          {
+            echo "## Summary"
+            echo
+            echo "Moves \`core.pin\` to marfa \`${short}\`, the head of marfa's \`main\` with a green \`ci.yml\` run, and regenerates the glue and the wire types it generates."
+            echo
+            echo "## Changes"
+            echo
+            echo "- \`core.pin\` names \`${HEAD}\`."
+            echo "- \`Sources/MarfaCore\` and \`Sources/MarfaTypes\` are what that commit generates."
+            echo
+            echo "## Testing"
+            echo
+            echo "The core built at the new pin and \`swift build\` passed in this run. The required checks run on this pull request in full, and it merges when they pass."
+            echo
+            echo "## Notes for reviewers"
+            echo
+            echo "Opened by the \`Bump the core pin\` workflow. Once merged, the workflow runs the release. A bump whose checks fail stays open, and no second one is opened beside it."
+            echo
+            echo "## Checklist"
+            echo
+            echo "- [x] Conventional Commit title"
+            echo "- [x] Checks run"
+          } > "${RUNNER_TEMP}/body.md"
+          url="$(gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${BRANCH}" \
+            --title "chore(package): build against marfa ${short}" --body-file "${RUNNER_TEMP}/body.md")"
+          number="${url##*/}"
+          gh pr merge "${number}" --repo "${GITHUB_REPOSITORY}" --squash --auto --delete-branch
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Release the bump
+    needs: bump
+    if: ${{ needs.bump.outputs.number != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          app-id: ${{ vars.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
+
+      - name: Wait for the merge, then run the release
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          NUMBER: ${{ needs.bump.outputs.number }}
+        run: |
+          for _ in $(seq 1 220); do
+            state="$(gh pr view "${NUMBER}" --repo "${GITHUB_REPOSITORY}" --json state --jq .state)"
+            case "${state}" in
+              MERGED)
+                gh workflow run release.yml --repo "${GITHUB_REPOSITORY}" --ref main -f dry_run=false
+                exit 0
+                ;;
+              CLOSED)
+                echo "::error::Pull request ${NUMBER} was closed without merging."
+                exit 1
+                ;;
+            esac
+            sleep 60
+          done
+          echo "::error::Pull request ${NUMBER} did not merge in time; its checks may have failed, and it stays open."
+          exit 1
