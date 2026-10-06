@@ -234,6 +234,30 @@ while true {
 try await copy.items.purge(item.id, version: item.version)
 ```
 
+## Edit an edge and move its end
+
+`edges.update(_:_:)` changes an edge's properties, moves one of its ends, or does both in one queued write. An `EdgeEdit` carries the properties to merge over the edge's, the version the copy holds, and the end to move. The edge keeps its id and its properties, and the end never holds no edge or two:
+
+```swift
+guard let edge = try await copy.edges.to(childId).first else { return }
+// A child changes parent: its `parent-of` edge now comes from another item.
+_ = try await copy.edges.update(edge.id, EdgeEdit(baseVersion: edge.version, move: .source(newParentId)))
+// A reply changes thread and merges a property.
+_ = try await copy.edges.update(
+    replyEdge.id, EdgeEdit(["note": "moved"], baseVersion: replyEdge.version, move: .target(newThreadId)))
+```
+
+The copy shows the edge at its new end at once, read from either end, offline included, and a move to an item whose create is still queued waits for that create. An edit throws `invalid` where its `baseVersion` is not the one the copy holds, and `notFound` where the copy does not hold the edge.
+
+Only one end moves, and only where the end that stays holds one edge of the type, so the move replaces it: the target of `in-thread` moves, because each reply holds one thread, and the source of `parent-of` moves, because each child holds one parent. A move throws `validation` and queues nothing in two cases:
+
+- `validation_error` where the type lets the end that stays hold more than one edge, such as `references` or `about`. Delete the edge and create the one wanted.
+- `edge_cycle` where the move would leave the edge running from an item to itself.
+
+A refusal that turns on rows the copy may not hold is queued, and the server refuses it with its own code in the write's `verdict`: `edge_cycle` for a longer `parent-of` or `supersedes` cycle, `edge_constraint_violation` for a new end that already holds its one edge, and `item_not_found` for a new end the server does not hold. The edge returns to where it was.
+
+Once the server accepts a source move, the drain throws `copyExpired(reason: "read_view_changed", …)`, as it does for a retype: the write is answered, and the app hydrates again. A target move leaves the copy current.
+
 ## Keep a copy in sync
 
 Nothing runs on its own, so an app drives the copy through its life:

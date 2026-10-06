@@ -395,6 +395,53 @@ public struct Edit: Sendable, Hashable {
     }
 }
 
+/// A change to an edge's properties, a move of one of its ends, or both, and
+/// the version it was read at.
+///
+/// A move is one write that carries the end it moves, so the end never holds
+/// no edge or two. An end the edge already holds moves nothing and is not
+/// sent. Only one end moves at a time, so the type cannot name both.
+///
+/// A move is refused `MarfaError.validation` before anything is queued, with
+/// the code `validation_error` where the edge's type lets the end that stays
+/// hold more than one edge, such as `about`, and with the code `edge_cycle`
+/// where the move would leave the edge running from an item to itself. A
+/// move the copy cannot judge, such as one that closes a longer cycle, is
+/// queued and refused by the server, and its verdict says why.
+///
+/// Once the server accepts a source move, the drain throws
+/// `MarfaError.copyExpired` with the reason `read_view_changed`, as it does
+/// for a retype. The write is answered, and the app hydrates again. A target
+/// move does not expire the copy.
+public struct EdgeEdit: Sendable, Hashable {
+    /// The end of an edge to move, and the item to move it to.
+    public enum Move: Sendable, Hashable {
+        case source(String)
+        case target(String)
+    }
+
+    /// Each property given replaces its whole value; every other one stays as it is.
+    public var properties: JSONObject
+    public var baseVersion: Int64
+    public var move: Move?
+
+    public init(_ properties: JSONObject = [:], baseVersion: Int64, move: Move? = nil) {
+        self.properties = properties
+        self.baseVersion = baseVersion
+        self.move = move
+    }
+
+    func core() throws -> MarfaCore.EdgeEdit {
+        let moves: MarfaCore.EdgeMove? =
+            switch move {
+            case .source(let id): MarfaCore.EdgeMove(end: .source, to: id)
+            case .target(let id): MarfaCore.EdgeMove(end: .target, to: id)
+            case nil: nil
+            }
+        return MarfaCore.EdgeEdit(propertiesJson: try properties.json(), baseVersion: baseVersion, moves: moves)
+    }
+}
+
 /// With `state` unset, a list answers active items only; `allStates` lifts
 /// that, and a named `state` wins over both.
 public struct ListFilters: Sendable, Hashable {

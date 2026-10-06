@@ -466,7 +466,7 @@ extension LiveWorkingCopies {
             let edgeId = try #require(edge.edgeId)
             #expect(edge.targetId != edgeId)
             let edgeVersion = try #require(try await copy.edges.from(a).first).version
-            _ = record(try await copy.edges.update(edgeId, properties: [:], baseVersion: edgeVersion))
+            _ = record(try await copy.edges.update(edgeId, EdgeEdit(baseVersion: edgeVersion)))
             _ = record(try await copy.edges.delete(edgeId))
             _ = record(try await copy.items.transition(b, to: .archived))
             _ = record(try await copy.items.delete(b))
@@ -527,12 +527,12 @@ extension LiveWorkingCopies {
             #expect(try await copy.edges.ofType("in-thread").contains { $0.id == edgeId } == false)
             let held = try #require(from.first).version
             await #expect {
-                _ = try await copy.edges.update(edgeId, properties: [:], baseVersion: held + 7)
+                _ = try await copy.edges.update(edgeId, EdgeEdit(baseVersion: held + 7))
             } throws: { error in
                 guard case Marfa.MarfaError.invalid(let message) = error else { return false }
                 return message.contains("version \(held + 7)")
             }
-            let updated = try await copy.edges.update(edgeId, properties: [:], baseVersion: held)
+            let updated = try await copy.edges.update(edgeId, EdgeEdit(baseVersion: held))
             #expect(updated.baseVersion == held)
         }
 
