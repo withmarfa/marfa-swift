@@ -1075,6 +1075,13 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     func search(query: String, filters: SearchFilters, limit: UInt32) throws  -> [SearchHit]
     
+    /**
+     * The server's item types and edge types, read from it now, so an app
+     * can choose a slice before a first hydration. Nothing in the copy
+     * changes. `NoServer` for a copy with no server.
+     */
+    func serverCatalog(stop: Stop?) throws  -> ServerCatalog
+    
     func status() throws  -> Status
     
     /**
@@ -1825,6 +1832,20 @@ open func search(query: String, filters: SearchFilters, limit: UInt32)throws  ->
         FfiConverterString.lower(query),
         FfiConverterTypeSearchFilters_lower(filters),
         FfiConverterUInt32.lower(limit),$0
+    )
+})
+}
+    
+    /**
+     * The server's item types and edge types, read from it now, so an app
+     * can choose a slice before a first hydration. Nothing in the copy
+     * changes. `NoServer` for a copy with no server.
+     */
+open func serverCatalog(stop: Stop?)throws  -> ServerCatalog  {
+    return try  FfiConverterTypeServerCatalog_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_server_catalog(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionTypeStop.lower(stop),$0
     )
 })
 }
@@ -6878,6 +6899,75 @@ public func FfiConverterTypeSearchHit_lower(_ value: SearchHit) -> RustBuffer {
 
 
 /**
+ * A server's two catalogs as it lists them now.
+ */
+public struct ServerCatalog: Equatable, Hashable {
+    /**
+     * By id.
+     */
+    public var itemTypes: [ItemType]
+    /**
+     * By id.
+     */
+    public var edgeTypes: [EdgeType]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * By id.
+         */itemTypes: [ItemType], 
+        /**
+         * By id.
+         */edgeTypes: [EdgeType]) {
+        self.itemTypes = itemTypes
+        self.edgeTypes = edgeTypes
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ServerCatalog: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeServerCatalog: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ServerCatalog {
+        return
+            try ServerCatalog(
+                itemTypes: FfiConverterSequenceTypeItemType.read(from: &buf), 
+                edgeTypes: FfiConverterSequenceTypeEdgeType.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ServerCatalog, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeItemType.write(value.itemTypes, into: &buf)
+        FfiConverterSequenceTypeEdgeType.write(value.edgeTypes, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeServerCatalog_lift(_ buf: RustBuffer) throws -> ServerCatalog {
+    return try FfiConverterTypeServerCatalog.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeServerCatalog_lower(_ value: ServerCatalog) -> RustBuffer {
+    return FfiConverterTypeServerCatalog.lower(value)
+}
+
+
+/**
  * What became of the folder's settings file in a pass.
  */
 public struct SettingsFileOutcome: Equatable, Hashable {
@@ -10804,6 +10894,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_search() != 11561) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_server_catalog() != 47388) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_status() != 27928) {
