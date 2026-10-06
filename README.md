@@ -264,11 +264,36 @@ for await change in copy.changes() {
 
 A stream that tells `.stopped` has ended its follow until the next hydration or catch-up. `copyExpired` means the copy can no longer be kept current from where it is, after the server's log moved past it, another instance answered at its address, or its read view changed, such as after a retype or a type registered: hydrate again, and the queue survives. `unauthorized` means the server refused the key, and `signedOut` that a signed-in credential is gone: get a new key and pass it to `useKey(_:)`, and the follow starts again with it.
 
+## Read and manage folders
+
+A `system.folder` item holds the settings of a folder: the search that decides what it holds, the defaults a new file takes, the paths a folder on disk includes and ignores, where an item first appears, and when a removal waits for confirmation. `Folder` and `FolderSettings` carry them, so an app can show a folder, list what it holds and change its settings without a directory on disk.
+
+Create a folder, then read what it holds from the copy alone:
+
+```swift
+let folder = try await copy.createFolder(
+    FolderSettings(title: "Recipes", search: FolderSearch(types: ["core.note"], filter: "tags contains \"recipe\"")))
+for item in try await copy.items.list(inFolder: folder.id) {
+    print(item.title ?? item.id)
+}
+let hits = try await copy.search("marmalade", inFolder: folder.id)
+```
+
+The copy holds a folder where its slice names `system.folder` or the folder is pinned. `items.folder(_:)` answers `nil` for one the copy doesn't hold, and throws `invalid` for a held item that isn't a `system.folder`. `list(inFolder:)` and `search(_:inFolder:)` throw `notFound` with the code `not_held`. They throw `invalid` where the copy can't answer the search whole, and never return part of it: a copy with no slice yet, a type or tier the search holds that the slice doesn't, a `beneath` search without `parent-of` edges held whole, a revoked folder, an item that isn't a `system.folder`, or settings that name a condition no folder follows, such as a `backref`.
+
+A folder write goes to the server at once and is never queued, because only the server's folder door writes a `system.folder`. With no server, or none reachable, it throws and nothing waits to be sent. The copy holds the answer at once where its slice or a pin takes it; if the core can't read the row back, it arrives at the next catch-up. A `network` failure after the request went out may follow a folder the server made, so retry `createFolder(_:idempotencyKey:)` with the same key, which answers the first folder. Settings the core refuses throw before anything is sent: `invalid` for settings no folder follows, and `validation` for a filter that doesn't parse. `changeFolder(_:_:baseVersion:)` replaces each setting its `FolderSettingsChange` names, whole, and leaves the others. A setting changed since `baseVersion` throws `server` with status 409 and the code `version_conflict`; a revoked folder throws `validation` with the code `invalid_transition`. `revokeFolder(_:)` is final. Each write tells `changes()` `.refreshed(.folderWritten)` with the folder's ID:
+
+```swift
+let renamed = try await copy.changeFolder(
+    folder.id, FolderSettingsChange(title: "Pantry"), baseVersion: folder.version)
+_ = try await copy.revokeFolder(renamed.id)
+```
+
 ## Sync a folder on a Mac
 
 A folder is a directory whose files Marfa keeps in step with the search a `system.folder` item on the server describes. `Folders` manages them on macOS through the same core and the same registry as `marfa folders`, so a folder added from an app appears in `marfa folders list`, and one added from the command line appears in `folders.list()`.
 
-1. Create the folder's settings on the server, for example with `marfa folders create --title Notes --search '{"types":["core.note"]}'`, and note the returned item ID.
+1. Create the folder's settings on the server with `createFolder(_:)` on a working copy, or with `marfa folders create --title Notes --search '{"types":["core.note"]}'`, and note the returned item ID.
 1. Add the directory. A new folder's first sync waits for you to confirm it, so `sync(_:)` reads the folder and says what it will do, and nothing is written into the directory or sent until `confirmFirstSync(in:)`:
 
     ```swift
@@ -299,7 +324,7 @@ A folder is a directory whose files Marfa keeps in step with the search a `syste
     }
     ```
 
-1. Read what the sync held back and what the server did with your edits. `pass.flagged` lists each file the scan or the pull held, with why. For a file the pull didn't write, `item` is the ID of the item it stands for. `pass.drain` counts every write the sync sent, including the placements of the files the pull wrote, and its verdicts say when the server kept its own text and put an edit's text in a copy:
+1. Read what the sync held back and what the server did with your edits. `pass.pull?.removed` counts the files the pull took off the disk, and `pass.pull?.purged` how many of those were files of purged items, which no restore brings back; `pass.pull` is `nil` where the copy expired and couldn't be hydrated. `pass.flagged` lists each file the scan or the pull held, with why. For a file the pull didn't write, `item` is the ID of the item it stands for. `pass.drain` counts every write the sync sent, including the placements of the files the pull wrote, and its verdicts say when the server kept its own text and put an edit's text in a copy:
 
     ```swift
     for file in synced.pass.flagged {

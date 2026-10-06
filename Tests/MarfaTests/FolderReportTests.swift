@@ -7,7 +7,8 @@ import Testing
 
 /// A core pass with nothing in it, for a test to set what it looks at.
 private func corePass(
-    drain: MarfaCore.DrainReport = coreDrain(), flagged: [MarfaCore.FlaggedFile] = []
+    drain: MarfaCore.DrainReport = coreDrain(), flagged: [MarfaCore.FlaggedFile] = [], removed: UInt64 = 0,
+    purged: UInt64 = 0
 ) -> MarfaCore.FolderPass {
     MarfaCore.FolderPass(
         settings: MarfaCore.SettingsFileOutcome(sent: false, written: false, flagged: nil, unwritten: nil),
@@ -16,7 +17,8 @@ private func corePass(
             paused: 0, trashed: [], secrets: [], warnings: [], rootGone: nil),
         drain: drain, rebased: 0, gaveWay: 0,
         pull: MarfaCore.FolderPull(
-            written: 0, rewritten: 0, moved: 0, unchanged: 0, skipped: 0, removed: 0, purged: 0, kept: 0, unwritten: 0,
+            written: 0, rewritten: 0, moved: 0, unchanged: 0, skipped: 0, removed: removed, purged: purged, kept: 0,
+            unwritten: 0,
             absent: 0, unplaced: 0, unmatched: 0, paused: 0, rootGone: nil),
         flagged: flagged)
 }
@@ -27,6 +29,13 @@ private func coreDrain(
     MarfaCore.DrainReport(
         answered: answered, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: verdicts,
         stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
+}
+
+@Test func aPassSaysHowManyOfTheFilesItRemovedWereOfPurgedItems() {
+    let pass = Marfa.FolderPass(corePass(removed: 5, purged: 2))
+    #expect(pass.pull?.removed == 5)
+    #expect(pass.pull?.purged == 2, "of the removed, not on top of them")
+    #expect(Marfa.FolderPass(corePass()).pull?.purged == 0)
 }
 
 @Test(arguments: ["unwritten", "outside", "unsuited", "absent", "retained"])
