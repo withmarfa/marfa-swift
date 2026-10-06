@@ -30,6 +30,20 @@ struct CopyOptions {
         await copy.close()
     }
 
+    @Test(arguments: [
+        (Marfa.SliceTier.library, MarfaCore.SliceTier.library), (.feed, .feed), (.all, .all),
+    ])
+    func hydrationCarriesEachSliceTier(tier: Marfa.SliceTier, core tierInCore: MarfaCore.SliceTier)
+        async throws
+    {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let report = try await copy.hydrate(types: ["core.note"], tier: tier)
+        #expect(core.state.withLock { $0.hydrationOptions }?.tier == tierInCore)
+        #expect(report.tier == tier)
+        await copy.close()
+    }
+
     @Test func hydrationPreservesRegistrationRefusals() async throws {
         let core = FakeCore.writer()
         core.state.withLock {
