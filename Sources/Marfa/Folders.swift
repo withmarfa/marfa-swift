@@ -531,6 +531,8 @@ public struct FolderPull: Sendable, Hashable {
     public let skipped: UInt64
     /// Files of items moved to the bin, purged, or moved out of the search's states, removed.
     public let removed: UInt64
+    /// Of `removed`, the files of items purged, which no restore brings back.
+    public let purged: UInt64
     /// Files of items gone from the search, kept because the person changed them.
     public let kept: UInt64
     /// Files the folder didn't write, and won't write over.
@@ -553,6 +555,7 @@ public struct FolderPull: Sendable, Hashable {
         unchanged = core.unchanged
         skipped = core.skipped
         removed = core.removed
+        purged = core.purged
         kept = core.kept
         unwritten = core.unwritten
         absent = core.absent
