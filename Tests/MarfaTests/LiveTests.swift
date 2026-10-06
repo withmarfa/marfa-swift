@@ -328,6 +328,40 @@ extension LiveWorkingCopies {
             #expect(fields == ["body"])
         }
 
+        @Test func aConflictedCopyAndItsOriginalFindEachOtherAfterTheStoreOpensAgain() async throws {
+            let store = Live.store()
+            let copy = try await Live.hydrated(store)
+            let made = try await copy.items.create(Live.note("original \(UUID())"))
+            _ = try await copy.queue.drain()
+            let id = try #require(made.itemId)
+            // Two copies edit the body from version 1, so the second keeps
+            // both: the server's text on the item, its own in a conflicted copy.
+            let elsewhere = try await Live.hydrated()
+            _ = try await copy.items.update(id, Edit(.merge(["body": "first"]), baseVersion: 1))
+            _ = try await copy.queue.drain()
+            let lost = try await elsewhere.items.update(id, Edit(.merge(["body": "lost"]), baseVersion: 1))
+            let report = try await elsewhere.queue.drain()
+            guard case .conflicted(let conflictedCopy, _) = report.verdicts.first(where: { $0.id == lost.id })?.verdict
+            else {
+                Issue.record("the stale body edit was not conflicted: \(report.verdicts)")
+                return
+            }
+            await elsewhere.close()
+            // The witness: before a catch-up brings the copy, neither end answers.
+            #expect(try await copy.items.conflictedCopies(of: id).isEmpty)
+            _ = try await copy.catchUp()
+            await copy.close()
+
+            let reopened = try await WorkingCopy.open(store: store, server: Live.server)
+            #expect(try await reopened.items.original(ofConflictedCopy: conflictedCopy) == id)
+            let copies = try await reopened.items.conflictedCopies(of: id)
+            #expect(copies.map(\.id) == [conflictedCopy])
+            #expect(copies.first?.body == "lost")
+            #expect(copies.first?.tags.contains("conflicted-copy") == true)
+            #expect(try await reopened.items.original(ofConflictedCopy: id) == nil)
+            await reopened.close()
+        }
+
         @Test func anEditBasedOnAnEarlierReadIsMerged() async throws {
             let copy = try await Live.hydrated()
             let note = try await copy.items.create(Live.note("read here"))

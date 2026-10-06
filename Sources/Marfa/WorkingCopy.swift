@@ -310,6 +310,23 @@ public struct Items: Sendable {
         try await holder.run { core in try core.get(id: id).map(Item.init) }
     }
 
+    /// The ID of the item a conflicted copy was made from: the item its
+    /// `derived-from` edge points to.
+    ///
+    /// `nil` unless `id` is a held item, outside the bin, tagged
+    /// `conflicted-copy`. The original may be an item the copy doesn't hold.
+    public func original(ofConflictedCopy id: String) async throws -> String? {
+        try await holder.run { core in try core.originalOfConflictedCopy(id: id) }
+    }
+
+    /// The held conflicted copies made from an item.
+    ///
+    /// Copies in the bin are left out. Oldest link first. The item itself need
+    /// not be held.
+    public func conflictedCopies(of id: String) async throws -> [Item] {
+        try await holder.run { core in try core.conflictedCopiesOf(id: id).map(Item.init) }
+    }
+
     /// Read from the held row, with no request.
     public func thumbnail(_ id: String) async throws -> Thumbnail? {
         try await holder.run { core in try core.thumbnail(id: id).map(Thumbnail.init) }
