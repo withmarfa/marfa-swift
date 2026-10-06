@@ -124,6 +124,7 @@ final class FakeCore: Core, @unchecked Sendable {
     struct Follow {
         let listener: any MarfaCore.ChangeListener
         let holdsStream: Bool
+        let toldUnreachable: Bool
         var stopped = false
         var ended = false
     }
@@ -183,10 +184,10 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.handle }
     }
 
-    override func follow(listener: any MarfaCore.ChangeListener) -> MarfaCore.Subscription {
+    override func follow(toldUnreachable: Bool, listener: any MarfaCore.ChangeListener) -> MarfaCore.Subscription {
         let (index, refused) = state.withLock { state in
             let refused = state.streamHeld
-            state.follows.append(Follow(listener: listener, holdsStream: !refused))
+            state.follows.append(Follow(listener: listener, holdsStream: !refused, toldUnreachable: toldUnreachable))
             state.streamHeld = true
             return (state.follows.count - 1, refused)
         }
@@ -495,7 +496,8 @@ final class OwnServer: Sendable {
         process.environment = environment
         let output = Pipe()
         process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+        // A failed boot writes the server's log here, its secret redacted.
+        process.standardError = FileHandle.standardError
         let ended = AsyncStream<Int32> { continuation in
             process.terminationHandler = { finished in
                 continuation.yield(finished.terminationStatus)
@@ -503,7 +505,12 @@ final class OwnServer: Sendable {
             }
         }
         try process.run()
-        let printed = output.fileHandleForReading.readDataToEndOfFile()
+        // Read off the concurrency pool: a boot can take a while.
+        let printed = await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
+            DispatchQueue.global().async {
+                continuation.resume(returning: output.fileHandleForReading.readDataToEndOfFile())
+            }
+        }
         var status: Int32 = -1
         for await code in ended { status = code }
         try #require(status == 0, "\(name) exited \(status)")

@@ -137,7 +137,7 @@ for item in try await copy.items.list(ListFilters(type: "core.event")) {
 
 `properties` is a `JSONObject`, which keeps its keys in the order the server answers them. A create puts the fields the type declares first, in the type's order, then the rest in the order they were written. A `.merge` edit moves no key and adds each new one after them, and a `.replace` edit keeps the order it sends. Any key that is an array index, such as `2024`, comes first of all. The copy shows the same order before a write is sent as after the server answers it, unless another device's write reaches the item first. Iterate it, or read `keys`, to lay out an item as a document. `JSONObject(json:)` and `JSONValue(json:)` read JSON text in order, and `json()` writes it back in order; `JSONEncoder` and `JSONDecoder` do not keep key order.
 
-An `Edit` says how its properties meet the item's. `.merge` replaces each property it names and leaves the rest; `.replace` makes them the item's whole properties, so a property it leaves out is cleared. A `.replace` sent through `updateAsRead(_:_:)`, at a version older than the one the copy holds, is merged as `.merge` is. An edit can also move the item to another type or tier:
+An `Edit` says how its properties meet the item's. `.merge` replaces each property it names and leaves the rest; `.replace` makes them the item's whole properties, so a property it leaves out is cleared. **`.replace` is the way to drop a property**: a `null` under `.merge` clears nothing, because the server drops it and the copy does too, and a `null` for an optional field in a `Draft` leaves the field out of the new item. A `.replace` sent through `updateAsRead(_:_:)`, at a version older than the one the copy holds, is merged as `.merge` is. An edit can also move the item to another type or tier:
 
 ```swift
 guard let item = try await copy.items.get(id) else { return }
@@ -176,8 +176,8 @@ Nothing runs on its own, so an app drives the copy through its life:
 1. **On first launch, or when `status().hydration` is `never` or `expired`,** call `hydrate(types:tier:)`. It replaces the copy with the slice and keeps the queue.
 1. **When the app starts or comes to the front,** call `catchUp()` to apply what changed while it was away, then `queue.drain()` to send what it queued.
 1. **While a screen shows server data,** hold a `changes()` stream. It follows the server's events and tells each one as `.server`.
-1. **When the stream tells `.serverUnreachable(error)`,** show the app as offline; `error` is typed, such as `network`, `rateLimited` or `server`. The follow keeps asking at a falling rate and says this once. Writes still queue.
-1. **When it tells `.serverReachable`,** call `queue.drain()` to send what waited, and show the app as online again.
+1. **When the stream tells `.serverUnreachable(error)`,** show the app as offline; `error` is typed, such as `network`, `rateLimited` or `server`. The follow keeps asking at a falling rate. Writes still queue. The copy tells this once until the server is reached again, however often the follow starts again around a catch-up or a hydration, and a stream added meanwhile is told it first.
+1. **When it tells `.serverReachable`,** call `queue.drain()` to send what waited, and show the app as online again. A hydration, a catch-up or a drain that reaches the server tells it too.
 1. **After each write the person makes,** call `queue.drain()` when the app is online; a drain that cannot reach the server leaves the writes waiting, uncounted.
 
 ```swift

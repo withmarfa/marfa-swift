@@ -3,6 +3,11 @@ import Testing
 
 @testable import Marfa
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil))
+func theRestartTestsHaveACheckoutWhereTheLiveTestsAreRequired() {
+    #expect(OwnServer.monorepo != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_MONOREPO is not")
+}
+
 /// Each test stops and starts a server of its own under a copy, so none of
 /// them can take the shared live server away from the other suites.
 @Suite(
@@ -10,10 +15,6 @@ import Testing
     .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"),
     .timeLimit(.minutes(5)))
 struct LiveRestart {
-    @Test func theRestartTestsHaveACheckoutWhereTheLiveTestsAreRequired() {
-        #expect(OwnServer.monorepo != nil)
-    }
-
     static func hydrated(_ own: OwnServer) async throws -> WorkingCopy {
         let copy = try await WorkingCopy.open(store: Live.store(), server: own.server)
         _ = try await copy.hydrate(types: ["core.note"], tier: .library)

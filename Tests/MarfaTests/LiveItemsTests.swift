@@ -205,8 +205,9 @@ extension LiveWorkingCopies {
             let again = try #require(try await Self.inBin(copy, id))
             try await copy.items.purge(id, version: again.version)
             #expect(try await Self.inBin(copy, id) == nil)
-            #expect(try await Self.answered(id) == nil)
-            #expect(try await copy.items.get(id) == nil)
+            // A row in the bin can be restored; a purged one cannot.
+            let (restoreStatus, _) = try await Self.send("POST", "items/\(id)/restore")
+            #expect(restoreStatus == 404, "the server could still restore a purged item")
             #expect(try await copy.queue.all().isEmpty)
             await copy.close()
         }

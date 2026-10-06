@@ -191,6 +191,21 @@ struct JSONObjectTests {
             #expect(try JSONValue(json: #"{"a":{"a":1},"b":[{"a":1},{"a":2}]}"#).object?.count == 2)
         }
 
+        @Test func keysThatDifferOnlyInNormalizationAreTwoKeys() throws {
+            let composed = "caf\u{E9}"
+            let decomposed = "cafe\u{301}"
+            // The witness: Swift takes the two as one string.
+            #expect(composed == decomposed)
+            let read = try JSONObject(json: "{\"\(composed)\":1,\"\(decomposed)\":2}")
+            #expect(read.count == 2)
+            #expect(read[composed] == 1)
+            #expect(read[decomposed] == 2)
+            #expect(try JSONObject(json: read.json()) == read)
+            let built: JSONObject = [composed: 1, decomposed: 2]
+            #expect(built.count == 2)
+            #expect(JSONObject([(composed, JSONValue.integer(1))]) != JSONObject([(decomposed, JSONValue.integer(1))]))
+        }
+
         @Test func nestingIsReadUpToTheLimit() throws {
             let limit = JSONValue.nestingLimit
             #expect(limit == 512)

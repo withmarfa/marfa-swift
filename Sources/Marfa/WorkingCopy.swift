@@ -86,6 +86,7 @@ public final class WorkingCopy: Sendable {
             try await holder.runUntilCanceled { core, stop in
                 try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes, stop: stop)
             })
+        feed.reached()
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }
@@ -139,6 +140,7 @@ public final class WorkingCopy: Sendable {
             feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
         }
         let report = try caughtUp.get()
+        feed.reached()
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -161,11 +163,13 @@ public final class WorkingCopy: Sendable {
     /// stream that read a changed type catalog arrives as
     /// `.refreshed(.catalog)`, naming neither.
     ///
-    /// The follow says what became of the server: `.serverUnreachable` with
-    /// the failure, once, when it cannot have its stream, and
-    /// `.serverReachable` once when it has one again, which is when to drain
-    /// what the app queued meanwhile. A follow that has its stream at once
-    /// says neither.
+    /// The copy says what became of the server: `.serverUnreachable` with
+    /// the failure when the follow cannot have its stream, and
+    /// `.serverReachable` when it has one again, or a hydration, catch-up or
+    /// drain reaches the server, which is when to drain what the app queued
+    /// meanwhile. Each is told once for each change, however often the follow
+    /// starts again, and a stream added while the server is unreachable is
+    /// told so first. A copy that reaches its server at once says neither.
     ///
     /// A writer with a server follows the server's events only while at least
     /// one stream is held, and pauses the follow during a hydration or
@@ -536,6 +540,7 @@ public struct Queue: Sendable {
     /// Nothing drains on its own.
     public func drain() async throws -> DrainReport {
         let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
+        if report.answered > 0 { feed.reached() }
         for answered in report.verdicts where answered.verdict != nil {
             feed.announce(Change(origin: .answered(answered), itemId: answered.itemId, edgeId: answered.edgeId))
         }
@@ -671,6 +676,9 @@ final class Feed: Sendable {
         /// on its own: it ended on something asking again does not clear.
         var halted = false
         var failure: MarfaError?
+        /// What the streams were last told of the server, kept across
+        /// follows: a new follow is told it, and a stream added is told it.
+        var unreachable: MarfaError?
         var closed = false
         var source: Source
         /// Holds every source off, as a key change does while the core is
@@ -719,16 +727,19 @@ final class Feed: Sendable {
             return !state.closed && !state.halted && state.suspends == 0
         }
         let seen = starts ? Result { try holder.with { try $0.dataVersion() } } : nil
-        let (added, failure) = locked { state -> (Bool, MarfaError?) in
-            guard !state.closed else { return (false, nil) }
+        let (added, failure, unreachable) = locked { state -> (Bool, MarfaError?, MarfaError?) in
+            guard !state.closed else { return (false, nil, nil) }
             state.streams[token] = continuation
             if state.suspends > 0 { state.addedWhileSuspended.insert(token) }
             settle(&state, seen: seen)
-            return (true, state.failure)
+            return (true, state.failure, state.unreachable)
         }
         guard added else {
             continuation.finish()
             return nil
+        }
+        if let unreachable {
+            continuation.yield(Change(origin: .serverUnreachable(unreachable), itemId: nil, edgeId: nil))
         }
         if let failure {
             continuation.yield(Change(origin: .stopped(failure), itemId: nil, edgeId: nil))
@@ -835,6 +846,32 @@ final class Feed: Sendable {
         }
     }
 
+    /// The follow's word on the server, told once for each change of it
+    /// however many follows the feed starts.
+    func reach(_ unreachable: MarfaError?, from generation: Int) {
+        locked { state in
+            guard state.phase.runs(generation) else { return }
+            tell(&state, unreachable)
+        }
+    }
+
+    /// A call that read the server, such as a catch-up, says it can be
+    /// reached.
+    func reached() {
+        locked { state in tell(&state, nil) }
+    }
+
+    private func tell(_ state: inout State, _ unreachable: MarfaError?) {
+        switch (state.unreachable, unreachable) {
+        case (nil, nil), (.some, .some): return
+        default: break
+        }
+        state.unreachable = unreachable
+        let origin: Change.Origin = unreachable.map { .serverUnreachable($0) } ?? .serverReachable
+        let change = Change(origin: origin, itemId: nil, edgeId: nil)
+        state.told += state.streams.values.map { ($0, change) }
+    }
+
     func announce(_ change: Change, from generation: Int) {
         let streams = locked { state in
             state.phase.runs(generation) ? Array(state.streams.values) : []
@@ -927,7 +964,8 @@ final class Feed: Sendable {
             return .idle
         case .follow:
             let subscription = try holder.with {
-                $0.follow(listener: Listener(feed: self, generation: generation))
+                $0.follow(
+                    toldUnreachable: state.unreachable != nil, listener: Listener(feed: self, generation: generation))
             }
             return .following(generation: generation, subscription)
         case .watch:
@@ -1019,16 +1057,19 @@ final class Listener: MarfaCore.ChangeListener, Sendable {
     private var feed: Feed? { held.withLock { $0.feed } }
 
     func changed(change: MarfaCore.Change) {
-        let origin: Change.Origin =
-            switch change.event {
-            case Self.catalogChanged: .refreshed(.catalog)
-            case Self.serverUnreachable:
-                .serverUnreachable(
-                    change.reason.map(MarfaError.init)
-                        ?? .network(message: "the event stream could not be opened"))
-            case Self.serverReachable: .serverReachable
-            default: .server(event: change.event, cursor: change.cursor)
-            }
+        let origin: Change.Origin
+        switch change.event {
+        case Self.catalogChanged: origin = .refreshed(.catalog)
+        case Self.serverUnreachable:
+            feed?.reach(
+                change.reason.map(MarfaError.init) ?? .network(message: "the event stream could not be opened"),
+                from: generation)
+            return
+        case Self.serverReachable:
+            feed?.reach(nil, from: generation)
+            return
+        default: origin = .server(event: change.event, cursor: change.cursor)
+        }
         feed?.announce(Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId), from: generation)
     }
 

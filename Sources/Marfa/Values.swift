@@ -349,7 +349,9 @@ public struct Edit: Sendable, Hashable {
     /// How the properties meet the item's.
     public enum Properties: Sendable, Hashable {
         /// Each property given replaces its whole value; every other one
-        /// stays as it is.
+        /// stays as it is. A `null` clears nothing: the server drops it, and
+        /// so does the copy, so the property keeps its value. Use `.replace`
+        /// to drop a property.
         case merge(JSONObject)
         /// The item's whole properties: a property left out is cleared.
         /// Sent at a version older than the one the copy holds, through

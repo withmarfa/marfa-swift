@@ -699,7 +699,11 @@ extension LiveWorkingCopies {
 
             _ = try await copy.queue.forgetAnswered()
             let kept = try #require(try await copy.queue.all().first { $0.id == refused.id })
-            #expect(kept.body["properties"] == ["title": "Too many", "serves": "many"], "\(kept.body)")
+            // The type was declared through an unordered dictionary, so its
+            // fields' order, and the create's with it, is not fixed here.
+            let sent = try #require(kept.body["properties"]?.object, "\(kept.body)")
+            #expect(Set(sent.keys) == ["title", "serves"])
+            #expect(sent["title"] == "Too many" && sent["serves"] == "many")
             #expect(kept.verdict == .refused(refusal))
             #expect(try await copy.queue.discard(refused.id))
             #expect(try await copy.queue.all().contains { $0.id == refused.id } == false)
