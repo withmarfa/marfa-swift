@@ -23,6 +23,11 @@ import Testing
             Edit(baseVersion: 1, type: "core.task", tier: .feed),
         ]
         #expect(Set(edits).count == 3)
+        let moves = [
+            EdgeEdit(baseVersion: 1), EdgeEdit(["note": "x"], baseVersion: 1),
+            EdgeEdit(baseVersion: 1, move: .source("a")), EdgeEdit(baseVersion: 1, move: .target("a")),
+        ]
+        #expect(Set(moves).count == 4)
 
         let edge = Edge(
             id: "edge", sourceId: "reply", targetId: "item", edgeType: "in-thread", properties: ["position": 1],

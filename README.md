@@ -217,6 +217,30 @@ while true {
 try await copy.items.purge(item.id, version: item.version)
 ```
 
+## Edit an edge and move its end
+
+`edges.update(_:_:)` changes an edge's properties, moves one of its ends, or does both in one queued write. An `EdgeEdit` carries the properties to merge over the edge's, the version the copy holds, and the end to move. The edge keeps its id and its properties, and the end never holds no edge or two:
+
+```swift
+guard let edge = try await copy.edges.to(childId).first else { return }
+// A child changes parent: its `parent-of` edge now comes from another item.
+_ = try await copy.edges.update(edge.id, EdgeEdit(baseVersion: edge.version, move: .source(newParentId)))
+// A reply changes thread and merges a property.
+_ = try await copy.edges.update(
+    replyEdge.id, EdgeEdit(["note": "moved"], baseVersion: replyEdge.version, move: .target(newThreadId)))
+```
+
+The copy shows the edge at its new end at once, read from either end, offline included, and a move to an item whose create is still queued waits for that create. An edit throws `invalid` where its `baseVersion` is not the one the copy holds, and `notFound` where the copy does not hold the edge.
+
+Only one end moves, and only where the end that stays holds one edge of the type: the target of `in-thread`, say, or the source of `parent-of`. A move throws `validation` and queues nothing in two cases:
+
+- `validation_error` where the type lets the end that stays hold more than one edge, such as `references` or `about`. Delete the edge and create the one wanted.
+- `edge_cycle` where the move would leave the edge running from an item to itself.
+
+A move that closes a longer `parent-of` or `supersedes` cycle is queued, because only the server holds the whole graph. The server refuses it, the write's `verdict` carries `edge_cycle`, and the edge returns to where it was.
+
+Once the server answers a source move, the drain throws `copyExpired(reason: "read_view_changed", …)`, as it does for a retype: the write is answered, and the app hydrates again. A target move leaves the copy current.
+
 ## Keep a copy in sync
 
 Nothing runs on its own, so an app drives the copy through its life:

@@ -159,7 +159,7 @@ struct Errors {
             ("create", { try await copy.items.create(Marfa.Draft(type: "core.note", properties: unwritable)) }),
             ("update", { try await copy.items.update("n1", Marfa.Edit(.merge(infinite), baseVersion: 1)) }),
             ("edge", { try await copy.edges.create(from: "a", to: "b", type: "references", properties: unwritable) }),
-            ("edge update", { try await copy.edges.update("e1", properties: infinite, baseVersion: 1) }),
+            ("edge update", { try await copy.edges.update("e1", Marfa.EdgeEdit(infinite, baseVersion: 1)) }),
             ("extension", { try await copy.extensions.write("ns", unwritable, on: "n1") }),
         ]
         for (name, write) in writes {

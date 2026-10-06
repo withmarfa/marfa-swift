@@ -515,12 +515,14 @@ public struct Edges: Sendable {
         }
     }
 
-    public func update(_ id: String, properties: JSONObject, baseVersion: Int64) async throws -> QueuedWrite {
-        try await write { core in
-            try core.updateEdge(
-                id: id,
-                edit: MarfaCore.EdgeEdit(propertiesJson: try properties.json(), baseVersion: baseVersion))
-        }
+    /// Changes an edge's properties, moves one of its ends, or both, in one queued write.
+    ///
+    /// Refused unless `edit.baseVersion` is the version the copy holds. An edge
+    /// the copy shows moved stays at its new end, read from either end, until
+    /// the server answers. A move to an item whose create is still queued waits
+    /// for that create. See ``EdgeEdit`` for the two refusals a move can meet.
+    public func update(_ id: String, _ edit: EdgeEdit) async throws -> QueuedWrite {
+        try await write { core in try core.updateEdge(id: id, edit: edit.core()) }
     }
 
     public func delete(_ id: String) async throws -> QueuedWrite {
