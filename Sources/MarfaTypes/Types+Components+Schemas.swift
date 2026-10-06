@@ -703,7 +703,7 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
-        /// How Marfa resolves a conflict on one field. `last_writer_wins` takes the later write. `keep_both_copies` keeps the losing value in a new item tagged `conflicted-copy`.
+        /// How Marfa resolves a conflict on one field. `last_writer_wins` takes the later write. `keep_both_copies` keeps the losing value in a new item tagged `conflicted-copy`, with a `derived-from` edge to the original.
         ///
         /// - Remark: Generated from `#/components/schemas/MergeStrategy`.
         @frozen public enum MergeStrategy: String, Codable, Hashable, Sendable, CaseIterable {
