@@ -89,7 +89,8 @@ extension LiveWorkingCopies {
             )
             let copy = try await Self.hydrated([type])
             let sent: JSONObject = ["extra": "x", "mid": "m", "10": "ten", "zeta": "z", "2": "two", "alpha": "a"]
-            let id = try #require(try await copy.items.create(Draft(type: type, properties: sent, tier: .library)).itemId)
+            let id = try #require(
+                try await copy.items.create(Draft(type: type, properties: sent, tier: .library)).itemId)
             let order = ["2", "10", "zeta", "alpha", "mid", "extra"]
             // The witness: the order sent is neither this one nor alphabetical.
             #expect(sent.keys != order)

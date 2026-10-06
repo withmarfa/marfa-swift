@@ -117,4 +117,3 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, Expre
         self = .object(JSONObject(elements))
     }
 }
-

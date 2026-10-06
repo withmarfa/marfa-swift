@@ -97,7 +97,8 @@ struct LiveRestart {
 
             try await own.stop()
             let wholeRead = try #require(try await copy.items.get(whole))
-            _ = try await copy.items.update(whole, Edit(.replace(["body": "only this"]), baseVersion: wholeRead.version))
+            _ = try await copy.items.update(
+                whole, Edit(.replace(["body": "only this"]), baseVersion: wholeRead.version))
             #expect(try await copy.items.get(whole)?.properties == ["body": "only this"])
             let movedRead = try #require(try await copy.items.get(moved))
             _ = try await copy.items.update(
@@ -120,7 +121,10 @@ struct LiveRestart {
                 _ = try await copy.hydrate(types: ["core.note"], tier: .library)
                 _ = try await copy.queue.drain()
             }
-            #expect(try await copy.queue.all().map(\.verdict) == [.accepted, .accepted, .accepted, .accepted, .accepted, .accepted])
+            #expect(
+                try await copy.queue.all().map(\.verdict) == [
+                    .accepted, .accepted, .accepted, .accepted, .accepted, .accepted,
+                ])
             #expect(try await Self.read(own, whole).item?["properties"] == .object(["body": "only this"]))
             let movedThere = try #require(try await Self.read(own, moved).item)
             #expect(movedThere["type"] == "core.task")

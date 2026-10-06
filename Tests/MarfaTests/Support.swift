@@ -430,7 +430,9 @@ struct LocalServer: Sendable {
 
 /// A server of a test's own, booted with marfa's `core/scripts/server-up.sh`
 /// from the checkout `MARFA_MONOREPO` names, so a test can stop it and start
-/// it again under a copy. Started again, it keeps its port, data and keys.
+/// it again under a copy.
+///
+/// Started again, it keeps its port, data and keys.
 final class OwnServer: Sendable {
     static let monorepo = ProcessInfo.processInfo.environment["MARFA_MONOREPO"].map {
         URL(filePath: $0, directoryHint: .isDirectory)
