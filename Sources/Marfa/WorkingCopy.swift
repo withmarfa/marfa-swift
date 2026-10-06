@@ -278,7 +278,8 @@ public struct Change: Sendable, Hashable {
         /// An item, named by `itemId`, was purged and left the copy.
         case purged
         /// A folder's settings, named by `itemId`, were created, changed or
-        /// revoked; the copy holds the answer where its slice or a pin takes it.
+        /// revoked; the copy holds the answer where its slice or a pin takes it,
+        /// and otherwise at its next catch-up.
         case folderWritten
         /// The app replaced its declarations, or a refresh read a changed
         /// item type or edge type catalog; read `catalog` again.

@@ -180,9 +180,10 @@ public struct FolderSettingsChange: Sendable, Hashable {
 extension Items {
     /// What the folder's search holds, as a folder on disk holds it, read from the copy alone.
     ///
-    /// Throws `MarfaError.invalid` where the copy cannot answer the search whole, never answering part of it: a type
-    /// or the tier the search holds that the slice does not, `beneath` without `parent-of` held whole, a revoked
-    /// folder, and settings naming a condition no folder follows, such as a `backref`. Throws `MarfaError.notFound`
+    /// Throws `MarfaError.invalid` where the copy cannot answer the search whole, never answering part of it: a copy
+    /// with no slice yet, a type or the tier the search holds that the slice does not, `beneath` without `parent-of`
+    /// held whole, a revoked folder, an item that is not a `system.folder`, and settings naming a condition no
+    /// folder follows, such as a `backref`. Throws `MarfaError.notFound`
     /// with the code `not_held` for a folder the copy does not hold; hydrate with `system.folder` in the slice, or
     /// pin it.
     public func list(
@@ -195,6 +196,9 @@ extension Items {
     }
 
     /// `nil` where the copy does not hold the folder.
+    ///
+    /// Throws `MarfaError.invalid` for a held item that is not a `system.folder`, or one whose settings name a
+    /// condition no folder follows.
     public func folder(_ id: String) async throws -> Folder? {
         try await holder.run { core in try core.folder(id: id).map(Folder.init) }
     }
@@ -211,9 +215,14 @@ extension WorkingCopy {
     /// Creates a folder through the server's folder door, at once.
     ///
     /// Folder writes are never queued, because only the folder door writes a `system.folder`: with no server, or
-    /// none reachable, this throws and nothing waits to be sent. Settings no folder follows throw
-    /// `MarfaError.invalid` before anything is sent. The copy holds the new folder at once where its slice or a pin
-    /// takes it. A repeat under the same `idempotencyKey` answers the first folder.
+    /// none reachable, this throws and nothing waits to be sent. Settings the core refuses are thrown before
+    /// anything is sent: `MarfaError.invalid` for settings no folder follows, and `MarfaError.validation` for a
+    /// filter that does not parse or a default tag or property name the server refuses. The copy holds the new
+    /// folder at once where its slice or a pin takes it; where it cannot read the row back, the row arrives at the
+    /// next catch-up.
+    ///
+    /// A `network` failure after the request went out may follow a folder the server made. Retry with the same
+    /// `idempotencyKey`, which answers the first folder, rather than creating a second.
     public func createFolder(_ settings: FolderSettings, idempotencyKey: String? = nil) async throws -> Folder {
         let folder = try await holder.run { core in
             try Folder(core.createFolder(settings: try settings.core(), idempotencyKey: idempotencyKey))

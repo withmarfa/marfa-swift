@@ -143,6 +143,12 @@ extension LiveWorkingCopies {
             let copy = try await Self.copy()
             await #expect {
                 _ = try await copy.createFolder(
+                    FolderSettings(title: "Typo", search: FolderSearch(types: ["core.note"], filter: "title eq 1")))
+            } throws: { error in
+                if case .validation = error as? MarfaError { true } else { false }
+            }
+            await #expect {
+                _ = try await copy.createFolder(
                     FolderSettings(title: "Back", search: FolderSearch(filter: "backref[parent-of] exists")))
             } throws: { error in
                 if case .invalid(let message) = error as? MarfaError { message.contains("backref") } else { false }
