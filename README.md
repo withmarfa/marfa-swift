@@ -198,7 +198,7 @@ Where no embed can name the file alone among the item's attachments, the file st
 
 ## Conflicted copies
 
-When two devices edit the same `body` or `notes` of a note, the server keeps its own text on the item and puts the other edit's text in a new item tagged `conflicted-copy`, with a `derived-from` edge to the original. The drain's verdict names the copy once, as `.conflicted(siblingId:fields:)`, and the copy arrives in the working copy with the next catch-up. After that, either item leads to the other, offline and after a restart:
+When two devices edit the same `body` or `notes` of an item whose type keeps both texts, such as a note, the server keeps its own text on the item and puts the other edit's text in a new item tagged `conflicted-copy`, with a `derived-from` edge to the original. The drain's verdict names the copy as `.conflicted(siblingId:fields:)`. The copy and its link reach the working copy with a catch-up, not with the verdict. After that, either item leads to the other, offline and after a restart:
 
 ```swift
 for conflicted in try await copy.items.conflictedCopies(of: note.id) {
@@ -209,7 +209,7 @@ if let original = try await copy.items.original(ofConflictedCopy: item.id) {
 }
 ```
 
-`original(ofConflictedCopy:)` answers an ID, because the original may be an item the copy doesn't hold; read it with `get(_:)`. Neither call answers an item in the bin. To keep one text, edit the original and delete the copy.
+`original(ofConflictedCopy:)` answers an ID, because the original may be an item the copy doesn't hold; read it with `get(_:)`. It answers `nil` for a copy in the bin, and `conflictedCopies(of:)` leaves out the copies in the bin. The link comes in the event after the copy's, so a catch-up that ends between the two can leave a held copy with no original until the next catch-up. To keep one text, edit the original and delete the copy.
 
 ## Recently deleted
 

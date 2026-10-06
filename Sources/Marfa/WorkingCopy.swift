@@ -314,7 +314,8 @@ public struct Items: Sendable {
     /// `derived-from` edge points to.
     ///
     /// `nil` unless `id` is a held item, outside the bin, tagged
-    /// `conflicted-copy`. The original may be an item the copy doesn't hold.
+    /// `conflicted-copy` and linked. The original may be an item the copy
+    /// doesn't hold.
     public func original(ofConflictedCopy id: String) async throws -> String? {
         try await holder.run { core in try core.originalOfConflictedCopy(id: id) }
     }
