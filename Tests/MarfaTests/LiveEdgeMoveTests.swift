@@ -141,5 +141,31 @@ extension LiveWorkingCopies {
             #expect(back.map(\.sourceId) == [a], "the refused move left the edge at \(back.map(\.sourceId))")
             await copy.close()
         }
+
+        @Test func aMoveOntoAnEndThatHoldsItsOneEdgeIsRefusedWithItsCodeAndTheEdgeReturns() async throws {
+            let copy = try await Live.hydrated()
+            let old = try #require(try await copy.items.create(Live.note("old \(UUID())")).itemId)
+            let newer = try #require(try await copy.items.create(Live.note("newer \(UUID())")).itemId)
+            let other = try #require(try await copy.items.create(Live.note("other \(UUID())")).itemId)
+            let another = try #require(try await copy.items.create(Live.note("another \(UUID())")).itemId)
+            let first = try #require(try await copy.edges.create(from: newer, to: old, type: "supersedes").edgeId)
+            _ = try await copy.edges.create(from: other, to: another, type: "supersedes")
+            let setup = try await copy.queue.drain()
+            #expect(setup.verdicts.allSatisfy { $0.verdict == .accepted }, "\(setup.verdicts)")
+            let held = try #require(try await copy.edges.from(newer).first)
+
+            // `other` already supersedes one item, and a supersedes edge is one to one at both ends.
+            let move = try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .source(other)))
+            #expect(try await copy.edges.from(newer).isEmpty)
+            let report = try await copy.queue.drain()
+
+            guard case .refused(let refusal)? = report.verdicts.first(where: { $0.id == move.id })?.verdict else {
+                Issue.record("the move was not refused: \(report.verdicts)")
+                return
+            }
+            #expect(refusal.code == "edge_constraint_violation")
+            #expect(try await copy.edges.from(newer).map(\.id) == [first], "the refused move left the edge elsewhere")
+            await copy.close()
+        }
     }
 }
