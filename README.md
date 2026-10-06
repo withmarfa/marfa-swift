@@ -161,6 +161,8 @@ _ = try await copy.items.update(id, Edit(baseVersion: item.version, type: "core.
 
 Each edit is queued and shown at once, offline included. A type the copy's catalog does not hold throws `unknownType` and queues nothing. A retype changes what the copy's read view covers, so once the server answers it the drain throws `copyExpired(reason: "read_view_changed", …)`: the write is answered, and the app hydrates again.
 
+To attach a file to an item, call `copy.items.attach(to:file:)`. It queues an upload, a file item that names the bytes, and an `attached-to` edge. A file item, whose type is `core.file` or inherits from it, carries the length of the bytes as `size_bytes` from the moment it is queued, so a list of files can show each size before the first drain. After the drain, the item holds the size the server set from the bytes it stored. Read it with `item.properties["size_bytes"]?.integer`. A file attached under a type outside the file family has no `size_bytes`.
+
 ## Links and embeds in a body
 
 A link in an item's body, `[[Another note]]`, is a `references` edge to the item it names. An embed of a file, `![[photo.png]]` or `![](photo.png)`, is an `attached-to` edge from the file's item to the item whose body embeds it. Saving a body through a working copy queues those edges, and taking a link or an embed out of a body queues the delete of its edge.
