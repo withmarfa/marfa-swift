@@ -145,8 +145,9 @@ jobs:
             echo
             echo "## Checklist"
             echo
-            echo "- [x] Conventional Commit title"
-            echo "- [x] Checks run"
+            echo "- [x] The title is a scoped Conventional Commit."
+            echo "- [x] New behavior has a test that was seen failing first, or no test was needed and the reason is above."
+            echo "- [x] Docs, comments and the contract still say what is true after this change."
           } > "${RUNNER_TEMP}/body.md"
           url="$(gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${BRANCH}" \
             --title "chore(package): build against marfa ${short}" --body-file "${RUNNER_TEMP}/body.md")"
