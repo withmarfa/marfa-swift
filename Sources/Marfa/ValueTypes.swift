@@ -769,16 +769,109 @@ public struct Attached: Sendable, Hashable {
     public var upload: QueuedWrite
     public var item: QueuedWrite
     public var edge: QueuedWrite
+    /// The text that embeds the file in the item's body, `![[title]]`, which
+    /// the body reads back as `edge` and not as a second one; `nil` where the
+    /// file's title cannot name it alone in an embed.
+    public var embed: String?
 
-    public init(upload: QueuedWrite, item: QueuedWrite, edge: QueuedWrite) {
+    public init(upload: QueuedWrite, item: QueuedWrite, edge: QueuedWrite, embed: String? = nil) {
         self.upload = upload
         self.item = item
         self.edge = edge
+        self.embed = embed
     }
 
     init(_ core: MarfaCore.Attached) throws {
         self.init(
-            upload: try QueuedWrite(core.upload), item: try QueuedWrite(core.item), edge: try QueuedWrite(core.edge))
+            upload: try QueuedWrite(core.upload), item: try QueuedWrite(core.item), edge: try QueuedWrite(core.edge),
+            embed: core.embed)
+    }
+}
+
+/// An attached file, and the write that put its embed in the item's body.
+public struct Embedded: Sendable, Hashable {
+    public var attached: Attached
+    public var body: QueuedWrite
+    /// What was added to the body.
+    public var embed: String
+
+    public init(attached: Attached, body: QueuedWrite, embed: String) {
+        self.attached = attached
+        self.body = body
+        self.embed = embed
+    }
+}
+
+/// A file was attached, and the edit that embeds it in the body failed.
+///
+/// The attach's writes are queued. Read the file's item from `attached`, then
+/// fix the cause and write the embed with `Items.embedText(of:in:)` and an edit.
+public struct EmbedFailure: Error {
+    public var attached: Attached
+    /// Why the body step failed: `invalid` where the file's title cannot name it alone in an embed.
+    public var cause: any Error
+
+    public init(attached: Attached, cause: any Error) {
+        self.attached = attached
+        self.cause = cause
+    }
+}
+
+/// What a link or an embed in an item's body names.
+public enum BodyTarget: Sendable, Hashable {
+    /// The item it names; for an embed, the file item that holds the bytes.
+    case item(id: String)
+    /// Not looked up on the server yet. A drain, a catch-up or a hydration tries it again.
+    case pending
+    /// Names no item.
+    case missing
+    /// Names more than one item.
+    case ambiguous
+    /// The edge's write, or the server's lookup, was refused.
+    case refused(reason: String)
+
+    init(_ core: MarfaCore.BodyTarget) {
+        switch core {
+        case .item(let id): self = .item(id: id)
+        case .pending: self = .pending
+        case .missing: self = .missing
+        case .ambiguous: self = .ambiguous
+        case .refused(let reason): self = .refused(reason: reason)
+        }
+    }
+}
+
+/// A link or an embed as the body carries it, and what it names.
+public struct BodyName: Sendable, Hashable {
+    /// As typed: `[[Note|shown]]`, `![[photo.png]]`.
+    public var text: String
+    /// What it is read as: the name before any `|` or `#`, or the embed's path or name.
+    public var name: String
+    public var target: BodyTarget
+
+    public init(text: String, name: String, target: BodyTarget) {
+        self.text = text
+        self.name = name
+        self.target = target
+    }
+
+    init(_ core: MarfaCore.BodyName) {
+        self.init(text: core.text, name: core.name, target: BodyTarget(core.target))
+    }
+}
+
+/// The links in an item's body, and its embeds of files, each in body order.
+public struct BodyLinks: Sendable, Hashable {
+    public var links: [BodyName]
+    public var embeds: [BodyName]
+
+    public init(links: [BodyName] = [], embeds: [BodyName] = []) {
+        self.links = links
+        self.embeds = embeds
+    }
+
+    init(_ core: MarfaCore.BodyLinks) {
+        self.init(links: core.links.map(BodyName.init), embeds: core.embeds.map(BodyName.init))
     }
 }
 

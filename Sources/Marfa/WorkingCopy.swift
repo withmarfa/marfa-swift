@@ -404,6 +404,77 @@ public struct Items: Sendable {
         return attached
     }
 
+    /// Attaches `file` to the item and adds its embed to the end of the item's body, after a blank line.
+    ///
+    /// Queues the writes of `attach(to:file:_:)` and an edit of the body, which
+    /// reads back as the attachment's own edge and makes no second one. The edit
+    /// is based on the body and version the copy holds, as `update(_:_:)`'s is,
+    /// so a body another device changes first is answered as the type's merge
+    /// policy says: `conflicted` for a note. Where the file's title cannot name
+    /// it alone in an embed, such as a title given in `attachment` that another
+    /// attachment has or a name that ends in a document's extension like `.txt`,
+    /// the body is left as it was.
+    ///
+    /// The body is read and written in two core calls, so an edit of the same
+    /// body queued while this one runs is replaced, not merged: make an item's
+    /// body edits one after another.
+    ///
+    /// Throws `EmbedFailure`, with the attachment, where the file was attached
+    /// and the body step failed; any other error means nothing was written. To
+    /// place the embed elsewhere, attach the file and write `Attached.embed`
+    /// where it belongs.
+    public func embed(file: URL, in id: String, _ attachment: Attachment = Attachment()) async throws -> Embedded {
+        let (attached, body) = try await holder.run { core -> (Attached, Result<(QueuedWrite, String), any Error>) in
+            let attached = try Attached(core.attach(id: id, path: file.path, attachment: attachment.core))
+            return (attached, Result { try translated { try Self.writeEmbed(attached, into: id, core) } })
+        }
+        for write in [attached.upload, attached.item, attached.edge] {
+            feed.announce(write)
+        }
+        let written: QueuedWrite
+        let embed: String
+        do {
+            (written, embed) = try body.get()
+        } catch {
+            throw EmbedFailure(attached: attached, cause: error)
+        }
+        feed.announce(written)
+        return Embedded(attached: attached, body: written, embed: embed)
+    }
+
+    private static func writeEmbed(_ attached: Attached, into id: String, _ core: Core) throws -> (QueuedWrite, String)
+    {
+        let embed = try core.embedText(id: id, file: attached.item.itemId ?? "")
+        guard let host = try core.get(id: id) else {
+            throw MarfaError.notFound(code: "item_not_found", message: "\(id) is not a row this copy holds")
+        }
+        let field = try core.itemType(id: host.type).bodyField ?? "body"
+        let body = try JSONObject(json: host.propertiesJson)[field]?.string ?? ""
+        let separator = String(
+            repeating: "\n", count: body.isEmpty ? 0 : max(0, 2 - body.reversed().prefix(while: \.isNewline).count))
+        let edit = Edit(.merge([field: .string(body + separator + embed)]), baseVersion: host.version)
+        return (try QueuedWrite(core.updateItem(id: id, edit: edit.core())), embed)
+    }
+
+    /// Each link and each embed of a file in the item's body, in body order, read from the copy alone.
+    ///
+    /// A link or an embed names the item it resolves to, or says why it names
+    /// none: `pending` until the server's lookup has answered, `missing`,
+    /// `ambiguous` or `refused`. An embed resolves to the file item that holds
+    /// the bytes. Throws `notFound` for an item the copy does not hold.
+    public func links(in id: String) async throws -> BodyLinks {
+        try await holder.run { core in BodyLinks(try core.bodyLinks(id: id)) }
+    }
+
+    /// The text that embeds `file`, an attachment of the item `id`, in that item's body: `![[title]]`.
+    ///
+    /// Throws `notFound` where the copy does not hold the item or the file, and
+    /// `invalid` where `file` is not a file item, is not attached to the item,
+    /// or has a title that cannot name it alone.
+    public func embedText(of file: String, in id: String) async throws -> String {
+        try await holder.run { core in try core.embedText(id: id, file: file) }
+    }
+
     private func write(_ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite) async throws -> QueuedWrite {
         try await queued(holder, feed, work)
     }

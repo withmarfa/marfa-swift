@@ -161,6 +161,41 @@ _ = try await copy.items.update(id, Edit(baseVersion: item.version, type: "core.
 
 Each edit is queued and shown at once, offline included. A type the copy's catalog does not hold throws `unknownType` and queues nothing. A retype changes what the copy's read view covers, so once the server answers it the drain throws `copyExpired(reason: "read_view_changed", …)`: the write is answered, and the app hydrates again.
 
+## Links and embeds in a body
+
+A link in an item's body, `[[Another note]]`, is a `references` edge to the item it names. An embed of a file, `![[photo.png]]` or `![](photo.png)`, is an `attached-to` edge from the file's item to the item whose body embeds it. Saving a body through a working copy queues those edges, and taking a link or an embed out of a body queues the delete of its edge.
+
+`links(in:)` reads an item's links and embeds in body order, each as typed, from the copy alone and offline:
+
+```swift
+let found = try await copy.items.links(in: noteId)
+for link in found.links {
+    switch link.target {
+    case .item(let id): print("\(link.name) is \(id)")
+    case .pending: print("\(link.name) is not looked up yet")
+    case .missing: print("\(link.name) names no item")
+    case .ambiguous: print("\(link.name) names more than one item")
+    case .refused(let reason): print("\(link.name) was refused: \(reason)")
+    }
+}
+let files = found.embeds.compactMap { embed in
+    if case .item(let id) = embed.target { id } else { nil }
+}
+```
+
+A name that the copy cannot resolve alone is `pending` until the server's lookup answers it. A drain, a catch-up and a hydration try it again. An embed resolves to the file item that holds the bytes, which you read with `items.get(_:)` and `blobs.get(_:)`.
+
+To attach a file and embed it, `embed(file:in:_:)` queues the writes of `attach(to:file:_:)` and adds the embed to the end of the body, after a blank line:
+
+```swift
+let embedded = try await copy.items.embed(file: photoURL, in: noteId)
+print(embedded.embed)  // ![[photo.png]]
+```
+
+The body edit is based on the body and the version the copy holds, as an `update(_:_:)` is. Where another device changes the body before this edit reaches the server, the server answers it as the type's merge policy says: for a note, `conflicted`, with this body set aside in a conflicted copy. The body is read and written in two core calls, so an edit of the same body queued while the call runs is replaced, not merged; make an item's body edits one after another.
+
+Where no embed can name the file alone among the item's attachments, the file stays attached with the body unchanged, and the call throws `EmbedFailure`, which carries the `Attached` and the `cause`, an `invalid` error. That happens for a title that contains `[`, `]`, `|`, `#` or `^`, for a title given in `Attachment` that another attachment already has, and for a name that ends in a document extension such as `.txt`, which a body reads as a note and not a file. To put an embed somewhere else in the body, call `attach(to:file:_:)` and write `Attached.embed` into the body yourself with an edit. `embedText(of:in:)` answers the same text for a file that is already attached.
+
 ## Recently deleted
 
 `items.delete(_:)` moves an item to the bin. The bin itself is read from the server, a page at a time, newest change first, and nothing read from it is held in the copy. Offline, `bin` throws `network`; the copy never answers for it. The server answers no time an item went to the bin, so its `updatedAt` stands for it, though a write to an item in the bin moves it too.

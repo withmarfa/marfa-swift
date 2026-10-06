@@ -832,6 +832,12 @@ public func FfiConverterTypeChangeListener_lower(_ value: ChangeListener) -> UIn
 public protocol CoreProtocol: AnyObject, Sendable {
     
     /**
+     * Adds a file as an item of its own, attached to nothing: its upload and
+     * a file item naming the bytes, and a write for each tag.
+     */
+    func addFile(path: String, attachment: Attachment, tags: [String]) throws  -> Added
+    
+    /**
      * Puts one tag on an item, as its own write.
      */
     func addTag(id: String, tag: String) throws  -> QueuedWrite
@@ -861,6 +867,13 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * Whether a blob's bytes are held beside the store, with no request.
      */
     func blobHeld(hash: String) throws  -> Bool
+    
+    /**
+     * Each link and each embed of a file in an item's body, with the item it
+     * names or why it names none yet, from the copy alone. An item the copy
+     * does not hold throws `NotFound`.
+     */
+    func bodyLinks(id: String) throws  -> BodyLinks
     
     func catchUp(stop: Stop?) throws  -> CatchUpReport
     
@@ -937,6 +950,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func edgesOfType(edgeType: String) throws  -> [Edge]
     
     func edgesTo(id: String) throws  -> [Edge]
+    
+    /**
+     * The text that embeds the file item `file` in the body of `id`, which
+     * names that file alone; throws `Invalid` where no embed can.
+     */
+    func embedText(id: String, file: String) throws  -> String
     
     /**
      * Holds the event stream open on a thread of its own and applies each
@@ -1231,6 +1250,21 @@ public static func openReader(path: String)throws  -> Core  {
 
     
     /**
+     * Adds a file as an item of its own, attached to nothing: its upload and
+     * a file item naming the bytes, and a write for each tag.
+     */
+open func addFile(path: String, attachment: Attachment, tags: [String])throws  -> Added  {
+    return try  FfiConverterTypeAdded_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_add_file(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(path),
+        FfiConverterTypeAttachment_lower(attachment),
+        FfiConverterSequenceString.lower(tags),$0
+    )
+})
+}
+    
+    /**
      * Puts one tag on an item, as its own write.
      */
 open func addTag(id: String, tag: String)throws  -> QueuedWrite  {
@@ -1297,6 +1331,20 @@ open func blobHeld(hash: String)throws  -> Bool  {
     uniffi_marfa_core_ffi_fn_method_core_blob_held(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(hash),$0
+    )
+})
+}
+    
+    /**
+     * Each link and each embed of a file in an item's body, with the item it
+     * names or why it names none yet, from the copy alone. An item the copy
+     * does not hold throws `NotFound`.
+     */
+open func bodyLinks(id: String)throws  -> BodyLinks  {
+    return try  FfiConverterTypeBodyLinks_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_body_links(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
     )
 })
 }
@@ -1489,6 +1537,20 @@ open func edgesTo(id: String)throws  -> [Edge]  {
     uniffi_marfa_core_ffi_fn_method_core_edges_to(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+    /**
+     * The text that embeds the file item `file` in the body of `id`, which
+     * names that file alone; throws `Invalid` where no embed can.
+     */
+open func embedText(id: String, file: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_embed_text(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterString.lower(file),$0
     )
 })
 }
@@ -2840,19 +2902,87 @@ public func FfiConverterTypeSubscription_lower(_ value: Subscription) -> UInt64 
 
 
 /**
- * The three writes an attachment is, in the order they go out.
+ * The two writes a file added on its own is, in the order they go out.
+ */
+public struct Added: Equatable, Hashable {
+    public var upload: QueuedWrite
+    public var item: QueuedWrite
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(upload: QueuedWrite, item: QueuedWrite) {
+        self.upload = upload
+        self.item = item
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Added: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeAdded: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Added {
+        return
+            try Added(
+                upload: FfiConverterTypeQueuedWrite.read(from: &buf), 
+                item: FfiConverterTypeQueuedWrite.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Added, into buf: inout [UInt8]) {
+        FfiConverterTypeQueuedWrite.write(value.upload, into: &buf)
+        FfiConverterTypeQueuedWrite.write(value.item, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAdded_lift(_ buf: RustBuffer) throws -> Added {
+    return try FfiConverterTypeAdded.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAdded_lower(_ value: Added) -> RustBuffer {
+    return FfiConverterTypeAdded.lower(value)
+}
+
+
+/**
+ * The three writes an attachment is, in the order they go out, and the
+ * text that embeds the file in the item's body.
  */
 public struct Attached: Equatable, Hashable {
     public var upload: QueuedWrite
     public var item: QueuedWrite
     public var edge: QueuedWrite
+    /**
+     * `![[title]]`, which reads back as `edge` once written into the item's
+     * body; none where its title cannot name it alone in an embed.
+     */
+    public var embed: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(upload: QueuedWrite, item: QueuedWrite, edge: QueuedWrite) {
+    public init(upload: QueuedWrite, item: QueuedWrite, edge: QueuedWrite, 
+        /**
+         * `![[title]]`, which reads back as `edge` once written into the item's
+         * body; none where its title cannot name it alone in an embed.
+         */embed: String?) {
         self.upload = upload
         self.item = item
         self.edge = edge
+        self.embed = embed
     }
 
     
@@ -2873,7 +3003,8 @@ public struct FfiConverterTypeAttached: FfiConverterRustBuffer {
             try Attached(
                 upload: FfiConverterTypeQueuedWrite.read(from: &buf), 
                 item: FfiConverterTypeQueuedWrite.read(from: &buf), 
-                edge: FfiConverterTypeQueuedWrite.read(from: &buf)
+                edge: FfiConverterTypeQueuedWrite.read(from: &buf), 
+                embed: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2881,6 +3012,7 @@ public struct FfiConverterTypeAttached: FfiConverterRustBuffer {
         FfiConverterTypeQueuedWrite.write(value.upload, into: &buf)
         FfiConverterTypeQueuedWrite.write(value.item, into: &buf)
         FfiConverterTypeQueuedWrite.write(value.edge, into: &buf)
+        FfiConverterOptionString.write(value.embed, into: &buf)
     }
 }
 
@@ -3026,6 +3158,138 @@ public func FfiConverterTypeBinPage_lift(_ buf: RustBuffer) throws -> BinPage {
 #endif
 public func FfiConverterTypeBinPage_lower(_ value: BinPage) -> RustBuffer {
     return FfiConverterTypeBinPage.lower(value)
+}
+
+
+/**
+ * The links in an item's body, and its embeds of files, in body order.
+ */
+public struct BodyLinks: Equatable, Hashable {
+    public var links: [BodyName]
+    public var embeds: [BodyName]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(links: [BodyName], embeds: [BodyName]) {
+        self.links = links
+        self.embeds = embeds
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension BodyLinks: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBodyLinks: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BodyLinks {
+        return
+            try BodyLinks(
+                links: FfiConverterSequenceTypeBodyName.read(from: &buf), 
+                embeds: FfiConverterSequenceTypeBodyName.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: BodyLinks, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeBodyName.write(value.links, into: &buf)
+        FfiConverterSequenceTypeBodyName.write(value.embeds, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBodyLinks_lift(_ buf: RustBuffer) throws -> BodyLinks {
+    return try FfiConverterTypeBodyLinks.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBodyLinks_lower(_ value: BodyLinks) -> RustBuffer {
+    return FfiConverterTypeBodyLinks.lower(value)
+}
+
+
+/**
+ * A link or an embed as the body carries it, and what it names.
+ */
+public struct BodyName: Equatable, Hashable {
+    /**
+     * As typed: `[[Note|shown]]`, `![[photo.png]]`.
+     */
+    public var text: String
+    /**
+     * What it is read as: the name before any `|` or `#`, or the embed's
+     * path or name.
+     */
+    public var name: String
+    public var target: BodyTarget
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * As typed: `[[Note|shown]]`, `![[photo.png]]`.
+         */text: String, 
+        /**
+         * What it is read as: the name before any `|` or `#`, or the embed's
+         * path or name.
+         */name: String, target: BodyTarget) {
+        self.text = text
+        self.name = name
+        self.target = target
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension BodyName: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBodyName: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BodyName {
+        return
+            try BodyName(
+                text: FfiConverterString.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                target: FfiConverterTypeBodyTarget.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: BodyName, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.text, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterTypeBodyTarget.write(value.target, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBodyName_lift(_ buf: RustBuffer) throws -> BodyName {
+    return try FfiConverterTypeBodyName.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBodyName_lower(_ value: BodyName) -> RustBuffer {
+    return FfiConverterTypeBodyName.lower(value)
 }
 
 
@@ -3758,17 +4022,20 @@ public func FfiConverterTypeEdgeDraft_lower(_ value: EdgeDraft) -> RustBuffer {
 
 
 /**
- * A change to an edge's properties, and the version it was read at.
+ * A change to an edge's properties, a move of one of its ends, or both,
+ * and the version it was read at.
  */
 public struct EdgeEdit: Equatable, Hashable {
     public var propertiesJson: String
     public var baseVersion: Int64?
+    public var moves: EdgeMove?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(propertiesJson: String, baseVersion: Int64? = nil) {
+    public init(propertiesJson: String, baseVersion: Int64? = nil, moves: EdgeMove? = nil) {
         self.propertiesJson = propertiesJson
         self.baseVersion = baseVersion
+        self.moves = moves
     }
 
     
@@ -3788,13 +4055,15 @@ public struct FfiConverterTypeEdgeEdit: FfiConverterRustBuffer {
         return
             try EdgeEdit(
                 propertiesJson: FfiConverterString.read(from: &buf), 
-                baseVersion: FfiConverterOptionInt64.read(from: &buf)
+                baseVersion: FfiConverterOptionInt64.read(from: &buf), 
+                moves: FfiConverterOptionTypeEdgeMove.read(from: &buf)
         )
     }
 
     public static func write(_ value: EdgeEdit, into buf: inout [UInt8]) {
         FfiConverterString.write(value.propertiesJson, into: &buf)
         FfiConverterOptionInt64.write(value.baseVersion, into: &buf)
+        FfiConverterOptionTypeEdgeMove.write(value.moves, into: &buf)
     }
 }
 
@@ -3811,6 +4080,63 @@ public func FfiConverterTypeEdgeEdit_lift(_ buf: RustBuffer) throws -> EdgeEdit 
 #endif
 public func FfiConverterTypeEdgeEdit_lower(_ value: EdgeEdit) -> RustBuffer {
     return FfiConverterTypeEdgeEdit.lower(value)
+}
+
+
+/**
+ * The end an edge edit moves, and the item it moves it to.
+ */
+public struct EdgeMove: Equatable, Hashable {
+    public var end: EdgeEnd
+    public var to: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(end: EdgeEnd, to: String) {
+        self.end = end
+        self.to = to
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension EdgeMove: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEdgeMove: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeMove {
+        return
+            try EdgeMove(
+                end: FfiConverterTypeEdgeEnd.read(from: &buf), 
+                to: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EdgeMove, into buf: inout [UInt8]) {
+        FfiConverterTypeEdgeEnd.write(value.end, into: &buf)
+        FfiConverterString.write(value.to, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeMove_lift(_ buf: RustBuffer) throws -> EdgeMove {
+    return try FfiConverterTypeEdgeMove.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeMove_lower(_ value: EdgeMove) -> RustBuffer {
+    return FfiConverterTypeEdgeMove.lower(value)
 }
 
 
@@ -4507,9 +4833,13 @@ public struct FolderPull: Equatable, Hashable {
     public var unchanged: UInt64
     public var skipped: UInt64
     /**
-     * Files of items trashed or gone from the search's states, removed.
+     * Files of items trashed, purged or gone from the search's states, removed.
      */
     public var removed: UInt64
+    /**
+     * Of `removed`, the files of items purged, which no restore brings back.
+     */
+    public var purged: UInt64
     /**
      * Files of items gone from the search, kept with the person's changes.
      */
@@ -4543,8 +4873,11 @@ public struct FolderPull: Equatable, Hashable {
     // declare one manually.
     public init(written: UInt64, rewritten: UInt64, moved: UInt64, unchanged: UInt64, skipped: UInt64, 
         /**
-         * Files of items trashed or gone from the search's states, removed.
+         * Files of items trashed, purged or gone from the search's states, removed.
          */removed: UInt64, 
+        /**
+         * Of `removed`, the files of items purged, which no restore brings back.
+         */purged: UInt64, 
         /**
          * Files of items gone from the search, kept with the person's changes.
          */kept: UInt64, 
@@ -4572,6 +4905,7 @@ public struct FolderPull: Equatable, Hashable {
         self.unchanged = unchanged
         self.skipped = skipped
         self.removed = removed
+        self.purged = purged
         self.kept = kept
         self.unwritten = unwritten
         self.absent = absent
@@ -4603,6 +4937,7 @@ public struct FfiConverterTypeFolderPull: FfiConverterRustBuffer {
                 unchanged: FfiConverterUInt64.read(from: &buf), 
                 skipped: FfiConverterUInt64.read(from: &buf), 
                 removed: FfiConverterUInt64.read(from: &buf), 
+                purged: FfiConverterUInt64.read(from: &buf), 
                 kept: FfiConverterUInt64.read(from: &buf), 
                 unwritten: FfiConverterUInt64.read(from: &buf), 
                 absent: FfiConverterUInt64.read(from: &buf), 
@@ -4620,6 +4955,7 @@ public struct FfiConverterTypeFolderPull: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.unchanged, into: &buf)
         FfiConverterUInt64.write(value.skipped, into: &buf)
         FfiConverterUInt64.write(value.removed, into: &buf)
+        FfiConverterUInt64.write(value.purged, into: &buf)
         FfiConverterUInt64.write(value.kept, into: &buf)
         FfiConverterUInt64.write(value.unwritten, into: &buf)
         FfiConverterUInt64.write(value.absent, into: &buf)
@@ -7212,7 +7548,119 @@ public func FfiConverterTypeBlockedReason_lower(_ value: BlockedReason) -> RustB
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * The end of an edge whose file writes it.
+ * What a link or an embed in an item's body names.
+ */
+
+public enum BodyTarget: Equatable, Hashable {
+    
+    /**
+     * The item it names; for an embed, the file item with the bytes.
+     */
+    case item(id: String
+    )
+    /**
+     * Not yet looked up on the server.
+     */
+    case pending
+    /**
+     * Names no item.
+     */
+    case missing
+    /**
+     * Names more than one item.
+     */
+    case ambiguous
+    /**
+     * The edge's write, or the server's lookup, was refused, for `reason`.
+     */
+    case refused(reason: String
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension BodyTarget: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBodyTarget: FfiConverterRustBuffer {
+    typealias SwiftType = BodyTarget
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BodyTarget {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .item(id: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .pending
+        
+        case 3: return .missing
+        
+        case 4: return .ambiguous
+        
+        case 5: return .refused(reason: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: BodyTarget, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .item(id):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(id, into: &buf)
+            
+        
+        case .pending:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .missing:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .ambiguous:
+            writeInt(&buf, Int32(4))
+        
+        
+        case let .refused(reason):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(reason, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBodyTarget_lift(_ buf: RustBuffer) throws -> BodyTarget {
+    return try FfiConverterTypeBodyTarget.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBodyTarget_lower(_ value: BodyTarget) -> RustBuffer {
+    return FfiConverterTypeBodyTarget.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * One end of an edge.
  */
 
 public enum EdgeEnd: Equatable, Hashable {
@@ -7414,8 +7862,10 @@ public enum FolderEvent: Equatable, Hashable {
     case watcherFailed(message: String
     )
     /**
-     * A hydration failed, and is tried again after `wait_ms`. Told once for
-     * each run of failures.
+     * A hydration failed, and is tried again after `wait_ms`; or a pull met
+     * the copy changing under it, with the error `StreamIncomplete` and the
+     * reason `local_copy_changed`, and the next pass pulls again. Told once
+     * for each run of failures.
      */
     case retrying(error: MarfaError, waitMs: UInt64
     )
@@ -9219,6 +9669,30 @@ fileprivate struct FfiConverterOptionTypeStop: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeEdgeMove: FfiConverterRustBuffer {
+    typealias SwiftType = EdgeMove?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEdgeMove.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEdgeMove.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeFirstSyncPlan: FfiConverterRustBuffer {
     typealias SwiftType = FirstSyncPlan?
 
@@ -9724,6 +10198,31 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeBodyName: FfiConverterRustBuffer {
+    typealias SwiftType = [BodyName]
+
+    public static func write(_ value: [BodyName], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeBodyName.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [BodyName] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [BodyName]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeBodyName.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeDrainVerdict: FfiConverterRustBuffer {
     typealias SwiftType = [DrainVerdict]
 
@@ -10169,6 +10668,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_changelistener_ended() != 39692) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_core_add_file() != 63903) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_core_add_tag() != 54886) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -10182,6 +10684,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_blob_held() != 47878) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_body_links() != 16922) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_catch_up() != 44200) {
@@ -10233,6 +10738,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_edges_to() != 56298) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_embed_text() != 54663) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 52227) {
