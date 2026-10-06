@@ -13,7 +13,7 @@ import { generate, prepare } from "./generate.mjs";
 
 const nullable = {
   anyOf: [
-    { $ref: "#/components/schemas/BackgroundJobReport" },
+    { $ref: "#/components/schemas/HousekeepingReport" },
     { type: "null" },
   ],
 };
@@ -22,7 +22,7 @@ const document = (schema) => ({
   info: { title: "Fixture", version: "1" },
   paths: {},
   components: {
-    schemas: { Fixture: schema, BackgroundJobReport: { type: "object" } },
+    schemas: { Fixture: schema, HousekeepingReport: { type: "object" } },
   },
 });
 
@@ -36,7 +36,7 @@ test("normalizes null schemas without changing examples or the source", () => {
   const before = JSON.stringify(input);
   const { document: output } = prepare(input);
   assert.deepEqual(output.components.schemas.Fixture.properties.result, {
-    $ref: "#/components/schemas/MarfaNullableBackgroundJobReport",
+    $ref: "#/components/schemas/MarfaNullableHousekeepingReport",
   });
   assert.deepEqual(output.components.schemas.MarfaNull, { enum: [null] });
   assert.deepEqual(output.components.schemas.Fixture.example, example);
@@ -76,14 +76,14 @@ test("visits inline request and response schemas and preserves constraints", () 
     output.paths["/rows"].post.requestBody.content["application/json"].schema
       .properties.value,
     {
-      $ref: "#/components/schemas/MarfaNullableBackgroundJobReport",
+      $ref: "#/components/schemas/MarfaNullableHousekeepingReport",
       description: "clear",
     },
   );
   assert.deepEqual(
     output.paths["/rows"].post.responses[200].content["application/json"].schema
       .items,
-    { $ref: "#/components/schemas/MarfaNullableBackgroundJobReport" },
+    { $ref: "#/components/schemas/MarfaNullableHousekeepingReport" },
   );
 });
 
@@ -137,4 +137,75 @@ test(
 test("leaves other unsupported null schemas for the diagnostic guard", () => {
   const input = document({ anyOf: [{ type: "string" }, { type: "null" }] });
   assert.deepEqual(prepare(input).document, input);
+});
+
+test("treats a oneOf of a reference and null as nullable", () => {
+  const input = document({
+    type: "object",
+    properties: {
+      result: {
+        oneOf: [
+          { $ref: "#/components/schemas/HousekeepingReport" },
+          { type: "null" },
+        ],
+        description: "kept",
+      },
+    },
+  });
+  const { document: output } = prepare(input);
+  assert.deepEqual(output.components.schemas.Fixture.properties.result, {
+    $ref: "#/components/schemas/MarfaNullableHousekeepingReport",
+    description: "kept",
+  });
+});
+
+test("reads a reference with only a description beside it as the reference", () => {
+  const input = document({
+    type: "object",
+    properties: {
+      report: {
+        allOf: [
+          { $ref: "#/components/schemas/HousekeepingReport" },
+          { description: "what the run reports" },
+        ],
+      },
+    },
+  });
+  const { document: output } = prepare(input);
+  assert.deepEqual(output.components.schemas.Fixture.properties.report, {
+    $ref: "#/components/schemas/HousekeepingReport",
+    description: "what the run reports",
+  });
+});
+
+test("leaves an allOf that adds more than a description to a reference", () => {
+  const joined = {
+    allOf: [
+      { $ref: "#/components/schemas/HousekeepingReport" },
+      { type: "object", properties: { extra: { type: "string" } } },
+    ],
+  };
+  assert.deepEqual(prepare(document(joined)).document, document(joined));
+});
+
+test("drops a requirement one member makes of a name another defines, and keeps one nobody defines", () => {
+  const input = document({
+    allOf: [
+      { $ref: "#/components/schemas/Frame" },
+      {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id", "metadata", "typo"],
+      },
+    ],
+  });
+  input.components.schemas.Frame = {
+    type: "object",
+    properties: { metadata: { type: "string" } },
+  };
+  const { document: output } = prepare(input);
+  assert.deepEqual(output.components.schemas.Fixture.allOf[1].required, [
+    "id",
+    "typo",
+  ]);
 });

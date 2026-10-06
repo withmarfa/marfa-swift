@@ -335,7 +335,7 @@ public protocol APIProtocol: Sendable {
     func uploadBlob(_ input: Operations.UploadBlob.Input) async throws -> Operations.UploadBlob.Output
     /// List orphaned blobs
     ///
-    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` background job found them, oldest first. Requires the operator key.
+    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires the operator key.
     ///
     /// - Remark: HTTP `GET /blobs/orphans`.
     /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)`.
@@ -375,163 +375,163 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /blobs/{hash}/locations/{store}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(deleteBlobLocation)`.
     func deleteBlobLocation(_ input: Operations.DeleteBlobLocation.Input) async throws -> Operations.DeleteBlobLocation.Output
-    /// List background jobs
+    /// List housekeeping jobs
     ///
-    /// Returns every background job Marfa runs on itself: its interval, when it's next due, whether a run holds it, and what its last run did. One turned off by configuration isn't listed, unless `/config` can turn it back on. Operator key only.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires the operator key.
     ///
-    /// - Remark: HTTP `GET /background-jobs`.
-    /// - Remark: Generated from `#/paths//background-jobs/get(listBackgroundJobs)`.
-    func listBackgroundJobs(_ input: Operations.ListBackgroundJobs.Input) async throws -> Operations.ListBackgroundJobs.Output
-    /// Run a background job
+    /// - Remark: HTTP `GET /housekeeping`.
+    /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
+    func listHousekeeping(_ input: Operations.ListHousekeeping.Input) async throws -> Operations.ListHousekeeping.Output
+    /// Run a housekeeping job
     ///
-    /// Runs a background job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Operator key only.
+    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires the operator key.
     ///
-    /// - Remark: HTTP `POST /background-jobs/{name}/run`.
-    /// - Remark: Generated from `#/paths//background-jobs/{name}/run/post(runBackgroundJob)`.
-    func runBackgroundJob(_ input: Operations.RunBackgroundJob.Input) async throws -> Operations.RunBackgroundJob.Output
+    /// - Remark: HTTP `POST /housekeeping/{name}/run`.
+    /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)`.
+    func runHousekeeping(_ input: Operations.RunHousekeeping.Input) async throws -> Operations.RunHousekeeping.Output
     /// List connectors
     ///
-    /// The caller's own registration, or every registration for the operator key, newest first, each with when it last heartbeated, its last run, and until when a process holds it.
+    /// Returns your registration, or every registration if you use the operator key, newest first.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
     func listConnectors(_ input: Operations.ListConnectors.Input) async throws -> Operations.ListConnectors.Output
     /// Register a connector
     ///
-    /// Registers the key this request carries as a connector, with a name and a description, and answers `201`. The key is the identity, one registration per key: the same key registering again updates the name and the description and answers `200` with the same `id`. Nothing runs here; a registration is a name for a process outside the server that heartbeats and reports its runs.
+    /// Registers your key as a connector, with a name and description, and returns it. Each key has one registration: registering again updates the name and description and returns the same `id`.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
     func registerConnector(_ input: Operations.RegisterConnector.Input) async throws -> Operations.RegisterConnector.Output
     /// Get a connector
     ///
-    /// The connector's own key or the operator key.
+    /// Returns a connector, with when it last sent a heartbeat, its last run and any hold on it.
     ///
     /// - Remark: HTTP `GET /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
     func getConnector(_ input: Operations.GetConnector.Input) async throws -> Operations.GetConnector.Output
     /// Delete a connector
     ///
-    /// Removes the registration, every run it reported, its hold, and its inbound webhook endpoints with every delivery they stored. The state and the agreements it kept stay with its source, for a later key with the same source. The connector's own key or the operator key.
+    /// Deletes the connector, its runs and hold, and its webhook endpoints with every delivery they stored. Its state document and agreements stay with its source, for a later key with the same source.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
     func deleteConnector(_ input: Operations.DeleteConnector.Input) async throws -> Operations.DeleteConnector.Output
     /// Send a heartbeat
     ///
-    /// Stamps `last_heartbeat_at` with the server's clock. The connector's own key only. What a stale heartbeat means is the reader's to decide: nothing here supervises.
+    /// Sets `last_heartbeat_at` to the current time and returns it. Marfa takes no action when heartbeats stop.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/heartbeat`.
     /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)`.
     func heartbeatConnector(_ input: Operations.HeartbeatConnector.Input) async throws -> Operations.HeartbeatConnector.Output
     /// List connector runs
     ///
-    /// Newest first, to the connector's own key or the operator key.
+    /// Returns the runs the connector reported, newest first.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
     func listConnectorRuns(_ input: Operations.ListConnectorRuns.Input) async throws -> Operations.ListConnectorRuns.Output
     /// Report a run
     ///
-    /// Records one run: `succeeded` or `failed`, when it started and finished, and a summary or an error. The connector's own key only. The server keeps the last hundred runs per connector and drops the oldest beyond that.
+    /// Records one run of the connector, with its outcome and times, and returns it. Marfa keeps the last 100 runs and drops older ones.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)`.
     func reportConnectorRun(_ input: Operations.ReportConnectorRun.Input) async throws -> Operations.ReportConnectorRun.Output
     /// List webhook endpoints
     ///
-    /// Newest first, retired ones included, each address redacted. The connector's own key or the operator key.
+    /// Returns the connector's webhook endpoints, newest first, retired ones included.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
     /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
     func listInboundEndpoints(_ input: Operations.ListInboundEndpoints.Input) async throws -> Operations.ListInboundEndpoints.Output
     /// Create a webhook endpoint
     ///
-    /// Makes an address a sender posts to without a credential, and answers it in full this once; later reads show its last four characters. The connector's own key or the operator key. A registration holds at most 10 live endpoints.
+    /// Creates a webhook endpoint for the connector and returns it. Save its `path`: this is the only response that shows it in full.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
     /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
     func createInboundEndpoint(_ input: Operations.CreateInboundEndpoint.Input) async throws -> Operations.CreateInboundEndpoint.Output
     /// Retire a webhook endpoint
     ///
-    /// Its address stops accepting deliveries, and it stays listed with `retired_at`. Deliveries it already stored stay readable until they age out. The connector's own key or the operator key.
+    /// Retires a webhook endpoint, so its address stops accepting deliveries. It stays listed with `retired_at`, and deliveries it already stored stay readable until they age out.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
     func retireInboundEndpoint(_ input: Operations.RetireInboundEndpoint.Input) async throws -> Operations.RetireInboundEndpoint.Output
     /// List inbound deliveries
     ///
-    /// Oldest first, the ones not yet handled unless `state` says otherwise, without their bodies. The connector's own key only.
+    /// Returns the webhook deliveries the connector received, oldest first, without their bodies. Only those not yet handled, unless you set `state`.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)`.
     func listInboundDeliveries(_ input: Operations.ListInboundDeliveries.Input) async throws -> Operations.ListInboundDeliveries.Output
     /// Get an inbound delivery's body
     ///
-    /// The bytes exactly as they arrived, as `application/octet-stream` whatever the sender declared. The connector's own key only.
+    /// Returns a delivery's body exactly as it arrived, as `application/octet-stream` whatever the sender declared.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/deliveries/{delivery_id}/body`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)`.
     func getInboundDeliveryBody(_ input: Operations.GetInboundDeliveryBody.Input) async throws -> Operations.GetInboundDeliveryBody.Output
     /// Mark inbound deliveries handled
     ///
-    /// Marks each delivery `processed`, `duplicate` or `rejected` and answers them in the order named. The first mark stands, so a repeat answers it again. The connector's own key only.
+    /// Marks each named delivery handled, with an outcome, and returns them in the order you named. The first mark stands: marking a delivery again returns it unchanged.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/deliveries/handled`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)`.
     func markInboundDeliveriesHandled(_ input: Operations.MarkInboundDeliveriesHandled.Input) async throws -> Operations.MarkInboundDeliveriesHandled.Output
     /// Take or renew a hold
     ///
-    /// Holds the registration for `process` until the server's clock plus the instance's hold window, three minutes unless it names another, and answers until when, for how long, and whether this renewed a hold the process still held. The process holding it renews it the same way. Only the process holding a live hold writes the state and the agreements. A hold is a lock the process takes and gives up: nothing watches it, and a process that stops renewing simply loses it, so one answered `renewed: false` while it believed it held the registration re-reads the state and the agreements before writing again. The connector's own key only.
+    /// Takes the connector's hold for `process`, or renews it if `process` already holds it. Only the process holding a live hold can replace the state document or write agreements.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/hold`.
     /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)`.
     func holdConnector(_ input: Operations.HoldConnector.Input) async throws -> Operations.HoldConnector.Output
     /// Release a hold
     ///
-    /// Releases the hold if `process` holds it, so another process may take it at once. Answers the same whether or not it did, and leaves another process's hold standing. The connector's own key only.
+    /// Releases the hold if `process` holds it, so another process can take it at once. Returns the same either way, and leaves another process's hold in place.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/hold`.
     /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)`.
     func releaseConnectorHold(_ input: Operations.ReleaseConnectorHold.Input) async throws -> Operations.ReleaseConnectorHold.Output
     /// Get the state document
     ///
-    /// The state document of the registration's source, which a later key with the same source reads too. The connector's own key only.
+    /// Returns the state document of the connector's source. A later key with the same source reads the same document.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)`.
     func getConnectorState(_ input: Operations.GetConnectorState.Input) async throws -> Operations.GetConnectorState.Output
     /// Replace the state document
     ///
-    /// Replaces the state document of the registration's source whole. At most 512 KiB serialized. Taken only from the `process` holding a live hold. The connector's own key only.
+    /// Replaces the whole state document of the connector's source. Only the process holding a live hold can write it.
     ///
     /// - Remark: HTTP `PUT /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)`.
     func replaceConnectorState(_ input: Operations.ReplaceConnectorState.Input) async throws -> Operations.ReplaceConnectorState.Output
     /// Delete the state document
     ///
-    /// Removes the state document and every agreement of the registration's source, which every registration of that source reads, and writes an audit row against the registration named. No hold fences it. The connector's own key or the operator key.
+    /// Deletes the state document and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
     func deleteConnectorState(_ input: Operations.DeleteConnectorState.Input) async throws -> Operations.DeleteConnectorState.Output
     /// List a connector's agreements
     ///
-    /// The agreements of the registration's source, the longest unchanged first. A row whose type the key's type map does not read is left out, so a page can be short with a cursor still to follow. The connector's own key only.
+    /// Returns the agreements of the connector's source, the one written longest ago first. Items whose type you can't read are left out, so a page can be short with more to follow.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
     func listConnectorAgreements(_ input: Operations.ListConnectorAgreements.Input) async throws -> Operations.ListConnectorAgreements.Output
     /// Write agreements
     ///
-    /// Writes and removes the connector's records of what it and its vendor last agreed about rows, one per row for the registration's source: at most 500 in each list, each record at most 16 KiB serialized, and no row named twice. A row that is not stored, or whose type the key's type map does not read, is skipped and named in `skipped`; a trashed row is stored. A record announces nothing and leaves the row, its `updated_at` and its version as they were. Taken only from the `process` holding a live hold. The connector's own key only.
+    /// Writes and clears the connector's agreements, its records of what it and its vendor last agreed about each item. Only the process holding a live hold can write them.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)`.
     func writeConnectorAgreements(_ input: Operations.WriteConnectorAgreements.Input) async throws -> Operations.WriteConnectorAgreements.Output
     /// Look up agreements
     ///
-    /// The agreements of the rows named that have one, each row once, in the order first named; at most 500 ids. A row whose type the key's type map does not read is left out. The connector's own key only.
+    /// Returns the agreements of the named items that have one, each item once, in the order you first named it. An item whose type you can't read is left out.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements/lookup`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)`.
@@ -559,64 +559,56 @@ public protocol APIProtocol: Sendable {
     func revokeFolder(_ input: Operations.RevokeFolder.Input) async throws -> Operations.RevokeFolder.Output
     /// List API keys
     ///
-    /// Returns the API keys within the caller's reach, the caller included, without plaintext, which is only ever returned at creation time. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.
+    /// Returns the API keys you could have created, your own included, without their plaintext. The operator key gets every key. Requires `keys.mint` or the operator key.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
     func listKeys(_ input: Operations.ListKeys.Input) async throws -> Operations.ListKeys.Output
     /// Create an API key
     ///
-    /// Creates a new API key. The plaintext `key` is returned only in this response and never shown again, so store it securely.
-    ///
-    /// A credential is a set of permissions and nothing else. `permissions` names the permissions the key holds, and a mint can narrow and can never widen. A key holds exactly what its body names. The families are `permissions`, the five permission maps and `sources`, and naming one, even empty, names it. A body naming none takes the creator's whole set, permissions and maps alike; a body naming any holds only what it names and nothing in the others, so a key minted with only `permissions` holds those permissions and no map entry or claimed source, and a key minted with a type map and no `permissions` holds no permission. A signed-in app must hold `keys.mint` to reach this route at all.
-    ///
-    /// `source` is the key's own, and no other unrevoked key may hold it as its own, though keys claiming it write under it too. `sources` names the sources the key claims besides it, which a write may name so its rows are keyed by the claimed source.
-    ///
-    /// The operator key holds no permissions, because running the instance sits outside the permission model, so it is not a ceiling: a working key it mints holds what the body names, or the whole set when the body names nothing. With `is_operator: true` it mints a second operator key instead, which holds nothing.
-    ///
-    /// On a fresh server with zero keys this runs in bootstrap mode: the key it mints is the operator key, and the request must present the one-time secret the server printed to its log at startup, as a bearer token. That secret works once (the mint consumes it). The operator key is not a working key, so the next call is this route again with it, minting the key to configure a client with.
+    /// Creates an API key and returns it with its plaintext `key`, shown only here. If the body names none of `permissions`, the five permission maps and `sources`, the key gets everything you hold; if it names any, the key holds only what it names.
     ///
     /// - Remark: HTTP `POST /keys`.
     /// - Remark: Generated from `#/paths//keys/post(createKey)`.
     func createKey(_ input: Operations.CreateKey.Input) async throws -> Operations.CreateKey.Output
     /// Get the current key
     ///
-    /// Returns the key the request bears, without plaintext: its permissions, its maps, its claimed sources, its tier and its own enforcement levers, if it carries any. Any key may read itself, whatever it holds, so a process handed a key can check it holds what it should and no more; every other key stays behind `keys.mint`.
+    /// Returns the key that sends the request, without its plaintext. Any key can read itself, whatever it holds, so a process can check what it was given.
     ///
     /// - Remark: HTTP `GET /keys/current`.
     /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)`.
     func getCurrentKey(_ input: Operations.GetCurrentKey.Input) async throws -> Operations.GetCurrentKey.Output
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, claimed `sources` or permission maps in place. `source` is immutable; revoke and recreate to change it. Requires `keys.mint`. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key.
+    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint` or the operator key.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
     func updateKey(_ input: Operations.UpdateKey.Input) async throws -> Operations.UpdateKey.Output
     /// Revoke an API key
     ///
-    /// Revokes the key immediately. An event stream the key holds open ends before it sends anything written after the revoke, and at its next heartbeat when nothing is written. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key.
+    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. You can revoke any key you could have created, your own included. Requires `keys.mint` or the operator key.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
     func revokeKey(_ input: Operations.RevokeKey.Input) async throws -> Operations.RevokeKey.Output
     /// Get the configuration
     ///
-    /// Returns the instance configuration (the optional `enforcement` levers plus the cleanup-job retention overrides) under `instance_id`, the identifier this deployment answers to. Only `instance_id` is present when nothing is configured. Requires `config.manage`.
+    /// Returns the instance configuration: its enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
     ///
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.
     func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output
     /// Replace the configuration
     ///
-    /// Overwrites the instance config with the supplied object: full replacement, not a merge. A cleanup-job retention override of `0` disables the corresponding job. `instance_id` may be sent back as read, so a body taken from `GET /config` round trips; it sets nothing. Requires `config.manage`.
+    /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. Requires `config.manage`.
     ///
     /// - Remark: HTTP `PUT /config`.
     /// - Remark: Generated from `#/paths//config/put(replaceConfig)`.
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
     /// Restore from an archive
     ///
-    /// Ingests a `marfa-archive-v0.tar.gz` produced by `GET /export?format=archive`. Every row is checked before anything is written, and everything the restore writes commits together: type and edge-type registrations first, so a restore into an empty instance can write the items that use them, then blob rows, items, edges and their events, so a restore that fails or is interrupted leaves none of them. A registration the instance already holds identically is skipped, and one it holds differently fails the whole restore. Item ids are preserved so restored edges resolve; an id or natural-key collision, or a link another item of the row's type holds, counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Original item and edge dates and every archived item snapshot are preserved. Historical properties are not checked against current type schemas. Duplicate items retain their live metadata, dates and history. Entries under names the restore does not read are skipped without being held in memory. While a restore writes, other writes wait for it. Keys, webhooks, configuration and tombstones are not restored. Trashed items are restored only when explicitly included in the export. Until the first public release, archives are supported only by the build that wrote them; format 0 promises no compatibility between builds.
+    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires the operator key.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -637,116 +629,98 @@ public protocol APIProtocol: Sendable {
     func deletePlatformType(_ input: Operations.DeletePlatformType.Input) async throws -> Operations.DeletePlatformType.Output
     /// Get the owner
     ///
-    /// Answers the owner: the one account on this instance's sign-in surface, which is the person the OAuth consent screen asks. An instance boots with no owner, and `POST /owner` creates one. Operator key only.
+    /// Returns the owner: the one account that can sign in to the instance and approve apps. A new instance has no owner until `POST /owner` creates one. Requires the operator key.
     ///
     /// - Remark: HTTP `GET /owner`.
     /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
     func getOwner(_ input: Operations.GetOwner.Input) async throws -> Operations.GetOwner.Output
     /// Create the owner
     ///
-    /// Creates the one account on this instance's sign-in surface, with an email address and a password. Sign-up is disabled on every instance, so this is the only way a person comes to exist behind the consent screen, and the account can sign in at `POST /auth/sign-in/email` the moment this answers. The password is judged by the sign-in surface's own length rule. Operator key only: the operator key is what proves the person running the instance, and it outlives the bootstrap secret.
+    /// Creates the owner, the one account that can sign in to the instance, and returns it. The owner can sign in at once with the email address and password. No other route creates an account. Requires the operator key.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
     /// Export items and edges
     ///
-    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and the bytes of each blob the selection or its readable history references that `GET /blobs/{hash}` would serve the caller, which `POST /restore` can ingest. Each archive item line carries `versions`, every stored earlier snapshot the caller may read under its historical type, strictly below the selected current row's version, `lending_blobs`, the digests in that row's properties that lend its reach, and `lending_extensions`, the digests that lend its reach in each extension namespace the line carries. Each archive edge line carries `lending_blobs`, the digests in that edge's properties that lend its reach. A restore lends through those alone. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read.
+    /// Exports the items you can read, with their tags and readable extensions, followed by the edges between them. Without `state`, trashed items are left out. With `format=archive`, returns a file that `POST /restore` reads.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
     func exportData(_ input: Operations.ExportData.Input) async throws -> Operations.ExportData.Output
     /// List webhooks
     ///
-    /// Returns the outbound webhook subscriptions that belong to this credential. Secrets are redacted here; the plaintext is only returned at create time.
+    /// Returns every webhook that belongs to you, with each `secret` shortened to its last four characters.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
     func listWebhooks(_ input: Operations.ListWebhooks.Input) async throws -> Operations.ListWebhooks.Output
     /// Create a webhook
     ///
-    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The subscription belongs to the credential that registers it, which for a signed-in app is its grant rather than the token: each delivery carries only what that credential may read when it is sent, and the subscription is deleted when the key or the app's grant is revoked, while a key that expires or no longer holds `webhooks.manage` delivers nothing more. The URL must be `http` or `https` and reach a public address. The `secret` is the HMAC-SHA256 signing key, at least 32 characters, generated server-side when omitted, and returned in plaintext only on creation.
+    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when that is revoked, and sends nothing while it lacks `webhooks.manage` or the key has expired.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
     func createWebhook(_ input: Operations.CreateWebhook.Input) async throws -> Operations.CreateWebhook.Output
     /// Get a webhook
     ///
-    /// Returns one outbound webhook subscription by id, with its secret redacted.
+    /// Returns a webhook, with its `secret` shortened to its last four characters.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
     func getWebhook(_ input: Operations.GetWebhook.Input) async throws -> Operations.GetWebhook.Output
     /// Update a webhook
     ///
-    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. Pointing it at another URL or turning it off settles its pending deliveries unsent. The signing secret cannot be rotated here; delete the subscription and create a new one.
+    /// Updates a webhook and returns it. Fields you leave out keep their values. Changing `url`, or setting `active` to `false`, cancels its pending deliveries. To change the secret, create a new webhook.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
     func updateWebhook(_ input: Operations.UpdateWebhook.Input) async throws -> Operations.UpdateWebhook.Output
     /// Delete a webhook
     ///
-    /// Removes the subscription so no new deliveries are queued, and its pending deliveries are settled unsent rather than retried.
+    /// Deletes a webhook and cancels its pending deliveries.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
     func deleteWebhook(_ input: Operations.DeleteWebhook.Input) async throws -> Operations.DeleteWebhook.Output
     /// List webhook deliveries
     ///
-    /// Returns recent delivery rows for one subscription, newest first, with the last accepted outcome and cumulative accepted-outcome ordinal. This is not a census of concurrent or lost HTTP sends.
+    /// Returns a page of a webhook's deliveries, newest first. Marfa deletes a delivery that isn't `pending` once it's older than the instance's audit retention.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
     func listWebhookDeliveries(_ input: Operations.ListWebhookDeliveries.Input) async throws -> Operations.ListWebhookDeliveries.Output
     /// Redeliver a failed delivery
     ///
-    /// Queues one retained failed delivery using the current subscription address and secret. Stable delivery and event identity are preserved. The cumulative attempt ordinal counts accepted outcomes, not every concurrent or lost HTTP send.
+    /// Sends a `dead_letter` delivery again, to the webhook's current `url`, and returns it as `pending`. The delivery keeps its ID, and Marfa makes up to 8 more attempts.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
     func redeliverWebhookDelivery(_ input: Operations.RedeliverWebhookDelivery.Input) async throws -> Operations.RedeliverWebhookDelivery.Output
     /// List audit log entries
     ///
-    /// Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads; item/edge reads, SSE, and search are not logged. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.
     func listAuditLog(_ input: Operations.ListAuditLog.Input) async throws -> Operations.ListAuditLog.Output
     /// Describe the instance
     ///
-    /// Answers without a credential: the instance's name, the build it runs as `version`, the `instance_id` that tells two instances answering the same shape apart, the contract version as `contract`, and the surfaces it carries as `features`. `contract` equals this document's `info.version`, so a client generated from this document can tell whether a server speaks the contract it was generated for.
+    /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
     func getInstance(_ input: Operations.GetInstance.Input) async throws -> Operations.GetInstance.Output
     /// Stream change events
     ///
-    /// Opens a Server-Sent Events stream of item and edge changes the caller can read. Send `Last-Event-ID` to replay events missed across a reconnect.
-    ///
-    /// For a certified working copy, use exactly `?edges=all&copy=1`. Bootstrap omits both resume headers; resumption sends both `Last-Event-ID` and `X-Marfa-Read-View`. Its no-id `stream_cursor` and `stream_live` markers contain exact string fields `event_type`, `cursor`, `instance_id` and `read_view`. A known coherent head is required; failed opening reads end incomplete without a certificate. Only completed replay and held-frame delivery produce `stream_live`. Copy item and metadata frames additionally carry boolean `listed`, classifying item-set membership independently of direct-ID read authority. A view that changes after the stream opens sends only the no-id terminal `read_view_changed` with data `{"event_type":"read_view_changed"}` and closes. Copy markers use body certificates, never the HTTP response certificate header. The remaining ordinary-stream rules apply except where these copy guarantees are stricter.
-    ///
-    /// The stream opens with a `stream_cursor` frame, carrying `{ "event_type": "stream_cursor", "cursor": "<event id>" }`, the log position the stream opened at. It does not wait for anything to happen, so a client that subscribes and then reads a snapshot holds a resume point from the first moment rather than waiting for an event to tell it where it is. The frame deliberately carries no SSE `id:` field: on a reconnect it precedes the backlog, and a client adopting it as its cursor there would discard exactly the events it reconnected for.
-    ///
-    /// For an ordinary stream, treat the frame as the first one delivered rather than as guaranteed. Reading the head is bounded, so a stream opened while the database is not answering carries no cursor instead of holding its events back, and a client that receives none proceeds with no cursor of its own. Do not gate hydration on its arrival.
-    ///
-    /// Once the replay is done, and the live frames held while it ran are drained, the stream sends a `stream_live` frame, carrying `{ "event_type": "stream_live", "cursor": "<event id>" | null }` and no SSE `id:`. It says the prologue is over: everything up to `cursor` has been sent or withheld, and what follows is live. A frame the `type` filter or the credential withholds is not written at all, so a client cannot otherwise tell that it has caught up, and its cursor is one a client may resume from without being sent again what the replay covered. It is null only where no position is known: a head read that outran its budget with nothing to replay. A stream that ends short never sends it.
-    ///
-    /// The cursor is a position in one ascending sequence, and `type` and `edges` select a subset of that sequence rather than reordering it, so a cursor taken under one filter can be replayed under another without skipping or repeating a row.
-    ///
-    /// An item frame carries `event_type` and `item`, and an edge frame `event_type`, `edge` and `source_type`, the type of the edge's source item when the event was published. An edge frame reaches a subscriber that may read its edge type and that `source_type`, on a replay as on a live frame, so the edges a purge takes reach only a subscriber that could read the purged item. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
-    ///
-    /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame, `{ "event_type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }`, and closes. `reason` is one of `replay_failed` (the catch-up failed), `backlog_overflow` (the frames held while the stream opened outgrew their buffer), `live_delivery_failed` (the subscription or a read of the credential failed), `credential_ended` (the credential no longer stands: a key revoked, deleted or past its expiry, a sign-in token revoked or expired, or its app disconnected), `reader_behind` (a live frame found 4 MiB of frames unread, or the client took no frame for 30 seconds while a replay, which waits for room before every frame, waited for it) or `server_stopping` (the instance is stopping, and sends this to every stream it has open before it closes them). Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
-    ///
-    /// The stream answers to the credential as it stands: it reads it again before each batch of frames and at each heartbeat, every 30 seconds. A key narrowed meanwhile narrows the stream; one that no longer stands ends it with `stream_incomplete` and `credential_ended`, and nothing written after the change is sent. An app reconnects with the token it refreshed to.
-    ///
-    /// A `Last-Event-ID` past the log's head is a position the log never issued, which is what a client holds after the instance is restored behind it. The stream answers a terminal `cursor_ahead` frame, `{ "event_type": "cursor_ahead", "requested": "<event id>", "head": "<event id>" }`, with no SSE `id:`, and closes; the client re-reads state from the API, as for `catchup_too_old`.
+    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
     ///
     /// - Remark: HTTP `GET /events`.
     /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
     func streamEvents(_ input: Operations.StreamEvents.Input) async throws -> Operations.StreamEvents.Output
     /// Register an OAuth client
     ///
-    /// Dynamic Client Registration (RFC 7591), served by the authorization server's provider. Registers an OAuth client and returns its issued `client_id`. Unauthenticated. A registration is a `web` client unless `application_type` says `native`: a web client's redirect URIs must be https off the loopback, a native client may use http on `localhost`, `127.0.0.1` or `[::1]`. A client is confidential and issued a `client_secret` unless `token_endpoint_auth_method` is `none`. A requested `scope` is validated against the server's allowlist, and the registered ceiling is that whole allowlist whatever was requested; the consent screen is where a grant is narrowed. The `client_credentials` grant is not supported: a machine caller uses an API key, which the keys surface can list, narrow and revoke.
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
     /// - Remark: HTTP `POST /auth/oauth2/register`.
     /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
@@ -1463,7 +1437,7 @@ extension APIProtocol {
     }
     /// List orphaned blobs
     ///
-    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` background job found them, oldest first. Requires the operator key.
+    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires the operator key.
     ///
     /// - Remark: HTTP `GET /blobs/orphans`.
     /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)`.
@@ -1541,33 +1515,33 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// List background jobs
+    /// List housekeeping jobs
     ///
-    /// Returns every background job Marfa runs on itself: its interval, when it's next due, whether a run holds it, and what its last run did. One turned off by configuration isn't listed, unless `/config` can turn it back on. Operator key only.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires the operator key.
     ///
-    /// - Remark: HTTP `GET /background-jobs`.
-    /// - Remark: Generated from `#/paths//background-jobs/get(listBackgroundJobs)`.
-    public func listBackgroundJobs(headers: Operations.ListBackgroundJobs.Input.Headers = .init()) async throws -> Operations.ListBackgroundJobs.Output {
-        try await listBackgroundJobs(Operations.ListBackgroundJobs.Input(headers: headers))
+    /// - Remark: HTTP `GET /housekeeping`.
+    /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
+    public func listHousekeeping(headers: Operations.ListHousekeeping.Input.Headers = .init()) async throws -> Operations.ListHousekeeping.Output {
+        try await listHousekeeping(Operations.ListHousekeeping.Input(headers: headers))
     }
-    /// Run a background job
+    /// Run a housekeeping job
     ///
-    /// Runs a background job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Operator key only.
+    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires the operator key.
     ///
-    /// - Remark: HTTP `POST /background-jobs/{name}/run`.
-    /// - Remark: Generated from `#/paths//background-jobs/{name}/run/post(runBackgroundJob)`.
-    public func runBackgroundJob(
-        path: Operations.RunBackgroundJob.Input.Path,
-        headers: Operations.RunBackgroundJob.Input.Headers = .init()
-    ) async throws -> Operations.RunBackgroundJob.Output {
-        try await runBackgroundJob(Operations.RunBackgroundJob.Input(
+    /// - Remark: HTTP `POST /housekeeping/{name}/run`.
+    /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)`.
+    public func runHousekeeping(
+        path: Operations.RunHousekeeping.Input.Path,
+        headers: Operations.RunHousekeeping.Input.Headers = .init()
+    ) async throws -> Operations.RunHousekeeping.Output {
+        try await runHousekeeping(Operations.RunHousekeeping.Input(
             path: path,
             headers: headers
         ))
     }
     /// List connectors
     ///
-    /// The caller's own registration, or every registration for the operator key, newest first, each with when it last heartbeated, its last run, and until when a process holds it.
+    /// Returns your registration, or every registration if you use the operator key, newest first.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -1576,7 +1550,7 @@ extension APIProtocol {
     }
     /// Register a connector
     ///
-    /// Registers the key this request carries as a connector, with a name and a description, and answers `201`. The key is the identity, one registration per key: the same key registering again updates the name and the description and answers `200` with the same `id`. Nothing runs here; a registration is a name for a process outside the server that heartbeats and reports its runs.
+    /// Registers your key as a connector, with a name and description, and returns it. Each key has one registration: registering again updates the name and description and returns the same `id`.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -1591,7 +1565,7 @@ extension APIProtocol {
     }
     /// Get a connector
     ///
-    /// The connector's own key or the operator key.
+    /// Returns a connector, with when it last sent a heartbeat, its last run and any hold on it.
     ///
     /// - Remark: HTTP `GET /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
@@ -1606,7 +1580,7 @@ extension APIProtocol {
     }
     /// Delete a connector
     ///
-    /// Removes the registration, every run it reported, its hold, and its inbound webhook endpoints with every delivery they stored. The state and the agreements it kept stay with its source, for a later key with the same source. The connector's own key or the operator key.
+    /// Deletes the connector, its runs and hold, and its webhook endpoints with every delivery they stored. Its state document and agreements stay with its source, for a later key with the same source.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
@@ -1621,7 +1595,7 @@ extension APIProtocol {
     }
     /// Send a heartbeat
     ///
-    /// Stamps `last_heartbeat_at` with the server's clock. The connector's own key only. What a stale heartbeat means is the reader's to decide: nothing here supervises.
+    /// Sets `last_heartbeat_at` to the current time and returns it. Marfa takes no action when heartbeats stop.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/heartbeat`.
     /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)`.
@@ -1636,7 +1610,7 @@ extension APIProtocol {
     }
     /// List connector runs
     ///
-    /// Newest first, to the connector's own key or the operator key.
+    /// Returns the runs the connector reported, newest first.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
@@ -1653,7 +1627,7 @@ extension APIProtocol {
     }
     /// Report a run
     ///
-    /// Records one run: `succeeded` or `failed`, when it started and finished, and a summary or an error. The connector's own key only. The server keeps the last hundred runs per connector and drops the oldest beyond that.
+    /// Records one run of the connector, with its outcome and times, and returns it. Marfa keeps the last 100 runs and drops older ones.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/runs`.
     /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)`.
@@ -1670,7 +1644,7 @@ extension APIProtocol {
     }
     /// List webhook endpoints
     ///
-    /// Newest first, retired ones included, each address redacted. The connector's own key or the operator key.
+    /// Returns the connector's webhook endpoints, newest first, retired ones included.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
     /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
@@ -1685,7 +1659,7 @@ extension APIProtocol {
     }
     /// Create a webhook endpoint
     ///
-    /// Makes an address a sender posts to without a credential, and answers it in full this once; later reads show its last four characters. The connector's own key or the operator key. A registration holds at most 10 live endpoints.
+    /// Creates a webhook endpoint for the connector and returns it. Save its `path`: this is the only response that shows it in full.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
     /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
@@ -1702,7 +1676,7 @@ extension APIProtocol {
     }
     /// Retire a webhook endpoint
     ///
-    /// Its address stops accepting deliveries, and it stays listed with `retired_at`. Deliveries it already stored stay readable until they age out. The connector's own key or the operator key.
+    /// Retires a webhook endpoint, so its address stops accepting deliveries. It stays listed with `retired_at`, and deliveries it already stored stay readable until they age out.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
     /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
@@ -1717,7 +1691,7 @@ extension APIProtocol {
     }
     /// List inbound deliveries
     ///
-    /// Oldest first, the ones not yet handled unless `state` says otherwise, without their bodies. The connector's own key only.
+    /// Returns the webhook deliveries the connector received, oldest first, without their bodies. Only those not yet handled, unless you set `state`.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)`.
@@ -1734,7 +1708,7 @@ extension APIProtocol {
     }
     /// Get an inbound delivery's body
     ///
-    /// The bytes exactly as they arrived, as `application/octet-stream` whatever the sender declared. The connector's own key only.
+    /// Returns a delivery's body exactly as it arrived, as `application/octet-stream` whatever the sender declared.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/deliveries/{delivery_id}/body`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)`.
@@ -1749,7 +1723,7 @@ extension APIProtocol {
     }
     /// Mark inbound deliveries handled
     ///
-    /// Marks each delivery `processed`, `duplicate` or `rejected` and answers them in the order named. The first mark stands, so a repeat answers it again. The connector's own key only.
+    /// Marks each named delivery handled, with an outcome, and returns them in the order you named. The first mark stands: marking a delivery again returns it unchanged.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/deliveries/handled`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)`.
@@ -1766,7 +1740,7 @@ extension APIProtocol {
     }
     /// Take or renew a hold
     ///
-    /// Holds the registration for `process` until the server's clock plus the instance's hold window, three minutes unless it names another, and answers until when, for how long, and whether this renewed a hold the process still held. The process holding it renews it the same way. Only the process holding a live hold writes the state and the agreements. A hold is a lock the process takes and gives up: nothing watches it, and a process that stops renewing simply loses it, so one answered `renewed: false` while it believed it held the registration re-reads the state and the agreements before writing again. The connector's own key only.
+    /// Takes the connector's hold for `process`, or renews it if `process` already holds it. Only the process holding a live hold can replace the state document or write agreements.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/hold`.
     /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)`.
@@ -1783,7 +1757,7 @@ extension APIProtocol {
     }
     /// Release a hold
     ///
-    /// Releases the hold if `process` holds it, so another process may take it at once. Answers the same whether or not it did, and leaves another process's hold standing. The connector's own key only.
+    /// Releases the hold if `process` holds it, so another process can take it at once. Returns the same either way, and leaves another process's hold in place.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/hold`.
     /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)`.
@@ -1800,7 +1774,7 @@ extension APIProtocol {
     }
     /// Get the state document
     ///
-    /// The state document of the registration's source, which a later key with the same source reads too. The connector's own key only.
+    /// Returns the state document of the connector's source. A later key with the same source reads the same document.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)`.
@@ -1815,7 +1789,7 @@ extension APIProtocol {
     }
     /// Replace the state document
     ///
-    /// Replaces the state document of the registration's source whole. At most 512 KiB serialized. Taken only from the `process` holding a live hold. The connector's own key only.
+    /// Replaces the whole state document of the connector's source. Only the process holding a live hold can write it.
     ///
     /// - Remark: HTTP `PUT /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)`.
@@ -1832,7 +1806,7 @@ extension APIProtocol {
     }
     /// Delete the state document
     ///
-    /// Removes the state document and every agreement of the registration's source, which every registration of that source reads, and writes an audit row against the registration named. No hold fences it. The connector's own key or the operator key.
+    /// Deletes the state document and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
@@ -1847,7 +1821,7 @@ extension APIProtocol {
     }
     /// List a connector's agreements
     ///
-    /// The agreements of the registration's source, the longest unchanged first. A row whose type the key's type map does not read is left out, so a page can be short with a cursor still to follow. The connector's own key only.
+    /// Returns the agreements of the connector's source, the one written longest ago first. Items whose type you can't read are left out, so a page can be short with more to follow.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
@@ -1864,7 +1838,7 @@ extension APIProtocol {
     }
     /// Write agreements
     ///
-    /// Writes and removes the connector's records of what it and its vendor last agreed about rows, one per row for the registration's source: at most 500 in each list, each record at most 16 KiB serialized, and no row named twice. A row that is not stored, or whose type the key's type map does not read, is skipped and named in `skipped`; a trashed row is stored. A record announces nothing and leaves the row, its `updated_at` and its version as they were. Taken only from the `process` holding a live hold. The connector's own key only.
+    /// Writes and clears the connector's agreements, its records of what it and its vendor last agreed about each item. Only the process holding a live hold can write them.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)`.
@@ -1881,7 +1855,7 @@ extension APIProtocol {
     }
     /// Look up agreements
     ///
-    /// The agreements of the rows named that have one, each row once, in the order first named; at most 500 ids. A row whose type the key's type map does not read is left out. The connector's own key only.
+    /// Returns the agreements of the named items that have one, each item once, in the order you first named it. An item whose type you can't read is left out.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements/lookup`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)`.
@@ -1945,7 +1919,7 @@ extension APIProtocol {
     }
     /// List API keys
     ///
-    /// Returns the API keys within the caller's reach, the caller included, without plaintext, which is only ever returned at creation time. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key. `last_used_at` is debounced to at most one write per hour, so treat it as a coarse activity signal rather than an audit log. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission.
+    /// Returns the API keys you could have created, your own included, without their plaintext. The operator key gets every key. Requires `keys.mint` or the operator key.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -1954,15 +1928,7 @@ extension APIProtocol {
     }
     /// Create an API key
     ///
-    /// Creates a new API key. The plaintext `key` is returned only in this response and never shown again, so store it securely.
-    ///
-    /// A credential is a set of permissions and nothing else. `permissions` names the permissions the key holds, and a mint can narrow and can never widen. A key holds exactly what its body names. The families are `permissions`, the five permission maps and `sources`, and naming one, even empty, names it. A body naming none takes the creator's whole set, permissions and maps alike; a body naming any holds only what it names and nothing in the others, so a key minted with only `permissions` holds those permissions and no map entry or claimed source, and a key minted with a type map and no `permissions` holds no permission. A signed-in app must hold `keys.mint` to reach this route at all.
-    ///
-    /// `source` is the key's own, and no other unrevoked key may hold it as its own, though keys claiming it write under it too. `sources` names the sources the key claims besides it, which a write may name so its rows are keyed by the claimed source.
-    ///
-    /// The operator key holds no permissions, because running the instance sits outside the permission model, so it is not a ceiling: a working key it mints holds what the body names, or the whole set when the body names nothing. With `is_operator: true` it mints a second operator key instead, which holds nothing.
-    ///
-    /// On a fresh server with zero keys this runs in bootstrap mode: the key it mints is the operator key, and the request must present the one-time secret the server printed to its log at startup, as a bearer token. That secret works once (the mint consumes it). The operator key is not a working key, so the next call is this route again with it, minting the key to configure a client with.
+    /// Creates an API key and returns it with its plaintext `key`, shown only here. If the body names none of `permissions`, the five permission maps and `sources`, the key gets everything you hold; if it names any, the key holds only what it names.
     ///
     /// - Remark: HTTP `POST /keys`.
     /// - Remark: Generated from `#/paths//keys/post(createKey)`.
@@ -1977,7 +1943,7 @@ extension APIProtocol {
     }
     /// Get the current key
     ///
-    /// Returns the key the request bears, without plaintext: its permissions, its maps, its claimed sources, its tier and its own enforcement levers, if it carries any. Any key may read itself, whatever it holds, so a process handed a key can check it holds what it should and no more; every other key stays behind `keys.mint`.
+    /// Returns the key that sends the request, without its plaintext. Any key can read itself, whatever it holds, so a process can check what it was given.
     ///
     /// - Remark: HTTP `GET /keys/current`.
     /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)`.
@@ -1986,7 +1952,7 @@ extension APIProtocol {
     }
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, claimed `sources` or permission maps in place. `source` is immutable; revoke and recreate to change it. Requires `keys.mint`. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key.
+    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint` or the operator key.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -2003,7 +1969,7 @@ extension APIProtocol {
     }
     /// Revoke an API key
     ///
-    /// Revokes the key immediately. An event stream the key holds open ends before it sends anything written after the revoke, and at its next heartbeat when nothing is written. Requires `keys.mint`, or the operator key, which reaches these doors by being the operator key rather than by holding a permission. A key is within the caller's reach when the caller could have minted it: it is not an operator key, and it holds no permission, map entry, extension namespace or claimed source the caller does not hold itself, a signed-in app being measured against its grant's scopes or the maps they project, neither of which names an extension namespace. A key always reaches itself, and the operator key reaches every key.
+    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. You can revoke any key you could have created, your own included. Requires `keys.mint` or the operator key.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -2018,7 +1984,7 @@ extension APIProtocol {
     }
     /// Get the configuration
     ///
-    /// Returns the instance configuration (the optional `enforcement` levers plus the cleanup-job retention overrides) under `instance_id`, the identifier this deployment answers to. Only `instance_id` is present when nothing is configured. Requires `config.manage`.
+    /// Returns the instance configuration: its enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
     ///
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.
@@ -2027,7 +1993,7 @@ extension APIProtocol {
     }
     /// Replace the configuration
     ///
-    /// Overwrites the instance config with the supplied object: full replacement, not a merge. A cleanup-job retention override of `0` disables the corresponding job. `instance_id` may be sent back as read, so a body taken from `GET /config` round trips; it sets nothing. Requires `config.manage`.
+    /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. Requires `config.manage`.
     ///
     /// - Remark: HTTP `PUT /config`.
     /// - Remark: Generated from `#/paths//config/put(replaceConfig)`.
@@ -2042,7 +2008,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Ingests a `marfa-archive-v0.tar.gz` produced by `GET /export?format=archive`. Every row is checked before anything is written, and everything the restore writes commits together: type and edge-type registrations first, so a restore into an empty instance can write the items that use them, then blob rows, items, edges and their events, so a restore that fails or is interrupted leaves none of them. A registration the instance already holds identically is skipped, and one it holds differently fails the whole restore. Item ids are preserved so restored edges resolve; an id or natural-key collision, or a link another item of the row's type holds, counts as a duplicate and leaves the existing row untouched. Tags and extensions restore with their items; edges restore in a second pass, skipped (and counted) when either endpoint does not resolve. A row comes back at the version it was archived at, for items and edges alike, so a client holding a version across a restore cannot have its precondition pass against content it never read. Original item and edge dates and every archived item snapshot are preserved. Historical properties are not checked against current type schemas. Duplicate items retain their live metadata, dates and history. Entries under names the restore does not read are skipped without being held in memory. While a restore writes, other writes wait for it. Keys, webhooks, configuration and tombstones are not restored. Trashed items are restored only when explicitly included in the export. Until the first public release, archives are supported only by the build that wrote them; format 0 promises no compatibility between builds.
+    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires the operator key.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -2081,7 +2047,7 @@ extension APIProtocol {
     }
     /// Get the owner
     ///
-    /// Answers the owner: the one account on this instance's sign-in surface, which is the person the OAuth consent screen asks. An instance boots with no owner, and `POST /owner` creates one. Operator key only.
+    /// Returns the owner: the one account that can sign in to the instance and approve apps. A new instance has no owner until `POST /owner` creates one. Requires the operator key.
     ///
     /// - Remark: HTTP `GET /owner`.
     /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
@@ -2090,7 +2056,7 @@ extension APIProtocol {
     }
     /// Create the owner
     ///
-    /// Creates the one account on this instance's sign-in surface, with an email address and a password. Sign-up is disabled on every instance, so this is the only way a person comes to exist behind the consent screen, and the account can sign in at `POST /auth/sign-in/email` the moment this answers. The password is judged by the sign-in surface's own length rule. Operator key only: the operator key is what proves the person running the instance, and it outlives the bootstrap secret.
+    /// Creates the owner, the one account that can sign in to the instance, and returns it. The owner can sign in at once with the email address and password. No other route creates an account. Requires the operator key.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -2105,7 +2071,7 @@ extension APIProtocol {
     }
     /// Export items and edges
     ///
-    /// Streams the instance's items with their metadata (tags and extensions) as `{item, metadata}` NDJSON lines, followed by the edges between exported items as `{edge}` lines (default) or, with `format=archive`, a `marfa-archive-v0.tar.gz` carrying `manifest.json`, `items.ndjson`, `edges.ndjson`, `types.ndjson` (the type and edge-type registrations, so a restore into an empty database can write the items that use them), and the bytes of each blob the selection or its readable history references that `GET /blobs/{hash}` would serve the caller, which `POST /restore` can ingest. Each archive item line carries `versions`, every stored earlier snapshot the caller may read under its historical type, strictly below the selected current row's version, `lending_blobs`, the digests in that row's properties that lend its reach, and `lending_extensions`, the digests that lend its reach in each extension namespace the line carries. Each archive edge line carries `lending_blobs`, the digests in that edge's properties that lend its reach. A restore lends through those alone. Exports only what the caller can read; the response streams until the filter is exhausted. Only edges whose endpoints are both in the exported item set are included, so a filtered export never references items it does not carry, and only edges of a type the credential may read.
+    /// Exports the items you can read, with their tags and readable extensions, followed by the edges between them. Without `state`, trashed items are left out. With `format=archive`, returns a file that `POST /restore` reads.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
@@ -2120,7 +2086,7 @@ extension APIProtocol {
     }
     /// List webhooks
     ///
-    /// Returns the outbound webhook subscriptions that belong to this credential. Secrets are redacted here; the plaintext is only returned at create time.
+    /// Returns every webhook that belongs to you, with each `secret` shortened to its last four characters.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -2129,7 +2095,7 @@ extension APIProtocol {
     }
     /// Create a webhook
     ///
-    /// Registers an outbound webhook subscription targeting a URL and one or more event types from the closed vocabulary. The subscription belongs to the credential that registers it, which for a signed-in app is its grant rather than the token: each delivery carries only what that credential may read when it is sent, and the subscription is deleted when the key or the app's grant is revoked, while a key that expires or no longer holds `webhooks.manage` delivers nothing more. The URL must be `http` or `https` and reach a public address. The `secret` is the HMAC-SHA256 signing key, at least 32 characters, generated server-side when omitted, and returned in plaintext only on creation.
+    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when that is revoked, and sends nothing while it lacks `webhooks.manage` or the key has expired.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
@@ -2144,7 +2110,7 @@ extension APIProtocol {
     }
     /// Get a webhook
     ///
-    /// Returns one outbound webhook subscription by id, with its secret redacted.
+    /// Returns a webhook, with its `secret` shortened to its last four characters.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -2159,7 +2125,7 @@ extension APIProtocol {
     }
     /// Update a webhook
     ///
-    /// Updates mutable fields on an outbound webhook subscription; the body is a partial, so unsupplied fields keep their existing values. Pointing it at another URL or turning it off settles its pending deliveries unsent. The signing secret cannot be rotated here; delete the subscription and create a new one.
+    /// Updates a webhook and returns it. Fields you leave out keep their values. Changing `url`, or setting `active` to `false`, cancels its pending deliveries. To change the secret, create a new webhook.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
@@ -2176,7 +2142,7 @@ extension APIProtocol {
     }
     /// Delete a webhook
     ///
-    /// Removes the subscription so no new deliveries are queued, and its pending deliveries are settled unsent rather than retried.
+    /// Deletes a webhook and cancels its pending deliveries.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
@@ -2191,7 +2157,7 @@ extension APIProtocol {
     }
     /// List webhook deliveries
     ///
-    /// Returns recent delivery rows for one subscription, newest first, with the last accepted outcome and cumulative accepted-outcome ordinal. This is not a census of concurrent or lost HTTP sends.
+    /// Returns a page of a webhook's deliveries, newest first. Marfa deletes a delivery that isn't `pending` once it's older than the instance's audit retention.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -2208,7 +2174,7 @@ extension APIProtocol {
     }
     /// Redeliver a failed delivery
     ///
-    /// Queues one retained failed delivery using the current subscription address and secret. Stable delivery and event identity are preserved. The cumulative attempt ordinal counts accepted outcomes, not every concurrent or lost HTTP send.
+    /// Sends a `dead_letter` delivery again, to the webhook's current `url`, and returns it as `pending`. The delivery keeps its ID, and Marfa makes up to 8 more attempts.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -2223,7 +2189,7 @@ extension APIProtocol {
     }
     /// List audit log entries
     ///
-    /// Returns audit-log entries in reverse-chronological order, filtered by action, resource, or time range, with cursor pagination. Records only state-changing calls and a few admin reads; item/edge reads, SSE, and search are not logged. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.
@@ -2238,7 +2204,7 @@ extension APIProtocol {
     }
     /// Describe the instance
     ///
-    /// Answers without a credential: the instance's name, the build it runs as `version`, the `instance_id` that tells two instances answering the same shape apart, the contract version as `contract`, and the surfaces it carries as `features`. `contract` equals this document's `info.version`, so a client generated from this document can tell whether a server speaks the contract it was generated for.
+    /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -2247,25 +2213,7 @@ extension APIProtocol {
     }
     /// Stream change events
     ///
-    /// Opens a Server-Sent Events stream of item and edge changes the caller can read. Send `Last-Event-ID` to replay events missed across a reconnect.
-    ///
-    /// For a certified working copy, use exactly `?edges=all&copy=1`. Bootstrap omits both resume headers; resumption sends both `Last-Event-ID` and `X-Marfa-Read-View`. Its no-id `stream_cursor` and `stream_live` markers contain exact string fields `event_type`, `cursor`, `instance_id` and `read_view`. A known coherent head is required; failed opening reads end incomplete without a certificate. Only completed replay and held-frame delivery produce `stream_live`. Copy item and metadata frames additionally carry boolean `listed`, classifying item-set membership independently of direct-ID read authority. A view that changes after the stream opens sends only the no-id terminal `read_view_changed` with data `{"event_type":"read_view_changed"}` and closes. Copy markers use body certificates, never the HTTP response certificate header. The remaining ordinary-stream rules apply except where these copy guarantees are stricter.
-    ///
-    /// The stream opens with a `stream_cursor` frame, carrying `{ "event_type": "stream_cursor", "cursor": "<event id>" }`, the log position the stream opened at. It does not wait for anything to happen, so a client that subscribes and then reads a snapshot holds a resume point from the first moment rather than waiting for an event to tell it where it is. The frame deliberately carries no SSE `id:` field: on a reconnect it precedes the backlog, and a client adopting it as its cursor there would discard exactly the events it reconnected for.
-    ///
-    /// For an ordinary stream, treat the frame as the first one delivered rather than as guaranteed. Reading the head is bounded, so a stream opened while the database is not answering carries no cursor instead of holding its events back, and a client that receives none proceeds with no cursor of its own. Do not gate hydration on its arrival.
-    ///
-    /// Once the replay is done, and the live frames held while it ran are drained, the stream sends a `stream_live` frame, carrying `{ "event_type": "stream_live", "cursor": "<event id>" | null }` and no SSE `id:`. It says the prologue is over: everything up to `cursor` has been sent or withheld, and what follows is live. A frame the `type` filter or the credential withholds is not written at all, so a client cannot otherwise tell that it has caught up, and its cursor is one a client may resume from without being sent again what the replay covered. It is null only where no position is known: a head read that outran its budget with nothing to replay. A stream that ends short never sends it.
-    ///
-    /// The cursor is a position in one ascending sequence, and `type` and `edges` select a subset of that sequence rather than reordering it, so a cursor taken under one filter can be replayed under another without skipping or repeating a row.
-    ///
-    /// An item frame carries `event_type` and `item`, and an edge frame `event_type`, `edge` and `source_type`, the type of the edge's source item when the event was published. An edge frame reaches a subscriber that may read its edge type and that `source_type`, on a replay as on a live frame, so the edges a purge takes reach only a subscriber that could read the purged item. An `item.restored` frame for a row another item's restore brought back, by `POST /items/{id}/restore`, a transition out of the bin or a bulk transition, also carries `restored_with` naming that item, to a subscriber that may read that item's type; an `edge.deleted` frame for an edge a purge took also carries `purged_with` naming the purged item. No other frame carries either. The `item` of an `item.deleted` or `item.purged` frame for a row a cascade trashed carries `trashed_by_cascade`, and `trashed_with` naming the item that trash named, to a subscriber that may read its type.
-    ///
-    /// A stream that can no longer deliver what it opened with sends a terminal `stream_incomplete` frame, `{ "event_type": "stream_incomplete", "reason": "…", "cursor": "<event id>" | null }`, and closes. `reason` is one of `replay_failed` (the catch-up failed), `backlog_overflow` (the frames held while the stream opened outgrew their buffer), `live_delivery_failed` (the subscription or a read of the credential failed), `credential_ended` (the credential no longer stands: a key revoked, deleted or past its expiry, a sign-in token revoked or expired, or its app disconnected), `reader_behind` (a live frame found 4 MiB of frames unread, or the client took no frame for 30 seconds while a replay, which waits for room before every frame, waited for it) or `server_stopping` (the instance is stopping, and sends this to every stream it has open before it closes them). Nothing after the gap is ever sent, so the last `id:` received is still the last event held and the recovery is to reconnect with it: the frame carries no `id:` of its own for that reason, and `cursor` repeats the position for a client that is not tracking one. That is the opposite of `catchup_too_old`, which says the log can no longer serve the cursor at all and the client has to re-read state instead.
-    ///
-    /// The stream answers to the credential as it stands: it reads it again before each batch of frames and at each heartbeat, every 30 seconds. A key narrowed meanwhile narrows the stream; one that no longer stands ends it with `stream_incomplete` and `credential_ended`, and nothing written after the change is sent. An app reconnects with the token it refreshed to.
-    ///
-    /// A `Last-Event-ID` past the log's head is a position the log never issued, which is what a client holds after the instance is restored behind it. The stream answers a terminal `cursor_ahead` frame, `{ "event_type": "cursor_ahead", "requested": "<event id>", "head": "<event id>" }`, with no SSE `id:`, and closes; the client re-reads state from the API, as for `catchup_too_old`.
+    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
     ///
     /// - Remark: HTTP `GET /events`.
     /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
@@ -2280,7 +2228,7 @@ extension APIProtocol {
     }
     /// Register an OAuth client
     ///
-    /// Dynamic Client Registration (RFC 7591), served by the authorization server's provider. Registers an OAuth client and returns its issued `client_id`. Unauthenticated. A registration is a `web` client unless `application_type` says `native`: a web client's redirect URIs must be https off the loopback, a native client may use http on `localhost`, `127.0.0.1` or `[::1]`. A client is confidential and issued a `client_secret` unless `token_endpoint_auth_method` is `none`. A requested `scope` is validated against the server's allowlist, and the registered ceiling is that whole allowlist whatever was requested; the consent screen is where a grant is narrowed. The `client_credentials` grant is not supported: a machine caller uses an API key, which the keys surface can list, narrow and revoke.
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
     /// - Remark: HTTP `POST /auth/oauth2/register`.
     /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.

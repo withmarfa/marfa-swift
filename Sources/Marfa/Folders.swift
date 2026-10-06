@@ -48,8 +48,8 @@ public struct Folders: Sendable {
         return FolderStatus(try await run { folders in try folders.status(dir: dir) })
     }
 
-    /// Syncs the folder once: sends what changed on disk, catches up with the server, and writes out what the
-    /// folder's search matches.
+    /// Syncs the folder once: sends what changed on disk, catches up with the server, writes out what the
+    /// folder's search matches, and sends the placements of the files it wrote.
     ///
     /// While the folder's first sync waits to be confirmed, it only reads the folder and returns
     /// ``FolderSyncResult/awaitingConfirmation(_:)``: nothing was written or sent.
@@ -433,6 +433,15 @@ public struct FolderSync: Sendable, Hashable {
 public struct FolderPass: Sendable, Hashable {
     public let settings: SettingsFileOutcome
     public let scan: FolderScan
+    /// The writes the pass sent.
+    ///
+    /// A sync drains again after its pull, so this also counts the placements of the files the pull wrote; where
+    /// the first drain or the catch-up showed the server can't take writes, it doesn't, and those placements wait
+    /// for the next sync.
+    ///
+    /// A conflicted edit is a verdict of `.conflicted` naming the item and the copy that took its text. The drain
+    /// answers every write the folder's store holds, so a verdict can be for an item that isn't a file of this
+    /// folder.
     public let drain: DrainReport
     /// Edits written from a version the server no longer holds, sent again on the version the copy holds.
     public let rebased: UInt64
@@ -440,7 +449,9 @@ public struct FolderPass: Sendable, Hashable {
     public let gaveWay: UInt64
     /// `nil` where the copy expired and couldn't be hydrated, so there was nothing to write out.
     public let pull: FolderPull?
-    /// The files the pass held, each with why.
+    /// The files the scan and the pull held, each with why and each once.
+    ///
+    /// The pull's entries name their item.
     public let flagged: [FlaggedFile]
 
     init(_ core: MarfaCore.FolderPass) {
@@ -557,11 +568,19 @@ public struct FlaggedFile: Sendable, Hashable {
     public let path: String
     public let flag: String
     public let reason: String
+    /// The id of the item a pull held back, where a pull did.
+    ///
+    /// Set for a `flag` of `unwritten`, `outside`, `unsuited` or `absent`, where the pull didn't write the item's
+    /// file, and `retained`, for a file the pull couldn't let go to another folder. Then `path` is where the pull
+    /// would have written the file, or the item's own file where it left that file as it stands. `nil` for a file
+    /// the scan flagged. Two items held back at one path are two entries.
+    public let item: String?
 
     init(_ core: MarfaCore.FlaggedFile) {
         path = core.path
         flag = core.flag
         reason = core.reason
+        item = core.item
     }
 }
 

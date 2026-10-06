@@ -160,6 +160,19 @@ A folder is a directory whose files Marfa keeps in step with the search a `syste
     }
     ```
 
+1. Read what the sync held back and what the server did with your edits. `pass.flagged` lists each file the scan or the pull held, with why. For a file the pull didn't write, `item` is the ID of the item it stands for. `pass.drain` counts every write the sync sent, including the placements of the files the pull wrote, and its verdicts say when the server kept its own text and put an edit's text in a copy:
+
+    ```swift
+    for file in synced.pass.flagged {
+        print(file.path, file.flag, file.reason, file.item ?? "")
+    }
+    for write in synced.pass.drain.verdicts {
+        if case .conflicted(let copy, _)? = write.verdict {
+            // The edit of `write.itemId` lost to a newer one; its text is in the item `copy`.
+        }
+    }
+    ```
+
 1. Read where each file stands. `status(of:)` reads the folder's own store and asks the server nothing:
 
     ```swift

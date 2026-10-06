@@ -30,6 +30,11 @@ enum FolderFixture {
     /// Makes a `system.folder` of the notes tagged with a tag of its own, so the folder holds only what the test
     /// writes, and answers its id.
     static func settings(removalThreshold: [String: Any]? = nil) async throws -> String {
+        try await folder(removalThreshold: removalThreshold).id
+    }
+
+    /// The same, and the tag its notes carry.
+    static func folder(removalThreshold: [String: Any]? = nil) async throws -> (id: String, tag: String) {
         let server = try #require(Live.server)
         let tag = "folder\(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: ""))"
         var body: [String: Any] = [
@@ -48,7 +53,7 @@ enum FolderFixture {
         try #require(
             status == 201, "making a folder answered \(status ?? 0): \(String(decoding: answer, as: UTF8.self))")
         let made = try JSONDecoder().decode(JSONValue.self, from: answer)
-        return try #require(made["item"]?["id"]?.string)
+        return (try #require(made["item"]?["id"]?.string), tag)
     }
 
     /// A folder added, its first sync confirmed and synced once, so its copy holds its settings.
@@ -69,6 +74,13 @@ enum FolderFixture {
     }
 
     struct FirstSyncWaits: Error { let plan: FirstSyncPlan }
+
+    /// A note on the server that the folder whose notes carry `tag` takes: a folder takes the library, not the feed.
+    static func note(_ title: String, tagged tag: String) -> Draft {
+        Draft(
+            type: "core.note", properties: ["title": .string(title), "body": "Written by a test."], tags: [tag],
+            tier: .library)
+    }
 
     static func note(_ name: String, in directory: URL) throws {
         try Data("---\ntitle: \(name)\n---\nWritten by a test.\n".utf8)
@@ -200,6 +212,86 @@ extension LiveWorkingCopies {
             #expect(status.files.map(\.path) == ["First.md"])
             #expect(status.files.allSatisfy { $0.state == .inStep }, "\(status.files)")
             #expect(!status.paused.isPaused)
+        }
+
+        @Test func aSyncLeavesTheFilesItWroteInStepAndCountsTheirPlacements() async throws {
+            let (folderId, tag) = try await FolderFixture.folder()
+            let writer = try await Live.hydrated()
+            for title in ["Alpha", "Beta"] {
+                _ = try await writer.items.create(FolderFixture.note(title, tagged: tag))
+            }
+            #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+            await writer.close()
+
+            let directory = FolderFixture.directory()
+            _ = try await folders.add(directory, following: folderId)
+            try await folders.confirmFirstSync(in: directory)
+            let synced = try await FolderFixture.sync(directory)
+
+            #expect(synced.pass.pull?.written == 2)
+            // The pull queued a placement for each file it wrote, and the sync's second drain sent them.
+            #expect(synced.pass.drain.answered >= 2, "\(synced.pass.drain)")
+            let verdicts = synced.pass.drain.verdicts
+            #expect(verdicts.allSatisfy { $0.verdict == .accepted }, "\(verdicts)")
+            let status = try await folders.status(of: directory)
+            #expect(status.files.map(\.path).sorted() == ["Alpha.md", "Beta.md"])
+            #expect(status.files.allSatisfy { $0.state == .inStep }, "\(status.files)")
+        }
+
+        @Test func aSyncNamesTheItemItsPullDidNotWriteAtASecretsName() async throws {
+            let (folderId, tag) = try await FolderFixture.folder()
+            let writer = try await Live.hydrated()
+            let secret = try #require(try await writer.items.create(FolderFixture.note("id_rsa", tagged: tag)).itemId)
+            let ordinary = try #require(
+                try await writer.items.create(FolderFixture.note("Ordinary", tagged: tag)).itemId)
+            #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+            await writer.close()
+
+            let directory = FolderFixture.directory()
+            _ = try await folders.add(directory, following: folderId)
+            try await folders.confirmFirstSync(in: directory)
+            let synced = try await FolderFixture.sync(directory)
+
+            let held = try #require(synced.pass.flagged.first { $0.item == secret }, "\(synced.pass.flagged)")
+            #expect(held.flag == "outside" && held.path == "id_rsa.md", "\(held)")
+            #expect(!held.reason.isEmpty)
+            // The witness: the item beside it was written, and is not named as held back.
+            #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Ordinary.md").path()))
+            #expect(!synced.pass.flagged.contains { $0.item == ordinary }, "\(synced.pass.flagged)")
+            #expect(!FileManager.default.fileExists(atPath: directory.appending(path: held.path).path()))
+        }
+
+        @Test func aSyncCarriesAConflictedEditAndTheFileItsTextWentTo() async throws {
+            let (folderId, tag) = try await FolderFixture.folder()
+            let title = "Conflicted \(UUID().uuidString.prefix(8))"
+            let writer = try await Live.hydrated()
+            let note = try #require(try await writer.items.create(FolderFixture.note(title, tagged: tag)).itemId)
+            #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+
+            let directory = FolderFixture.directory()
+            _ = try await folders.add(directory, following: folderId)
+            try await folders.confirmFirstSync(in: directory)
+            _ = try await FolderFixture.sync(directory)
+            let path = try #require(
+                try await folders.status(of: directory).files.first { $0.itemId == note }?.path,
+                "the first sync wrote no file for the note")
+            let file = directory.appending(path: path)
+            #expect(FileManager.default.fileExists(atPath: file.path(percentEncoded: false)))
+
+            // Another device edits the body the folder's file is based on, and the person edits the file.
+            _ = try await writer.items.update(note, Edit(properties: ["body": "elsewhere"], baseVersion: 1))
+            #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+            await writer.close()
+            try Data("---\ntitle: \(title)\n---\nWritten here.\n".utf8).write(to: file)
+
+            let synced = try await FolderFixture.sync(directory)
+            let conflicts = synced.pass.drain.verdicts.compactMap { write -> (item: String?, copy: String)? in
+                guard case .conflicted(let copy, _)? = write.verdict else { return nil }
+                return (write.itemId, copy)
+            }
+            let conflict = try #require(conflicts.first { $0.item == note }, "\(synced.pass.drain.verdicts)")
+            let files = try await folders.status(of: directory).files
+            #expect(files.contains { $0.itemId == conflict.copy }, "the copy is no file of the folder: \(files)")
         }
 
         @Test func aFirstSyncStillWaitingIsCancelledByRemovingTheFolderAndTheFilesStay() async throws {
