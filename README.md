@@ -192,7 +192,9 @@ let embedded = try await copy.items.embed(file: photoURL, in: noteId)
 print(embedded.embed)  // ![[photo.png]]
 ```
 
-The body edit is read at the version the copy holds, so another write that reaches the item first refuses it. A file whose title cannot name it alone among the item's attachments, such as a title another attachment shares, one that contains `|` or `#`, or one that ends in a document extension like `.txt`, which a body reads as a note and not a file, throws `invalid` and stays attached. To put an embed somewhere else in the body, call `attach(to:file:_:)` and write `Attached.embed` into the body yourself with an edit. `embedText(of:in:)` answers the same text for a file that is already attached.
+The body edit is based on the body and the version the copy holds, as an `update(_:_:)` is. Where another device changes the body before this edit reaches the server, the server answers it as the type's merge policy says: for a note, `conflicted`, with this body set aside in a conflicted copy. The body is read and written in two core calls, so an edit of the same body queued while the call runs is replaced, not merged; make an item's body edits one after another.
+
+Where no embed can name the file alone among the item's attachments, the file stays attached with the body unchanged, and the call throws `EmbedFailure`, which carries the `Attached` and the `cause`, an `invalid` error. That happens for a title that contains `[`, `]`, `|`, `#` or `^`, for a title given in `Attachment` that another attachment already has, and for a name that ends in a document extension such as `.txt`, which a body reads as a note and not a file. To put an embed somewhere else in the body, call `attach(to:file:_:)` and write `Attached.embed` into the body yourself with an edit. `embedText(of:in:)` answers the same text for a file that is already attached.
 
 ## Recently deleted
 

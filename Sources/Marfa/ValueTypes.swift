@@ -802,11 +802,26 @@ public struct Embedded: Sendable, Hashable {
     }
 }
 
+/// A file was attached, and the edit that embeds it in the body failed.
+///
+/// The attach's writes are queued. Read the file's item from `attached`, then
+/// fix the cause and write the embed with `Items.embedText(of:in:)` and an edit.
+public struct EmbedFailure: Error {
+    public var attached: Attached
+    /// Why the body step failed: `invalid` where the file's title cannot name it alone in an embed.
+    public var cause: any Error
+
+    public init(attached: Attached, cause: any Error) {
+        self.attached = attached
+        self.cause = cause
+    }
+}
+
 /// What a link or an embed in an item's body names.
 public enum BodyTarget: Sendable, Hashable {
     /// The item it names; for an embed, the file item that holds the bytes.
     case item(id: String)
-    /// Not looked up on the server yet. A drain or a catch-up tries it again.
+    /// Not looked up on the server yet. A drain, a catch-up or a hydration tries it again.
     case pending
     /// Names no item.
     case missing

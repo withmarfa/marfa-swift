@@ -529,7 +529,7 @@ public struct FolderPull: Sendable, Hashable {
     public let moved: UInt64
     public let unchanged: UInt64
     public let skipped: UInt64
-    /// Files of items moved to the bin or out of the search's states, removed.
+    /// Files of items moved to the bin, purged, or moved out of the search's states, removed.
     public let removed: UInt64
     /// Files of items gone from the search, kept because the person changed them.
     public let kept: UInt64
