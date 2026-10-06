@@ -274,13 +274,13 @@ extension LiveWorkingCopies {
             // Two notes, because two edits to one note wait on each other and
             // the second is sent only on the first's answer.
             let elsewhere = try await Live.hydrated()
-            _ = try await copy.items.update(titledId, Edit(properties: ["title": "second"], baseVersion: 1))
-            _ = try await copy.items.update(bodiedId, Edit(properties: ["body": "second"], baseVersion: 1))
+            _ = try await copy.items.update(titledId, Edit(.merge(["title": "second"]), baseVersion: 1))
+            _ = try await copy.items.update(bodiedId, Edit(.merge(["body": "second"]), baseVersion: 1))
             report = try await copy.queue.drain()
             let merged = try await elsewhere.items.update(
-                titledId, Edit(properties: ["title": "third"], baseVersion: 1))
+                titledId, Edit(.merge(["title": "third"]), baseVersion: 1))
             let conflicted = try await elsewhere.items.update(
-                bodiedId, Edit(properties: ["body": "elsewhere"], baseVersion: 1))
+                bodiedId, Edit(.merge(["body": "elsewhere"]), baseVersion: 1))
             report = try await elsewhere.queue.drain()
             #expect(report.verdicts.first { $0.id == merged.id }?.verdict == .merged(fields: ["title"]))
             guard case .conflicted(_, let fields) = report.verdicts.first(where: { $0.id == conflicted.id })?.verdict
@@ -300,13 +300,13 @@ extension LiveWorkingCopies {
 
             let elsewhere = try await Live.hydrated()
             _ = try await elsewhere.items.update(
-                id, Edit(properties: ["title": "retitled elsewhere"], baseVersion: read.version))
+                id, Edit(.merge(["title": "retitled elsewhere"]), baseVersion: read.version))
             _ = try await elsewhere.queue.drain()
             _ = try await copy.catchUp()
             let held = try #require(try await copy.items.get(id))
             #expect(held.version > read.version, "the copy did not take in the retitle")
 
-            let edit = Edit(properties: ["body": "written here"], baseVersion: read.version)
+            let edit = Edit(.merge(["body": "written here"]), baseVersion: read.version)
             await #expect {
                 _ = try await copy.items.update(id, edit)
             } throws: { error in
@@ -315,7 +315,7 @@ extension LiveWorkingCopies {
             }
             let saved = try await copy.items.updateAsRead(id, edit)
             let next = try await copy.items.update(
-                id, Edit(properties: ["body": "written here, then more"], baseVersion: held.version))
+                id, Edit(.merge(["body": "written here, then more"]), baseVersion: held.version))
             let report = try await copy.queue.drain()
             // `merged` names a collision the server resolved, and none happened.
             #expect(report.verdicts.first { $0.id == saved.id }?.verdict == .accepted)
@@ -384,7 +384,7 @@ extension LiveWorkingCopies {
             let b = try #require(record(try await copy.items.create(Live.note("told b"))).itemId)
             let version = try #require(try await copy.items.get(a)).version
             _ = record(
-                try await copy.items.update(a, Edit(properties: ["title": "told a, edited"], baseVersion: version)))
+                try await copy.items.update(a, Edit(.merge(["title": "told a, edited"]), baseVersion: version)))
             _ = record(try await copy.tags.add("told", to: a))
             _ = record(try await copy.tags.remove("told", from: a))
             _ = record(try await copy.metadata.replaceTags(of: a, with: ["x"]))
@@ -476,7 +476,7 @@ extension LiveWorkingCopies {
             func mimeType(_ write: QueuedWrite) throws -> JSONValue? {
                 let row = try #require(answered.first { $0.id == write.id })
                 #expect(row.verdict == .accepted)
-                return try Properties.object(try #require(row.answer))["mime_type"]
+                return try JSONObject(json: try #require(row.answer))["mime_type"]
             }
             #expect(try mimeType(given) == "text/markdown")
             #expect(try mimeType(guessed) == "text/plain")

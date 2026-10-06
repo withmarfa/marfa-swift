@@ -105,6 +105,10 @@ public final class WorkingCopy: Sendable {
     }
 
     /// Reads and holds an item whatever the slice says of it.
+    ///
+    /// An item in the bin is not pinned: it throws `notFound` with the code
+    /// `trashed`, so the app can offer to restore it. One the server does not
+    /// hold throws `notFound` with the code `not_found`.
     public func pin(_ id: String) async throws -> PinReport {
         let report = PinReport(try await holder.run { core in try core.pin(id: id) })
         feed.announce(Change(origin: .refreshed(.pinned), itemId: id, edgeId: nil))
@@ -156,6 +160,12 @@ public final class WorkingCopy: Sendable {
     /// event's type and the item or edge it was about. A catch-up or a held
     /// stream that read a changed type catalog arrives as
     /// `.refreshed(.catalog)`, naming neither.
+    ///
+    /// The follow says what became of the server: `.serverUnreachable` with
+    /// the failure, once, when it cannot have its stream, and
+    /// `.serverReachable` once when it has one again, which is when to drain
+    /// what the app queued meanwhile. A follow that has its stream at once
+    /// says neither.
     ///
     /// A writer with a server follows the server's events only while at least
     /// one stream is held, and pauses the follow during a hydration or
@@ -231,6 +241,14 @@ public struct Change: Sendable, Hashable {
     public enum Origin: Sendable, Hashable {
         case local(WriteKind)
         case server(event: String, cursor: String)
+        /// The follow cannot have its stream, for this failure: the network,
+        /// a rate limit, a failing server, or a refusal naming no contract.
+        /// It keeps asking, at a falling rate, and is told once however many
+        /// attempts fail.
+        case serverUnreachable(MarfaError)
+        /// The follow has its stream again after `.serverUnreachable`: a
+        /// good moment to drain.
+        case serverReachable
         /// A drain answered this write; `itemId` and `edgeId` name what it
         /// wrote. Told for each write with a verdict, before the drain's
         /// `.refreshed(.drained)`.
@@ -252,6 +270,8 @@ public struct Change: Sendable, Hashable {
         case withdrawn
         case pinned
         case unpinned
+        /// An item, named by `itemId`, was purged and left the copy.
+        case purged
         /// The app replaced its declarations, or a refresh read a changed
         /// item type or edge type catalog; read `catalog` again.
         case catalog
@@ -260,13 +280,11 @@ public struct Change: Sendable, Hashable {
     public let origin: Origin
     public let itemId: String?
     public let edgeId: String?
-    public let reason: String?
 
-    public init(origin: Origin, itemId: String?, edgeId: String?, reason: String? = nil) {
+    public init(origin: Origin, itemId: String?, edgeId: String?) {
         self.origin = origin
         self.itemId = itemId
         self.edgeId = edgeId
-        self.reason = reason
     }
 }
 
@@ -314,6 +332,51 @@ public struct Items: Sendable {
         try await write { core in try core.deleteItem(id: id) }
     }
 
+    /// Destroys an item in the bin on the server now, and takes it, its
+    /// edges and its pin out of the copy once the server accepts it.
+    ///
+    /// Never queued: it needs the server, and the key needs `items.purge` and
+    /// write on the item's type. It is sent at `version`, the version the
+    /// person was shown, such as a ``BinPage`` item's, or else the version the
+    /// copy holds, so an item changed elsewhere since throws `server` with
+    /// status 409 and `version_conflict`.
+    ///
+    /// Refused before anything is sent: an item the copy does not hold, with
+    /// no `version`, throws `notFound` with the code `not_held`; one the copy
+    /// shows outside the bin, such as one whose restore is queued, throws
+    /// `validation` with the code `invalid_transition`; and one with a write
+    /// still waiting throws `invalid`. Offline it throws `network` and a copy
+    /// with no server throws `noServer`. On every failure the copy and the
+    /// queue stay as they were. A `network` failure after the request went
+    /// out may follow a purge the server made, which its event then shows.
+    public func purge(_ id: String, version: Int64? = nil) async throws {
+        try await holder.run { core in try core.purgeItem(id: id, version: version) }
+        feed.announce(Change(origin: .refreshed(.purged), itemId: id, edgeId: nil))
+    }
+
+    /// One page of the server's bin, newest change first: its items in the
+    /// bin, whatever the copy's slice, read online and held nowhere in the
+    /// copy.
+    ///
+    /// Each item's `updatedAt` stands for when it went to the bin; the server
+    /// keeps no time of its own for that, and a write to an item in the bin
+    /// moves it too. Pass the page's `nextCursor` as `after` for the next
+    /// page. Offline it throws `network`, and a copy with no server throws
+    /// `noServer`: the copy never answers for the bin. Restore an item with
+    /// ``restore(_:)`` and destroy it with ``purge(_:version:)``.
+    public func bin(type: String? = nil, after cursor: String? = nil, limit: Int = 50) async throws -> BinPage {
+        try await holder.run { core in
+            try BinPage(core.bin(type: type, cursor: cursor, limit: UInt32(clamping: limit)))
+        }
+    }
+
+    /// Takes an item out of the bin, and queues the restore.
+    ///
+    /// An item the copy holds shows as restored at once. One it does not
+    /// hold, such as an item read from ``bin(type:after:limit:)`` or one whose
+    /// delete was answered, is restored by id: queued, shown nowhere until
+    /// the server answers, and held once the answer or its event brings it
+    /// where the slice or a pin takes it.
     public func restore(_ id: String) async throws -> QueuedWrite {
         try await write { core in try core.restoreItem(id: id) }
     }
@@ -370,7 +433,7 @@ public struct Edges: Sendable {
             try core.createEdge(
                 draft: MarfaCore.EdgeDraft(
                     sourceId: source, targetId: target, edgeType: type,
-                    propertiesJson: try Properties.text(properties), id: id))
+                    propertiesJson: try properties.json(), id: id))
         }
     }
 
@@ -378,7 +441,7 @@ public struct Edges: Sendable {
         try await write { core in
             try core.updateEdge(
                 id: id,
-                edit: MarfaCore.EdgeEdit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion))
+                edit: MarfaCore.EdgeEdit(propertiesJson: try properties.json(), baseVersion: baseVersion))
         }
     }
 
@@ -423,7 +486,7 @@ public struct Extensions: Sendable {
 
     public func write(_ namespace: String, _ body: JSONObject, on id: String) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in
-            try core.writeExtension(id: id, namespace: namespace, bodyJson: try Properties.text(body))
+            try core.writeExtension(id: id, namespace: namespace, bodyJson: try body.json())
         }
     }
 
@@ -955,16 +1018,23 @@ final class Listener: MarfaCore.ChangeListener, Sendable {
 
     func changed(change: MarfaCore.Change) {
         let origin: Change.Origin =
-            change.event == Self.catalogChanged
-            ? .refreshed(.catalog) : .server(event: change.event, cursor: change.cursor)
-        feed?.announce(
-            Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId, reason: change.reason),
-            from: generation)
+            switch change.event {
+            case Self.catalogChanged: .refreshed(.catalog)
+            case Self.serverUnreachable:
+                .serverUnreachable(
+                    change.reason.map(MarfaError.init)
+                        ?? .network(message: "the event stream could not be opened"))
+            case Self.serverReachable: .serverReachable
+            default: .server(event: change.event, cursor: change.cursor)
+            }
+        feed?.announce(Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId), from: generation)
     }
 
-    /// What the core names a stream that read a changed catalog, in place of
-    /// an event's type.
+    /// What the core names, in place of an event's type, a stream that read a
+    /// changed catalog and the follow's word on the server.
     static let catalogChanged = "catalog.changed"
+    static let serverUnreachable = "server.unreachable"
+    static let serverReachable = "server.reachable"
 
     /// Resumes waiters only once nothing on this thread holds the feed, since
     /// one may drop the working copy and open the store again at once.

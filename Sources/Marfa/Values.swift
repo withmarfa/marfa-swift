@@ -179,12 +179,21 @@ public struct Item: Sendable, Hashable, Identifiable {
     public let createdAt: String
     public let updatedAt: String
     public let tags: [String]
+    /// The text under the property the type's display hints name as its
+    /// title, or under `title` where they name none; `nil` where that
+    /// property holds no string. The core resolves it from the catalog the
+    /// copy holds, by the rule a folder names its files by.
+    public let title: String?
+    /// The text under the property the type's display hints name as its
+    /// body, such as `description` for `core.event`, or under `body` where
+    /// they name none; `nil` where that property holds no string.
+    public let body: String?
 
     /// For an app's previews and tests.
     public init(
         id: String, type: String, properties: JSONObject, state: ItemState, tier: Tier?, version: Int64,
         schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
-        updatedAt: String, tags: [String]
+        updatedAt: String, tags: [String], title: String? = nil, body: String? = nil
     ) {
         self.id = id
         self.type = type
@@ -199,12 +208,14 @@ public struct Item: Sendable, Hashable, Identifiable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.tags = tags
+        self.title = title
+        self.body = body
     }
 
     init(_ item: MarfaCore.Item) throws {
         id = item.id
         type = item.type
-        properties = try Properties.object(item.propertiesJson)
+        properties = try JSONObject(json: item.propertiesJson)
         state = ItemState(item.state)
         tier = item.tier.map(Tier.init)
         version = item.version
@@ -215,9 +226,26 @@ public struct Item: Sendable, Hashable, Identifiable {
         createdAt = item.createdAt
         updatedAt = item.updatedAt
         tags = item.tags
+        title = item.title
+        body = item.body
+    }
+}
+
+/// One page of the server's bin.
+public struct BinPage: Sendable, Hashable {
+    public let items: [Item]
+    /// Where the next page starts; `nil` on the last.
+    public let nextCursor: String?
+
+    public init(items: [Item], nextCursor: String?) {
+        self.items = items
+        self.nextCursor = nextCursor
     }
 
-    public var title: String? { properties["title"]?.string }
+    init(_ page: MarfaCore.BinPage) throws {
+        items = try page.items.map(Item.init)
+        nextCursor = page.nextCursor
+    }
 }
 
 public struct Edge: Sendable, Hashable, Identifiable {
@@ -250,7 +278,7 @@ public struct Edge: Sendable, Hashable, Identifiable {
         sourceId = edge.sourceId
         targetId = edge.targetId
         edgeType = edge.edgeType
-        properties = try Properties.object(edge.propertiesJson)
+        properties = try JSONObject(json: edge.propertiesJson)
         version = edge.version
         createdAt = edge.createdAt
         updatedAt = edge.updatedAt
@@ -305,25 +333,56 @@ public struct Draft: Sendable, Hashable {
 
     func core() throws -> MarfaCore.Draft {
         MarfaCore.Draft(
-            type: type, id: id, propertiesJson: try Properties.text(properties), tags: tags, tier: tier?.core,
+            type: type, id: id, propertiesJson: try properties.json(), tags: tags, tier: tier?.core,
             source: source, sourceId: sourceId, occurredAt: occurredAt, baseVersion: baseVersion)
     }
 }
 
-/// Each property given replaces its whole value.
+/// A change to an item, and the version it was read at.
+///
+/// A type or a tier the item already has moves nothing and is not sent. A
+/// `type` the copy's catalog does not hold is refused `unknownType` before
+/// anything is queued.
 public struct Edit: Sendable, Hashable {
-    public var properties: JSONObject
-    public var baseVersion: Int64
-    public var sourceId: String?
+    /// How the properties meet the item's.
+    public enum Properties: Sendable, Hashable {
+        /// Each property given replaces its whole value; every other one
+        /// stays as it is.
+        case merge(JSONObject)
+        /// The item's whole properties: a property left out is cleared.
+        case replace(JSONObject)
+    }
 
-    public init(properties: JSONObject, baseVersion: Int64, sourceId: String? = nil) {
+    public var properties: Properties
+    public var baseVersion: Int64
+    /// The natural key to move the item to.
+    public var sourceId: String?
+    /// The type to move the item to, sent as the server's retype. The
+    /// properties it ends up with are held to that type.
+    public var type: String?
+    /// The tier to move the item to.
+    public var tier: Tier?
+
+    public init(
+        _ properties: Properties = .merge([:]), baseVersion: Int64, sourceId: String? = nil, type: String? = nil,
+        tier: Tier? = nil
+    ) {
         self.properties = properties
         self.baseVersion = baseVersion
         self.sourceId = sourceId
+        self.type = type
+        self.tier = tier
     }
 
     func core() throws -> MarfaCore.Edit {
-        MarfaCore.Edit(propertiesJson: try Properties.text(properties), baseVersion: baseVersion, sourceId: sourceId)
+        let (properties, replace) =
+            switch self.properties {
+            case .merge(let properties): (properties, false)
+            case .replace(let properties): (properties, true)
+            }
+        return MarfaCore.Edit(
+            propertiesJson: try properties.json(), replaceProperties: replace, baseVersion: baseVersion,
+            sourceId: sourceId, type: type, tier: tier?.core)
     }
 }
 

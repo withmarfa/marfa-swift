@@ -81,7 +81,7 @@ _ = try await copy.items.create(
 let hydrated = try await copy.hydrate(types: ["app.readinglist.entry"], tier: .library)
 let items = try await copy.items.list()
 if let item = items.first {
-    _ = try await copy.items.update(item.id, Edit(properties: ["title": "Read next"], baseVersion: item.version))
+    _ = try await copy.items.update(item.id, Edit(.merge(["title": "Read next"]), baseVersion: item.version))
 }
 let report = try await copy.queue.drain()
 // Present refused or blocked verdicts before deciding what to do with them.
@@ -124,6 +124,80 @@ The package is not built for library evolution, so its enums are exhaustive: swi
 `MarfaTypes`, a second product, holds the server's wire types, generated from the pinned `openapi.json`, for reading answers the working copy does not hold. Generation fails on any diagnostic instead of silently dropping an unsupported schema. Nullable reference unions use `MarfaNullable.null` for an explicit JSON null; an absent optional omits the field. For example, `Operations.UpdateKey.Input.Body.JsonPayload(enforcementOverride: .null)` clears an override, while leaving `enforcementOverride` unset makes no change.
 
 A blocked verdict can carry the structured refusal and missing grant. Drain reports preserve the core’s retry delay, including when an intermediary answers without the server’s contract header.
+
+## Read and edit items
+
+An `Item` carries `title` and `body`, read from the properties its type's display hints name: `core.event` shows its `description` as its body, a type that names a body field of its own shows that one, and a type whose hints name neither uses `title` and `body`. Use them rather than reading `properties["title"]`:
+
+```swift
+for item in try await copy.items.list(ListFilters(type: "core.event")) {
+    print(item.title ?? "Untitled", item.body ?? "")
+}
+```
+
+`properties` is a `JSONObject`, which keeps its keys in the order the server answers them: the fields the type declares first, in the type's order, then the rest in the order they were written, with any key that is an array index, such as `2024`, first of all. The copy shows the same order before a write is sent as after the server answers it. Iterate it, or read `keys`, to lay out an item as a document. `JSONObject(json:)` and `JSONValue(json:)` read JSON text in order, and `json()` writes it back in order; `JSONEncoder` and `JSONDecoder` do not keep key order.
+
+An `Edit` says how its properties meet the item's. `.merge` replaces each property it names and leaves the rest; `.replace` makes them the item's whole properties, so a property it leaves out is cleared. An edit can also move the item to another type or tier:
+
+```swift
+let item = try #require(try await copy.items.get(id))
+_ = try await copy.items.update(id, Edit(.merge(["title": "Renamed"]), baseVersion: item.version))
+_ = try await copy.items.update(id, Edit(.replace(["body": "Only this"]), baseVersion: item.version))
+_ = try await copy.items.update(id, Edit(baseVersion: item.version, type: "core.task", tier: .feed))
+```
+
+Each edit is queued and shown at once, offline included. A type the copy's catalog does not hold throws `unknownType` and queues nothing. A retype changes what the copy's read view covers, so once the server answers it the drain throws `copyExpired(reason: "read_view_changed", …)`: the write is answered, and the app hydrates again.
+
+## Recently deleted
+
+`items.delete(_:)` moves an item to the bin. The bin itself is read from the server, a page at a time, newest change first, and nothing read from it is held in the copy. Offline, `bin` throws `network`; the copy never answers for it. The server keeps no deletion time, so an item's `updatedAt` stands for when it went to the bin.
+
+```swift
+var page = try await copy.items.bin(type: "core.note")
+while true {
+    for item in page.items { print(item.title ?? item.id, item.updatedAt) }
+    guard let next = page.nextCursor else { break }
+    page = try await copy.items.bin(type: "core.note", after: next)
+}
+```
+
+`items.restore(_:)` brings an item back. One the copy holds shows as restored at once; one it does not, such as an item read from the bin, is restored by id: the restore is queued, survives a restart, and the item arrives in the copy once the server answers, where the slice takes it. `pin(_:)` of an item in the bin throws `notFound(code: "trashed", …)`.
+
+`items.purge(_:version:)` destroys an item in the bin for good. It is never queued: it is sent at once, and needs the server and a key holding `items.purge`. Pass the version the person was shown, such as a bin item's; without one, the copy's own is used, and an item the copy does not hold throws `notFound(code: "not_held", …)`. An item the copy shows outside the bin throws `validation(code: "invalid_transition", …)`, and one with a write still waiting throws `invalid`. On any failure the copy and the queue stay as they were.
+
+```swift
+try await copy.items.purge(item.id, version: item.version)
+```
+
+## Keep a copy in sync
+
+Nothing runs on its own, so an app drives the copy through its life:
+
+1. **On first launch, or when `status().hydration` is `never` or `expired`,** call `hydrate(types:tier:)`. It replaces the copy with the slice and keeps the queue.
+1. **When the app starts or comes to the front,** call `catchUp()` to apply what changed while it was away, then `queue.drain()` to send what it queued.
+1. **While a screen shows server data,** hold a `changes()` stream. It follows the server's events and tells each one as `.server`.
+1. **When the stream tells `.serverUnreachable(error)`,** show the app as offline; `error` is typed, such as `network`, `rateLimited` or `server`. The follow keeps asking at a falling rate and says this once. Writes still queue.
+1. **When it tells `.serverReachable`,** call `queue.drain()` to send what waited, and show the app as online again.
+1. **After each write the person makes,** call `queue.drain()` when the app is online; a drain that cannot reach the server leaves the writes waiting, uncounted.
+
+```swift
+for await change in copy.changes() {
+    switch change.origin {
+    case .serverUnreachable(let error): showOffline(error)
+    case .serverReachable:
+        showOnline()
+        _ = try? await copy.queue.drain()
+    case .stopped(.copyExpired):
+        _ = try? await copy.hydrate(types: ["core.note"], tier: .library)
+    case .stopped(.unauthorized), .stopped(.signedOut):
+        askForANewKey()
+    default:
+        refresh(change.itemId)
+    }
+}
+```
+
+A stream that tells `.stopped` has ended its follow until the next hydration or catch-up. `copyExpired` means the copy can no longer be kept current from where it is, after the server's log moved past it, another instance answered at its address, or its read view changed, such as after a retype or a type registered: hydrate again, and the queue survives. `unauthorized` means the server refused the key, and `signedOut` that a signed-in credential is gone: get a new key and pass it to `useKey(_:)`, and the follow starts again with it.
 
 ## Sync a folder on a Mac
 

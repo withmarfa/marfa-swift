@@ -118,12 +118,3 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, Expre
     }
 }
 
-enum Properties {
-    static func text(_ properties: JSONObject) throws -> String {
-        try properties.json()
-    }
-
-    static func object(_ text: String) throws -> JSONObject {
-        try JSONObject(json: text)
-    }
-}

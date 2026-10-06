@@ -38,18 +38,18 @@ struct Values {
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
             "tags": ["a", "b"], "nested": ["key": "value"],
         ]
-        #expect(try Properties.object(Properties.text(properties)) == properties)
+        #expect(try JSONObject(json: properties.json()) == properties)
     }
 
     @Test func anIntegerBeyondWhatADoubleHoldsComesBackExact() throws {
-        let read = try Properties.object(#"{"id":9007199254740993,"ratio":0.25}"#)
+        let read = try JSONObject(json: #"{"id":9007199254740993,"ratio":0.25}"#)
         #expect(read["id"] == .integer(9_007_199_254_740_993))
         #expect(read["ratio"] == .number(0.25))
-        #expect(try Properties.text(read).contains("9007199254740993"))
+        #expect(try read.json().contains("9007199254740993"))
     }
 
     @Test func aNumberReadsAsAnIntegerWhereInt64HoldsItsValue() throws {
-        let read = try Properties.object(#"{"a":1.0,"b":1e2,"c":9223372036854775808,"d":1.5}"#)
+        let read = try JSONObject(json: #"{"a":1.0,"b":1e2,"c":9223372036854775808,"d":1.5}"#)
         #expect(read["a"] == .integer(1))
         #expect(read["b"] == .integer(100))
         #expect(read["c"] == .number(9_223_372_036_854_775_808))
@@ -60,7 +60,7 @@ struct Values {
         let unreadable = MarfaCore.Item(
             id: "n1", type: "core.note", propertiesJson: "[1,2]", state: .active, tier: nil, version: 1,
             schemaVersion: 1, source: "device", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "",
-            tags: [])
+            tags: [], title: nil, body: nil)
         #expect {
             try translated { try Marfa.Item(unreadable) }
         } throws: { error in
@@ -157,7 +157,7 @@ struct Errors {
         let infinite: JSONObject = ["r": .number(-.infinity)]
         let writes: [(String, @Sendable () async throws -> Marfa.QueuedWrite)] = [
             ("create", { try await copy.items.create(Marfa.Draft(type: "core.note", properties: unwritable)) }),
-            ("update", { try await copy.items.update("n1", Marfa.Edit(properties: infinite, baseVersion: 1)) }),
+            ("update", { try await copy.items.update("n1", Marfa.Edit(.merge(infinite), baseVersion: 1)) }),
             ("edge", { try await copy.edges.create(from: "a", to: "b", type: "references", properties: unwritable) }),
             ("edge update", { try await copy.edges.update("e1", properties: infinite, baseVersion: 1) }),
             ("extension", { try await copy.extensions.write("ns", unwritable, on: "n1") }),

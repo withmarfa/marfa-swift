@@ -275,7 +275,7 @@ extension LiveWorkingCopies {
             #expect(FileManager.default.fileExists(atPath: file.path(percentEncoded: false)))
 
             // Another device edits the body the folder's file is based on, and the person edits the file.
-            _ = try await writer.items.update(note, Edit(properties: ["body": "elsewhere"], baseVersion: 1))
+            _ = try await writer.items.update(note, Edit(.merge(["body": "elsewhere"]), baseVersion: 1))
             #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
             await writer.close()
             try Data("---\ntitle: \(title)\n---\nWritten here.\n".utf8).write(to: file)

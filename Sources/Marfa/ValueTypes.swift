@@ -456,7 +456,7 @@ public struct QueuedWrite: Sendable, Hashable {
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,
             baseVersion: core.baseVersion, idempotencyKey: core.idempotencyKey, dependsOn: core.dependsOn,
             follows: core.follows, verdict: core.verdict.map(Verdict.init), waiting: core.waiting,
-            body: try Properties.object(core.bodyJson), answer: core.answer, refusals: core.refusals,
+            body: try JSONObject(json: core.bodyJson), answer: core.answer, refusals: core.refusals,
             queuedAt: core.queuedAt, answeredAt: core.answeredAt)
     }
 
@@ -465,7 +465,7 @@ public struct QueuedWrite: Sendable, Hashable {
             id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
-            bodyJson: try Properties.text(body), answer: answer, refusals: refusals, queuedAt: queuedAt,
+            bodyJson: try body.json(), answer: answer, refusals: refusals, queuedAt: queuedAt,
             answeredAt: answeredAt)
     }
 }

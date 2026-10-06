@@ -63,16 +63,23 @@ struct CopyOptions {
         await copy.close()
     }
 
-    @Test func anExpiredChangeRetainsItsReason() async throws {
+    @Test func theFollowSaysTypedWhenTheServerGoesAndComesBack() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.change(
             0,
-            MarfaCore.Change(event: "copy.expired", itemId: nil, edgeId: nil, cursor: "3", reason: "instance_changed"))
-        try await eventually("expiry was told") { heard.all.count == 1 }
-        #expect(heard.all.first?.reason == "instance_changed")
-        #expect(heard.all.first?.origin == .server(event: "copy.expired", cursor: "3"))
+            MarfaCore.Change(
+                event: "server.unreachable", itemId: nil, edgeId: nil, cursor: "3",
+                reason: .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7)))
+        core.change(
+            0, MarfaCore.Change(event: "server.reachable", itemId: nil, edgeId: nil, cursor: "3", reason: nil))
+        try await eventually("both were told") { heard.all.count == 2 }
+        #expect(
+            heard.all.map(\.origin) == [
+                .serverUnreachable(.rateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7)),
+                .serverReachable,
+            ])
         await copy.close()
     }
 }
