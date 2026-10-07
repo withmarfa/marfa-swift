@@ -125,14 +125,14 @@ public protocol APIProtocol: Sendable {
     func bulkUpsertItems(_ input: Operations.BulkUpsertItems.Input) async throws -> Operations.BulkUpsertItems.Output
     /// Apply a bulk action
     ///
-    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a job.
+    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
     ///
     /// - Remark: HTTP `POST /items/bulk-actions`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
     func applyBulkAction(_ input: Operations.ApplyBulkAction.Input) async throws -> Operations.ApplyBulkAction.Output
     /// Get a bulk-action job
     ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or an operator key, can read it.
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the operator key, can read it.
     ///
     /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
@@ -991,7 +991,7 @@ extension APIProtocol {
     }
     /// Apply a bulk action
     ///
-    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a job.
+    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
     ///
     /// - Remark: HTTP `POST /items/bulk-actions`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
@@ -1006,7 +1006,7 @@ extension APIProtocol {
     }
     /// Get a bulk-action job
     ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or an operator key, can read it.
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the operator key, can read it.
     ///
     /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.

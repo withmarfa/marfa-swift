@@ -5766,12 +5766,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/404/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/404/content/application\/json`.
-                    case json(Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal)
+                    case json(Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal {
+                    public var json: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -5797,6 +5797,7 @@ public enum Operations {
             }
             /// - `item_not_found`: no item has this ID, its type is one you can't read, or an edge target doesn't exist or has a type you can't read. For an item in the trash, `details.trashed` is `true` if you can read its type.
             /// - `edge_type_not_found`: an edge names an edge type that doesn't exist.
+            /// - `edge_not_found`: a repeat under the `Idempotency-Key` would show an edge you can no longer read.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/404`.
             ///
@@ -7229,12 +7230,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/404/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/404/content/application\/json`.
-                    case json(Components.Schemas.ItemNotFoundRefusal)
+                    case json(Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ItemNotFoundRefusal {
+                    public var json: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -7259,6 +7260,7 @@ public enum Operations {
                 }
             }
             /// - `item_not_found`: no item has this ID, or its type is one you can't read. If the item is in the trash and you can read its type, `details.trashed` is `true`.
+            /// - `edge_not_found`: a repeat under the `Idempotency-Key` would show an edge you can no longer read.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)/responses/404`.
             ///
@@ -10029,12 +10031,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/404/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/404/content/application\/json`.
-                    case json(Components.Schemas.ItemNotFoundRefusal)
+                    case json(Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ItemNotFoundRefusal {
+                    public var json: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -10059,6 +10061,7 @@ public enum Operations {
                 }
             }
             /// - `item_not_found`: no item has this ID, or its type is one you can't read.
+            /// - `edge_not_found`: a repeat under the `Idempotency-Key` would show an edge you can no longer read.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/404`.
             ///
@@ -19780,7 +19783,7 @@ public enum Operations {
     }
     /// Apply a bulk action
     ///
-    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a job.
+    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
     ///
     /// - Remark: HTTP `POST /items/bulk-actions`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
@@ -21561,7 +21564,7 @@ public enum Operations {
     }
     /// Get a bulk-action job
     ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or an operator key, can read it.
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the operator key, can read it.
     ///
     /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
@@ -22015,7 +22018,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: another credential queued the job, and yours is not an operator key.
+            /// - `forbidden`: another credential queued the job, and yours isn't the operator key.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)/responses/403`.
             ///
@@ -22968,7 +22971,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: another credential queued the job, and yours is not an operator key.
+            /// - `forbidden`: another credential queued the job, and yours isn't the operator key.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)/responses/403`.
             ///
@@ -44794,8 +44797,8 @@ public enum Operations {
             /// - `missing_required_field`: `fields` is missing.
             /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes too deep a chain.
             /// - `invalid_schema`: the schema is invalid, such as a `link_field` that isn't a string field.
-            /// - `property_shadows_field`: a field has the name of one every item has, such as `title`.
-            /// - `inheritance_violation`: the type changes an inherited field's shape.
+            /// - `property_shadows_field`: a field is named like one every item has, such as `source_id`.
+            /// - `inheritance_violation`: the type reshapes an inherited field.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/400`.
             ///
@@ -50052,7 +50055,7 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/occurrences/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Window start, ISO 8601. An event overlaps the window if it starts before `to` and ends after this time. An event's end is its `ends_at`, else its start plus `duration`, else, for a whole-day event, the next day.
+                /// Window start, ISO 8601. An event overlaps the window if it starts before `to` and ends after this time. Its end is `ends_at`, else its start plus `duration`. A whole-day event fills whole days in its `timezone`, or in UTC if it has none.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/from`.
                 public var from: Swift.String
@@ -50067,7 +50070,7 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - from: Window start, ISO 8601. An event overlaps the window if it starts before `to` and ends after this time. An event's end is its `ends_at`, else its start plus `duration`, else, for a whole-day event, the next day.
+                ///   - from: Window start, ISO 8601. An event overlaps the window if it starts before `to` and ends after this time. Its end is `ends_at`, else its start plus `duration`. A whole-day event fills whole days in its `timezone`, or in UTC if it has none.
                 ///   - to: Window end, ISO 8601. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
                 ///   - _type: Only return events of this type, or of the event types a wildcard matches.
                 public init(

@@ -2661,6 +2661,90 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeNotFound = "edge_not_found"
+                    case edgeTypeNotFound = "edge_type_not_found"
+                    case itemNotFound = "item_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// A stale write that carried nothing to merge: the error and the item now.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemStaleVersion`.
@@ -2879,6 +2963,89 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal`.
+        public struct EdgeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeNotFound = "edge_not_found"
+                    case itemNotFound = "item_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeNotFoundOrItemNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -4533,90 +4700,6 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
-        public struct EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgeNotFound = "edge_not_found"
-                    case edgeTypeNotFound = "edge_type_not_found"
-                    case itemNotFound = "item_not_found"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
-            public var error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
-            /// Creates a new `EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -6365,7 +6448,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/parent`.
             public var parent: Swift.String?
-            /// A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            /// A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/label`.
             public var label: Swift.String?
@@ -6462,7 +6545,7 @@ extension Components {
             ///   - fields: The type's own fields, by name.
             ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
-            ///   - label: A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            ///   - label: A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
             ///   - description: What the type is for.
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
@@ -6848,7 +6931,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/parent`.
             public var parent: Swift.String?
-            /// A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            /// A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/label`.
             public var label: Swift.String?
@@ -6941,7 +7024,7 @@ extension Components {
             ///   - fields: The type's own fields, by name.
             ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
-            ///   - label: A name for people to read. Leave it out on `POST /types` and Marfa derives one from the last segment of the identifier.
+            ///   - label: A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
             ///   - description: What the type is for.
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
@@ -7483,7 +7566,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Occurrence/starts_at`.
             public var startsAt: Swift.String
-            /// When the occurrence ends, in UTC. One computed from a rule lasts as long as its series' first; any other ends at its item's `ends_at`. Absent when it has no end.
+            /// When the occurrence ends, in UTC. A whole-day event ends at midnight in its `timezone`, or in UTC if it has none. One computed from a rule lasts as long as its series' first; any other ends at its item's `ends_at`. Absent when it has no end.
             ///
             /// - Remark: Generated from `#/components/schemas/Occurrence/ends_at`.
             public var endsAt: Swift.String?
@@ -7503,7 +7586,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - startsAt: When the occurrence starts, in UTC.
-            ///   - endsAt: When the occurrence ends, in UTC. One computed from a rule lasts as long as its series' first; any other ends at its item's `ends_at`. Absent when it has no end.
+            ///   - endsAt: When the occurrence ends, in UTC. A whole-day event ends at midnight in its `timezone`, or in UTC if it has none. One computed from a rule lasts as long as its series' first; any other ends at its item's `ends_at`. Absent when it has no end.
             ///   - item: The event: the series for an occurrence computed from its rule, otherwise the occurrence's own item.
             ///   - seriesId: The ID of the recurring event the occurrence belongs to. Absent on an event that doesn't recur.
             ///   - replaces: The start, in UTC, of the computed occurrence this stored exception takes the place of. Present only on an exception.
