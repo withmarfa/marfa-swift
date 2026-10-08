@@ -7517,7 +7517,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/series_errors_truncated`.
             public var seriesErrorsTruncated: Swift.Bool?
-            /// `true` when a series' expansion didn't finish, so `data` may be missing its occurrences; `scan.series_unexpanded` counts those series. A narrower window doesn't help: narrow by `type` or fix the rules. Absent otherwise.
+            /// `true` when a series didn't finish expanding, so `data` may be missing occurrences; `scan.series_unexpanded` counts them. If a series has too many in the window, narrow the window; else narrow by `type` or fix the rules. Absent otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/expansion_incomplete`.
             public var expansionIncomplete: Swift.Bool?
@@ -7530,7 +7530,7 @@ extension Components {
             ///   - scan: What this read cost, and the limits that would stop it.
             ///   - seriesErrors: One entry per failure found in a recurrence rule, such as a line Marfa can't read or a timezone that doesn't resolve. One event can have several entries and still appear in `data`. Absent when there were none.
             ///   - seriesErrorsTruncated: `true` when `series_errors` stops at `scan.max_series_errors` entries and leaves failures out. `scan.series_errors` has the total. Absent otherwise.
-            ///   - expansionIncomplete: `true` when a series' expansion didn't finish, so `data` may be missing its occurrences; `scan.series_unexpanded` counts those series. A narrower window doesn't help: narrow by `type` or fix the rules. Absent otherwise.
+            ///   - expansionIncomplete: `true` when a series didn't finish expanding, so `data` may be missing occurrences; `scan.series_unexpanded` counts them. If a series has too many in the window, narrow the window; else narrow by `type` or fix the rules. Absent otherwise.
             public init(
                 data: [Components.Schemas.Occurrence],
                 nextCursor: Swift.String? = nil,
@@ -10099,7 +10099,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/type_permissions`.
             public var typePermissions: Components.Schemas.KeyResponse.TypePermissionsPayload
-            /// Extension namespaces the key may `read` or `write`, by namespace or `*`. A key can always read and write the namespace named by its own `label`.
+            /// Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/extension_permissions`.
             public struct ExtensionPermissionsPayload: Codable, Hashable, Sendable {
@@ -10119,7 +10119,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// Extension namespaces the key may `read` or `write`, by namespace or `*`. A key can always read and write the namespace named by its own `label`.
+            /// Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/extension_permissions`.
             public var extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload
@@ -10220,7 +10220,7 @@ extension Components {
             ///   - defaultTier: The tier an item this key creates goes to when the write names none.
             ///   - isOperator: `true` if this is an operator key. An operator key opens the routes that run the instance, such as `/housekeeping`, and holds no permissions, so it reads and writes no items.
             ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
-            ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`. A key can always read and write the namespace named by its own `label`.
+            ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
             ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
             ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
@@ -10400,7 +10400,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/type_permissions`.
             public var typePermissions: Components.Schemas.ApiKey.TypePermissionsPayload
-            /// Extension namespaces the key may `read` or `write`, by namespace or `*`. A key can always read and write the namespace named by its own `label`.
+            /// Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/extension_permissions`.
             public struct ExtensionPermissionsPayload: Codable, Hashable, Sendable {
@@ -10420,7 +10420,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// Extension namespaces the key may `read` or `write`, by namespace or `*`. A key can always read and write the namespace named by its own `label`.
+            /// Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/extension_permissions`.
             public var extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload
@@ -10524,7 +10524,7 @@ extension Components {
             ///   - defaultTier: The tier an item this key creates goes to when the write names none.
             ///   - isOperator: `true` if this is an operator key. An operator key opens the routes that run the instance, such as `/housekeeping`, and holds no permissions, so it reads and writes no items.
             ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
-            ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`. A key can always read and write the namespace named by its own `label`.
+            ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
             ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
             ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
@@ -11986,6 +11986,88 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.WriteContentionRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal`.
+        public struct InsufficientStorageRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case insufficientStorage = "insufficient_storage"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error/code`.
+                public var code: Components.Schemas.InsufficientStorageRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error/details`.
+                public var details: Components.Schemas.InsufficientStorageRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InsufficientStorageRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InsufficientStorageRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InsufficientStorageRefusal/error`.
+            public var error: Components.Schemas.InsufficientStorageRefusal._ErrorPayload
+            /// Creates a new `InsufficientStorageRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InsufficientStorageRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
