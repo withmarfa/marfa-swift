@@ -98647,7 +98647,7 @@ public enum Operations {
     }
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -100066,7 +100066,7 @@ public enum Operations {
     }
     /// Revoke an API key
     ///
-    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. `keys.manage` and direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -103346,7 +103346,7 @@ public enum Operations {
     }
     /// Restore from an archive
     ///
-    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires direct owner or local authority. The owner must have authenticated within five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -107881,21 +107881,29 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/owner/POST/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// Email address the owner uses to sign in.
+                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/email`.
                     public var email: Swift.String
+                    /// Password for the new owner.
+                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/password`.
                     public var password: Swift.String
+                    /// Display name. Defaults to the part before @ in the email address when omitted or blank.
+                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/name`.
                     public var name: Swift.String?
+                    /// Machine-issued setup code. Omit when using a setup-only browser session.
+                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/code`.
                     public var code: Swift.String?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - email:
-                    ///   - password:
-                    ///   - name:
-                    ///   - code:
+                    ///   - email: Email address the owner uses to sign in.
+                    ///   - password: Password for the new owner.
+                    ///   - name: Display name. Defaults to the part before @ in the email address when omitted or blank.
+                    ///   - code: Machine-issued setup code. Omit when using a setup-only browser session.
                     public init(
                         email: Swift.String,
                         password: Swift.String,
@@ -118514,7 +118522,7 @@ public enum Operations {
     }
     /// Get server metrics
     ///
-    /// Instance-wide counters for items, blobs, types, keys, and webhooks, plus process uptime. `keys.total` counts unrevoked keys. Requires instance.read: the counters are instance-wide rather than permission-scoped.
+    /// Returns instance-wide counters and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
@@ -118593,10 +118601,16 @@ public enum Operations {
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// Instance-wide item counts.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items`.
                         public struct ItemsPayload: Codable, Hashable, Sendable {
+                            /// Number of items across all states.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items/total`.
                             public var total: Swift.Double
+                            /// Item counts by state.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items/by_state`.
                             public struct ByStatePayload: Codable, Hashable, Sendable {
                                 /// A container of undocumented properties.
@@ -118615,13 +118629,15 @@ public enum Operations {
                                     try encoder.encodeAdditionalProperties(additionalProperties)
                                 }
                             }
+                            /// Item counts by state.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items/by_state`.
                             public var byState: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload.ByStatePayload
                             /// Creates a new `ItemsPayload`.
                             ///
                             /// - Parameters:
-                            ///   - total:
-                            ///   - byState:
+                            ///   - total: Number of items across all states.
+                            ///   - byState: Item counts by state.
                             public init(
                                 total: Swift.Double,
                                 byState: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload.ByStatePayload
@@ -118634,19 +118650,27 @@ public enum Operations {
                                 case byState = "by_state"
                             }
                         }
+                        /// Instance-wide item counts.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items`.
                         public var items: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload
+                        /// Stored blob counts and size.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs`.
                         public struct BlobsPayload: Codable, Hashable, Sendable {
+                            /// Number of stored blobs.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/count`.
                             public var count: Swift.Double
+                            /// Total size of stored blobs, in bytes.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/total_bytes`.
                             public var totalBytes: Swift.Double
                             /// Creates a new `BlobsPayload`.
                             ///
                             /// - Parameters:
-                            ///   - count:
-                            ///   - totalBytes:
+                            ///   - count: Number of stored blobs.
+                            ///   - totalBytes: Total size of stored blobs, in bytes.
                             public init(
                                 count: Swift.Double,
                                 totalBytes: Swift.Double
@@ -118659,19 +118683,27 @@ public enum Operations {
                                 case totalBytes = "total_bytes"
                             }
                         }
+                        /// Stored blob counts and size.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs`.
                         public var blobs: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.BlobsPayload
+                        /// Built-in and registered type counts.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types`.
                         public struct TypesPayload: Codable, Hashable, Sendable {
+                            /// Number of built-in types.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types/core`.
                             public var core: Swift.Double
+                            /// Number of registered types.
+                            ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types/registered`.
                             public var registered: Swift.Double
                             /// Creates a new `TypesPayload`.
                             ///
                             /// - Parameters:
-                            ///   - core:
-                            ///   - registered:
+                            ///   - core: Number of built-in types.
+                            ///   - registered: Number of registered types.
                             public init(
                                 core: Swift.Double,
                                 registered: Swift.Double
@@ -118684,26 +118716,34 @@ public enum Operations {
                                 case registered
                             }
                         }
+                        /// Built-in and registered type counts.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types`.
                         public var types: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.TypesPayload
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/keys`.
                         public var keys: Components.Schemas.MetricCount
+                        /// Number of webhook registrations.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/webhooks`.
                         public var webhooks: Components.Schemas.MetricCount
+                        /// Seconds since this server process started.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/uptime_seconds`.
                         public var uptimeSeconds: Swift.Double
+                        /// When these counters were collected, in UTC.
+                        ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/cached_at`.
                         public var cachedAt: Swift.String
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
-                        ///   - items:
-                        ///   - blobs:
-                        ///   - types:
+                        ///   - items: Instance-wide item counts.
+                        ///   - blobs: Stored blob counts and size.
+                        ///   - types: Built-in and registered type counts.
                         ///   - keys:
-                        ///   - webhooks:
-                        ///   - uptimeSeconds:
-                        ///   - cachedAt:
+                        ///   - webhooks: Number of webhook registrations.
+                        ///   - uptimeSeconds: Seconds since this server process started.
+                        ///   - cachedAt: When these counters were collected, in UTC.
                         public init(
                             items: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload,
                             blobs: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.BlobsPayload,

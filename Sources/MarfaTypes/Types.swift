@@ -580,14 +580,14 @@ public protocol APIProtocol: Sendable {
     func getCurrentKey(_ input: Operations.GetCurrentKey.Input) async throws -> Operations.GetCurrentKey.Output
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
     func updateKey(_ input: Operations.UpdateKey.Input) async throws -> Operations.UpdateKey.Output
     /// Revoke an API key
     ///
-    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. `keys.manage` and direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -608,7 +608,7 @@ public protocol APIProtocol: Sendable {
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
     /// Restore from an archive
     ///
-    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires direct owner or local authority. The owner must have authenticated within five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -706,7 +706,7 @@ public protocol APIProtocol: Sendable {
     func listAuditLog(_ input: Operations.ListAuditLog.Input) async throws -> Operations.ListAuditLog.Output
     /// Get server metrics
     ///
-    /// Instance-wide counters for items, blobs, types, keys, and webhooks, plus process uptime. `keys.total` counts unrevoked keys. Requires instance.read: the counters are instance-wide rather than permission-scoped.
+    /// Returns instance-wide counters and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
@@ -1959,7 +1959,7 @@ extension APIProtocol {
     }
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -1976,7 +1976,7 @@ extension APIProtocol {
     }
     /// Revoke an API key
     ///
-    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. `keys.manage` and direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -2015,7 +2015,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires direct owner or local authority. The owner must have authenticated within five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -2211,7 +2211,7 @@ extension APIProtocol {
     }
     /// Get server metrics
     ///
-    /// Instance-wide counters for items, blobs, types, keys, and webhooks, plus process uptime. `keys.total` counts unrevoked keys. Requires instance.read: the counters are instance-wide rather than permission-scoped.
+    /// Returns instance-wide counters and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.

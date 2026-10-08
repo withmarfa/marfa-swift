@@ -11171,23 +11171,33 @@ extension Components {
                 case error
             }
         }
+        /// The single owner of the instance.
+        ///
         /// - Remark: Generated from `#/components/schemas/Owner`.
         public struct Owner: Codable, Hashable, Sendable {
+            /// Unique identifier for the owner.
+            ///
             /// - Remark: Generated from `#/components/schemas/Owner/id`.
             public var id: Swift.String
+            /// Email address used to sign in.
+            ///
             /// - Remark: Generated from `#/components/schemas/Owner/email`.
             public var email: Swift.String
+            /// Display name of the owner.
+            ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
             public var name: Swift.String
+            /// When the owner was created, in UTC.
+            ///
             /// - Remark: Generated from `#/components/schemas/Owner/created_at`.
             public var createdAt: Swift.String
             /// Creates a new `Owner`.
             ///
             /// - Parameters:
-            ///   - id:
-            ///   - email:
-            ///   - name:
-            ///   - createdAt:
+            ///   - id: Unique identifier for the owner.
+            ///   - email: Email address used to sign in.
+            ///   - name: Display name of the owner.
+            ///   - createdAt: When the owner was created, in UTC.
             public init(
                 id: Swift.String,
                 email: Swift.String,
@@ -11889,14 +11899,18 @@ extension Components {
                 case details
             }
         }
+        /// Number of unrevoked keys.
+        ///
         /// - Remark: Generated from `#/components/schemas/MetricCount`.
         public struct MetricCount: Codable, Hashable, Sendable {
+            /// Number of records.
+            ///
             /// - Remark: Generated from `#/components/schemas/MetricCount/total`.
             public var total: Swift.Double
             /// Creates a new `MetricCount`.
             ///
             /// - Parameters:
-            ///   - total:
+            ///   - total: Number of records.
             public init(total: Swift.Double) {
                 self.total = total
             }
