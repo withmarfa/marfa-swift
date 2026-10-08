@@ -23494,7 +23494,7 @@ public enum Operations {
     }
     /// Get a bulk-action job
     ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the operator key, can read it.
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of instance.read, can read it.
     ///
     /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
@@ -23948,7 +23948,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: another credential queued the job, and yours isn't the operator key.
+            /// - `forbidden`: another credential queued the job, and yours lacks instance.read.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)/responses/403`.
             ///
@@ -25010,7 +25010,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: another credential queued the job, and yours isn't the operator key.
+            /// - `forbidden`: another credential queued the job, and yours lacks instance.maintain.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)/responses/403`.
             ///
@@ -57726,7 +57726,7 @@ public enum Operations {
     }
     /// List orphaned blobs
     ///
-    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires the operator key.
+    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /blobs/orphans`.
     /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)`.
@@ -58160,7 +58160,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// Caller lacks the required management permission.
             ///
             /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)/responses/403`.
             ///
@@ -58659,7 +58659,7 @@ public enum Operations {
     }
     /// List blob stores
     ///
-    /// Returns every store the instance has attached, including any it has since detached, and `min_copies`, the fewest live copies Marfa keeps of a blob. Requires the operator key.
+    /// Returns every store the instance has attached, including any it has since detached, and `min_copies`, the fewest live copies Marfa keeps of a blob. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /blobs/stores`.
     /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)`.
@@ -59093,7 +59093,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// Caller lacks the required management permission.
             ///
             /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)/responses/403`.
             ///
@@ -59601,14 +59601,14 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/blobs/{hash}/GET/path`.
             public struct Path: Sendable, Hashable {
-                /// The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The operator key reads every blob.
+                /// The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The blobs.manage permission reads every blob.
                 ///
                 /// - Remark: Generated from `#/paths/blobs/{hash}/GET/path/hash`.
                 public var hash: Swift.String
                 /// Creates a new `Path`.
                 ///
                 /// - Parameters:
-                ///   - hash: The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The operator key reads every blob.
+                ///   - hash: The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The blobs.manage permission reads every blob.
                 public init(hash: Swift.String) {
                     self.hash = hash
                 }
@@ -60950,14 +60950,14 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/path`.
             public struct Path: Sendable, Hashable {
-                /// The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The operator key reads every blob.
+                /// The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The blobs.manage permission reads every blob.
                 ///
                 /// - Remark: Generated from `#/paths/blobs/{hash}/url/GET/path/hash`.
                 public var hash: Swift.String
                 /// Creates a new `Path`.
                 ///
                 /// - Parameters:
-                ///   - hash: The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The operator key reads every blob.
+                ///   - hash: The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The blobs.manage permission reads every blob.
                 public init(hash: Swift.String) {
                     self.hash = hash
                 }
@@ -62057,14 +62057,14 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/path`.
             public struct Path: Sendable, Hashable {
-                /// The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The operator key reads every blob.
+                /// The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The blobs.manage permission reads every blob.
                 ///
                 /// - Remark: Generated from `#/paths/blobs/{hash}/locations/GET/path/hash`.
                 public var hash: Swift.String
                 /// Creates a new `Path`.
                 ///
                 /// - Parameters:
-                ///   - hash: The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The operator key reads every blob.
+                ///   - hash: The blob's hash, `sha256:<hex>`. You can read a blob only if an item, edge or extension you can read references its hash, and whoever wrote that reference had uploaded the bytes or could read them. The blobs.manage permission reads every blob.
                 public init(hash: Swift.String) {
                     self.hash = hash
                 }
@@ -63110,7 +63110,7 @@ public enum Operations {
     }
     /// Delete a blob's copy in a store
     ///
-    /// Deletes the copy of a blob that one store holds, and its row in the location log. Requires the operator key.
+    /// Deletes the copy of a blob that one store holds, and its row in the location log. Requires blobs.manage.
     ///
     /// - Remark: HTTP `DELETE /blobs/{hash}/locations/{store}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(deleteBlobLocation)`.
@@ -63573,7 +63573,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// Caller lacks the required management permission.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(deleteBlobLocation)/responses/403`.
             ///
@@ -64291,7 +64291,7 @@ public enum Operations {
     }
     /// List housekeeping jobs
     ///
-    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires the operator key.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /housekeeping`.
     /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
@@ -64725,7 +64725,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// Caller lacks the required management permission.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)/responses/403`.
             ///
@@ -65224,7 +65224,7 @@ public enum Operations {
     }
     /// Run a housekeeping job
     ///
-    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires the operator key.
+    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires instance.maintain.
     ///
     /// - Remark: HTTP `POST /housekeeping/{name}/run`.
     /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)`.
@@ -65678,7 +65678,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// Caller lacks the required management permission.
             ///
             /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)/responses/403`.
             ///
@@ -66483,7 +66483,7 @@ public enum Operations {
     }
     /// List connectors
     ///
-    /// Returns your registration, or every registration if you use the operator key, newest first.
+    /// Returns your registration, or every registration if you hold connectors.manage, newest first.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -67882,7 +67882,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is an app's session token, not a key, or the operator key, which runs the instance and can't register as a connector.
+            /// - `forbidden`: your credential is an app's session token, not a key, or direct owner or local authority.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/403`.
             ///
@@ -68923,7 +68923,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `connector_not_found`: no connector has this ID, or it is registered under another key and yours isn't the operator key.
+            /// - `connector_not_found`: no connector has this ID, or it is registered under another key and yours lacks connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)/responses/404`.
             ///
@@ -69876,7 +69876,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is neither the connector's own key nor the operator key.
+            /// - `forbidden`: your credential is neither the connector's own key nor a holder of connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)/responses/403`.
             ///
@@ -71043,7 +71043,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)/responses/403`.
             ///
@@ -72220,7 +72220,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `connector_not_found`: no connector has this ID, or it is registered under another key and yours isn't the operator key.
+            /// - `connector_not_found`: no connector has this ID, or it is registered under another key and yours lacks connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)/responses/404`.
             ///
@@ -73241,7 +73241,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)/responses/403`.
             ///
@@ -74391,7 +74391,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is neither the connector's own key nor the operator key.
+            /// - `forbidden`: your credential is neither the connector's own key nor a holder of connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)/responses/403`.
             ///
@@ -75489,7 +75489,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is neither the connector's own key nor the operator key.
+            /// - `forbidden`: your credential is neither the connector's own key nor a holder of connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)/responses/403`.
             ///
@@ -76757,7 +76757,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is neither the connector's own key nor the operator key.
+            /// - `forbidden`: your credential is neither the connector's own key nor a holder of connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)/responses/403`.
             ///
@@ -77957,7 +77957,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/get(listInboundDeliveries)/responses/403`.
             ///
@@ -79028,7 +79028,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/{delivery_id}/body/get(getInboundDeliveryBody)/responses/403`.
             ///
@@ -80159,7 +80159,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)/responses/403`.
             ///
@@ -81372,7 +81372,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/post(holdConnector)/responses/403`.
             ///
@@ -82650,7 +82650,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)/responses/403`.
             ///
@@ -83800,7 +83800,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/get(getConnectorState)/responses/403`.
             ///
@@ -84966,7 +84966,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/put(replaceConnectorState)/responses/403`.
             ///
@@ -86225,7 +86225,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is neither the connector's own key nor the operator key.
+            /// - `forbidden`: your credential is neither the connector's own key nor a holder of connectors.manage.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)/responses/403`.
             ///
@@ -87416,7 +87416,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)/responses/403`.
             ///
@@ -88617,7 +88617,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/post(writeConnectorAgreements)/responses/403`.
             ///
@@ -89920,7 +89920,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential isn't the connector's own key. The operator key can't use this endpoint.
+            /// - `forbidden`: your credential isn't the connector's own key. Management permission does not authorize connector activity.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)/responses/403`.
             ///
@@ -95248,7 +95248,7 @@ public enum Operations {
     }
     /// List API keys
     ///
-    /// Returns the API keys you could have created, your own included, without their plaintext. The operator key gets every key. Requires `keys.mint` or the operator key.
+    /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -95682,7 +95682,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the operator key. `details.required_scope` names it.
+            /// - `forbidden`: this operation requires its explicit permission or direct owner or local authority. `details.required_scope` names it.
             ///
             /// - Remark: Generated from `#/paths//keys/get(listKeys)/responses/403`.
             ///
@@ -96212,7 +96212,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/source`.
                     public var source: Swift.String
-                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the operator key can grant any.
+                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the owner or local command can grant any.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -96224,10 +96224,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/default_tier`.
                     public var defaultTier: Components.Schemas.Tier?
-                    /// `true` to create another operator key, which holds no permissions, maps or claimed sources. Only the operator key can create one.
-                    ///
-                    /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/is_operator`.
-                    public var isOperator: Swift.Bool?
                     /// Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/type_permissions`.
@@ -96357,10 +96353,9 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label: A name for the key, to tell it apart from your other keys.
                     ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key may have it as its own, and it can't change later.
-                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the operator key can grant any.
+                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the owner or local command can grant any.
                     ///   - permissions: The permissions to give the key, such as `audit.read`.
                     ///   - defaultTier: The tier an item this key creates goes to when the write names none. Leave it out for `library`.
-                    ///   - isOperator: `true` to create another operator key, which holds no permissions, maps or claimed sources. Only the operator key can create one.
                     ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
                     ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
                     ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
@@ -96373,7 +96368,6 @@ public enum Operations {
                         sources: [Swift.String]? = nil,
                         permissions: [Components.Schemas.Permission]? = nil,
                         defaultTier: Components.Schemas.Tier? = nil,
-                        isOperator: Swift.Bool? = nil,
                         typePermissions: Operations.CreateKey.Input.Body.JsonPayload.TypePermissionsPayload? = nil,
                         extensionPermissions: Operations.CreateKey.Input.Body.JsonPayload.ExtensionPermissionsPayload? = nil,
                         edgePermissions: Operations.CreateKey.Input.Body.JsonPayload.EdgePermissionsPayload? = nil,
@@ -96386,7 +96380,6 @@ public enum Operations {
                         self.sources = sources
                         self.permissions = permissions
                         self.defaultTier = defaultTier
-                        self.isOperator = isOperator
                         self.typePermissions = typePermissions
                         self.extensionPermissions = extensionPermissions
                         self.edgePermissions = edgePermissions
@@ -96400,7 +96393,6 @@ public enum Operations {
                         case sources
                         case permissions
                         case defaultTier = "default_tier"
-                        case isOperator = "is_operator"
                         case typePermissions = "type_permissions"
                         case extensionPermissions = "extension_permissions"
                         case edgePermissions = "edge_permissions"
@@ -96429,10 +96421,6 @@ public enum Operations {
                         self.defaultTier = try container.decodeIfPresent(
                             Components.Schemas.Tier.self,
                             forKey: .defaultTier
-                        )
-                        self.isOperator = try container.decodeIfPresent(
-                            Swift.Bool.self,
-                            forKey: .isOperator
                         )
                         self.typePermissions = try container.decodeIfPresent(
                             Operations.CreateKey.Input.Body.JsonPayload.TypePermissionsPayload.self,
@@ -96464,7 +96452,6 @@ public enum Operations {
                             "sources",
                             "permissions",
                             "default_tier",
-                            "is_operator",
                             "type_permissions",
                             "extension_permissions",
                             "edge_permissions",
@@ -96571,7 +96558,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the new key with its plaintext `key`. When the operator key creates an ordinary key from a body naming no permission, map or `sources`, the key holds every permission and `*: write` on every map, and claims no source. On a new instance, the first request sends the one-time secret from the server's startup log as its bearer token, and returns the operator key, which reads no items.
+            /// Returns the new key with its plaintext `key`. When the owner or local command creates an ordinary key from a body naming no permission, map or `sources`, the key holds every permission and `*: write` on every map, and claims no source.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/201`.
             ///
@@ -96899,7 +96886,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the operator key; the body names a permission, map entry or source you don't hold, or a `source` another key claims that you can't grant; it gives an operator key any reach; or it asks for an operator key and you aren't one. `details.required_scope` or `details.source` names what you lack.
+            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body names a permission, map entry or source you don't hold, or a `source` another key claims that you can't grant. `details.required_scope` or `details.source` names what you lack.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/403`.
             ///
@@ -98660,7 +98647,7 @@ public enum Operations {
     }
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint` or the operator key.
+    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -98706,7 +98693,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/default_tier`.
                     public var defaultTier: Components.Schemas.Tier?
-                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the operator key can grant any.
+                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the owner or local command can grant any.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -98847,7 +98834,7 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label: A name for the key, to tell it apart from your other keys.
                     ///   - defaultTier: The tier an item this key creates goes to when the write names none.
-                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the operator key can grant any.
+                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the owner or local command can grant any.
                     ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
                     ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
                     ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
@@ -99383,7 +99370,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the operator key; the body gives the key a permission, map entry or source you don't hold; it gives an operator key any reach; or it widens a key an app created, which only narrows. `details.required_scope` or `details.source` names what's missing.
+            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body gives the key a permission, map entry or source you don't hold; or it widens a key an app created, which only narrows. `details.required_scope` or `details.source` names what's missing.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/403`.
             ///
@@ -100079,7 +100066,7 @@ public enum Operations {
     }
     /// Revoke an API key
     ///
-    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. You can revoke any key you could have created, your own included. Requires `keys.mint` or the operator key.
+    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. `keys.manage` and direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -100533,7 +100520,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the operator key. `details.required_scope` names it.
+            /// - `forbidden`: this operation requires its explicit permission or direct owner or local authority. `details.required_scope` names it.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/403`.
             ///
@@ -100642,7 +100629,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `api_key_not_found`: no key you could have created has this ID, or the key is revoked or past its `expires_at`. The operator key's message says when the key was already revoked.
+            /// - `api_key_not_found`: no key you could have created has this ID, or the key is revoked or past its `expires_at`. The owner or local command's message says when the key was already revoked.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/404`.
             ///
@@ -101663,7 +101650,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `config.manage`. The operator key doesn't hold it either. `details.required_scope` names it.
+            /// - `forbidden`: you don't hold `config.manage`. `details.required_scope` names it.
             ///
             /// - Remark: Generated from `#/paths//config/get(getConfig)/responses/403`.
             ///
@@ -102772,7 +102759,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `config.manage`. The operator key doesn't hold it either. `details.required_scope` names it.
+            /// - `forbidden`: you don't hold `config.manage`. `details.required_scope` names it.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/403`.
             ///
@@ -103359,7 +103346,7 @@ public enum Operations {
     }
     /// Restore from an archive
     ///
-    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires the operator key.
+    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires direct owner or local authority. The owner must have authenticated within five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -103916,7 +103903,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// Requires direct owner or local authority and recent owner authentication.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/403`.
             ///
@@ -104613,7 +104600,7 @@ public enum Operations {
     }
     /// List stale platform types
     ///
-    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Operator key only.
+    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /platform-types/drift`.
     /// - Remark: Generated from `#/paths//platform-types/drift/get(listPlatformTypeDrift)`.
@@ -105047,7 +105034,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: you aren't using the operator key.
+            /// `forbidden`: you lack the required management permission.
             ///
             /// - Remark: Generated from `#/paths//platform-types/drift/get(listPlatformTypeDrift)/responses/403`.
             ///
@@ -105546,7 +105533,7 @@ public enum Operations {
     }
     /// Delete a stale platform type
     ///
-    /// Deletes one platform type that this build no longer ships. The type stops resolving at once. Operator key only.
+    /// Deletes one platform type that this build no longer ships. The type stops resolving at once. Requires instance.maintain.
     ///
     /// - Remark: HTTP `DELETE /platform-types/{id}`.
     /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deletePlatformType)`.
@@ -106023,7 +106010,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `forbidden`: you aren't using the operator key.
+            /// `forbidden`: you lack the required management permission.
             ///
             /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deletePlatformType)/responses/403`.
             ///
@@ -106829,7 +106816,7 @@ public enum Operations {
     }
     /// Get the owner
     ///
-    /// Returns the owner: the one account that can sign in to the instance and approve apps. A new instance has no owner until `POST /owner` creates one. Requires the operator key.
+    /// Returns the owner of the claimed instance. Requires a direct owner sign-in or local process authority.
     ///
     /// - Remark: HTTP `GET /owner`.
     /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
@@ -106936,7 +106923,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the owner.
+            /// The owner.
             ///
             /// - Remark: Generated from `#/paths//owner/get(getOwner)/responses/200`.
             ///
@@ -107263,7 +107250,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// This operation requires direct owner or local authority.
             ///
             /// - Remark: Generated from `#/paths//owner/get(getOwner)/responses/403`.
             ///
@@ -107372,7 +107359,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `owner_not_found`: the instance has no owner yet.
+            /// The owner is unavailable.
             ///
             /// - Remark: Generated from `#/paths//owner/get(getOwner)/responses/404`.
             ///
@@ -107869,9 +107856,9 @@ public enum Operations {
             }
         }
     }
-    /// Create the owner
+    /// Claim the instance
     ///
-    /// Creates the owner, the one account that can sign in to the instance, and returns it. The owner can sign in at once with the email address and password. No other route creates an account. Requires the operator key.
+    /// Creates the one owner using a machine-issued setup code or setup-only browser session. The claim, consumed proof, and audit commit together. A claimed instance never reopens setup.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -107894,37 +107881,37 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/owner/POST/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// The owner's email address, which they sign in with. Marfa stores it in lowercase.
-                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/email`.
                     public var email: Swift.String
-                    /// The password the owner signs in with.
-                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/password`.
                     public var password: Swift.String
-                    /// The owner's name. Leave it out or blank to use the part of `email` before the `@`.
-                    ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/name`.
                     public var name: Swift.String?
+                    /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/code`.
+                    public var code: Swift.String?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - email: The owner's email address, which they sign in with. Marfa stores it in lowercase.
-                    ///   - password: The password the owner signs in with.
-                    ///   - name: The owner's name. Leave it out or blank to use the part of `email` before the `@`.
+                    ///   - email:
+                    ///   - password:
+                    ///   - name:
+                    ///   - code:
                     public init(
                         email: Swift.String,
                         password: Swift.String,
-                        name: Swift.String? = nil
+                        name: Swift.String? = nil,
+                        code: Swift.String? = nil
                     ) {
                         self.email = email
                         self.password = password
                         self.name = name
+                        self.code = code
                     }
                     public enum CodingKeys: String, CodingKey {
                         case email
                         case password
                         case name
+                        case code
                     }
                 }
                 /// - Remark: Generated from `#/paths/owner/POST/requestBody/content/application\/json`.
@@ -107956,38 +107943,17 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/201/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/201/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/201/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/201/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRequestID: Components.Headers.XRequestID? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                     }
                 }
                 /// Received HTTP response headers
@@ -108024,7 +107990,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the new owner.
+            /// The new owner can sign in.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/201`.
             ///
@@ -108058,18 +108024,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/400/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/400/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/400/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/400/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/400/headers/X-Error-Code`.
@@ -108079,23 +108033,14 @@ public enum Operations {
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                     }
                 }
@@ -108133,8 +108078,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `missing_required_field`: `email` or `password` is missing.
-            /// - `validation_error`: a field is invalid, such as an `email` that isn't an email address or a `password` shorter or longer than sign-in allows. For `password`, the message names the limit.
+            /// Owner details are invalid.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/400`.
             ///
@@ -108168,18 +108112,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/401/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/401/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/401/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/401/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/401/headers/X-Error-Code`.
@@ -108189,23 +108121,14 @@ public enum Operations {
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                     }
                 }
@@ -108243,7 +108166,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `unauthorized`: the request has no credential, or its credential is not valid.
+            /// Setup proof is invalid, expired, or replaced.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/401`.
             ///
@@ -108277,18 +108200,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/403/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/403/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/403/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/403/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/403/headers/X-Error-Code`.
@@ -108298,23 +108209,14 @@ public enum Operations {
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                     }
                 }
@@ -108352,7 +108254,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your key isn't an operator key.
+            /// The browser origin or transport is not permitted.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/403`.
             ///
@@ -108386,18 +108288,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/409/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/409/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/409/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/409/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/409/headers/X-Error-Code`.
@@ -108407,23 +108297,14 @@ public enum Operations {
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                     }
                 }
@@ -108461,7 +108342,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `owner_exists`: the instance already has an owner.
+            /// The instance has already been claimed.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/409`.
             ///
@@ -108583,18 +108464,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/429/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/429/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/429/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/429/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/429/headers/X-Error-Code`.
@@ -108608,25 +108477,16 @@ public enum Operations {
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
                         retryAfter: Components.Headers.RetryAfter? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
                     }
@@ -108665,7 +108525,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
+            /// The address has used its setup-code attempts.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/429`.
             ///
@@ -108699,18 +108559,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/500/headers/X-Request-ID`.
                     public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/500/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/500/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/500/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
                     /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/responses/500/headers/X-Error-Code`.
@@ -108720,23 +108568,14 @@ public enum Operations {
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                     }
                 }
@@ -108792,224 +108631,6 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "internalServerError",
-                            response: self
-                        )
-                    }
-                }
-            }
-            public struct ServiceUnavailable: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.CreateOwner.Output.ServiceUnavailable.Headers
-                /// - Remark: Generated from `#/paths/owner/POST/responses/503/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/503/content/application\/json`.
-                    case json(Components.Schemas.WriteContentionRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.WriteContentionRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.CreateOwner.Output.ServiceUnavailable.Body
-                /// Creates a new `ServiceUnavailable`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.CreateOwner.Output.ServiceUnavailable.Headers = .init(),
-                    body: Operations.CreateOwner.Output.ServiceUnavailable.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
-            ///
-            /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/503`.
-            ///
-            /// HTTP response code: `503 serviceUnavailable`.
-            case serviceUnavailable(Operations.CreateOwner.Output.ServiceUnavailable)
-            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
-            ///
-            /// - Throws: An error if `self` is not `.serviceUnavailable`.
-            /// - SeeAlso: `.serviceUnavailable`.
-            public var serviceUnavailable: Operations.CreateOwner.Output.ServiceUnavailable {
-                get throws {
-                    switch self {
-                    case let .serviceUnavailable(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "serviceUnavailable",
-                            response: self
-                        )
-                    }
-                }
-            }
-            public struct Code507: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers/X-RateLimit-Limit`.
-                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
-                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers/X-RateLimit-Remaining`.
-                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
-                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers/X-RateLimit-Reset`.
-                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
-                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xRateLimitLimit = xRateLimitLimit
-                        self.xRateLimitRemaining = xRateLimitRemaining
-                        self.xRateLimitReset = xRateLimitReset
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.CreateOwner.Output.Code507.Headers
-                /// - Remark: Generated from `#/paths/owner/POST/responses/507/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/owner/POST/responses/507/content/application\/json`.
-                    case json(Components.Schemas.InsufficientStorageRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InsufficientStorageRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.CreateOwner.Output.Code507.Body
-                /// Creates a new `Code507`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.CreateOwner.Output.Code507.Headers = .init(),
-                    body: Operations.CreateOwner.Output.Code507.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `insufficient_storage`: the disk that holds the instance's data has no room for the request, or the request would leave less free than the instance keeps in reserve. Nothing changed, unless `details.write_outcome` is `unknown`, which means the write may have landed: read what you changed before you repeat it. Free space on the disk, then try the request again.
-            ///
-            /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/507`.
-            ///
-            /// HTTP response code: `507 code507`.
-            case code507(Operations.CreateOwner.Output.Code507)
-            /// The associated value of the enum case if `self` is `.code507`.
-            ///
-            /// - Throws: An error if `self` is not `.code507`.
-            /// - SeeAlso: `.code507`.
-            public var code507: Operations.CreateOwner.Output.Code507 {
-                get throws {
-                    switch self {
-                    case let .code507(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "code507",
                             response: self
                         )
                     }
@@ -118394,7 +118015,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `audit.read`. The operator key doesn't hold it either. `details.required_scope` names it.
+            /// - `forbidden`: you don't hold `audit.read`. `details.required_scope` names it.
             ///
             /// - Remark: Generated from `#/paths//audit/get(listAuditLog)/responses/403`.
             ///
@@ -118848,6 +118469,1079 @@ public enum Operations {
             /// - Throws: An error if `self` is not `.code507`.
             /// - SeeAlso: `.code507`.
             public var code507: Operations.ListAuditLog.Output.Code507 {
+                get throws {
+                    switch self {
+                    case let .code507(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "code507",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
+    /// Get server metrics
+    ///
+    /// Instance-wide counters for items, blobs, types, keys, and webhooks, plus process uptime. `keys.total` counts unrevoked keys. Requires instance.read: the counters are instance-wide rather than permission-scoped.
+    ///
+    /// - Remark: HTTP `GET /metrics`.
+    /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
+    public enum GetServerMetrics {
+        public static let id: Swift.String = "getServerMetrics"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/metrics/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetServerMetrics.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetServerMetrics.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.GetServerMetrics.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            public init(headers: Operations.GetServerMetrics.Input.Headers = .init()) {
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items`.
+                        public struct ItemsPayload: Codable, Hashable, Sendable {
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items/total`.
+                            public var total: Swift.Double
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items/by_state`.
+                            public struct ByStatePayload: Codable, Hashable, Sendable {
+                                /// A container of undocumented properties.
+                                public var additionalProperties: [String: Swift.Double]
+                                /// Creates a new `ByStatePayload`.
+                                ///
+                                /// - Parameters:
+                                ///   - additionalProperties: A container of undocumented properties.
+                                public init(additionalProperties: [String: Swift.Double] = .init()) {
+                                    self.additionalProperties = additionalProperties
+                                }
+                                public init(from decoder: any Swift.Decoder) throws {
+                                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                                }
+                                public func encode(to encoder: any Swift.Encoder) throws {
+                                    try encoder.encodeAdditionalProperties(additionalProperties)
+                                }
+                            }
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items/by_state`.
+                            public var byState: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload.ByStatePayload
+                            /// Creates a new `ItemsPayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - total:
+                            ///   - byState:
+                            public init(
+                                total: Swift.Double,
+                                byState: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload.ByStatePayload
+                            ) {
+                                self.total = total
+                                self.byState = byState
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case total
+                                case byState = "by_state"
+                            }
+                        }
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/items`.
+                        public var items: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs`.
+                        public struct BlobsPayload: Codable, Hashable, Sendable {
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/count`.
+                            public var count: Swift.Double
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/total_bytes`.
+                            public var totalBytes: Swift.Double
+                            /// Creates a new `BlobsPayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - count:
+                            ///   - totalBytes:
+                            public init(
+                                count: Swift.Double,
+                                totalBytes: Swift.Double
+                            ) {
+                                self.count = count
+                                self.totalBytes = totalBytes
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case count
+                                case totalBytes = "total_bytes"
+                            }
+                        }
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs`.
+                        public var blobs: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.BlobsPayload
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types`.
+                        public struct TypesPayload: Codable, Hashable, Sendable {
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types/core`.
+                            public var core: Swift.Double
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types/registered`.
+                            public var registered: Swift.Double
+                            /// Creates a new `TypesPayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - core:
+                            ///   - registered:
+                            public init(
+                                core: Swift.Double,
+                                registered: Swift.Double
+                            ) {
+                                self.core = core
+                                self.registered = registered
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case core
+                                case registered
+                            }
+                        }
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/types`.
+                        public var types: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.TypesPayload
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/keys`.
+                        public var keys: Components.Schemas.MetricCount
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/webhooks`.
+                        public var webhooks: Components.Schemas.MetricCount
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/uptime_seconds`.
+                        public var uptimeSeconds: Swift.Double
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/cached_at`.
+                        public var cachedAt: Swift.String
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - items:
+                        ///   - blobs:
+                        ///   - types:
+                        ///   - keys:
+                        ///   - webhooks:
+                        ///   - uptimeSeconds:
+                        ///   - cachedAt:
+                        public init(
+                            items: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.ItemsPayload,
+                            blobs: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.BlobsPayload,
+                            types: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload.TypesPayload,
+                            keys: Components.Schemas.MetricCount,
+                            webhooks: Components.Schemas.MetricCount,
+                            uptimeSeconds: Swift.Double,
+                            cachedAt: Swift.String
+                        ) {
+                            self.items = items
+                            self.blobs = blobs
+                            self.types = types
+                            self.keys = keys
+                            self.webhooks = webhooks
+                            self.uptimeSeconds = uptimeSeconds
+                            self.cachedAt = cachedAt
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case items
+                            case blobs
+                            case types
+                            case keys
+                            case webhooks
+                            case uptimeSeconds = "uptime_seconds"
+                            case cachedAt = "cached_at"
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/application\/json`.
+                    case json(Operations.GetServerMetrics.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.GetServerMetrics.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.Ok.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Server metrics
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.GetServerMetrics.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.GetServerMetrics.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct BadRequest: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.BadRequest.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/400/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/400/content/application\/json`.
+                    case json(Components.Schemas.ValidationErrorRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ValidationErrorRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.BadRequest.Body
+                /// Creates a new `BadRequest`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.BadRequest.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.BadRequest.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `validation_error`: the query has a parameter this endpoint doesn't take.
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Operations.GetServerMetrics.Output.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Operations.GetServerMetrics.Output.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Unauthorized: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.Unauthorized.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/401/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/401/content/application\/json`.
+                    case json(Components.Schemas.UnauthorizedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.UnauthorizedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.Unauthorized.Body
+                /// Creates a new `Unauthorized`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.Unauthorized.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.Unauthorized.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `unauthorized`: the request has no credential, or its credential is not valid.
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Operations.GetServerMetrics.Output.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Operations.GetServerMetrics.Output.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.Forbidden.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/403/content/application\/json`.
+                    case json(Components.Schemas.ForbiddenRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ForbiddenRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.Forbidden.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.Forbidden.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Caller lacks instance.read
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.GetServerMetrics.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.GetServerMetrics.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct TooManyRequests: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/headers/Retry-After`.
+                    public var retryAfter: Components.Headers.RetryAfter?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        retryAfter: Components.Headers.RetryAfter? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.retryAfter = retryAfter
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.TooManyRequests.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/429/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/429/content/application\/json`.
+                    case json(Components.Schemas.RateLimitedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RateLimitedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.TooManyRequests.Body
+                /// Creates a new `TooManyRequests`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.TooManyRequests.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.TooManyRequests.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            case tooManyRequests(Operations.GetServerMetrics.Output.TooManyRequests)
+            /// The associated value of the enum case if `self` is `.tooManyRequests`.
+            ///
+            /// - Throws: An error if `self` is not `.tooManyRequests`.
+            /// - SeeAlso: `.tooManyRequests`.
+            public var tooManyRequests: Operations.GetServerMetrics.Output.TooManyRequests {
+                get throws {
+                    switch self {
+                    case let .tooManyRequests(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "tooManyRequests",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct InternalServerError: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.InternalServerError.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/500/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/500/content/application\/json`.
+                    case json(Components.Schemas.InternalErrorRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InternalErrorRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.InternalServerError.Body
+                /// Creates a new `InternalServerError`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.InternalServerError.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.InternalServerError.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `internal_error`: Marfa failed in a way it didn't expect, and the request may not have completed. Read what you changed before you repeat a write.
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Operations.GetServerMetrics.Output.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Operations.GetServerMetrics.Output.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ServiceUnavailable: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.ServiceUnavailable.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/503/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/503/content/application\/json`.
+                    case json(Components.Schemas.WriteContentionRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WriteContentionRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.ServiceUnavailable.Body
+                /// Creates a new `ServiceUnavailable`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.ServiceUnavailable.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.ServiceUnavailable.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Operations.GetServerMetrics.Output.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Operations.GetServerMetrics.Output.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Code507: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.GetServerMetrics.Output.Code507.Headers
+                /// - Remark: Generated from `#/paths/metrics/GET/responses/507/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/metrics/GET/responses/507/content/application\/json`.
+                    case json(Components.Schemas.InsufficientStorageRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InsufficientStorageRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.GetServerMetrics.Output.Code507.Body
+                /// Creates a new `Code507`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.GetServerMetrics.Output.Code507.Headers = .init(),
+                    body: Operations.GetServerMetrics.Output.Code507.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `insufficient_storage`: the disk that holds the instance's data has no room for the request, or the request would leave less free than the instance keeps in reserve. Nothing changed, unless `details.write_outcome` is `unknown`, which means the write may have landed: read what you changed before you repeat it. Free space on the disk, then try the request again.
+            ///
+            /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)/responses/507`.
+            ///
+            /// HTTP response code: `507 code507`.
+            case code507(Operations.GetServerMetrics.Output.Code507)
+            /// The associated value of the enum case if `self` is `.code507`.
+            ///
+            /// - Throws: An error if `self` is not `.code507`.
+            /// - SeeAlso: `.code507`.
+            public var code507: Operations.GetServerMetrics.Output.Code507 {
                 get throws {
                     switch self {
                     case let .code507(response):

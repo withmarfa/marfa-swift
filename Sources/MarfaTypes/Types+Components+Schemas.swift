@@ -10063,7 +10063,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/permissions`.
             public var permissions: [Components.Schemas.Permission]
-            /// The `client_id` of the app whose sign-in token created this key. Absent on every other key.
+            /// The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/oauth_client_id`.
             public var oauthClientId: Swift.String?
@@ -10071,10 +10071,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/default_tier`.
             public var defaultTier: Components.Schemas.Tier
-            /// `true` if this is an operator key. An operator key opens the routes that run the instance, such as `/housekeeping`, and holds no permissions, so it reads and writes no items.
-            ///
-            /// - Remark: Generated from `#/components/schemas/KeyResponse/is_operator`.
-            public var isOperator: Swift.Bool
             /// Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/type_permissions`.
@@ -10216,9 +10212,8 @@ extension Components {
             ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
-            ///   - oauthClientId: The `client_id` of the app whose sign-in token created this key. Absent on every other key.
+            ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
             ///   - defaultTier: The tier an item this key creates goes to when the write names none.
-            ///   - isOperator: `true` if this is an operator key. An operator key opens the routes that run the instance, such as `/housekeeping`, and holds no permissions, so it reads and writes no items.
             ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
             ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
@@ -10236,7 +10231,6 @@ extension Components {
                 permissions: [Components.Schemas.Permission],
                 oauthClientId: Swift.String? = nil,
                 defaultTier: Components.Schemas.Tier,
-                isOperator: Swift.Bool,
                 typePermissions: Components.Schemas.KeyResponse.TypePermissionsPayload,
                 extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload,
                 edgePermissions: Components.Schemas.KeyResponse.EdgePermissionsPayload,
@@ -10254,7 +10248,6 @@ extension Components {
                 self.permissions = permissions
                 self.oauthClientId = oauthClientId
                 self.defaultTier = defaultTier
-                self.isOperator = isOperator
                 self.typePermissions = typePermissions
                 self.extensionPermissions = extensionPermissions
                 self.edgePermissions = edgePermissions
@@ -10273,7 +10266,6 @@ extension Components {
                 case permissions
                 case oauthClientId = "oauth_client_id"
                 case defaultTier = "default_tier"
-                case isOperator = "is_operator"
                 case typePermissions = "type_permissions"
                 case extensionPermissions = "extension_permissions"
                 case edgePermissions = "edge_permissions"
@@ -10295,6 +10287,11 @@ extension Components {
             case items_purge = "items.purge"
             case keys_mint = "keys.mint"
             case grants_manage = "grants.manage"
+            case instance_read = "instance.read"
+            case instance_maintain = "instance.maintain"
+            case connectors_manage = "connectors.manage"
+            case blobs_manage = "blobs.manage"
+            case keys_manage = "keys.manage"
         }
         /// What a key may do with a type: `read` it, `write` it (which includes reading), or `none`, which denies a type a wildcard entry would reach.
         ///
@@ -10364,7 +10361,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/permissions`.
             public var permissions: [Components.Schemas.Permission]
-            /// The `client_id` of the app whose sign-in token created this key. Absent on every other key.
+            /// The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/oauth_client_id`.
             public var oauthClientId: Swift.String?
@@ -10372,10 +10369,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/default_tier`.
             public var defaultTier: Components.Schemas.Tier
-            /// `true` if this is an operator key. An operator key opens the routes that run the instance, such as `/housekeeping`, and holds no permissions, so it reads and writes no items.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ApiKey/is_operator`.
-            public var isOperator: Swift.Bool
             /// Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/type_permissions`.
@@ -10520,9 +10513,8 @@ extension Components {
             ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
-            ///   - oauthClientId: The `client_id` of the app whose sign-in token created this key. Absent on every other key.
+            ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
             ///   - defaultTier: The tier an item this key creates goes to when the write names none.
-            ///   - isOperator: `true` if this is an operator key. An operator key opens the routes that run the instance, such as `/housekeeping`, and holds no permissions, so it reads and writes no items.
             ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
             ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
@@ -10540,7 +10532,6 @@ extension Components {
                 permissions: [Components.Schemas.Permission],
                 oauthClientId: Swift.String? = nil,
                 defaultTier: Components.Schemas.Tier,
-                isOperator: Swift.Bool,
                 typePermissions: Components.Schemas.ApiKey.TypePermissionsPayload,
                 extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload,
                 edgePermissions: Components.Schemas.ApiKey.EdgePermissionsPayload,
@@ -10558,7 +10549,6 @@ extension Components {
                 self.permissions = permissions
                 self.oauthClientId = oauthClientId
                 self.defaultTier = defaultTier
-                self.isOperator = isOperator
                 self.typePermissions = typePermissions
                 self.extensionPermissions = extensionPermissions
                 self.edgePermissions = edgePermissions
@@ -10577,7 +10567,6 @@ extension Components {
                 case permissions
                 case oauthClientId = "oauth_client_id"
                 case defaultTier = "default_tier"
-                case isOperator = "is_operator"
                 case typePermissions = "type_permissions"
                 case extensionPermissions = "extension_permissions"
                 case edgePermissions = "edge_permissions"
@@ -11182,33 +11171,23 @@ extension Components {
                 case error
             }
         }
-        /// The owner is the one person who can sign in to the instance.
-        ///
         /// - Remark: Generated from `#/components/schemas/Owner`.
         public struct Owner: Codable, Hashable, Sendable {
-            /// Unique identifier for the owner's account.
-            ///
             /// - Remark: Generated from `#/components/schemas/Owner/id`.
             public var id: Swift.String
-            /// The owner's email address, in lowercase.
-            ///
             /// - Remark: Generated from `#/components/schemas/Owner/email`.
             public var email: Swift.String
-            /// The owner's name.
-            ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
             public var name: Swift.String
-            /// When the owner was created, in UTC.
-            ///
             /// - Remark: Generated from `#/components/schemas/Owner/created_at`.
             public var createdAt: Swift.String
             /// Creates a new `Owner`.
             ///
             /// - Parameters:
-            ///   - id: Unique identifier for the owner's account.
-            ///   - email: The owner's email address, in lowercase.
-            ///   - name: The owner's name.
-            ///   - createdAt: When the owner was created, in UTC.
+            ///   - id:
+            ///   - email:
+            ///   - name:
+            ///   - createdAt:
             public init(
                 id: Swift.String,
                 email: Swift.String,
@@ -11385,6 +11364,88 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.OwnerExistsRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal`.
+        public struct RateLimitedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case rateLimited = "rate_limited"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/code`.
+                public var code: Components.Schemas.RateLimitedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
+                public var details: Components.Schemas.RateLimitedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.RateLimitedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.RateLimitedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error`.
+            public var error: Components.Schemas.RateLimitedRefusal._ErrorPayload
+            /// Creates a new `RateLimitedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.RateLimitedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -11828,86 +11889,19 @@ extension Components {
                 case details
             }
         }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal`.
-        public struct RateLimitedRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case rateLimited = "rate_limited"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/code`.
-                public var code: Components.Schemas.RateLimitedRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
-                public var details: Components.Schemas.RateLimitedRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.RateLimitedRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.RateLimitedRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error`.
-            public var error: Components.Schemas.RateLimitedRefusal._ErrorPayload
-            /// Creates a new `RateLimitedRefusal`.
+        /// - Remark: Generated from `#/components/schemas/MetricCount`.
+        public struct MetricCount: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MetricCount/total`.
+            public var total: Swift.Double
+            /// Creates a new `MetricCount`.
             ///
             /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.RateLimitedRefusal._ErrorPayload) {
-                self.error = error
+            ///   - total:
+            public init(total: Swift.Double) {
+                self.total = total
             }
             public enum CodingKeys: String, CodingKey {
-                case error
+                case total
             }
         }
         /// An error response.

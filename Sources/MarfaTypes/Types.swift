@@ -132,7 +132,7 @@ public protocol APIProtocol: Sendable {
     func applyBulkAction(_ input: Operations.ApplyBulkAction.Input) async throws -> Operations.ApplyBulkAction.Output
     /// Get a bulk-action job
     ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the operator key, can read it.
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of instance.read, can read it.
     ///
     /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
@@ -335,14 +335,14 @@ public protocol APIProtocol: Sendable {
     func uploadBlob(_ input: Operations.UploadBlob.Input) async throws -> Operations.UploadBlob.Output
     /// List orphaned blobs
     ///
-    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires the operator key.
+    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /blobs/orphans`.
     /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)`.
     func listBlobOrphans(_ input: Operations.ListBlobOrphans.Input) async throws -> Operations.ListBlobOrphans.Output
     /// List blob stores
     ///
-    /// Returns every store the instance has attached, including any it has since detached, and `min_copies`, the fewest live copies Marfa keeps of a blob. Requires the operator key.
+    /// Returns every store the instance has attached, including any it has since detached, and `min_copies`, the fewest live copies Marfa keeps of a blob. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /blobs/stores`.
     /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)`.
@@ -370,28 +370,28 @@ public protocol APIProtocol: Sendable {
     func listBlobLocations(_ input: Operations.ListBlobLocations.Input) async throws -> Operations.ListBlobLocations.Output
     /// Delete a blob's copy in a store
     ///
-    /// Deletes the copy of a blob that one store holds, and its row in the location log. Requires the operator key.
+    /// Deletes the copy of a blob that one store holds, and its row in the location log. Requires blobs.manage.
     ///
     /// - Remark: HTTP `DELETE /blobs/{hash}/locations/{store}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(deleteBlobLocation)`.
     func deleteBlobLocation(_ input: Operations.DeleteBlobLocation.Input) async throws -> Operations.DeleteBlobLocation.Output
     /// List housekeeping jobs
     ///
-    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires the operator key.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /housekeeping`.
     /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
     func listHousekeeping(_ input: Operations.ListHousekeeping.Input) async throws -> Operations.ListHousekeeping.Output
     /// Run a housekeeping job
     ///
-    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires the operator key.
+    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires instance.maintain.
     ///
     /// - Remark: HTTP `POST /housekeeping/{name}/run`.
     /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)`.
     func runHousekeeping(_ input: Operations.RunHousekeeping.Input) async throws -> Operations.RunHousekeeping.Output
     /// List connectors
     ///
-    /// Returns your registration, or every registration if you use the operator key, newest first.
+    /// Returns your registration, or every registration if you hold connectors.manage, newest first.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -559,7 +559,7 @@ public protocol APIProtocol: Sendable {
     func revokeFolder(_ input: Operations.RevokeFolder.Input) async throws -> Operations.RevokeFolder.Output
     /// List API keys
     ///
-    /// Returns the API keys you could have created, your own included, without their plaintext. The operator key gets every key. Requires `keys.mint` or the operator key.
+    /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -580,14 +580,14 @@ public protocol APIProtocol: Sendable {
     func getCurrentKey(_ input: Operations.GetCurrentKey.Input) async throws -> Operations.GetCurrentKey.Output
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint` or the operator key.
+    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
     func updateKey(_ input: Operations.UpdateKey.Input) async throws -> Operations.UpdateKey.Output
     /// Revoke an API key
     ///
-    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. You can revoke any key you could have created, your own included. Requires `keys.mint` or the operator key.
+    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. `keys.manage` and direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -608,35 +608,35 @@ public protocol APIProtocol: Sendable {
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
     /// Restore from an archive
     ///
-    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires the operator key.
+    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires direct owner or local authority. The owner must have authenticated within five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
     func restoreArchive(_ input: Operations.RestoreArchive.Input) async throws -> Operations.RestoreArchive.Output
     /// List stale platform types
     ///
-    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Operator key only.
+    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /platform-types/drift`.
     /// - Remark: Generated from `#/paths//platform-types/drift/get(listPlatformTypeDrift)`.
     func listPlatformTypeDrift(_ input: Operations.ListPlatformTypeDrift.Input) async throws -> Operations.ListPlatformTypeDrift.Output
     /// Delete a stale platform type
     ///
-    /// Deletes one platform type that this build no longer ships. The type stops resolving at once. Operator key only.
+    /// Deletes one platform type that this build no longer ships. The type stops resolving at once. Requires instance.maintain.
     ///
     /// - Remark: HTTP `DELETE /platform-types/{id}`.
     /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deletePlatformType)`.
     func deletePlatformType(_ input: Operations.DeletePlatformType.Input) async throws -> Operations.DeletePlatformType.Output
     /// Get the owner
     ///
-    /// Returns the owner: the one account that can sign in to the instance and approve apps. A new instance has no owner until `POST /owner` creates one. Requires the operator key.
+    /// Returns the owner of the claimed instance. Requires a direct owner sign-in or local process authority.
     ///
     /// - Remark: HTTP `GET /owner`.
     /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
     func getOwner(_ input: Operations.GetOwner.Input) async throws -> Operations.GetOwner.Output
-    /// Create the owner
+    /// Claim the instance
     ///
-    /// Creates the owner, the one account that can sign in to the instance, and returns it. The owner can sign in at once with the email address and password. No other route creates an account. Requires the operator key.
+    /// Creates the one owner using a machine-issued setup code or setup-only browser session. The claim, consumed proof, and audit commit together. A claimed instance never reopens setup.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -704,6 +704,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.
     func listAuditLog(_ input: Operations.ListAuditLog.Input) async throws -> Operations.ListAuditLog.Output
+    /// Get server metrics
+    ///
+    /// Instance-wide counters for items, blobs, types, keys, and webhooks, plus process uptime. `keys.total` counts unrevoked keys. Requires instance.read: the counters are instance-wide rather than permission-scoped.
+    ///
+    /// - Remark: HTTP `GET /metrics`.
+    /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
+    func getServerMetrics(_ input: Operations.GetServerMetrics.Input) async throws -> Operations.GetServerMetrics.Output
     /// Describe the instance
     ///
     /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
@@ -1006,7 +1013,7 @@ extension APIProtocol {
     }
     /// Get a bulk-action job
     ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the operator key, can read it.
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of instance.read, can read it.
     ///
     /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
@@ -1437,7 +1444,7 @@ extension APIProtocol {
     }
     /// List orphaned blobs
     ///
-    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires the operator key.
+    /// Returns the blobs that nothing references, as the last run of the `blob-orphans` housekeeping job found them, oldest first. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /blobs/orphans`.
     /// - Remark: Generated from `#/paths//blobs/orphans/get(listBlobOrphans)`.
@@ -1446,7 +1453,7 @@ extension APIProtocol {
     }
     /// List blob stores
     ///
-    /// Returns every store the instance has attached, including any it has since detached, and `min_copies`, the fewest live copies Marfa keeps of a blob. Requires the operator key.
+    /// Returns every store the instance has attached, including any it has since detached, and `min_copies`, the fewest live copies Marfa keeps of a blob. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /blobs/stores`.
     /// - Remark: Generated from `#/paths//blobs/stores/get(listBlobStores)`.
@@ -1502,7 +1509,7 @@ extension APIProtocol {
     }
     /// Delete a blob's copy in a store
     ///
-    /// Deletes the copy of a blob that one store holds, and its row in the location log. Requires the operator key.
+    /// Deletes the copy of a blob that one store holds, and its row in the location log. Requires blobs.manage.
     ///
     /// - Remark: HTTP `DELETE /blobs/{hash}/locations/{store}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/locations/{store}/delete(deleteBlobLocation)`.
@@ -1517,7 +1524,7 @@ extension APIProtocol {
     }
     /// List housekeeping jobs
     ///
-    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires the operator key.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /housekeeping`.
     /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
@@ -1526,7 +1533,7 @@ extension APIProtocol {
     }
     /// Run a housekeeping job
     ///
-    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires the operator key.
+    /// Runs a housekeeping job now, waits for it to finish, and returns what the run did. A failed run still returns `200`, with the failure in `outcome` and `error`. Requires instance.maintain.
     ///
     /// - Remark: HTTP `POST /housekeeping/{name}/run`.
     /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)`.
@@ -1541,7 +1548,7 @@ extension APIProtocol {
     }
     /// List connectors
     ///
-    /// Returns your registration, or every registration if you use the operator key, newest first.
+    /// Returns your registration, or every registration if you hold connectors.manage, newest first.
     ///
     /// - Remark: HTTP `GET /connectors`.
     /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
@@ -1919,7 +1926,7 @@ extension APIProtocol {
     }
     /// List API keys
     ///
-    /// Returns the API keys you could have created, your own included, without their plaintext. The operator key gets every key. Requires `keys.mint` or the operator key.
+    /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -1952,7 +1959,7 @@ extension APIProtocol {
     }
     /// Update an API key
     ///
-    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint` or the operator key.
+    /// Updates a key's label, default tier, permissions, maps, claimed `sources` or enforcement levers, and returns it. Each field you send replaces its old value, and a field you leave out stays. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -1969,7 +1976,7 @@ extension APIProtocol {
     }
     /// Revoke an API key
     ///
-    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. You can revoke any key you could have created, your own included. Requires `keys.mint` or the operator key.
+    /// Revokes an API key at once: Marfa stops accepting it, ends its open event streams and stops its queued bulk actions. `keys.manage` and direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -2008,7 +2015,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires the operator key.
+    /// Restores an archive that `GET /export?format=archive` made, and returns counts of what it wrote and skipped. Everything it writes commits together, so a failed restore writes nothing. Other writes wait until it ends. Requires direct owner or local authority. The owner must have authenticated within five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -2023,7 +2030,7 @@ extension APIProtocol {
     }
     /// List stale platform types
     ///
-    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Operator key only.
+    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /platform-types/drift`.
     /// - Remark: Generated from `#/paths//platform-types/drift/get(listPlatformTypeDrift)`.
@@ -2032,7 +2039,7 @@ extension APIProtocol {
     }
     /// Delete a stale platform type
     ///
-    /// Deletes one platform type that this build no longer ships. The type stops resolving at once. Operator key only.
+    /// Deletes one platform type that this build no longer ships. The type stops resolving at once. Requires instance.maintain.
     ///
     /// - Remark: HTTP `DELETE /platform-types/{id}`.
     /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deletePlatformType)`.
@@ -2047,16 +2054,16 @@ extension APIProtocol {
     }
     /// Get the owner
     ///
-    /// Returns the owner: the one account that can sign in to the instance and approve apps. A new instance has no owner until `POST /owner` creates one. Requires the operator key.
+    /// Returns the owner of the claimed instance. Requires a direct owner sign-in or local process authority.
     ///
     /// - Remark: HTTP `GET /owner`.
     /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
     public func getOwner(headers: Operations.GetOwner.Input.Headers = .init()) async throws -> Operations.GetOwner.Output {
         try await getOwner(Operations.GetOwner.Input(headers: headers))
     }
-    /// Create the owner
+    /// Claim the instance
     ///
-    /// Creates the owner, the one account that can sign in to the instance, and returns it. The owner can sign in at once with the email address and password. No other route creates an account. Requires the operator key.
+    /// Creates the one owner using a machine-issued setup code or setup-only browser session. The claim, consumed proof, and audit commit together. A claimed instance never reopens setup.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -2201,6 +2208,15 @@ extension APIProtocol {
             query: query,
             headers: headers
         ))
+    }
+    /// Get server metrics
+    ///
+    /// Instance-wide counters for items, blobs, types, keys, and webhooks, plus process uptime. `keys.total` counts unrevoked keys. Requires instance.read: the counters are instance-wide rather than permission-scoped.
+    ///
+    /// - Remark: HTTP `GET /metrics`.
+    /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
+    public func getServerMetrics(headers: Operations.GetServerMetrics.Input.Headers = .init()) async throws -> Operations.GetServerMetrics.Output {
+        try await getServerMetrics(Operations.GetServerMetrics.Input(headers: headers))
     }
     /// Describe the instance
     ///

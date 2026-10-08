@@ -117,13 +117,9 @@ func thePinnedServerAnswersInTheseTypes() async throws {
     #expect(strict["types"] as? [String] == ["core.note"])
 }
 
-@Test(
-    .enabled(
-        if: live != nil && ProcessInfo.processInfo.environment["MARFA_TEST_OPERATOR_KEY"] != nil,
-        "the pinned test server supplies an isolated operator key"))
+@Test(.enabled(if: live != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"))
 func nullableWireFieldsRoundTripThroughTheServer() async throws {
-    let (url, _) = try #require(live)
-    let key = try #require(ProcessInfo.processInfo.environment["MARFA_TEST_OPERATOR_KEY"])
+    let (url, key) = try #require(live)
     func send(_ method: String, _ path: String, _ body: Data? = nil, status: Int = 200) async throws -> Data {
         var request = URLRequest(url: url.appending(path: path))
         request.httpMethod = method
@@ -164,4 +160,28 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
         _ = try? await send("DELETE", path)
         throw error
     }
+}
+
+@Test func ordinaryKeyWireTypesHaveNoPrivilegedFlag() throws {
+    let body = Data(
+        #"{"id":"k1","key":"marfa_k1_fixture","label":"Fixture","source":"wire-fixture","sources":[],"permissions":[],"default_tier":"library","type_permissions":{},"extension_permissions":{},"edge_permissions":{},"metadata_permissions":{},"profile_permissions":{},"created_at":"2026-10-08T00:00:00Z","last_used_at":null}"#
+            .utf8)
+    let decoder = JSONDecoder()
+    let created = try decoder.decode(Components.Schemas.KeyResponse.self, from: body)
+    let held = try decoder.decode(Components.Schemas.ApiKey.self, from: body)
+    #expect(created.id == held.id)
+    for encoded in [try JSONEncoder().encode(created), try JSONEncoder().encode(held)] {
+        let fields = try #require(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        #expect(fields["is_operator"] == nil)
+    }
+}
+
+@Test func everyNamedPermissionDecodes() throws {
+    let names = [
+        "schema.write", "keys.mint", "items.purge", "webhooks.manage", "config.manage", "audit.read", "grants.manage",
+        "instance.read", "instance.maintain", "connectors.manage", "blobs.manage", "keys.manage",
+    ]
+    let decoded = try JSONDecoder().decode([Components.Schemas.Permission].self, from: JSONEncoder().encode(names))
+    #expect(decoded.map(\.rawValue) == names)
+    #expect(Set(Components.Schemas.Permission.allCases.map(\.rawValue)) == Set(names))
 }
