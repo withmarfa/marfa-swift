@@ -311,11 +311,13 @@ jobs:
   # draft skips most of `Build + test`. On a draft this job is `Draft CI`, so
   # the required `Full CI` stays expected, and blocks a merge, until the run
   # that marking it ready starts has finished every job. A skipped job keeps
-  # its name unevaluated, so it can never report as `Full CI`.
+  # its name unevaluated, so it can never report as `Full CI`: a run that is
+  # cancelled skips this job, so a cancel can never leave `Full CI` green, and
+  # a failed job still runs it, and it fails.
   gate:
     name: ${{ github.event.pull_request.draft && 'Draft CI' || 'Full CI' }}
     needs: [changes, lint-workflows, validate]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

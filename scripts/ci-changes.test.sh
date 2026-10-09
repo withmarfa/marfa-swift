@@ -79,7 +79,7 @@ check "the classifier asks about the workflow it is in" "$(grep -cF 'workflows/c
 draft='!github.event.pull_request.draft'
 job_steps() { awk -v job="$1" '
   $0 ~ "^  " job ":$" { injob = 1; next }
-  injob && /^  [a-z-]+:$/ { injob = 0 }
+  injob && /^  [A-Za-z0-9_-]+:$/ { injob = 0 }
   injob && /^      - / { n++ }
   injob { print n "\t" $0 }' "${workflow}"; }
 unguarded="$(job_steps validate | awk -F'\t' -v draft="${draft}" '
@@ -96,10 +96,10 @@ check "no step stops a draft with a failure" "$(grep -cF 'Stop a draft' "${workf
 # when a job it waited for failed or was cancelled.
 check "the last job is named Full CI, or Draft CI for a draft" \
   "$(grep -cF "name: \${{ github.event.pull_request.draft && 'Draft CI' || 'Full CI' }}" "${workflow}")" 1
-jobs="$(sed -n '/^jobs:$/,$p' "${workflow}" | grep -E '^  [a-z-]+:$' | tr -d ' :' | grep -vx gate | sort | tr '\n' ' ')"
+jobs="$(sed -n '/^jobs:$/,$p' "${workflow}" | grep -E '^  [A-Za-z0-9_-]+:$' | tr -d ' :' | grep -vx gate | sort | tr '\n' ' ')"
 needs="$(sed -n '/^  gate:$/,$p' "${workflow}" | sed -n 's/^    needs: \[\(.*\)\]$/\1/p' | tr -d ',' | tr ' ' '\n' | sort | tr '\n' ' ')"
 check "Full CI waits for every other job" "${needs}" "${jobs}"
-check "Full CI runs whatever the other jobs did" "$(sed -n '/^  gate:$/,$p' "${workflow}" | grep -cF 'if: ${{ always() }}')" 1
+check "Full CI runs after a failed job, and is skipped when the run is cancelled" "$(sed -n '/^  gate:$/,$p' "${workflow}" | grep -cF 'if: ${{ !cancelled() }}')" 1
 check "Full CI reads the results of the jobs it needs" \
   "$(sed -n '/^  gate:$/,$p' "${workflow}" | grep -cF "RESULTS: \${{ join(needs.*.result, ' ') }}")" 1
 verdict="$(sed -n '/^  gate:$/,$p' "${workflow}" | awk '/^        run: \|$/ { on = 1; next } on { sub(/^          /, ""); print }')"
