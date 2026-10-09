@@ -2,7 +2,7 @@ name: CI
 
 on:
   # A draft runs only the quick checks; marking it ready for review runs the
-  # rest, and so does every push after that.
+  # rest, and so does every push after that. `Full CI` is the required check.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
@@ -19,8 +19,8 @@ jobs:
   # `Build + test` runs only when `scripts/ci-changes.sh` says the change can
   # affect it, on a pull request and on a push to main alike. A skipped job
   # satisfies a required check, where a workflow filtered out by `paths` would
-  # leave it pending, so a draft always runs it, to stop after the lint. A
-  # push is classified only when the commit before it had a green run of this
+  # leave it pending. A draft that changes it runs it only as far as the lint.
+  # A push is classified only when the commit before it had a green run of this
   # workflow, which the script asks the API for, hence `actions: read`.
   changes:
     name: Classify changes
@@ -39,7 +39,6 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-          DRAFT: ${{ github.event.pull_request.draft }}
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci-changes.sh
 
@@ -95,33 +94,32 @@ jobs:
           swift format lint --strict --configuration .swift-format -r \
             Package.swift Sources/Marfa Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
 
-      # A skipped job passes its required check, and a draft skips the rest of
-      # this one, so a draft's results would let a pull request merge in the
-      # moment between marking it ready and the first run that runs it. This
-      # job fails for a draft, whatever the diff, until that run replaces it.
-      - name: Stop a draft after the lint
-        if: ${{ github.event.pull_request.draft }}
-        run: |
-          echo "::error::A draft runs only the quick checks. Mark the pull request ready for review to run the build and the tests."
-          exit 1
-
+      # The steps from here on are for a pull request that is ready for
+      # review and for a push. A draft ends here and passes; `Full CI`, named
+      # `Draft CI` for a draft, keeps it from merging.
       - name: Test which changes run this job
+        if: ${{ !github.event.pull_request.draft }}
         run: scripts/ci-changes.test.sh
 
       - name: Test the release steps
+        if: ${{ !github.event.pull_request.draft }}
         run: scripts/release.test.sh
 
       - name: Test the pin bump decision
+        if: ${{ !github.event.pull_request.draft }}
         run: scripts/pin-bump.test.sh
 
       - name: Test the pull request description check
+        if: ${{ !github.event.pull_request.draft }}
         run: scripts/check-pr-description.test.sh
 
       - name: Read the pin
         id: pin
+        if: ${{ !github.event.pull_request.draft }}
         run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
 
       - name: Check out the core at the pin
+        if: ${{ !github.event.pull_request.draft }}
         uses: actions/checkout@v7
         with:
           repository: withmarfa/marfa
@@ -129,11 +127,13 @@ jobs:
           path: .build/marfa
 
       - name: Install sample project generator
+        if: ${{ !github.event.pull_request.draft }}
         run: brew install xcodegen
 
       # Emptied first, so a committed file the pin does not generate shows as
       # deleted whatever comes next.
       - name: Empty what the core generates
+        if: ${{ !github.event.pull_request.draft }}
         run: rm -rf Sources/MarfaCore Sources/MarfaTypes
 
       # What core.sh makes depends only on the pin, the script and the
@@ -141,6 +141,7 @@ jobs:
       # last time and builds no Rust.
       - name: Restore what the pin generates
         id: core
+        if: ${{ !github.event.pull_request.draft }}
         uses: actions/cache@v6
         with:
           path: |
@@ -150,10 +151,10 @@ jobs:
           key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
 
       - name: Add the iOS targets
-        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
       - name: Cache the core's build
-        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
         uses: actions/cache@v6
         with:
           path: |
@@ -165,34 +166,37 @@ jobs:
           key: core-${{ runner.os }}-${{ hashFiles('core.pin') }}
           restore-keys: core-${{ runner.os }}-
       - name: Cache the generator's build
-        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
         uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/.build/generator-build
           key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
-      - uses: pnpm/action-setup@v6
+      - if: ${{ !github.event.pull_request.draft }}
+        uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm
           package_json_file: .build/marfa/package.json
-      - uses: actions/setup-node@v7
+      - if: ${{ !github.event.pull_request.draft }}
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: .build/marfa/pnpm-lock.yaml
       - name: Build the core at the pin
-        if: ${{ steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
         run: scripts/core.sh
 
       # The folder tests hold the package's registry to the one `marfa folders list` reads. Its own target
       # directory and cache, so it never starts cold behind a core cache hit or swells the core's cache.
       - name: Restore the command line the pin builds
         id: cli
+        if: ${{ !github.event.pull_request.draft }}
         uses: actions/cache@v6
         with:
           path: .build/marfa-cli
           key: marfa-cli-${{ runner.os }}-${{ hashFiles('core.pin') }}
       - name: Cache the command line's build
-        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+        if: ${{ !github.event.pull_request.draft && steps.cli.outputs.cache-hit != 'true' }}
         uses: actions/cache@v6
         with:
           path: |
@@ -203,7 +207,7 @@ jobs:
           key: cli-build-${{ runner.os }}-${{ hashFiles('core.pin') }}
           restore-keys: cli-build-${{ runner.os }}-
       - name: Build the command line at the pin
-        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+        if: ${{ !github.event.pull_request.draft && steps.cli.outputs.cache-hit != 'true' }}
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/.build/cli-target
         run: |
@@ -212,6 +216,7 @@ jobs:
           cp "${CARGO_TARGET_DIR}/debug/marfa" .build/marfa-cli/marfa
 
       - name: Test wire generation
+        if: ${{ !github.event.pull_request.draft }}
         run: |
           if [[ -x "${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator" ]]; then
             export MARFA_GENERATOR_BIN="${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator"
@@ -219,6 +224,7 @@ jobs:
           node --test generator/generate.test.mjs
 
       - name: Check what the pin generates
+        if: ${{ !github.event.pull_request.draft }}
         run: |
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
             git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
@@ -229,12 +235,14 @@ jobs:
       # server-up.sh runs the server through tsx, which resolves
       # @withmarfa/shared through its dist.
       - name: Build the server at the pin
+        if: ${{ !github.event.pull_request.draft }}
         working-directory: .build/marfa
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter "@withmarfa/server..." build
 
       - name: Build and test against a booted server
+        if: ${{ !github.event.pull_request.draft }}
         env:
           MARFA_LIVE_REQUIRED: '1'
         run: |
@@ -269,6 +277,7 @@ jobs:
           exit "${tested}"
 
       - name: Build the sample for macOS and the iOS simulator
+        if: ${{ !github.event.pull_request.draft }}
         working-directory: Examples/MarfaSample
         run: |
           xcodegen generate --quiet
@@ -279,6 +288,7 @@ jobs:
           done
 
       - name: Run the sample's scenario offline and back
+        if: ${{ !github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           sample="${RUNNER_TEMP}/marfa-sample/Build/Products/Debug/MarfaSample.app/Contents/MacOS/MarfaSample"
@@ -296,3 +306,25 @@ jobs:
           up
           phase drain
           phase catch-up
+
+  # The one required check, since a skipped job passes a required check and a
+  # draft skips most of `Build + test`. On a draft this job is `Draft CI`, so
+  # the required `Full CI` stays expected, and blocks a merge, until the run
+  # that marking it ready starts has finished every job. A skipped job keeps
+  # its name unevaluated, so it can never report as `Full CI`.
+  gate:
+    name: ${{ github.event.pull_request.draft && 'Draft CI' || 'Full CI' }}
+    needs: [changes, lint-workflows, validate]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          case " ${RESULTS} " in
+            *" failure "* | *" cancelled "*)
+              echo "::error::A job failed or was cancelled: ${RESULTS}"
+              exit 1
+              ;;
+          esac

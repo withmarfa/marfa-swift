@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Pins scripts/ci-changes.sh: which changes run `Build + test`, that the job
 # reads the answer, and that only a readable diff can skip it: a pull
-# request's, or a push's after a commit with a green run.
+# request's, or a push's after a commit with a green run. Also pins the last
+# job of ci.yml, `Full CI`, and that a draft stops after the lint without
+# failing.
 # The workflow expressions below are matched literally, not expanded.
 # shellcheck disable=SC2016
 set -euo pipefail
@@ -62,9 +64,7 @@ runs "an empty change" true
 workflow="${root}/.github/workflows/ci.yml"
 gate="if: \${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false') }}"
 check "Build + test reads the answer" "$(grep -cF "${gate}" "${workflow}")" 1
-draft="\${{ github.event.pull_request.draft }}"
-check "the classifier reads whether the pull request is a draft" "$(grep -cF "DRAFT: ${draft}" "${workflow}")" 1
-check "a draft fails Build + test after the lint" "$(grep -cF "if: ${draft}" "${workflow}")" 1
+check "the classifier is not told whether the pull request is a draft" "$(grep -cF 'DRAFT' "${workflow}")" 0
 check "the classifier runs in CI" "$(grep -cF "run: scripts/ci-changes.sh" "${workflow}")" 1
 check "a push is classified against the commit before it" \
   "$(grep -cF 'BASE: ${{ github.event.pull_request.base.sha || github.event.before }}' "${workflow}")" 1
@@ -73,6 +73,42 @@ check "a push is classified up to its own commit" \
 check "the classifier may read the runs of this workflow" "$(grep -cF '      actions: read' "${workflow}")" 1
 check "the classifier is handed a token" "$(grep -cF 'GH_TOKEN: ${{ github.token }}' "${workflow}")" 1
 check "the classifier asks about the workflow it is in" "$(grep -cF 'workflows/ci.yml/runs' "${classifier}")" 1
+
+# A draft runs `Build + test` only to the lint, and passes there: a step that
+# exits non-zero for a draft would turn the draft red.
+draft='!github.event.pull_request.draft'
+job_steps() { awk -v job="$1" '
+  $0 ~ "^  " job ":$" { injob = 1; next }
+  injob && /^  [a-z-]+:$/ { injob = 0 }
+  injob && /^      - / { n++ }
+  injob { print n "\t" $0 }' "${workflow}"; }
+unguarded="$(job_steps validate | awk -F'\t' -v draft="${draft}" '
+  /name: Lint$/ { lint = $1 }
+  lint && $1 > lint { seen[$1] = 1; if (index($0, draft)) guarded[$1] = 1 }
+  END { for (n in seen) if (!(n in guarded)) count++; print count + 0 }')"
+after_lint="$(job_steps validate | awk -F'\t' '/name: Lint$/ { lint = $1 } lint && $1 > lint { seen[$1] = 1 } END { print length(seen) }')"
+check "every step after the lint is skipped for a draft" "${unguarded}" 0
+check "there are steps after the lint to skip" "$([[ "${after_lint}" -gt 10 ]] && echo yes)" yes
+check "no step stops a draft with a failure" "$(grep -cF 'Stop a draft' "${workflow}")" 0
+
+# The last job, `Full CI`, is the required check. It waits for every job, is
+# named Draft CI for a draft so that `Full CI` stays expected, and fails only
+# when a job it waited for failed or was cancelled.
+check "the last job is named Full CI, or Draft CI for a draft" \
+  "$(grep -cF "name: \${{ github.event.pull_request.draft && 'Draft CI' || 'Full CI' }}" "${workflow}")" 1
+jobs="$(sed -n '/^jobs:$/,$p' "${workflow}" | grep -E '^  [a-z-]+:$' | tr -d ' :' | grep -vx gate | sort | tr '\n' ' ')"
+needs="$(sed -n '/^  gate:$/,$p' "${workflow}" | sed -n 's/^    needs: \[\(.*\)\]$/\1/p' | tr -d ',' | tr ' ' '\n' | sort | tr '\n' ' ')"
+check "Full CI waits for every other job" "${needs}" "${jobs}"
+check "Full CI runs whatever the other jobs did" "$(sed -n '/^  gate:$/,$p' "${workflow}" | grep -cF 'if: ${{ always() }}')" 1
+check "Full CI reads the results of the jobs it needs" \
+  "$(sed -n '/^  gate:$/,$p' "${workflow}" | grep -cF "RESULTS: \${{ join(needs.*.result, ' ') }}")" 1
+verdict="$(sed -n '/^  gate:$/,$p' "${workflow}" | awk '/^        run: \|$/ { on = 1; next } on { sub(/^          /, ""); print }')"
+gate_passes() { RESULTS="$1" bash -c "${verdict}" >/dev/null 2>&1 && echo pass || echo fail; }
+check "Full CI passes when every job passed" "$(gate_passes 'success success success')" pass
+check "Full CI passes when jobs were skipped" "$(gate_passes 'success skipped skipped')" pass
+check "Full CI fails when a job failed" "$(gate_passes 'success failure success')" fail
+check "Full CI fails when a job was cancelled" "$(gate_passes 'success success cancelled')" fail
+check "Full CI fails when the first job failed" "$(gate_passes 'failure skipped skipped')" fail
 
 # CodeQL starts no run for a change to instructions alone, on a pull request or a push.
 codeql="${root}/.github/workflows/codeql.yml"
@@ -153,7 +189,8 @@ check "a pull request over several commits runs it when one needs it" "$(ci pull
 check "a pull request over several commits, one of them Swift" "$(ci pull_request "${base}" "${swift}")" validate=true
 check "an unreadable diff runs it" "$(ci pull_request invalid "${docs}")" validate=true
 check "an unknown commit runs it" "$(ci pull_request 1111111111111111111111111111111111111111 "${docs}")" validate=true
-check "a documentation-only draft runs it, to fail" "$(ci pull_request "${base}" "${docs}" true)" validate=true
+check "a documentation-only draft skips it, as any pull request does" "$(ci pull_request "${base}" "${docs}" true)" validate=false
+check "a draft with a Swift change runs it, to the lint" "$(ci pull_request "${agents}" "${swift}" true)" validate=true
 check "a documentation-only pull request that is no draft skips it" "$(ci pull_request "${base}" "${docs}" false)" validate=false
 
 # A push to main is classified too, but only on top of a commit that went green.

@@ -11,9 +11,9 @@
 # commit that touches nothing the job reads would show green on top of a
 # commit that was never checked or was red. An empty diff, one that cannot be
 # read, a push that is not a fast-forward, a schedule and a manual run all
-# answer true, and so does a draft (DRAFT=true): it runs the job only to lint
-# and then fail, so that the skip of everything after does not let it merge
-# before the first full run. `scripts/ci-changes.test.sh` pins the rules.
+# answer true. A draft is classified like any other pull request: the job's
+# steps after the lint skip themselves for one, and the last job of `ci.yml`
+# keeps a draft from merging. `scripts/ci-changes.test.sh` pins the rules.
 set -euo pipefail
 
 # Whether one changed path can affect the job. A path no rule names can.
@@ -85,6 +85,5 @@ case "${GITHUB_EVENT_NAME:-}" in
     fi
     ;;
 esac
-if [[ "${DRAFT:-}" == true ]]; then validate=true; fi
 echo "validate=${validate}"
 echo "validate=${validate}" >>"${GITHUB_OUTPUT:-/dev/null}"
