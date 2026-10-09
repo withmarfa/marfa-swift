@@ -21,7 +21,7 @@ extension LiveWorkingCopies {
             return (parent, other, child, edge)
         }
 
-        /// A source move changes the structural generation of the server's read view (device.md 52), so the read
+        /// A source move changes the structural generation of the server's read view (`device/view-changed`), so the read
         /// after its answer expires the copy: the write is answered, and the app hydrates again.
         static func drainAfterASourceMove(_ copy: WorkingCopy) async throws {
             await #expect {

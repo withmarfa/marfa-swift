@@ -114,7 +114,7 @@ struct LiveRestart {
             #expect(away.verdicts.isEmpty)
 
             try await own.start()
-            // The retype expires the copy once answered (device.md 52), so
+            // The retype expires the copy once answered (`device/view-changed`), so
             // the drain may end there with every write answered.
             do {
                 _ = try await copy.queue.drain()
