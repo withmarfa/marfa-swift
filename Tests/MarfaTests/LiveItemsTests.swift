@@ -136,8 +136,8 @@ extension LiveWorkingCopies {
             _ = try await copy.items.update(
                 id, Edit(.merge(["title": "a task"]), baseVersion: now.version, type: "core.task", tier: .feed))
             // A retype changes what the copy's read view covers, so the read
-            // after the answer expires the copy (device.md 52): the write is
-            // answered, and the app hydrates again.
+            // after the answer expires the copy (`device/view-changed`): the
+            // write is answered, and the app hydrates again.
             await #expect {
                 _ = try await copy.queue.drain()
             } throws: { error in
