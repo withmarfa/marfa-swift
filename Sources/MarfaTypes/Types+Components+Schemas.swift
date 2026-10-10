@@ -1142,21 +1142,53 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `DisplayHints`.
             ///
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
             ///   - bodyField: The field that holds an item's body for display.
+            ///   - additionalProperties: A container of undocumented properties.
             public init(
                 titleField: Swift.String? = nil,
-                bodyField: Swift.String? = nil
+                bodyField: Swift.String? = nil,
+                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.titleField = titleField
                 self.bodyField = bodyField
+                self.additionalProperties = additionalProperties
             }
             public enum CodingKeys: String, CodingKey {
                 case titleField = "title_field"
                 case bodyField = "body_field"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.titleField = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .titleField
+                )
+                self.bodyField = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .bodyField
+                )
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                    "title_field",
+                    "body_field"
+                ])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encodeIfPresent(
+                    self.titleField,
+                    forKey: .titleField
+                )
+                try container.encodeIfPresent(
+                    self.bodyField,
+                    forKey: .bodyField
+                )
+                try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
         /// How long Marfa keeps the versions of a type's items. A field you leave out comes from the parent type, then from the instance defaults.
@@ -10051,7 +10083,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/label`.
             public var label: Swift.String
-            /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key has it as its own, and it can't change.
+            /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/source`.
             public var source: Swift.String
@@ -10199,6 +10231,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/created_at`.
             public var createdAt: Swift.String
+            /// When the key stops working, in UTC, or `null` if it doesn't expire.
+            ///
+            /// - Remark: Generated from `#/components/schemas/KeyResponse/expires_at`.
+            public var expiresAt: Swift.String?
             /// When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/last_used_at`.
@@ -10209,7 +10245,7 @@ extension Components {
             ///   - id: Unique identifier for the key.
             ///   - key: The plaintext key, which you send as a bearer token. Save it: no other response shows it.
             ///   - label: A name for the key, to tell it apart from your other keys.
-            ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key has it as its own, and it can't change.
+            ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
             ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
@@ -10221,6 +10257,7 @@ extension Components {
             ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
+            ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
             ///   - lastUsedAt: When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
             public init(
                 id: Swift.String,
@@ -10238,6 +10275,7 @@ extension Components {
                 profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
+                expiresAt: Swift.String? = nil,
                 lastUsedAt: Swift.String? = nil
             ) {
                 self.id = id
@@ -10255,6 +10293,7 @@ extension Components {
                 self.profilePermissions = profilePermissions
                 self.enforcementOverride = enforcementOverride
                 self.createdAt = createdAt
+                self.expiresAt = expiresAt
                 self.lastUsedAt = lastUsedAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -10273,10 +10312,11 @@ extension Components {
                 case profilePermissions = "profile_permissions"
                 case enforcementOverride = "enforcement_override"
                 case createdAt = "created_at"
+                case expiresAt = "expires_at"
                 case lastUsedAt = "last_used_at"
             }
         }
-        /// A permission a credential can hold. `schema.write` replaces and deletes types and edge types, `keys.mint` creates and manages keys, `items.purge` purges trashed items, `webhooks.manage` manages webhooks, `config.manage` reads and replaces `/config`, `audit.read` reads the audit log, and `grants.manage` lists and revokes other apps' access.
+        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists and revokes other apps' access; `instance.read` reads health, metrics, housekeeping, platform type drift, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, resets platform type definitions and cancels bulk jobs; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; and `blobs.manage` manages every blob.
         ///
         /// - Remark: Generated from `#/components/schemas/Permission`.
         @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {
@@ -10349,7 +10389,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/label`.
             public var label: Swift.String
-            /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key has it as its own, and it can't change.
+            /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/source`.
             public var source: Swift.String
@@ -10497,7 +10537,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/created_at`.
             public var createdAt: Swift.String
-            /// When the key stops working, in UTC, or `null` if it doesn't expire. A key created through the API never expires.
+            /// When the key stops working, in UTC, or `null` if it doesn't expire.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/expires_at`.
             public var expiresAt: Swift.String?
@@ -10510,7 +10550,7 @@ extension Components {
             /// - Parameters:
             ///   - id: Unique identifier for the key.
             ///   - label: A name for the key, to tell it apart from your other keys.
-            ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key has it as its own, and it can't change.
+            ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
             ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
@@ -10522,7 +10562,7 @@ extension Components {
             ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
-            ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire. A key created through the API never expires.
+            ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
             ///   - lastUsedAt: When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
             public init(
                 id: Swift.String,
@@ -10768,30 +10808,31 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal`.
-        public struct InvalidPropertiesOrValidationErrorRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal`.
+        public struct InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidProperties = "invalid_properties"
+                    case invalidSchema = "invalid_schema"
                     case validationError = "validation_error"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -10811,8 +10852,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -10820,9 +10861,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -10836,13 +10877,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `InvalidPropertiesOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -11818,7 +11859,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/key_id`.
             public var keyId: Swift.String?
-            /// What happened, such as `key.create` or `owner.created`.
+            /// What happened, such as `key.create` or `owner.claimed`.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/action`.
             public var action: Swift.String
@@ -11864,7 +11905,7 @@ extension Components {
             ///   - id: Unique identifier for the entry.
             ///   - createdAt: When Marfa recorded the entry, in UTC.
             ///   - keyId: The ID of the credential that acted, or `null` if the entry names none, as for Marfa's own housekeeping.
-            ///   - action: What happened, such as `key.create` or `owner.created`.
+            ///   - action: What happened, such as `key.create` or `owner.claimed`.
             ///   - resourceType: The kind of resource acted on, such as `key`.
             ///   - resourceId: The ID of the resource acted on, or `null` if there is none.
             ///   - clientIp: The IP address of the request that acted, or `null` if the entry records none.
@@ -11899,7 +11940,7 @@ extension Components {
                 case details
             }
         }
-        /// Number of unrevoked keys.
+        /// Number of keys that haven't been revoked or expired.
         ///
         /// - Remark: Generated from `#/components/schemas/MetricCount`.
         public struct MetricCount: Codable, Hashable, Sendable {

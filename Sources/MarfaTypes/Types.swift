@@ -377,7 +377,7 @@ public protocol APIProtocol: Sendable {
     func deleteBlobLocation(_ input: Operations.DeleteBlobLocation.Input) async throws -> Operations.DeleteBlobLocation.Output
     /// List housekeeping jobs
     ///
-    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires instance.read.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job a server setting switches off isn't listed. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /housekeeping`.
     /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
@@ -1524,7 +1524,7 @@ extension APIProtocol {
     }
     /// List housekeeping jobs
     ///
-    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires instance.read.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job a server setting switches off isn't listed. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /housekeeping`.
     /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
