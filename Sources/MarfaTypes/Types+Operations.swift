@@ -45668,9 +45668,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a field is invalid, such as an `id` or `reverse_name` that isn't a valid edge type identifier, a `role:` constraint naming no role, or `written_at: target` with no `reverse_name`; or the body names `extends`.
+            /// - `validation_error`: a field is invalid, such as a bad `id` or `reverse_name`, a `role:` naming no role, or `written_at: target` with no `reverse_name`, or `extends` is set.
             /// - `missing_required_field`: `id` or `cardinality` is missing.
-            /// - `invalid_schema`: a property's `type` isn't a field type.
+            /// - `invalid_schema`: a property's `type` isn't a field type, or the body has a key the schema doesn't define (`details.errors` names each path).
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)/responses/400`.
             ///
@@ -49048,8 +49048,8 @@ public enum Operations {
             }
             /// - `missing_required_field`: `fields` is missing.
             /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes too deep a chain.
-            /// - `invalid_schema`: the schema is invalid, such as a `link_field` that isn't a string field.
-            /// - `property_shadows_field`: a field is named like one every item has, such as `source_id`.
+            /// - `invalid_schema`: the schema is invalid or has a key it doesn't define (`details.errors` names each path).
+            /// - `property_shadows_field`: a field is named like one every item has.
             /// - `inheritance_violation`: the type reshapes an inherited field.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/400`.
@@ -51383,8 +51383,8 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `fields` is missing.
-            /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes a circular or too deep chain.
-            /// - `invalid_schema`: the schema is invalid, such as a `link_field` that isn't a string field.
+            /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes a bad chain.
+            /// - `invalid_schema`: the schema is invalid or has a key it doesn't define (`details.errors` names each path).
             /// - `property_shadows_field`: a field has the name of one every item has.
             /// - `inheritance_violation`: a field's shape differs in a parent or subtype.
             ///
@@ -64291,7 +64291,7 @@ public enum Operations {
     }
     /// List housekeeping jobs
     ///
-    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job turned off by a server setting isn't listed, unless `/config` can turn it back on. Requires instance.read.
+    /// Returns every housekeeping job Marfa runs: its interval, when it's next due, whether a run holds it, and what its last run did. A job a server setting switches off isn't listed. Requires instance.read.
     ///
     /// - Remark: HTTP `GET /housekeeping`.
     /// - Remark: Generated from `#/paths//housekeeping/get(listHousekeeping)`.
@@ -67882,7 +67882,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: your credential is an app's session token, not a key, or direct owner or local authority.
+            /// - `forbidden`: your credential is an app's access token, not a key, or direct owner or local authority.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/403`.
             ///
@@ -75707,7 +75707,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `conflict`: the connector already has 10 live endpoints. Retire one first.
+            /// - `conflict`: the connector already has 10 live endpoints (retire one first), or its key is revoked or past its `expires_at`, so an address would never answer.
             ///
             /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)/responses/409`.
             ///
@@ -96208,7 +96208,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/label`.
                     public var label: Swift.String
-                    /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key may have it as its own, and it can't change later.
+                    /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired may have it as its own, and it can't change later.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/source`.
                     public var source: Swift.String
@@ -96348,11 +96348,15 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/enforcement_override`.
                     public var enforcementOverride: Components.Schemas.EnforcementOverride?
+                    /// When the key stops working, as an ISO 8601 date and time in the future. Leave it out for a key that never expires, or, if your own key expires, for one that expires when yours does. It can't be later than your own key's `expires_at`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/expires_at`.
+                    public var expiresAt: Swift.String?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - label: A name for the key, to tell it apart from your other keys.
-                    ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other unrevoked key may have it as its own, and it can't change later.
+                    ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired may have it as its own, and it can't change later.
                     ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the owner or local command can grant any.
                     ///   - permissions: The permissions to give the key, such as `audit.read`.
                     ///   - defaultTier: The tier an item this key creates goes to when the write names none. Leave it out for `library`.
@@ -96362,6 +96366,7 @@ public enum Operations {
                     ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
                     ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
                     ///   - enforcementOverride: Enforcement levers for this key alone. Leave it out for none, so the key follows the instance's.
+                    ///   - expiresAt: When the key stops working, as an ISO 8601 date and time in the future. Leave it out for a key that never expires, or, if your own key expires, for one that expires when yours does. It can't be later than your own key's `expires_at`.
                     public init(
                         label: Swift.String,
                         source: Swift.String,
@@ -96373,7 +96378,8 @@ public enum Operations {
                         edgePermissions: Operations.CreateKey.Input.Body.JsonPayload.EdgePermissionsPayload? = nil,
                         metadataPermissions: Operations.CreateKey.Input.Body.JsonPayload.MetadataPermissionsPayload? = nil,
                         profilePermissions: Operations.CreateKey.Input.Body.JsonPayload.ProfilePermissionsPayload? = nil,
-                        enforcementOverride: Components.Schemas.EnforcementOverride? = nil
+                        enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
+                        expiresAt: Swift.String? = nil
                     ) {
                         self.label = label
                         self.source = source
@@ -96386,6 +96392,7 @@ public enum Operations {
                         self.metadataPermissions = metadataPermissions
                         self.profilePermissions = profilePermissions
                         self.enforcementOverride = enforcementOverride
+                        self.expiresAt = expiresAt
                     }
                     public enum CodingKeys: String, CodingKey {
                         case label
@@ -96399,6 +96406,7 @@ public enum Operations {
                         case metadataPermissions = "metadata_permissions"
                         case profilePermissions = "profile_permissions"
                         case enforcementOverride = "enforcement_override"
+                        case expiresAt = "expires_at"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -96446,6 +96454,10 @@ public enum Operations {
                             Components.Schemas.EnforcementOverride.self,
                             forKey: .enforcementOverride
                         )
+                        self.expiresAt = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .expiresAt
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "label",
                             "source",
@@ -96457,7 +96469,8 @@ public enum Operations {
                             "edge_permissions",
                             "metadata_permissions",
                             "profile_permissions",
-                            "enforcement_override"
+                            "enforcement_override",
+                            "expires_at"
                         ])
                     }
                 }
@@ -96668,7 +96681,7 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `label` or `source` is missing, or a lever in `enforcement_override` lacks `types` or `sources`.
-            /// - `validation_error`: a field is invalid, such as a permission level that doesn't exist or more than 1,000 `sources`, or `source` or a claimed source starts with `oauth:`.
+            /// - `validation_error`: a field is invalid, such as a permission level that doesn't exist, more than 1,000 `sources`, or an `expires_at` that isn't a time or isn't in the future, or `source` or a claimed source starts with `oauth:`.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/400`.
             ///
@@ -96886,7 +96899,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body names a permission, map entry or source you don't hold, or a `source` another key claims that you can't grant; or it names `enforcement_override` and you don't hold `config.manage`. `details.required_scope` or `details.source` names what you lack.
+            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body names a permission, map entry or source you don't hold, or a `source` another key claims that you can't grant; it names an `expires_at` later than your own key's; or it names `enforcement_override` and you don't hold `config.manage`. `details.required_scope` or `details.source` names what you lack.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/403`.
             ///
@@ -96995,7 +97008,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `conflict`: another unrevoked key already has this `source` as its own. `details.source` names it. To let two keys write under one source, claim it in `sources` instead.
+            /// - `conflict`: another key that hasn't been revoked or expired already has this `source` as its own. `details.source` names it. To let two keys write under one source, claim it in `sources` instead.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/409`.
             ///
@@ -98825,6 +98838,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/enforcement_override`.
                     public var enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride?
+                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made or through `keys.manage`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/expires_at`.
+                    public var expiresAt: Swift.String?
                     /// Can't change. To give a key another source, create a new key and revoke this one.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/source`.
@@ -98842,6 +98859,7 @@ public enum Operations {
                     ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
                     ///   - permissions: The permissions the key holds, such as `audit.read`.
                     ///   - enforcementOverride: Replaces the key's enforcement levers whole. `null` clears them.
+                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made or through `keys.manage`.
                     ///   - source: Can't change. To give a key another source, create a new key and revoke this one.
                     public init(
                         label: Swift.String? = nil,
@@ -98854,6 +98872,7 @@ public enum Operations {
                         profilePermissions: Operations.UpdateKey.Input.Body.JsonPayload.ProfilePermissionsPayload? = nil,
                         permissions: [Components.Schemas.Permission]? = nil,
                         enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride? = nil,
+                        expiresAt: Swift.String? = nil,
                         source: Swift.String? = nil
                     ) {
                         self.label = label
@@ -98866,6 +98885,7 @@ public enum Operations {
                         self.profilePermissions = profilePermissions
                         self.permissions = permissions
                         self.enforcementOverride = enforcementOverride
+                        self.expiresAt = expiresAt
                         self.source = source
                     }
                     public enum CodingKeys: String, CodingKey {
@@ -98879,6 +98899,7 @@ public enum Operations {
                         case profilePermissions = "profile_permissions"
                         case permissions
                         case enforcementOverride = "enforcement_override"
+                        case expiresAt = "expires_at"
                         case source
                     }
                     public init(from decoder: any Swift.Decoder) throws {
@@ -98923,6 +98944,10 @@ public enum Operations {
                             Components.Schemas.MarfaNullableEnforcementOverride.self,
                             forKey: .enforcementOverride
                         )
+                        self.expiresAt = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .expiresAt
+                        )
                         self.source = try container.decodeIfPresent(
                             Swift.String.self,
                             forKey: .source
@@ -98938,6 +98963,7 @@ public enum Operations {
                             "profile_permissions",
                             "permissions",
                             "enforcement_override",
+                            "expires_at",
                             "source"
                         ])
                     }
@@ -99152,7 +99178,7 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: a lever in `enforcement_override` lacks `types` or `sources`.
-            /// - `validation_error`: `id` isn't a valid key ID, the body carries `source`, or a field is invalid, such as a claimed source that starts with `oauth:`.
+            /// - `validation_error`: `id` isn't a valid key ID, the body carries `source`, or a field is invalid, such as an `expires_at` that isn't a time or isn't in the future, or a claimed source that starts with `oauth:`.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/400`.
             ///
@@ -99370,7 +99396,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body gives the key a permission, map entry or source you don't hold; it widens a key an app created, or you act through `keys.manage`, which only narrows; or it names `enforcement_override` and you don't hold `config.manage`. `details.required_scope` or `details.source` names what's missing.
+            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body gives the key a permission, map entry or source you don't hold, or an `expires_at` later than yours; it widens a key an app created or, through `keys.manage`, any key; or it names `enforcement_override` and you don't hold `config.manage`. `details.required_scope` or `details.source` names what's missing.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/403`.
             ///
@@ -103655,12 +103681,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/restore/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/restore/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.InvalidPropertiesOrValidationErrorRefusal)
+                    case json(Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InvalidPropertiesOrValidationErrorRefusal {
+                    public var json: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -103684,8 +103710,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body isn't a valid archive, or the archive is at another format version, carries an entry twice, has an invalid row, or has a `manifest.json`, `types.ndjson` or line of `items.ndjson` or `edges.ndjson` larger than 64 MiB.
+            /// - `validation_error`: the body isn't a valid archive, or is at another format version, repeats an entry, has an invalid row, or has a file over 64 MiB.
             /// - `invalid_properties`: an item sets a property its type doesn't declare, and `strict_mode` names that type.
+            /// - `invalid_schema`: an archived type is invalid or carries a key the schema doesn't define.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/400`.
             ///
@@ -121144,7 +121171,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/requestBody/json/redirect_uris`.
                     public var redirectUris: [Swift.String]?
-                    /// The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`.
+                    /// The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`. Without `authorization_code`, add `refresh_token` to get a refresh token with `offline_access`.
                     ///
                     /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/requestBody/json/grant_types`.
                     public var grantTypes: [Swift.String]?
@@ -121160,7 +121187,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/requestBody/json/application_type`.
                     public var applicationType: Swift.String?
-                    /// Space-separated scopes to register the client for. Leave it out to register it for every scope the instance allows.
+                    /// Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
                     ///
                     /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/requestBody/json/scope`.
                     public var scope: Swift.String?
@@ -121172,11 +121199,11 @@ public enum Operations {
                     ///
                     /// - Parameters:
                     ///   - redirectUris: The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
-                    ///   - grantTypes: The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`.
+                    ///   - grantTypes: The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`. Without `authorization_code`, add `refresh_token` to get a refresh token with `offline_access`.
                     ///   - responseTypes: The response types the client uses. Defaults to `code` when `grant_types` includes `authorization_code`.
                     ///   - clientName: The app's name, which Marfa shows a person asked to approve it.
                     ///   - applicationType: `web` or `native`, which decides the redirect URIs the client may use. Defaults to `web`.
-                    ///   - scope: Space-separated scopes to register the client for. Leave it out to register it for every scope the instance allows.
+                    ///   - scope: Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
                     ///   - tokenEndpointAuthMethod: How the client proves itself at the token endpoint. Defaults to `client_secret_basic`. Send `none` for a public client, which gets no `client_secret`.
                     public init(
                         redirectUris: [Swift.String]? = nil,
@@ -121286,7 +121313,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/201/content/json/client_id_issued_at`.
                         public var clientIdIssuedAt: Swift.Int?
-                        /// Space-separated scopes the client is registered for: the ones you named, or every scope the instance allows.
+                        /// Space-separated scopes the client is registered for: the ones you named, or every scope the instance allows, without `offline_access` for a client that can't use a refresh token.
                         ///
                         /// - Remark: Generated from `#/paths/auth/oauth2/register/POST/responses/201/content/json/scope`.
                         public var scope: Swift.String?
@@ -121332,7 +121359,7 @@ public enum Operations {
                         ///   - clientId: Unique identifier for the client.
                         ///   - clientSecret: The secret the client proves itself with at the token endpoint. Absent for a public client.
                         ///   - clientIdIssuedAt: When the client was registered, in seconds since the Unix epoch.
-                        ///   - scope: Space-separated scopes the client is registered for: the ones you named, or every scope the instance allows.
+                        ///   - scope: Space-separated scopes the client is registered for: the ones you named, or every scope the instance allows, without `offline_access` for a client that can't use a refresh token.
                         ///   - redirectUris: The redirect URIs, as registered.
                         ///   - grantTypes: The grants, as registered.
                         ///   - responseTypes: The response types, as registered.
