@@ -5,7 +5,7 @@ import Synchronization
 
 /// The folders on this Mac: directories whose files Marfa keeps in step with a folder's settings on the server.
 ///
-/// Folders work through the same core and the same registry as the `marfa` command-line tool, so a folder
+/// Folders work through the same core and the same registry as the CLI, `marfa`, so a folder
 /// added here appears in `marfa folders list`, and one added there appears in `list()`.
 ///
 /// A new folder's first sync waits for the person to confirm it: `sync(_:)` reads the folder and returns

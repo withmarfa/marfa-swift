@@ -91,7 +91,7 @@ enum FolderFixture {
         listed.contains { $0.directory.lastPathComponent == directory.lastPathComponent }
     }
 
-    /// Runs the command-line tool with this process's environment, the registry's name and the server's among
+    /// Runs the CLI with this process's environment, the registry's name and the server's among
     /// it, and answers what it printed.
     static func run(_ arguments: [String]) throws -> Data {
         let binary = try #require(commandLine)
