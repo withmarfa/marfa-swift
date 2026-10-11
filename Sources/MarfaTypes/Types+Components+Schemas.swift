@@ -881,6 +881,56 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Version/source_id`.
             public var sourceId: Swift.String?
+            /// The sign-in that wrote this version, named as it was then, even after it ends. Whoever can read the snapshot sees it, such as another app's name or a key's label. `null` if no sign-in wrote it, such as when Marfa reads a file's text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Version/writer`.
+            public struct WriterPayload: Codable, Hashable, Sendable {
+                /// What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Version/writer/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case browser = "browser"
+                    case app = "app"
+                    case key = "key"
+                    case local = "local"
+                }
+                /// What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Version/writer/kind`.
+                public var kind: Components.Schemas.Version.WriterPayload.KindPayload
+                /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Version/writer/id`.
+                public var id: Swift.String
+                /// The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Version/writer/name`.
+                public var name: Swift.String
+                /// Creates a new `WriterPayload`.
+                ///
+                /// - Parameters:
+                ///   - kind: What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///   - name: The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                public init(
+                    kind: Components.Schemas.Version.WriterPayload.KindPayload,
+                    id: Swift.String,
+                    name: Swift.String
+                ) {
+                    self.kind = kind
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case kind
+                    case id
+                    case name
+                }
+            }
+            /// The sign-in that wrote this version, named as it was then, even after it ends. Whoever can read the snapshot sees it, such as another app's name or a key's label. `null` if no sign-in wrote it, such as when Marfa reads a file's text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Version/writer`.
+            public var writer: Components.Schemas.Version.WriterPayload?
             /// When Marfa recorded the snapshot, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/created_at`.
@@ -896,6 +946,7 @@ extension Components {
             ///   - tier: The item's tier at this version.
             ///   - occurredAt: When the item happened, in UTC, at this version.
             ///   - sourceId: The item's `source_id` at this version, or `null` if it had none.
+            ///   - writer: The sign-in that wrote this version, named as it was then, even after it ends. Whoever can read the snapshot sees it, such as another app's name or a key's label. `null` if no sign-in wrote it, such as when Marfa reads a file's text.
             ///   - createdAt: When Marfa recorded the snapshot, in UTC.
             public init(
                 id: Swift.String,
@@ -906,6 +957,7 @@ extension Components {
                 tier: Components.Schemas.Tier,
                 occurredAt: Swift.String,
                 sourceId: Swift.String? = nil,
+                writer: Components.Schemas.Version.WriterPayload? = nil,
                 createdAt: Swift.String
             ) {
                 self.id = id
@@ -916,6 +968,7 @@ extension Components {
                 self.tier = tier
                 self.occurredAt = occurredAt
                 self.sourceId = sourceId
+                self.writer = writer
                 self.createdAt = createdAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -927,6 +980,7 @@ extension Components {
                 case tier
                 case occurredAt = "occurred_at"
                 case sourceId = "source_id"
+                case writer
                 case createdAt = "created_at"
             }
         }
@@ -11333,6 +11387,218 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.OwnerNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// Every live sign-in of the owner.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SignInList`.
+        public struct SignInList: Codable, Hashable, Sendable {
+            /// The owner's live sign-ins, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignInList/data`.
+            public var data: [Components.Schemas.SignIn]
+            /// Always `null`: Marfa returns every sign-in in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignInList/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `SignInList`.
+            ///
+            /// - Parameters:
+            ///   - data: The owner's live sign-ins, oldest first.
+            ///   - nextCursor: Always `null`: Marfa returns every sign-in in one page.
+            public init(
+                data: [Components.Schemas.SignIn],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// A sign-in is one way the owner's Marfa can be reached.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SignIn`.
+        public struct SignIn: Codable, Hashable, Sendable {
+            /// Unique identifier for the sign-in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/id`.
+            public var id: Swift.String
+            /// What signed in. `browser`: a browser signed in with the owner's password. `app`: an app the owner approved, for every device it signs in on with that approval. `key`: an API key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case browser = "browser"
+                case app = "app"
+                case key = "key"
+            }
+            /// What signed in. `browser`: a browser signed in with the owner's password. `app`: an app the owner approved, for every device it signs in on with that approval. `key`: an API key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/kind`.
+            public var kind: Components.Schemas.SignIn.KindPayload
+            /// A readable name: a browser's from its `user_agent`, an app's the owner's name for it or else its registered name, a key's its `label`. A name with a control or bidirectional character, or over 200 characters, gives way to the ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/name`.
+            public var name: Swift.String
+            /// `true` if this sign-in sent the request.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/current`.
+            public var current: Swift.Bool
+            /// When the sign-in was made, in UTC. For an app, when the owner last approved it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/created_at`.
+            public var createdAt: Swift.String
+            /// When the sign-in last made a request, in UTC, or `null` if it hasn't. Marfa records a browser's use at most once a minute and an app's or key's at most once an hour.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/last_used_at`.
+            public var lastUsedAt: Swift.String?
+            /// When the sign-in ends unless something changes, in UTC. A browser's is seven days and one minute after `last_used_at`. `null` for an app, and for a key that doesn't expire.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/expires_at`.
+            public var expiresAt: Swift.String?
+            /// The address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/ip_address`.
+            public var ipAddress: Swift.String?
+            /// The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/user_agent`.
+            public var userAgent: Swift.String?
+            /// For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, any other key, and a key whose app has ended.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignIn/minted_by`.
+            public var mintedBy: Swift.String?
+            /// Creates a new `SignIn`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the sign-in.
+            ///   - kind: What signed in. `browser`: a browser signed in with the owner's password. `app`: an app the owner approved, for every device it signs in on with that approval. `key`: an API key.
+            ///   - name: A readable name: a browser's from its `user_agent`, an app's the owner's name for it or else its registered name, a key's its `label`. A name with a control or bidirectional character, or over 200 characters, gives way to the ID.
+            ///   - current: `true` if this sign-in sent the request.
+            ///   - createdAt: When the sign-in was made, in UTC. For an app, when the owner last approved it.
+            ///   - lastUsedAt: When the sign-in last made a request, in UTC, or `null` if it hasn't. Marfa records a browser's use at most once a minute and an app's or key's at most once an hour.
+            ///   - expiresAt: When the sign-in ends unless something changes, in UTC. A browser's is seven days and one minute after `last_used_at`. `null` for an app, and for a key that doesn't expire.
+            ///   - ipAddress: The address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
+            ///   - userAgent: The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
+            ///   - mintedBy: For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, any other key, and a key whose app has ended.
+            public init(
+                id: Swift.String,
+                kind: Components.Schemas.SignIn.KindPayload,
+                name: Swift.String,
+                current: Swift.Bool,
+                createdAt: Swift.String,
+                lastUsedAt: Swift.String? = nil,
+                expiresAt: Swift.String? = nil,
+                ipAddress: Swift.String? = nil,
+                userAgent: Swift.String? = nil,
+                mintedBy: Swift.String? = nil
+            ) {
+                self.id = id
+                self.kind = kind
+                self.name = name
+                self.current = current
+                self.createdAt = createdAt
+                self.lastUsedAt = lastUsedAt
+                self.expiresAt = expiresAt
+                self.ipAddress = ipAddress
+                self.userAgent = userAgent
+                self.mintedBy = mintedBy
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case kind
+                case name
+                case current
+                case createdAt = "created_at"
+                case lastUsedAt = "last_used_at"
+                case expiresAt = "expires_at"
+                case ipAddress = "ip_address"
+                case userAgent = "user_agent"
+                case mintedBy = "minted_by"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal`.
+        public struct SignInNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case signInNotFound = "sign_in_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.SignInNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.SignInNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.SignInNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.SignInNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignInNotFoundRefusal/error`.
+            public var error: Components.Schemas.SignInNotFoundRefusal._ErrorPayload
+            /// Creates a new `SignInNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.SignInNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
