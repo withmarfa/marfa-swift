@@ -641,6 +641,27 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
+    /// List sign-ins
+    ///
+    /// Returns every browser, app and key that can reach Marfa, marking the browser that sent the request. Requires the owner's browser session or the local command.
+    ///
+    /// - Remark: HTTP `GET /owner/sign-ins`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/get(listSignIns)`.
+    func listSignIns(_ input: Operations.ListSignIns.Input) async throws -> Operations.ListSignIns.Output
+    /// Update a sign-in
+    ///
+    /// Gives an app or a key a new name and returns the sign-in. A key's name is its `label`. Requires the owner's browser session, signed in within the last five minutes, or the local command.
+    ///
+    /// - Remark: HTTP `PATCH /owner/sign-ins/{id}`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/patch(updateSignIn)`.
+    func updateSignIn(_ input: Operations.UpdateSignIn.Input) async throws -> Operations.UpdateSignIn.Output
+    /// End a sign-in
+    ///
+    /// Ends a sign-in at once: it can't make another request, and an app can't refresh its tokens. The keys an app minted stay unless `revoke_keys` is `true`. Requires the owner's browser session, signed in within five minutes, or the local command.
+    ///
+    /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
+    func endSignIn(_ input: Operations.EndSignIn.Input) async throws -> Operations.EndSignIn.Output
     /// Export items and edges
     ///
     /// Exports the items you can read, with their tags and readable extensions, followed by the edges between them. Without `state`, trashed items are left out. With `format=archive`, returns a file that `POST /restore` reads.
@@ -2074,6 +2095,49 @@ extension APIProtocol {
         try await createOwner(Operations.CreateOwner.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// List sign-ins
+    ///
+    /// Returns every browser, app and key that can reach Marfa, marking the browser that sent the request. Requires the owner's browser session or the local command.
+    ///
+    /// - Remark: HTTP `GET /owner/sign-ins`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/get(listSignIns)`.
+    public func listSignIns(headers: Operations.ListSignIns.Input.Headers = .init()) async throws -> Operations.ListSignIns.Output {
+        try await listSignIns(Operations.ListSignIns.Input(headers: headers))
+    }
+    /// Update a sign-in
+    ///
+    /// Gives an app or a key a new name and returns the sign-in. A key's name is its `label`. Requires the owner's browser session, signed in within the last five minutes, or the local command.
+    ///
+    /// - Remark: HTTP `PATCH /owner/sign-ins/{id}`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/patch(updateSignIn)`.
+    public func updateSignIn(
+        path: Operations.UpdateSignIn.Input.Path,
+        headers: Operations.UpdateSignIn.Input.Headers = .init(),
+        body: Operations.UpdateSignIn.Input.Body
+    ) async throws -> Operations.UpdateSignIn.Output {
+        try await updateSignIn(Operations.UpdateSignIn.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// End a sign-in
+    ///
+    /// Ends a sign-in at once: it can't make another request, and an app can't refresh its tokens. The keys an app minted stay unless `revoke_keys` is `true`. Requires the owner's browser session, signed in within five minutes, or the local command.
+    ///
+    /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
+    public func endSignIn(
+        path: Operations.EndSignIn.Input.Path,
+        query: Operations.EndSignIn.Input.Query = .init(),
+        headers: Operations.EndSignIn.Input.Headers = .init()
+    ) async throws -> Operations.EndSignIn.Output {
+        try await endSignIn(Operations.EndSignIn.Input(
+            path: path,
+            query: query,
+            headers: headers
         ))
     }
     /// Export items and edges
