@@ -2387,8 +2387,12 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
-     * still waiting to be confirmed, which this cancels. A folder whose
-     * directory is gone is only taken off the registry.
+     * still waiting to be confirmed, which this cancels. Follows no symbolic
+     * link, and takes a path through one only where it is the path the
+     * registry lists. Where that path is
+     * gone, passes through a link, or holds state the registry does not
+     * show to be the folder's own, the folder is only taken off the
+     * registry.
      */
     func remove(dir: String) throws 
     
@@ -2549,8 +2553,12 @@ open func list()throws  -> [ListedFolder]  {
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
-     * still waiting to be confirmed, which this cancels. A folder whose
-     * directory is gone is only taken off the registry.
+     * still waiting to be confirmed, which this cancels. Follows no symbolic
+     * link, and takes a path through one only where it is the path the
+     * registry lists. Where that path is
+     * gone, passes through a link, or holds state the registry does not
+     * show to be the folder's own, the folder is only taken off the
+     * registry.
      */
 open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_remove(
@@ -11091,7 +11099,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 52626) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 14669) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 37532) {
