@@ -384,7 +384,7 @@ for try await event in watch {
 }
 ```
 
-One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
+One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. It also throws `invalid` for a path that passes through a symbolic link, such as one under `/var` on a Mac, unless it is the path `list()` gives; pass that path. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
 
 ## Keys
 

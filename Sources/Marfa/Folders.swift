@@ -89,7 +89,8 @@ public struct Folders: Sendable {
     /// On a folder whose first sync waits, it cancels that sync.
     ///
     /// Throws `MarfaError.invalid` while writes wait to be sent; sync first. A folder whose directory is gone is
-    /// only taken off the registry.
+    /// only taken off the registry. It also throws `invalid` for a path that passes through a symbolic link,
+    /// unless it is the path the registry lists, which `list()` gives and the error names.
     public func remove(_ directory: URL) async throws {
         let dir = directory.path(percentEncoded: false)
         try await run { folders in try folders.remove(dir: dir) }

@@ -23,8 +23,30 @@ enum FolderFixture {
         ProcessInfo.processInfo.environment["MARFA_CLI"].flatMap { $0.isEmpty ? nil : URL(filePath: $0) }
     }
 
+    /// A new folder's path as the registry lists it. `folders remove` takes a path through a symbolic link only
+    /// where it is the listed one, and the temporary directory is reached through `/var`, a link to `/private/var`.
     static func directory() -> URL {
-        FileManager.default.temporaryDirectory.appending(path: "marfa-folder-\(UUID())", directoryHint: .isDirectory)
+        let temporary = FileManager.default.temporaryDirectory.path(percentEncoded: false)
+        let resolved = realpath(temporary, nil).map { pointer in
+            defer { free(pointer) }
+            return String(cString: pointer)
+        }
+        return URL(filePath: resolved ?? temporary, directoryHint: .isDirectory)
+            .appending(path: "marfa-folder-\(UUID())", directoryHint: .isDirectory)
+    }
+
+    /// The files under a directory, as paths inside it.
+    ///
+    /// A removed folder leaves its `.marfa` directory, empty.
+    static func files(in directory: URL) -> [String] {
+        let root = directory.path(percentEncoded: false)
+        let names = (try? FileManager.default.subpathsOfDirectory(atPath: root)) ?? []
+        return names.filter { name in
+            var isDirectory: ObjCBool = false
+            FileManager.default.fileExists(
+                atPath: directory.appending(path: name).path(percentEncoded: false), isDirectory: &isDirectory)
+            return !isDirectory.boolValue
+        }
     }
 
     /// Makes a `system.folder` of the notes tagged with a tag of its own, so the folder holds only what the test
@@ -131,13 +153,7 @@ func addingAFolderAgainstAServerOutOfReachThrowsAndLeavesNoFile() async throws {
         if case .network = error as? MarfaError { true } else { false }
     }
     // The core makes the directory it is asked to follow, and takes back every file it put in it.
-    let left = (try? FileManager.default.subpathsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
-    let files = left.filter { name in
-        var isDirectory: ObjCBool = false
-        FileManager.default.fileExists(
-            atPath: directory.appending(path: name).path(percentEncoded: false), isDirectory: &isDirectory)
-        return !isDirectory.boolValue
-    }
+    let files = FolderFixture.files(in: directory)
     #expect(files.isEmpty, "the failed add left \(files)")
 }
 
@@ -309,7 +325,7 @@ extension LiveWorkingCopies {
             try await folders.remove(directory)
             #expect(!FolderFixture.listed(directory, in: try await folders.list()))
             #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Kept.md").path()))
-            #expect(!FileManager.default.fileExists(atPath: directory.appending(path: ".marfa").path()))
+            #expect(FolderFixture.files(in: directory).filter { $0.hasPrefix(".marfa/") }.isEmpty)
         }
 
         @Test func aFolderIsNotRemovedWhileWritesWaitAndIsOnceTheyAreSent() async throws {
@@ -329,10 +345,12 @@ extension LiveWorkingCopies {
             }
 
             _ = try await folders.sync(directory)
+            // The witness: the store is there before the folder is removed.
+            #expect(FolderFixture.files(in: directory).contains(".marfa/core.sqlite"))
             try await folders.remove(directory)
             #expect(!FolderFixture.listed(directory, in: try await folders.list()))
             #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Waiting.md").path()))
-            #expect(!FileManager.default.fileExists(atPath: directory.appending(path: ".marfa").path()))
+            #expect(FolderFixture.files(in: directory).filter { $0.hasPrefix(".marfa/") }.isEmpty)
         }
 
         @Test func aFolderWhoseDirectoryIsGoneIsTakenOffTheRegistry() async throws {
