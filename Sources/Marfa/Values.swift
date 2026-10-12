@@ -400,7 +400,9 @@ public struct Edit: Sendable, Hashable {
 ///
 /// A move is one write that carries the end it moves, so the end never holds
 /// no edge or two. An end the edge already holds moves nothing and is not
-/// sent. Only one end moves at a time, so the type cannot name both.
+/// sent. An edit that names no property and no end other than those the
+/// edge holds queues nothing: ``Edges/update(_:_:)`` returns `nil`. Only one
+/// end moves at a time, so the type cannot name both.
 ///
 /// A move is refused `MarfaError.validation` before anything is queued, with
 /// the code `validation_error` where the edge's type lets the end that stays

@@ -545,8 +545,16 @@ public struct Edges: Sendable {
     /// the copy shows moved stays at its new end, read from either end, until
     /// the server answers. A move to an item whose create is still queued waits
     /// for that create. See ``EdgeEdit`` for the two refusals a move can meet.
-    public func update(_ id: String, _ edit: EdgeEdit) async throws -> QueuedWrite {
-        try await write { core in try core.updateEdge(id: id, edit: edit.core()) }
+    ///
+    /// Returns `nil`, and queues and announces nothing, for an edit that names
+    /// no property and no end other than the ends the copy holds: the server
+    /// would raise the edge's version for a change that never happened.
+    public func update(_ id: String, _ edit: EdgeEdit) async throws -> QueuedWrite? {
+        let written = try await holder.run { core in
+            try core.updateEdge(id: id, edit: edit.core()).map { try QueuedWrite($0) }
+        }
+        if let written { feed.announce(written) }
+        return written
     }
 
     public func delete(_ id: String) async throws -> QueuedWrite {

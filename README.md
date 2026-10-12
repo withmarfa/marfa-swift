@@ -247,6 +247,8 @@ _ = try await copy.edges.update(
     replyEdge.id, EdgeEdit(["note": "moved"], baseVersion: replyEdge.version, move: .target(newThreadId)))
 ```
 
+`update` returns the queued write, or `nil` where the edit names no property and no end other than the ends the copy holds. It queues nothing then, so a stream is told nothing and the edge's version doesn't move.
+
 The copy shows the edge at its new end at once, read from either end, offline included, and a move to an item whose create is still queued waits for that create. An edit throws `invalid` where its `baseVersion` is not the one the copy holds, and `notFound` where the copy does not hold the edge.
 
 Only one end moves, and only where the end that stays holds one edge of the type, so the move replaces it: the target of `in-thread` moves, because each reply holds one thread, and the source of `parent-of` moves, because each child holds one parent. A move throws `validation` and queues nothing in two cases:
