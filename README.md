@@ -114,7 +114,7 @@ In a copy that holds one tier, the same item leaves the copy once the server ans
 
 Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does, and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events; if it stops with an error, the next hydration or catch-up starts it again.
 
-Each queued write carries its `verdict` once the server answers it. A write held behind another that has no answer yet is `waiting`, with no verdict, and goes once that write is answered; a `blocked` verdict is a stop the app may have to act on, by releasing or withdrawing it. A `refused` verdict carries a typed `Refusal`: the server's code and message, each property it would not take and why, whether the row is in the bin, and any permission the key lacks. A refused write that carried content keeps it in `body` through `forgetAnswered()`, so the app can offer it back to the person, until `queue.discard(_:)` takes it out. A drain's report lists each write it answered with the item or edge it wrote, and a held `changes()` stream is told each one as `.answered`. On a store that has never hydrated, the writer's stream receives local write and declaration notifications; it starts following server events with the first hydration.
+Each queued write carries its `verdict` once the server answers it. A write held behind another that has no answer yet is `waiting`, with no verdict, and goes once that write is answered; a `blocked` verdict is a stop the app may have to act on, by releasing or withdrawing it. A `refused` verdict carries a typed `Refusal`: the server's code and message, each property it would not take and why, whether the row is in the bin, and any permission the key lacks. A refused write that carried content keeps it in `body` through `forgetAnswered()`, so the app can offer it back to the person, until `queue.discard(_:)` takes it out. A drain's report lists each write it answered with the item or edge it wrote, and a held `changes()` stream is told each one as `.answered`. On a store that has never hydrated, the writer's stream receives local write and declaration notifications, and its follow waits for the first hydration before it follows server events.
 
 The drain report separates requests the server `answered`, writes still `undelivered`, writes settled `unsent`, and requests that were `unmade`. `unavailable` says why the pass ended without reaching the rest; `stopped` names a refused credential that parked the queue. A network outage leaves undelivered writes waiting without counting a refusal.
 
@@ -246,6 +246,8 @@ _ = try await copy.edges.update(edge.id, EdgeEdit(baseVersion: edge.version, mov
 _ = try await copy.edges.update(
     replyEdge.id, EdgeEdit(["note": "moved"], baseVersion: replyEdge.version, move: .target(newThreadId)))
 ```
+
+`update` returns the queued write, or `nil` where the edit names no property and no end other than the ends the copy holds. It queues nothing then, so a stream is told nothing and the edge's version doesn't move.
 
 The copy shows the edge at its new end at once, read from either end, offline included, and a move to an item whose create is still queued waits for that create. An edit throws `invalid` where its `baseVersion` is not the one the copy holds, and `notFound` where the copy does not hold the edge.
 
@@ -382,7 +384,7 @@ for try await event in watch {
 }
 ```
 
-One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
+One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. It also throws `invalid` for a path that passes through a symbolic link, such as one under `/var` on a Mac, unless it is the path `list()` gives; pass that path. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
 
 ## Keys
 

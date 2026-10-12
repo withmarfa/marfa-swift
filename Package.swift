@@ -17,7 +17,10 @@ let package = Package(
         .target(
             name: "MarfaCore",
             dependencies: ["MarfaCoreFFI"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            // The core reads a folder's package flag through it; a static library
+            // carries no link directive of its own into the xcframework.
+            linkerSettings: [.linkedFramework("UniformTypeIdentifiers", .when(platforms: [.macOS]))]
         ),
         .target(
             name: "Marfa",

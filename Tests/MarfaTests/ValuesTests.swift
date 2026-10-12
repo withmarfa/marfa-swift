@@ -155,7 +155,7 @@ struct Errors {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         let unwritable: JSONObject = ["r": .number(.nan)]
         let infinite: JSONObject = ["r": .number(-.infinity)]
-        let writes: [(String, @Sendable () async throws -> Marfa.QueuedWrite)] = [
+        let writes: [(String, @Sendable () async throws -> Marfa.QueuedWrite?)] = [
             ("create", { try await copy.items.create(Marfa.Draft(type: "core.note", properties: unwritable)) }),
             ("update", { try await copy.items.update("n1", Marfa.Edit(.merge(infinite), baseVersion: 1)) }),
             ("edge", { try await copy.edges.create(from: "a", to: "b", type: "references", properties: unwritable) }),
@@ -258,7 +258,8 @@ struct OwnValueTypes {
             registeredTypes: ["app.new"],
             unregisteredTypes: [Marfa.UnregisteredType(id: "app.no", code: "forbidden", message: "m")])
         #expect(Marfa.HydrateReport(hydrated.core) == hydrated)
-        let caught = Marfa.CatchUpReport(applied: 1, skipped: 2, cursor: "c", reachedHead: false)
+        let caught = Marfa.CatchUpReport(
+            applied: 1, skipped: 2, cursor: "c", reachedHead: false, catalogChanged: true)
         #expect(Marfa.CatchUpReport(caught.core) == caught)
         let status = Marfa.Status(
             serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],

@@ -1340,6 +1340,26 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// The source's current problems, by opaque key. Each message is at most 500 UTF-16 code units. The map has at most 200 entries and 512 KiB serialized as UTF-8. An empty map means no current problems.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorProblems`.
+        public struct ConnectorProblems: Codable, Hashable, Sendable {
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: Swift.String]
+            /// Creates a new `ConnectorProblems`.
+            ///
+            /// - Parameters:
+            ///   - additionalProperties: A container of undocumented properties.
+            public init(additionalProperties: [String: Swift.String] = .init()) {
+                self.additionalProperties = additionalProperties
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
         /// Where a bulk-action job is. `queued`: waiting to run. `in_progress`: running. `completed`: it reached every matched item. `failed`: it stopped early, and `error` says why. `canceled`: it was canceled before it finished.
         ///
         /// - Remark: Generated from `#/components/schemas/BulkActionJobStatus`.
@@ -4544,33 +4564,34 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
-        public struct EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
+        public struct EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case edgeConstraintViolation = "edge_constraint_violation"
                     case edgeCycle = "edge_cycle"
                     case invalidId = "invalid_id"
+                    case invalidProperties = "invalid_properties"
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -4590,8 +4611,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -4599,9 +4620,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -4615,13 +4636,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.EdgeConstraintViolationOrEdgeCycleOrInvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -4955,7 +4976,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload
-            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it.
+            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
@@ -4975,7 +4996,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it.
+            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public var propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
@@ -5008,7 +5029,7 @@ extension Components {
             ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
             ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`.
             ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
-            ///   - propertySchema: The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it.
+            ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
             ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
@@ -5063,7 +5084,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/description`.
             public var description: Swift.String?
-            /// `true` if every edge of the type should have the property.
+            /// `true` if every edge of the type must have the property.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/required`.
             public var required: Swift.Bool?
@@ -5075,7 +5096,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
             public var itemsType: Swift.String?
-            /// A refinement of a `string` property, such as `bcp47`. It can't be `thumbnail`: an edge carries no thumbnail.
+            /// A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
             public var format: Swift.String?
@@ -5084,10 +5105,10 @@ extension Components {
             /// - Parameters:
             ///   - _type: The property's type: one of the field types a type's `fields` take, except `thumbnail`.
             ///   - description: What the property holds.
-            ///   - required: `true` if every edge of the type should have the property.
+            ///   - required: `true` if every edge of the type must have the property.
             ///   - enumValues: The values an `enum` property takes.
             ///   - itemsType: The type of each element of an `array` property. It can't be `thumbnail`.
-            ///   - format: A refinement of a `string` property, such as `bcp47`. It can't be `thumbnail`: an edge carries no thumbnail.
+            ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
             public init(
                 _type: Swift.String,
                 description: Swift.String? = nil,
@@ -5410,7 +5431,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeTypeRequest.CascadeOnDeletePayload?
-            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it. Leave it out for none.
+            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
@@ -5430,7 +5451,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it. Leave it out for none.
+            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
             public var propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload?
@@ -5459,7 +5480,7 @@ extension Components {
             ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
             ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
             ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
-            ///   - propertySchema: The properties an edge of the type can carry, by name, for clients to read. Marfa doesn't check edges against it. Leave it out for none.
+            ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
             public init(
@@ -6228,23 +6249,41 @@ extension Components {
                 case error
             }
         }
-        /// One type.
+        /// Canonical definitions from one registry view, with field defaults made explicit as `required: false` and `searchable: true`.
         ///
-        /// - Remark: Generated from `#/components/schemas/TypeResponse`.
-        public struct TypeResponse: Codable, Hashable, Sendable {
-            /// The type.
+        /// - Remark: Generated from `#/components/schemas/NormalizedType`.
+        public struct NormalizedType: Codable, Hashable, Sendable {
+            /// The normalized candidate's declared definition, including its label and defaults.
             ///
-            /// - Remark: Generated from `#/components/schemas/TypeResponse/type`.
+            /// - Remark: Generated from `#/components/schemas/NormalizedType/type`.
             public var _type: Components.Schemas.TypeDefinition
-            /// Creates a new `TypeResponse`.
+            /// The canonical registered type's declared definition; `null` if its identifier is not registered.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NormalizedType/registered_type`.
+            public var registeredType: Components.Schemas.MarfaNullableTypeDefinition
+            /// The canonical registered definition, with inherited fields, policies and roles resolved as on `GET /types/{id}`; `null` if its identifier is not registered.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NormalizedType/resolved_type`.
+            public var resolvedType: Components.Schemas.MarfaNullableTypeDefinition
+            /// Creates a new `NormalizedType`.
             ///
             /// - Parameters:
-            ///   - _type: The type.
-            public init(_type: Components.Schemas.TypeDefinition) {
+            ///   - _type: The normalized candidate's declared definition, including its label and defaults.
+            ///   - registeredType: The canonical registered type's declared definition; `null` if its identifier is not registered.
+            ///   - resolvedType: The canonical registered definition, with inherited fields, policies and roles resolved as on `GET /types/{id}`; `null` if its identifier is not registered.
+            public init(
+                _type: Components.Schemas.TypeDefinition,
+                registeredType: Components.Schemas.MarfaNullableTypeDefinition,
+                resolvedType: Components.Schemas.MarfaNullableTypeDefinition
+            ) {
                 self._type = _type
+                self.registeredType = registeredType
+                self.resolvedType = resolvedType
             }
             public enum CodingKeys: String, CodingKey {
                 case _type = "type"
+                case registeredType = "registered_type"
+                case resolvedType = "resolved_type"
             }
         }
         /// An error response.
@@ -6335,89 +6374,6 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal`.
-        public struct LinkTakenOrTypeAlreadyExistsRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case linkTaken = "link_taken"
-                    case typeAlreadyExists = "type_already_exists"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
-                public var code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
-                public var details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
-            public var error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload
-            /// Creates a new `LinkTakenOrTypeAlreadyExistsRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
         /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal`.
         public struct CompatibleWithViolationRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -6498,7 +6454,7 @@ extension Components {
                 case error
             }
         }
-        /// A type to register.
+        /// A declared item type.
         ///
         /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput`.
         public struct TypeDefinitionInput: Codable, Hashable, Sendable {
@@ -6813,6 +6769,108 @@ extension Components {
                     forKey: .id
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// One type.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeResponse`.
+        public struct TypeResponse: Codable, Hashable, Sendable {
+            /// The type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeResponse/type`.
+            public var _type: Components.Schemas.TypeDefinition
+            /// Creates a new `TypeResponse`.
+            ///
+            /// - Parameters:
+            ///   - _type: The type.
+            public init(_type: Components.Schemas.TypeDefinition) {
+                self._type = _type
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal`.
+        public struct LinkTakenOrTypeAlreadyExistsRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case linkTaken = "link_taken"
+                    case typeAlreadyExists = "type_already_exists"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
+                public var code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/details`.
+                public var details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error`.
+            public var error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload
+            /// Creates a new `LinkTakenOrTypeAlreadyExistsRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// An error response.
@@ -8750,6 +8808,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/last_run`.
             public var lastRun: Components.Schemas.MarfaNullableConnectorRun
+            /// The source's current problems, by opaque key; `{}` if there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connector/problems`.
+            public var problems: Components.Schemas.ConnectorProblems
             /// When the hold on the connector lapses; `null` if no process holds it or its hold has lapsed.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/hold_expires_at`.
@@ -8766,6 +8828,7 @@ extension Components {
             ///   - updatedAt: When the connector's name or description was last set.
             ///   - lastHeartbeatAt: When the connector last sent a heartbeat; `null` if never.
             ///   - lastRun: The connector's most recently reported run; `null` if it has reported none.
+            ///   - problems: The source's current problems, by opaque key; `{}` if there are none.
             ///   - holdExpiresAt: When the hold on the connector lapses; `null` if no process holds it or its hold has lapsed.
             public init(
                 id: Swift.String,
@@ -8777,6 +8840,7 @@ extension Components {
                 updatedAt: Swift.String,
                 lastHeartbeatAt: Swift.String? = nil,
                 lastRun: Components.Schemas.MarfaNullableConnectorRun,
+                problems: Components.Schemas.ConnectorProblems,
                 holdExpiresAt: Swift.String? = nil
             ) {
                 self.id = id
@@ -8788,6 +8852,7 @@ extension Components {
                 self.updatedAt = updatedAt
                 self.lastHeartbeatAt = lastHeartbeatAt
                 self.lastRun = lastRun
+                self.problems = problems
                 self.holdExpiresAt = holdExpiresAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -8800,6 +8865,7 @@ extension Components {
                 case updatedAt = "updated_at"
                 case lastHeartbeatAt = "last_heartbeat_at"
                 case lastRun = "last_run"
+                case problems
                 case holdExpiresAt = "hold_expires_at"
             }
         }
@@ -9118,7 +9184,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpoint/id`.
             public var id: Swift.String
-            /// The ID of the connector the endpoint belongs to.
+            /// The ID of the current connector registration for the endpoint's source.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpoint/connector_id`.
             public var connectorId: Swift.String
@@ -9146,7 +9212,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the webhook endpoint.
-            ///   - connectorId: The ID of the connector the endpoint belongs to.
+            ///   - connectorId: The ID of the current connector registration for the endpoint's source.
             ///   - label: A name for people to read; `null` if none was given.
             ///   - duplicateHeader: The header whose value identifies a delivery, lowercased; `null` if none was set. A delivery that repeats a value is marked as a repeat in `duplicate_of`.
             ///   - path: The address a sender posts to, a path on this instance. It is in full only in the response that created the endpoint; after that it shows `/inbound/****` and its last four characters.
@@ -9637,6 +9703,10 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/ConnectorState`.
         public struct ConnectorState: Codable, Hashable, Sendable {
+            /// The source's current problems, by opaque key; `{}` if there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorState/problems`.
+            public var problems: Components.Schemas.ConnectorProblems
             /// The document as last written; `{}` if none was.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorState/state`.
@@ -9668,16 +9738,20 @@ extension Components {
             /// Creates a new `ConnectorState`.
             ///
             /// - Parameters:
+            ///   - problems: The source's current problems, by opaque key; `{}` if there are none.
             ///   - state: The document as last written; `{}` if none was.
             ///   - updatedAt: When it was last written; `null` if it never was.
             public init(
+                problems: Components.Schemas.ConnectorProblems,
                 state: Components.Schemas.ConnectorState.StatePayload,
                 updatedAt: Swift.String? = nil
             ) {
+                self.problems = problems
                 self.state = state
                 self.updatedAt = updatedAt
             }
             public enum CodingKeys: String, CodingKey {
+                case problems
                 case state
                 case updatedAt = "updated_at"
             }
@@ -10119,6 +10193,495 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case error
+            }
+        }
+        /// The latest accepted report's sequence and receipt time.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderStatusAck`.
+        public struct FolderStatusAck: Codable, Hashable, Sendable {
+            /// `true` if this report replaced the stored report; false for an equal or older sequence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusAck/accepted`.
+            public var accepted: Swift.Bool
+            /// The latest stored sequence for this copy and sign-in; a behind client resnapshots and sends a higher sequence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusAck/sequence`.
+            public var sequence: Swift.Int
+            /// When the latest report was first accepted, in UTC; retries do not refresh it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusAck/received_at`.
+            public var receivedAt: Swift.String
+            /// Creates a new `FolderStatusAck`.
+            ///
+            /// - Parameters:
+            ///   - accepted: `true` if this report replaced the stored report; false for an equal or older sequence.
+            ///   - sequence: The latest stored sequence for this copy and sign-in; a behind client resnapshots and sends a higher sequence.
+            ///   - receivedAt: When the latest report was first accepted, in UTC; retries do not refresh it.
+            public init(
+                accepted: Swift.Bool,
+                sequence: Swift.Int,
+                receivedAt: Swift.String
+            ) {
+                self.accepted = accepted
+                self.sequence = sequence
+                self.receivedAt = receivedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case accepted
+                case sequence
+                case receivedAt = "received_at"
+            }
+        }
+        /// A folder copy's last observed sync health, containing no file details.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderStatusReport`.
+        public struct FolderStatusReport: Codable, Hashable, Sendable {
+            /// The opaque ID of this local folder copy; it reveals no path or machine name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/folder_store_id`.
+            public var folderStoreId: Swift.String
+            /// The increasing sequence for this copy under this sign-in; a retry keeps its sequence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/sequence`.
+            public var sequence: Swift.Int
+            /// When this copy last finished a fully successful sync, as reported by the client, in UTC; null if none has completed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/last_success_at`.
+            public var lastSuccessAt: Swift.String?
+            /// The distinct local files last observed waiting to upload.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/pending_uploads`.
+            public var pendingUploads: Swift.Int
+            /// The distinct items whose files the last completed pull could not write; retained when a later pull fails.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/pending_downloads`.
+            public var pendingDownloads: Swift.Int
+            /// The file removals waiting for confirmation on this copy.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/paused_removals`.
+            public var pausedRemovals: Swift.Int
+            /// `true` if this copy's first sync is waiting for confirmation.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/first_sync_waiting`.
+            public var firstSyncWaiting: Swift.Bool
+            /// The current problem counts, each code once; an empty list means none were observed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusReport/problems`.
+            public var problems: [Components.Schemas.FolderStatusProblem]
+            /// Creates a new `FolderStatusReport`.
+            ///
+            /// - Parameters:
+            ///   - folderStoreId: The opaque ID of this local folder copy; it reveals no path or machine name.
+            ///   - sequence: The increasing sequence for this copy under this sign-in; a retry keeps its sequence.
+            ///   - lastSuccessAt: When this copy last finished a fully successful sync, as reported by the client, in UTC; null if none has completed.
+            ///   - pendingUploads: The distinct local files last observed waiting to upload.
+            ///   - pendingDownloads: The distinct items whose files the last completed pull could not write; retained when a later pull fails.
+            ///   - pausedRemovals: The file removals waiting for confirmation on this copy.
+            ///   - firstSyncWaiting: `true` if this copy's first sync is waiting for confirmation.
+            ///   - problems: The current problem counts, each code once; an empty list means none were observed.
+            public init(
+                folderStoreId: Swift.String,
+                sequence: Swift.Int,
+                lastSuccessAt: Swift.String? = nil,
+                pendingUploads: Swift.Int,
+                pendingDownloads: Swift.Int,
+                pausedRemovals: Swift.Int,
+                firstSyncWaiting: Swift.Bool,
+                problems: [Components.Schemas.FolderStatusProblem]
+            ) {
+                self.folderStoreId = folderStoreId
+                self.sequence = sequence
+                self.lastSuccessAt = lastSuccessAt
+                self.pendingUploads = pendingUploads
+                self.pendingDownloads = pendingDownloads
+                self.pausedRemovals = pausedRemovals
+                self.firstSyncWaiting = firstSyncWaiting
+                self.problems = problems
+            }
+            public enum CodingKeys: String, CodingKey {
+                case folderStoreId = "folder_store_id"
+                case sequence
+                case lastSuccessAt = "last_success_at"
+                case pendingUploads = "pending_uploads"
+                case pendingDownloads = "pending_downloads"
+                case pausedRemovals = "paused_removals"
+                case firstSyncWaiting = "first_sync_waiting"
+                case problems
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.folderStoreId = try container.decode(
+                    Swift.String.self,
+                    forKey: .folderStoreId
+                )
+                self.sequence = try container.decode(
+                    Swift.Int.self,
+                    forKey: .sequence
+                )
+                self.lastSuccessAt = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .lastSuccessAt
+                )
+                self.pendingUploads = try container.decode(
+                    Swift.Int.self,
+                    forKey: .pendingUploads
+                )
+                self.pendingDownloads = try container.decode(
+                    Swift.Int.self,
+                    forKey: .pendingDownloads
+                )
+                self.pausedRemovals = try container.decode(
+                    Swift.Int.self,
+                    forKey: .pausedRemovals
+                )
+                self.firstSyncWaiting = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .firstSyncWaiting
+                )
+                self.problems = try container.decode(
+                    [Components.Schemas.FolderStatusProblem].self,
+                    forKey: .problems
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "folder_store_id",
+                    "sequence",
+                    "last_success_at",
+                    "pending_uploads",
+                    "pending_downloads",
+                    "paused_removals",
+                    "first_sync_waiting",
+                    "problems"
+                ])
+            }
+        }
+        /// A safe problem code and its count.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderStatusProblem`.
+        public struct FolderStatusProblem: Codable, Hashable, Sendable {
+            /// conflict: unresolved conflict; refused: current refused write; credential_refused: rejected credential; unreadable: unreadable entry; held_file: held file; unavailable: failed sync; root_gone: unavailable root; settings_invalid: invalid settings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusProblem/code`.
+            @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case conflict = "conflict"
+                case refused = "refused"
+                case credentialRefused = "credential_refused"
+                case unreadable = "unreadable"
+                case heldFile = "held_file"
+                case unavailable = "unavailable"
+                case rootGone = "root_gone"
+                case settingsInvalid = "settings_invalid"
+            }
+            /// conflict: unresolved conflict; refused: current refused write; credential_refused: rejected credential; unreadable: unreadable entry; held_file: held file; unavailable: failed sync; root_gone: unavailable root; settings_invalid: invalid settings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusProblem/code`.
+            public var code: Components.Schemas.FolderStatusProblem.CodePayload
+            /// The number of current observations with this problem.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusProblem/count`.
+            public var count: Swift.Int
+            /// Creates a new `FolderStatusProblem`.
+            ///
+            /// - Parameters:
+            ///   - code: conflict: unresolved conflict; refused: current refused write; credential_refused: rejected credential; unreadable: unreadable entry; held_file: held file; unavailable: failed sync; root_gone: unavailable root; settings_invalid: invalid settings.
+            ///   - count: The number of current observations with this problem.
+            public init(
+                code: Components.Schemas.FolderStatusProblem.CodePayload,
+                count: Swift.Int
+            ) {
+                self.code = code
+                self.count = count
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code
+                case count
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.code = try container.decode(
+                    Components.Schemas.FolderStatusProblem.CodePayload.self,
+                    forKey: .code
+                )
+                self.count = try container.decode(
+                    Swift.Int.self,
+                    forKey: .count
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "code",
+                    "count"
+                ])
+            }
+        }
+        /// A folder's sync reports grouped by existing sign-in.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderStatus`.
+        public struct FolderStatus: Codable, Hashable, Sendable {
+            /// The ID of the folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatus/folder_id`.
+            public var folderId: Swift.String
+            /// Current and historical reports, grouped by sign-in; age is no claim of being online.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatus/sign_ins`.
+            public var signIns: [Components.Schemas.FolderStatusGroup]
+            /// Totals from current sign-ins alone; copies may contain overlapping files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatus/totals`.
+            public struct TotalsPayload: Codable, Hashable, Sendable {
+                /// `true` if any total exceeded the safe integer bound; capped totals then mean at least that bound.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/saturated`.
+                public var saturated: Swift.Bool
+                /// The sum of pending upload files across current sign-ins' copies.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/pending_uploads`.
+                public var pendingUploads: Swift.Int
+                /// The sum of observed pending download files across current sign-ins' copies.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/pending_downloads`.
+                public var pendingDownloads: Swift.Int
+                /// The sum of paused file removals across current sign-ins' copies.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/paused_removals`.
+                public var pausedRemovals: Swift.Int
+                /// The number of current sign-ins' copies waiting on their first sync.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/first_sync_waiting`.
+                public var firstSyncWaiting: Swift.Int
+                /// The summed current problem counts across current sign-ins' copies.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/problems`.
+                public var problems: [Components.Schemas.FolderStatusProblem]
+                /// Creates a new `TotalsPayload`.
+                ///
+                /// - Parameters:
+                ///   - saturated: `true` if any total exceeded the safe integer bound; capped totals then mean at least that bound.
+                ///   - pendingUploads: The sum of pending upload files across current sign-ins' copies.
+                ///   - pendingDownloads: The sum of observed pending download files across current sign-ins' copies.
+                ///   - pausedRemovals: The sum of paused file removals across current sign-ins' copies.
+                ///   - firstSyncWaiting: The number of current sign-ins' copies waiting on their first sync.
+                ///   - problems: The summed current problem counts across current sign-ins' copies.
+                public init(
+                    saturated: Swift.Bool,
+                    pendingUploads: Swift.Int,
+                    pendingDownloads: Swift.Int,
+                    pausedRemovals: Swift.Int,
+                    firstSyncWaiting: Swift.Int,
+                    problems: [Components.Schemas.FolderStatusProblem]
+                ) {
+                    self.saturated = saturated
+                    self.pendingUploads = pendingUploads
+                    self.pendingDownloads = pendingDownloads
+                    self.pausedRemovals = pausedRemovals
+                    self.firstSyncWaiting = firstSyncWaiting
+                    self.problems = problems
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case saturated
+                    case pendingUploads = "pending_uploads"
+                    case pendingDownloads = "pending_downloads"
+                    case pausedRemovals = "paused_removals"
+                    case firstSyncWaiting = "first_sync_waiting"
+                    case problems
+                }
+            }
+            /// Totals from current sign-ins alone; copies may contain overlapping files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatus/totals`.
+            public var totals: Components.Schemas.FolderStatus.TotalsPayload
+            /// Creates a new `FolderStatus`.
+            ///
+            /// - Parameters:
+            ///   - folderId: The ID of the folder.
+            ///   - signIns: Current and historical reports, grouped by sign-in; age is no claim of being online.
+            ///   - totals: Totals from current sign-ins alone; copies may contain overlapping files.
+            public init(
+                folderId: Swift.String,
+                signIns: [Components.Schemas.FolderStatusGroup],
+                totals: Components.Schemas.FolderStatus.TotalsPayload
+            ) {
+                self.folderId = folderId
+                self.signIns = signIns
+                self.totals = totals
+            }
+            public enum CodingKeys: String, CodingKey {
+                case folderId = "folder_id"
+                case signIns = "sign_ins"
+                case totals
+            }
+        }
+        /// The folder-copy reports grouped under one sign-in.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderStatusGroup`.
+        public struct FolderStatusGroup: Codable, Hashable, Sendable {
+            /// The sign-in that owns these reports.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in`.
+            public struct SignInPayload: Codable, Hashable, Sendable {
+                /// browser: owner browser session; app: signed-in app grant; key: API key.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case browser = "browser"
+                    case app = "app"
+                    case key = "key"
+                }
+                /// browser: owner browser session; app: signed-in app grant; key: API key.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/kind`.
+                public var kind: Components.Schemas.FolderStatusGroup.SignInPayload.KindPayload
+                /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/id`.
+                public var id: Swift.String
+                /// The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                ///
+                /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/name`.
+                public var name: Swift.String
+                /// Creates a new `SignInPayload`.
+                ///
+                /// - Parameters:
+                ///   - kind: browser: owner browser session; app: signed-in app grant; key: API key.
+                ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///   - name: The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                public init(
+                    kind: Components.Schemas.FolderStatusGroup.SignInPayload.KindPayload,
+                    id: Swift.String,
+                    name: Swift.String
+                ) {
+                    self.kind = kind
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case kind
+                    case id
+                    case name
+                }
+            }
+            /// The sign-in that owns these reports.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in`.
+            public var signIn: Components.Schemas.FolderStatusGroup.SignInPayload
+            /// `true` while the sign-in still stands; false for retained historical reports. This is no claim of current folder access, freshness, or being online.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/current`.
+            public var current: Swift.Bool
+            /// The latest report for each copy under this sign-in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/copies`.
+            public var copies: [Components.Schemas.FolderStatusCopy]
+            /// Creates a new `FolderStatusGroup`.
+            ///
+            /// - Parameters:
+            ///   - signIn: The sign-in that owns these reports.
+            ///   - current: `true` while the sign-in still stands; false for retained historical reports. This is no claim of current folder access, freshness, or being online.
+            ///   - copies: The latest report for each copy under this sign-in.
+            public init(
+                signIn: Components.Schemas.FolderStatusGroup.SignInPayload,
+                current: Swift.Bool,
+                copies: [Components.Schemas.FolderStatusCopy]
+            ) {
+                self.signIn = signIn
+                self.current = current
+                self.copies = copies
+            }
+            public enum CodingKeys: String, CodingKey {
+                case signIn = "sign_in"
+                case current
+                case copies
+            }
+        }
+        /// One copy's latest report and its server-measured age.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderStatusCopy`.
+        public struct FolderStatusCopy: Codable, Hashable, Sendable {
+            /// The opaque ID of this local folder copy; it reveals no path or machine name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/folder_store_id`.
+            public var folderStoreId: Swift.String
+            /// The increasing sequence for this copy under this sign-in; a retry keeps its sequence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/sequence`.
+            public var sequence: Swift.Int
+            /// When this copy last finished a fully successful sync, as reported by the client, in UTC; null if none has completed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/last_success_at`.
+            public var lastSuccessAt: Swift.String?
+            /// The distinct local files last observed waiting to upload.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/pending_uploads`.
+            public var pendingUploads: Swift.Int
+            /// The distinct items whose files the last completed pull could not write; retained when a later pull fails.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/pending_downloads`.
+            public var pendingDownloads: Swift.Int
+            /// The file removals waiting for confirmation on this copy.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/paused_removals`.
+            public var pausedRemovals: Swift.Int
+            /// `true` if this copy's first sync is waiting for confirmation.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/first_sync_waiting`.
+            public var firstSyncWaiting: Swift.Bool
+            /// The current problem counts, each code once; an empty list means none were observed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/problems`.
+            public var problems: [Components.Schemas.FolderStatusProblem]
+            /// When the server accepted this report, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/received_at`.
+            public var receivedAt: Swift.String
+            /// The whole seconds since receipt, measured by the server; it does not show whether the copy is online.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/age_seconds`.
+            public var ageSeconds: Swift.Int
+            /// Creates a new `FolderStatusCopy`.
+            ///
+            /// - Parameters:
+            ///   - folderStoreId: The opaque ID of this local folder copy; it reveals no path or machine name.
+            ///   - sequence: The increasing sequence for this copy under this sign-in; a retry keeps its sequence.
+            ///   - lastSuccessAt: When this copy last finished a fully successful sync, as reported by the client, in UTC; null if none has completed.
+            ///   - pendingUploads: The distinct local files last observed waiting to upload.
+            ///   - pendingDownloads: The distinct items whose files the last completed pull could not write; retained when a later pull fails.
+            ///   - pausedRemovals: The file removals waiting for confirmation on this copy.
+            ///   - firstSyncWaiting: `true` if this copy's first sync is waiting for confirmation.
+            ///   - problems: The current problem counts, each code once; an empty list means none were observed.
+            ///   - receivedAt: When the server accepted this report, in UTC.
+            ///   - ageSeconds: The whole seconds since receipt, measured by the server; it does not show whether the copy is online.
+            public init(
+                folderStoreId: Swift.String,
+                sequence: Swift.Int,
+                lastSuccessAt: Swift.String? = nil,
+                pendingUploads: Swift.Int,
+                pendingDownloads: Swift.Int,
+                pausedRemovals: Swift.Int,
+                firstSyncWaiting: Swift.Bool,
+                problems: [Components.Schemas.FolderStatusProblem],
+                receivedAt: Swift.String,
+                ageSeconds: Swift.Int
+            ) {
+                self.folderStoreId = folderStoreId
+                self.sequence = sequence
+                self.lastSuccessAt = lastSuccessAt
+                self.pendingUploads = pendingUploads
+                self.pendingDownloads = pendingDownloads
+                self.pausedRemovals = pausedRemovals
+                self.firstSyncWaiting = firstSyncWaiting
+                self.problems = problems
+                self.receivedAt = receivedAt
+                self.ageSeconds = ageSeconds
+            }
+            public enum CodingKeys: String, CodingKey {
+                case folderStoreId = "folder_store_id"
+                case sequence
+                case lastSuccessAt = "last_success_at"
+                case pendingUploads = "pending_uploads"
+                case pendingDownloads = "pending_downloads"
+                case pausedRemovals = "paused_removals"
+                case firstSyncWaiting = "first_sync_waiting"
+                case problems
+                case receivedAt = "received_at"
+                case ageSeconds = "age_seconds"
             }
         }
         /// A new API key, with its plaintext `key`.
@@ -13452,6 +14015,8 @@ extension Components {
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableTypeDefinition`.
+        public typealias MarfaNullableTypeDefinition = MarfaNullable<Components.Schemas.TypeDefinition>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.
         public typealias MarfaNullableHousekeepingOutcome = MarfaNullable<Components.Schemas.HousekeepingOutcome>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingReport`.

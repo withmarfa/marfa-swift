@@ -305,6 +305,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
     func deleteType(_ input: Operations.DeleteType.Input) async throws -> Operations.DeleteType.Output
+    /// Normalize a type
+    ///
+    /// Normalizes a candidate definition and returns its declared form, the registered declared definition and the registered resolved definition. It does not register or replace a type.
+    ///
+    /// - Remark: HTTP `POST /types/normalize`.
+    /// - Remark: Generated from `#/paths//types/normalize/post(normalizeType)`.
+    func normalizeType(_ input: Operations.NormalizeType.Input) async throws -> Operations.NormalizeType.Output
     /// Search items
     ///
     /// Returns a page of the items you can read whose text properties or tags match `q`, ranked by BM25 relevance, with ties ordered by item ID.
@@ -398,7 +405,7 @@ public protocol APIProtocol: Sendable {
     func listConnectors(_ input: Operations.ListConnectors.Input) async throws -> Operations.ListConnectors.Output
     /// Register a connector
     ///
-    /// Registers your key as a connector, with a name and description, and returns it. Each key has one registration: registering again updates the name and description and returns the same `id`.
+    /// Registers your key as a connector and returns it. Repeating registration updates its name and description and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -510,7 +517,7 @@ public protocol APIProtocol: Sendable {
     func replaceConnectorState(_ input: Operations.ReplaceConnectorState.Input) async throws -> Operations.ReplaceConnectorState.Output
     /// Delete the state document
     ///
-    /// Deletes the state document and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
+    /// Deletes the state document, current problems and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
@@ -557,6 +564,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /folders/{id}/revoke`.
     /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)`.
     func revokeFolder(_ input: Operations.RevokeFolder.Input) async throws -> Operations.RevokeFolder.Output
+    /// Get a folder status
+    ///
+    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. Historical reports remain visible.
+    ///
+    /// - Remark: HTTP `GET /folders/{id}/status`.
+    /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
+    func getFolderStatus(_ input: Operations.GetFolderStatus.Input) async throws -> Operations.GetFolderStatus.Output
+    /// Replace a folder status
+    ///
+    /// Replaces your sign-in's report for one folder copy and returns the latest accepted sequence and receipt time. An equal or older sequence leaves the stored report unchanged.
+    ///
+    /// - Remark: HTTP `PUT /folders/{id}/status`.
+    /// - Remark: Generated from `#/paths//folders/{id}/status/put(reportFolderStatus)`.
+    func reportFolderStatus(_ input: Operations.ReportFolderStatus.Input) async throws -> Operations.ReportFolderStatus.Output
     /// List API keys
     ///
     /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
@@ -1409,6 +1430,21 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Normalize a type
+    ///
+    /// Normalizes a candidate definition and returns its declared form, the registered declared definition and the registered resolved definition. It does not register or replace a type.
+    ///
+    /// - Remark: HTTP `POST /types/normalize`.
+    /// - Remark: Generated from `#/paths//types/normalize/post(normalizeType)`.
+    public func normalizeType(
+        headers: Operations.NormalizeType.Input.Headers = .init(),
+        body: Operations.NormalizeType.Input.Body
+    ) async throws -> Operations.NormalizeType.Output {
+        try await normalizeType(Operations.NormalizeType.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// Search items
     ///
     /// Returns a page of the items you can read whose text properties or tags match `q`, ranked by BM25 relevance, with ties ordered by item ID.
@@ -1578,7 +1614,7 @@ extension APIProtocol {
     }
     /// Register a connector
     ///
-    /// Registers your key as a connector, with a name and description, and returns it. Each key has one registration: registering again updates the name and description and returns the same `id`.
+    /// Registers your key as a connector and returns it. Repeating registration updates its name and description and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -1834,7 +1870,7 @@ extension APIProtocol {
     }
     /// Delete the state document
     ///
-    /// Deletes the state document and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
+    /// Deletes the state document, current problems and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
     ///
     /// - Remark: HTTP `DELETE /connectors/{id}/state`.
     /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
@@ -1943,6 +1979,38 @@ extension APIProtocol {
         try await revokeFolder(Operations.RevokeFolder.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// Get a folder status
+    ///
+    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. Historical reports remain visible.
+    ///
+    /// - Remark: HTTP `GET /folders/{id}/status`.
+    /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
+    public func getFolderStatus(
+        path: Operations.GetFolderStatus.Input.Path,
+        headers: Operations.GetFolderStatus.Input.Headers = .init()
+    ) async throws -> Operations.GetFolderStatus.Output {
+        try await getFolderStatus(Operations.GetFolderStatus.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Replace a folder status
+    ///
+    /// Replaces your sign-in's report for one folder copy and returns the latest accepted sequence and receipt time. An equal or older sequence leaves the stored report unchanged.
+    ///
+    /// - Remark: HTTP `PUT /folders/{id}/status`.
+    /// - Remark: Generated from `#/paths//folders/{id}/status/put(reportFolderStatus)`.
+    public func reportFolderStatus(
+        path: Operations.ReportFolderStatus.Input.Path,
+        headers: Operations.ReportFolderStatus.Input.Headers = .init(),
+        body: Operations.ReportFolderStatus.Input.Body
+    ) async throws -> Operations.ReportFolderStatus.Output {
+        try await reportFolderStatus(Operations.ReportFolderStatus.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// List API keys

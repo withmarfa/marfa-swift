@@ -959,10 +959,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     /**
      * Holds the event stream open on a thread of its own and applies each
-     * event as it arrives, telling `listener` of each change.
-     * `told_unreachable` says the app was last told `server.unreachable` by
-     * a follow before this one, so this one tells `server.reachable` when it
-     * has its first stream.
+     * event as it arrives, telling `listener` of each change. On a copy
+     * never hydrated, or whose hydration was interrupted, it waits, asking
+     * the server nothing, until a hydration completes; an expired copy is
+     * refused. `told_unreachable` says the app was last told
+     * `ServerUnreachable` by a follow before this one, so this one tells
+     * `ServerReachable` when it has its first stream.
      */
     func follow(toldUnreachable: Bool, listener: ChangeListener)  -> Subscription
     
@@ -1103,7 +1105,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func unpin(id: String) throws  -> PinReport
     
-    func updateEdge(id: String, edit: EdgeEdit) throws  -> QueuedWrite
+    /**
+     * Answers `nil` for an edit that names no property and no new end, which
+     * queues no write.
+     */
+    func updateEdge(id: String, edit: EdgeEdit) throws  -> QueuedWrite?
     
     /**
      * Changes an item in the local copy and queues the change.
@@ -1357,7 +1363,7 @@ open func bodyLinks(id: String)throws  -> BodyLinks  {
 }
     
 open func catchUp(stop: Stop?)throws  -> CatchUpReport  {
-    return try  FfiConverterTypeCatchUpReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    return try  FfiConverterTypeCatchUpReport_lift(try rustCallWithError(FfiConverterTypeCatchUpError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_catch_up(
             self.uniffiCloneHandle(),
         FfiConverterOptionTypeStop.lower(stop),$0
@@ -1564,10 +1570,12 @@ open func embedText(id: String, file: String)throws  -> String  {
     
     /**
      * Holds the event stream open on a thread of its own and applies each
-     * event as it arrives, telling `listener` of each change.
-     * `told_unreachable` says the app was last told `server.unreachable` by
-     * a follow before this one, so this one tells `server.reachable` when it
-     * has its first stream.
+     * event as it arrives, telling `listener` of each change. On a copy
+     * never hydrated, or whose hydration was interrupted, it waits, asking
+     * the server nothing, until a hydration completes; an expired copy is
+     * refused. `told_unreachable` says the app was last told
+     * `ServerUnreachable` by a follow before this one, so this one tells
+     * `ServerReachable` when it has its first stream.
      */
 open func follow(toldUnreachable: Bool, listener: ChangeListener) -> Subscription  {
     return try!  FfiConverterTypeSubscription_lift(try! rustCall() {
@@ -1899,8 +1907,12 @@ open func unpin(id: String)throws  -> PinReport  {
 })
 }
     
-open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite  {
-    return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    /**
+     * Answers `nil` for an edit that names no property and no new end, which
+     * queues no write.
+     */
+open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite?  {
+    return try  FfiConverterOptionTypeQueuedWrite.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_update_edge(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
@@ -2383,8 +2395,12 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
-     * still waiting to be confirmed, which this cancels. A folder whose
-     * directory is gone is only taken off the registry.
+     * still waiting to be confirmed, which this cancels. Follows no symbolic
+     * link, and takes a path through one only where it is the path the
+     * registry lists. Where that path is
+     * gone, passes through a link, or holds state the registry does not
+     * show to be the folder's own, the folder is only taken off the
+     * registry.
      */
     func remove(dir: String) throws 
     
@@ -2545,8 +2561,12 @@ open func list()throws  -> [ListedFolder]  {
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
-     * still waiting to be confirmed, which this cancels. A folder whose
-     * directory is gone is only taken off the registry.
+     * still waiting to be confirmed, which this cancels. Follows no symbolic
+     * link, and takes a path through one only where it is the path the
+     * registry lists. Where that path is
+     * gone, passes through a link, or holds state the registry does not
+     * show to be the folder's own, the folder is only taken off the
+     * registry.
      */
 open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_remove(
@@ -3319,14 +3339,22 @@ public struct CatchUpReport: Equatable, Hashable {
     public var skipped: UInt64
     public var cursor: String
     public var reachedHead: Bool
+    /**
+     * The catch-up changed the catalog the copy holds.
+     */
+    public var catalogChanged: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(applied: UInt64, skipped: UInt64, cursor: String, reachedHead: Bool) {
+    public init(applied: UInt64, skipped: UInt64, cursor: String, reachedHead: Bool, 
+        /**
+         * The catch-up changed the catalog the copy holds.
+         */catalogChanged: Bool) {
         self.applied = applied
         self.skipped = skipped
         self.cursor = cursor
         self.reachedHead = reachedHead
+        self.catalogChanged = catalogChanged
     }
 
     
@@ -3348,7 +3376,8 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
                 applied: FfiConverterUInt64.read(from: &buf), 
                 skipped: FfiConverterUInt64.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
-                reachedHead: FfiConverterBool.read(from: &buf)
+                reachedHead: FfiConverterBool.read(from: &buf), 
+                catalogChanged: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -3357,6 +3386,7 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.skipped, into: &buf)
         FfiConverterString.write(value.cursor, into: &buf)
         FfiConverterBool.write(value.reachedHead, into: &buf)
+        FfiConverterBool.write(value.catalogChanged, into: &buf)
     }
 }
 
@@ -3373,91 +3403,6 @@ public func FfiConverterTypeCatchUpReport_lift(_ buf: RustBuffer) throws -> Catc
 #endif
 public func FfiConverterTypeCatchUpReport_lower(_ value: CatchUpReport) -> RustBuffer {
     return FfiConverterTypeCatchUpReport.lower(value)
-}
-
-
-/**
- * What a held stream changed in the copy: an event it applied, named by the
- * event's type with the item or edge it was about, or `catalog.changed`,
- * naming neither, where a stream it opened read a catalog that differs from
- * the one held. Or what became of the server: `server.unreachable`, with
- * `reason`, once when a stream cannot be had, and `server.reachable` once
- * when one is had again, which is when to drain what waited. `cursor` is
- * the cursor held after it.
- */
-public struct Change: Equatable, Hashable {
-    public var event: String
-    public var itemId: String?
-    public var edgeId: String?
-    public var cursor: String
-    /**
-     * The failure the stream could not be had for, on `server.unreachable`
-     * alone, such as the network failing, a rate limit, a failing server or
-     * a refusal naming no contract.
-     */
-    public var reason: MarfaError?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(event: String, itemId: String?, edgeId: String?, cursor: String, 
-        /**
-         * The failure the stream could not be had for, on `server.unreachable`
-         * alone, such as the network failing, a rate limit, a failing server or
-         * a refusal naming no contract.
-         */reason: MarfaError?) {
-        self.event = event
-        self.itemId = itemId
-        self.edgeId = edgeId
-        self.cursor = cursor
-        self.reason = reason
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension Change: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeChange: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Change {
-        return
-            try Change(
-                event: FfiConverterString.read(from: &buf), 
-                itemId: FfiConverterOptionString.read(from: &buf), 
-                edgeId: FfiConverterOptionString.read(from: &buf), 
-                cursor: FfiConverterString.read(from: &buf), 
-                reason: FfiConverterOptionTypeMarfaError.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: Change, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.event, into: &buf)
-        FfiConverterOptionString.write(value.itemId, into: &buf)
-        FfiConverterOptionString.write(value.edgeId, into: &buf)
-        FfiConverterString.write(value.cursor, into: &buf)
-        FfiConverterOptionTypeMarfaError.write(value.reason, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeChange_lift(_ buf: RustBuffer) throws -> Change {
-    return try FfiConverterTypeChange.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeChange_lower(_ value: Change) -> RustBuffer {
-    return FfiConverterTypeChange.lower(value)
 }
 
 
@@ -5475,6 +5420,7 @@ public func FfiConverterTypeFolderSettingsChange_lower(_ value: FolderSettingsCh
 
 
 public struct FolderStatus: Equatable, Hashable {
+    public var directories: [FlaggedFile]
     public var files: [FileStatus]
     public var paused: PausedRemoval
     /**
@@ -5484,10 +5430,11 @@ public struct FolderStatus: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(files: [FileStatus], paused: PausedRemoval, 
+    public init(directories: [FlaggedFile], files: [FileStatus], paused: PausedRemoval, 
         /**
          * Set while the folder's first sync waits to be confirmed.
          */firstSync: WaitingFirstSync?) {
+        self.directories = directories
         self.files = files
         self.paused = paused
         self.firstSync = firstSync
@@ -5509,6 +5456,7 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderStatus {
         return
             try FolderStatus(
+                directories: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
                 files: FfiConverterSequenceTypeFileStatus.read(from: &buf), 
                 paused: FfiConverterTypePausedRemoval.read(from: &buf), 
                 firstSync: FfiConverterOptionTypeWaitingFirstSync.read(from: &buf)
@@ -5516,6 +5464,7 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: FolderStatus, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeFlaggedFile.write(value.directories, into: &buf)
         FfiConverterSequenceTypeFileStatus.write(value.files, into: &buf)
         FfiConverterTypePausedRemoval.write(value.paused, into: &buf)
         FfiConverterOptionTypeWaitingFirstSync.write(value.firstSync, into: &buf)
@@ -7556,7 +7505,6 @@ public enum BlockedReason: Equatable, Hashable {
     case keySpent
     case ancestorUnavailable
     case conflictUnresolved
-    case awaitingDependency
 
 
 
@@ -7586,8 +7534,6 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case 4: return .conflictUnresolved
         
-        case 5: return .awaitingDependency
-        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -7610,10 +7556,6 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case .conflictUnresolved:
             writeInt(&buf, Int32(4))
-        
-        
-        case .awaitingDependency:
-            writeInt(&buf, Int32(5))
         
         }
     }
@@ -7744,6 +7686,203 @@ public func FfiConverterTypeBodyTarget_lift(_ buf: RustBuffer) throws -> BodyTar
 #endif
 public func FfiConverterTypeBodyTarget_lower(_ value: BodyTarget) -> RustBuffer {
     return FfiConverterTypeBodyTarget.lower(value)
+}
+
+
+
+/**
+ * A catch-up that failed. The copy keeps the catalog a catch-up took
+ * whatever ends it, so `catalog_changed` says whether the types changed
+ * though the catch-up did not finish.
+ */
+public enum CatchUpError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case Failed(error: MarfaError, catalogChanged: Bool
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension CatchUpError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCatchUpError: FfiConverterRustBuffer {
+    typealias SwiftType = CatchUpError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CatchUpError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .Failed(
+            error: try FfiConverterTypeMarfaError.read(from: &buf), 
+            catalogChanged: try FfiConverterBool.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CatchUpError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .Failed(error,catalogChanged):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeMarfaError.write(error, into: &buf)
+            FfiConverterBool.write(catalogChanged, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatchUpError_lift(_ buf: RustBuffer) throws -> CatchUpError {
+    return try FfiConverterTypeCatchUpError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCatchUpError_lower(_ value: CatchUpError) -> RustBuffer {
+    return FfiConverterTypeCatchUpError.lower(value)
+}
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * What a held stream changed in the copy, or what became of the server.
+ * `cursor` is the cursor held after it.
+ */
+
+public enum Change: Equatable, Hashable {
+    
+    /**
+     * An event the stream applied, by the event's type, with the item or
+     * edge it was about.
+     */
+    case applied(event: String, itemId: String?, edgeId: String?, cursor: String
+    )
+    /**
+     * A stream it opened read a catalog that differs from the one held.
+     */
+    case catalogChanged(cursor: String
+    )
+    /**
+     * No stream can be had, told once until one is had again. `reason` is
+     * the failure, such as the network failing, a rate limit, a failing
+     * server or a refusal naming no contract.
+     */
+    case serverUnreachable(reason: MarfaError, cursor: String
+    )
+    /**
+     * A stream is had again, which is when to drain what waited.
+     */
+    case serverReachable(cursor: String
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension Change: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeChange: FfiConverterRustBuffer {
+    typealias SwiftType = Change
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Change {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .applied(event: try FfiConverterString.read(from: &buf), itemId: try FfiConverterOptionString.read(from: &buf), edgeId: try FfiConverterOptionString.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .catalogChanged(cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .serverUnreachable(reason: try FfiConverterTypeMarfaError.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .serverReachable(cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Change, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .applied(event,itemId,edgeId,cursor):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(event, into: &buf)
+            FfiConverterOptionString.write(itemId, into: &buf)
+            FfiConverterOptionString.write(edgeId, into: &buf)
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .catalogChanged(cursor):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .serverUnreachable(reason,cursor):
+            writeInt(&buf, Int32(3))
+            FfiConverterTypeMarfaError.write(reason, into: &buf)
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .serverReachable(cursor):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(cursor, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeChange_lift(_ buf: RustBuffer) throws -> Change {
+    return try FfiConverterTypeChange.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeChange_lower(_ value: Change) -> RustBuffer {
+    return FfiConverterTypeChange.lower(value)
 }
 
 
@@ -9975,6 +10114,30 @@ fileprivate struct FfiConverterOptionTypeMissingGrant: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeQueuedWrite: FfiConverterRustBuffer {
+    typealias SwiftType = QueuedWrite?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeQueuedWrite.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeQueuedWrite.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeRefusal: FfiConverterRustBuffer {
     typealias SwiftType = Refusal?
 
@@ -10752,7 +10915,7 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_changelistener_changed() != 54927) {
+    if (uniffi_marfa_core_ffi_checksum_method_changelistener_changed() != 39938) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_changelistener_ended() != 39692) {
@@ -10779,7 +10942,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_body_links() != 16922) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_catch_up() != 44200) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_catch_up() != 54493) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_conflicted_copies_of() != 13481) {
@@ -10833,7 +10996,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_embed_text() != 54663) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 52227) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 18794) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_forget_answered() != 62545) {
@@ -10911,7 +11074,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_unpin() != 56069) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_update_edge() != 37231) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_update_edge() != 9377) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_update_item() != 30971) {
@@ -10968,7 +11131,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 52626) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 14669) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 37532) {

@@ -18,13 +18,7 @@ private func saved(_ version: Int64) -> Marfa.Change {
 
 @Suite(.timeLimit(.minutes(1)))
 struct Changes {
-    @Test(
-        arguments: Errors.cases.filter { _, error in
-            switch error {
-            case .hydrationIncomplete, .noCursor: false
-            default: true
-            }
-        })
+    @Test(arguments: Errors.cases)
     func aStoppedStreamPreservesEveryFailureForExistingAndNewListeners(
         coreError: MarfaCore.MarfaError, expected: Marfa.MarfaError
     ) async throws {
@@ -94,17 +88,20 @@ struct Changes {
         #expect(copy.feed.count == 0)
     }
 
-    /// The real core refuses a follow on a store with no hydration.
-    @Test func aStoreThatNeverHydratedTellsItsStreamsOnlyWhatHappens() async throws {
+    /// The real core makes a follow on a store with no hydration wait for
+    /// one, asking the server nothing, so the streams hear no failure.
+    @Test func aFollowBeforeTheFirstHydrationWaitsRatherThanFailing() async throws {
         let copy = try await WorkingCopy.open(
             store: temporaryStore(), server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "k"))
-        var heard = copy.changes().makeAsyncIterator()
-        try await eventually("the refused follow ended") { copy.feed.watchTask == nil && copy.feed.count == 1 }
+        let heard = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.all.isEmpty, "\(heard.all)")
+        let later = Heard(copy.changes())
         try await Task.sleep(for: .milliseconds(100))
-        var later = copy.changes().makeAsyncIterator()
+        #expect(later.all.isEmpty, "a stream taken while the follow waited was told \(later.all)")
         copy.feed.announce(write(.addTag, item: "n1"))
-        #expect(await heard.next()?.origin == .local(.addTag))
-        #expect(await later.next()?.origin == .local(.addTag))
+        try await eventually("a local write was told to both") { heard.locals.count == 1 && later.locals.count == 1 }
+        #expect(heard.stops.isEmpty && later.stops.isEmpty)
         try await bounded("close") { await copy.close() }
     }
 
@@ -114,7 +111,7 @@ struct Changes {
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
         #expect(core.follows.count == 1)
-        core.change(0, MarfaCore.Change(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7", reason: nil))
+        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7"))
         let told = Marfa.Change(origin: .server(event: "item.created", cursor: "7"), itemId: "n1", edgeId: nil)
         try await eventually("both streams were told") { first.all == [told] && second.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -124,7 +121,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42", reason: nil))
+        core.change(0, MarfaCore.Change.applied(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42"))
         let told = Marfa.Change(origin: .server(event: "edge.created", cursor: "42"), itemId: "a", edgeId: "e1")
         try await eventually("the change was told") { heard.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -134,8 +131,8 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change(event: "catalog.changed", itemId: nil, edgeId: nil, cursor: "9", reason: nil))
-        core.change(0, MarfaCore.Change(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10", reason: nil))
+        core.change(0, MarfaCore.Change.catalogChanged(cursor: "9"))
+        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10"))
         let item = Marfa.Change(origin: .server(event: "item.created", cursor: "10"), itemId: "n1", edgeId: nil)
         try await eventually("both changes were told") { heard.all.count == 2 }
         #expect(heard.all == [refreshed(.catalog), item])
@@ -171,9 +168,9 @@ struct Changes {
         try await eventually("a second follow started") { core.follows.count == 2 }
 
         core.endAgain(0, with: .Network(message: "late"))
-        core.change(0, MarfaCore.Change(event: "item.created", itemId: "late", edgeId: nil, cursor: "1", reason: nil))
+        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
         core.change(
-            1, MarfaCore.Change(event: "item.created", itemId: "current", edgeId: nil, cursor: "2", reason: nil))
+            1, MarfaCore.Change.applied(event: "item.created", itemId: "current", edgeId: nil, cursor: "2"))
         try await eventually("the running follow's change was told") { !heard.all.isEmpty }
         #expect(heard.all.map(\.itemId) == ["current"])
         heard.stop()
@@ -198,24 +195,23 @@ struct Changes {
     }
 
     /// An app that listens at launch, before its first hydration, is told
-    /// nothing until there is something to follow.
-    @Test func aStoreWithNoHydrationLetsItsStreamsWaitForOne() async throws {
-        for error: MarfaCore.MarfaError in [.HydrationIncomplete(message: "m"), .NoCursor(message: "m")] {
-            let core = FakeCore.writer()
-            let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
-            let first = Heard(copy.changes())
-            core.fail(0, with: error)
-            try await eventually("the follow ended") { core.follows[0].ended }
-            let second = Heard(copy.changes())
-            try await Task.sleep(for: .milliseconds(100))
-            #expect(first.all.isEmpty, "\(first.all)")
-            #expect(second.all.isEmpty, "\(second.all)")
-            #expect(core.follows.count == 1, "a stream taken while nothing could be followed started a follow")
-            _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
-            #expect(core.follows.count == 2)
-            try await eventually("the hydration was told") { first.all == [refreshed(.hydrated)] }
-            try await bounded("close") { await copy.close() }
-        }
+    /// nothing until there is something to follow: the core holds the follow
+    /// itself, and a hydration pauses it and starts it again.
+    @Test func aFollowThatWaitsForAFirstHydrationIsPausedByItAndStartedAgain() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let first = Heard(copy.changes())
+        let second = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(first.all.isEmpty && second.all.isEmpty, "\(first.all) \(second.all)")
+        #expect(core.follows.count == 1, "a stream taken while the follow waited started another")
+        #expect(!core.follows[0].ended)
+        _ = try await bounded("the hydration") { try await copy.hydrate(types: ["core.note"], tier: .feed) }
+        #expect(core.follows[0].ended)
+        #expect(core.follows.count == 2)
+        try await eventually("the hydration was told") { first.all == [refreshed(.hydrated)] }
+        #expect(second.all == [refreshed(.hydrated)])
+        try await bounded("close") { await copy.close() }
     }
 
     @Test func aFollowThatFailedStartsAgainOnlyOnAHydrationOrACatchUp() async throws {
@@ -288,7 +284,45 @@ struct Changes {
         await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m")) {
             _ = try await bounded("the catch-up") { try await copy.catchUp() }
         }
-        try await eventually("the catalog change was told") { heard.all == [refreshed(.catalog)] }
+        try await eventually("the catalog change was told") { !heard.all.isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all == [refreshed(.catalog)], "the catalog change was not told exactly once: \(heard.all)")
+        try await bounded("close") { await copy.close() }
+    }
+
+    /// The witness for the test above: the same failure with the catalog
+    /// untouched tells nothing.
+    @Test func aCatchUpThatFailedWithTheCatalogUntouchedTellsNothing() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let heard = Heard(copy.changes())
+        core.state.withLock { $0.catchUpFails = .CopyExpired(reason: "aged_out", message: "m") }
+        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m")) {
+            _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        }
+        core.state.withLock { $0.catchUpChangesCatalog = true }
+        _ = try? await bounded("the catch-up") { try await copy.catchUp() }
+        try await eventually("the catalog change was told") { !heard.all.isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all == [refreshed(.catalog)], "the catalog change was not told exactly once: \(heard.all)")
+        try await bounded("close") { await copy.close() }
+    }
+
+    /// The core told the failure typed, and the translated error and the
+    /// cancellation mapping hold on the error inside it.
+    @Test(arguments: Errors.cases)
+    func aFailedCatchUpThrowsTheErrorInsideItsFailure(coreError: MarfaCore.MarfaError, expected: Marfa.MarfaError)
+        async throws
+    {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        core.state.withLock {
+            $0.catchUpChangesCatalog = true
+            $0.catchUpFails = coreError
+        }
+        await #expect(throws: expected) {
+            _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        }
         try await bounded("close") { await copy.close() }
     }
 

@@ -42,8 +42,9 @@ extension LiveWorkingCopies {
             let tree = try await Self.tree(in: copy)
             let held = try #require(try await copy.edges.to(tree.child).first)
 
-            let move = try await copy.edges.update(
-                tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other)))
+            let move = try #require(
+                try await copy.edges.update(
+                    tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other))))
             #expect(try await copy.edges.from(tree.parent).isEmpty)
             #expect(try await copy.edges.from(tree.other).map(\.id) == [tree.edge])
             await copy.close()
@@ -76,8 +77,9 @@ extension LiveWorkingCopies {
             let created = try await copy.items.create(Live.note("moved new parent \(UUID())"))
             let newParent = try #require(created.itemId)
 
-            let move = try await copy.edges.update(
-                tree.edge, EdgeEdit(baseVersion: held.version, move: .source(newParent)))
+            let move = try #require(
+                try await copy.edges.update(
+                    tree.edge, EdgeEdit(baseVersion: held.version, move: .source(newParent))))
             try await Self.drainAfterASourceMove(copy)
 
             #expect(try await Self.verdict(of: created, in: copy) == .accepted)
@@ -98,8 +100,9 @@ extension LiveWorkingCopies {
             #expect(setup.verdicts.allSatisfy { $0.verdict == .accepted }, "\(setup.verdicts)")
             let held = try #require(try await copy.edges.from(reply).first)
 
-            let move = try await copy.edges.update(
-                edge, EdgeEdit(["note": "moved"], baseVersion: held.version, move: .target(second)))
+            let move = try #require(
+                try await copy.edges.update(
+                    edge, EdgeEdit(["note": "moved"], baseVersion: held.version, move: .target(second))))
             let report = try await copy.queue.drain()
 
             #expect(report.verdicts.first { $0.id == move.id }?.verdict == .accepted, "\(report.verdicts)")
@@ -129,7 +132,8 @@ extension LiveWorkingCopies {
             let held = try #require(try await copy.edges.from(a).first)
 
             // c above b closes the cycle b, c, b, which the copy cannot see from the edge alone.
-            let move = try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c)))
+            let move = try #require(
+                try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c))))
             let report = try await copy.queue.drain()
 
             guard case .refused(let refusal)? = report.verdicts.first(where: { $0.id == move.id })?.verdict else {
@@ -155,7 +159,8 @@ extension LiveWorkingCopies {
             let held = try #require(try await copy.edges.from(newer).first)
 
             // `other` already supersedes one item, and a supersedes edge is one to one at both ends.
-            let move = try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .source(other)))
+            let move = try #require(
+                try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .source(other))))
             #expect(try await copy.edges.from(newer).isEmpty)
             let report = try await copy.queue.drain()
 

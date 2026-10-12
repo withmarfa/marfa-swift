@@ -144,10 +144,6 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     case keySpent
     case ancestorUnavailable
     case conflictUnresolved
-    /// Never a verdict's reason, here only because the core still lists it.
-    /// A write held behind another has no verdict and `QueuedWrite.waiting`
-    /// set instead.
-    case awaitingDependency
 
     init(_ core: MarfaCore.BlockedReason) {
         switch core {
@@ -155,7 +151,6 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .keySpent: self = .keySpent
         case .ancestorUnavailable: self = .ancestorUnavailable
         case .conflictUnresolved: self = .conflictUnresolved
-        case .awaitingDependency: self = .awaitingDependency
         }
     }
 
@@ -165,7 +160,6 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .keySpent: .keySpent
         case .ancestorUnavailable: .ancestorUnavailable
         case .conflictUnresolved: .conflictUnresolved
-        case .awaitingDependency: .awaitingDependency
         }
     }
 }
@@ -676,21 +670,27 @@ public struct CatchUpReport: Sendable, Hashable {
     public var skipped: UInt64
     public var cursor: String
     public var reachedHead: Bool
+    /// The catch-up changed the type catalog the copy holds.
+    public var catalogChanged: Bool
 
-    public init(applied: UInt64, skipped: UInt64, cursor: String, reachedHead: Bool) {
+    public init(applied: UInt64, skipped: UInt64, cursor: String, reachedHead: Bool, catalogChanged: Bool = false) {
         self.applied = applied
         self.skipped = skipped
         self.cursor = cursor
         self.reachedHead = reachedHead
+        self.catalogChanged = catalogChanged
     }
 
     init(_ core: MarfaCore.CatchUpReport) {
         self.init(
-            applied: core.applied, skipped: core.skipped, cursor: core.cursor, reachedHead: core.reachedHead)
+            applied: core.applied, skipped: core.skipped, cursor: core.cursor, reachedHead: core.reachedHead,
+            catalogChanged: core.catalogChanged)
     }
 
     var core: MarfaCore.CatchUpReport {
-        MarfaCore.CatchUpReport(applied: applied, skipped: skipped, cursor: cursor, reachedHead: reachedHead)
+        MarfaCore.CatchUpReport(
+            applied: applied, skipped: skipped, cursor: cursor, reachedHead: reachedHead,
+            catalogChanged: catalogChanged)
     }
 }
 

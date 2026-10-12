@@ -41,8 +41,9 @@ struct EdgeMoveOffline {
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
         let before = try await tree.copy.queue.all().count
 
-        let write = try await tree.copy.edges.update(
-            tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other)))
+        let write = try #require(
+            try await tree.copy.edges.update(
+                tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other))))
 
         #expect(write.kind == .updateEdge)
         #expect(write.edgeId == tree.edge)
@@ -66,22 +67,66 @@ struct EdgeMoveOffline {
         let created = try #require(
             try await tree.copy.queue.all().first { $0.kind == .createItem && $0.itemId == tree.other })
 
-        let write = try await tree.copy.edges.update(
-            tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other)))
+        let write = try #require(
+            try await tree.copy.edges.update(
+                tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other))))
 
         #expect(write.dependsOn.contains(created.id), "the move does not wait for the create it names: \(write)")
         await tree.copy.close()
     }
 
-    @Test func anEditNamingTheEndTheEdgeHoldsSendsNoEnd() async throws {
+    @Test func anEditNamingTheEndTheEdgeHoldsAndAPropertySendsNoEnd() async throws {
         let tree = try await Self.tree()
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
 
-        let write = try await tree.copy.edges.update(
-            tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.parent)))
+        let write = try #require(
+            try await tree.copy.edges.update(
+                tree.edge, EdgeEdit(["note": "n"], baseVersion: held.version, move: .source(tree.parent))))
 
         #expect(write.body["source_id"] == nil, "the end the edge holds was sent: \(write.body)")
+        #expect(write.body["properties"] != nil, "the property was not sent: \(write.body)")
         #expect(try await tree.copy.edges.from(tree.parent).map(\.id) == [tree.edge])
+        await tree.copy.close()
+    }
+
+    @Test(arguments: [false, true])
+    func anEditThatChangesNothingQueuesAndTellsNothing(namingTheHeldEnd: Bool) async throws {
+        let tree = try await Self.tree()
+        let held = try #require(try await tree.copy.edges.to(tree.child).first)
+        let before = try await tree.copy.queue.all()
+        let heard = Heard(tree.copy.changes())
+        let move: EdgeEdit.Move? = namingTheHeldEnd ? .source(tree.parent) : nil
+
+        let write = try await tree.copy.edges.update(tree.edge, EdgeEdit(baseVersion: held.version, move: move))
+
+        #expect(write == nil)
+        #expect(try await tree.copy.queue.all() == before)
+        #expect(try await tree.copy.edges.to(tree.child).first == held)
+        // The witness: the same edit with a property is queued and told.
+        let named = try #require(
+            try await tree.copy.edges.update(tree.edge, EdgeEdit(["note": "n"], baseVersion: held.version, move: move)))
+        try await eventually("the edit that changed something was told") { !heard.locals.isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.locals == [Marfa.Change(origin: .local(.updateEdge), itemId: named.itemId, edgeId: named.edgeId)])
+        #expect(try await tree.copy.queue.all().count == before.count + 1)
+        await tree.copy.close()
+    }
+
+    @Test func anEditThatChangesNothingStillMeetsTheVersionAndTheMissingEdge() async throws {
+        let tree = try await Self.tree()
+        let held = try #require(try await tree.copy.edges.to(tree.child).first)
+
+        await #expect {
+            _ = try await tree.copy.edges.update(tree.edge, EdgeEdit(baseVersion: held.version + 3))
+        } throws: { error in
+            guard case .invalid(let message)? = error as? MarfaError else { return false }
+            return message.contains("version \(held.version + 3)")
+        }
+        await #expect {
+            _ = try await tree.copy.edges.update("missing", EdgeEdit(baseVersion: 1))
+        } throws: { error in
+            if case .notFound? = error as? MarfaError { true } else { false }
+        }
         await tree.copy.close()
     }
 

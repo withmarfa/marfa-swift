@@ -40,7 +40,7 @@ import Testing
     @Test func anAppUsesEveryValueTypeAsItsOwn() {
         func placing(
             tier: Tier = .library, state: ItemState = .active, kind: WriteKind = .createItem,
-            blocked: BlockedReason = .awaitingDependency, handle: Handle = .writer,
+            blocked: BlockedReason = .credentialRefused, handle: Handle = .writer,
             hydration: Hydration = .never, field: SortField = .updatedAt,
             direction: SortDirection = .ascending, verdict: Verdict = .accepted
         ) -> [any Sendable] {
@@ -54,7 +54,7 @@ import Testing
             id: "q", kind: .updateItem, idempotencyKey: "k",
             verdict: .conflicted(siblingId: "s", fields: ["title"]), queuedAt: "")
         #expect(answered.verdict == .conflicted(siblingId: "s", fields: ["title"]))
-        #expect(Verdict.blocked(reason: .keySpent) != .blocked(reason: .awaitingDependency))
+        #expect(Verdict.blocked(reason: .keySpent) != .blocked(reason: .credentialRefused))
         let refusal = Refusal(
             reason: "validation_error", fields: [FieldRefusal(field: "title", message: "too long")],
             grant: MissingGrant(kind: .type, name: "core.note", level: .write))

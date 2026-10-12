@@ -72,7 +72,7 @@ func thePinnedServerAnswersInTheseTypes() async throws {
     let connector = try decoder.decode(
         Components.Schemas.Connector.self,
         from: Data(
-            #"{"id":"c","key_id":"k","source":"s","name":"n","description":null,"registered_at":"now","updated_at":"now","last_heartbeat_at":null,"hold_expires_at":null,"last_run":null}"#
+            #"{"id":"c","key_id":"k","source":"s","name":"n","description":null,"registered_at":"now","updated_at":"now","last_heartbeat_at":null,"hold_expires_at":null,"last_run":null,"problems":{}}"#
                 .utf8))
     #expect(connector.lastRun == .null)
     let run = try decoder.decode(
