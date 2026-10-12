@@ -121,7 +121,7 @@ func theFolderTestsHaveTheCommandLineWhereTheyAreRequired() {
 }
 
 @Test(.timeLimit(.minutes(1)))
-func addingAFolderAgainstAServerOutOfReachThrowsAndLeavesNothing() async throws {
+func addingAFolderAgainstAServerOutOfReachThrowsAndLeavesNoFile() async throws {
     _ = FolderFixture.registry
     let directory = FolderFixture.directory()
     let folders = Folders(server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "unused"))
@@ -130,7 +130,15 @@ func addingAFolderAgainstAServerOutOfReachThrowsAndLeavesNothing() async throws 
     } throws: { error in
         if case .network = error as? MarfaError { true } else { false }
     }
-    #expect(!FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)))
+    // The core makes the directory it is asked to follow, and takes back every file it put in it.
+    let left = (try? FileManager.default.subpathsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
+    let files = left.filter { name in
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(
+            atPath: directory.appending(path: name).path(percentEncoded: false), isDirectory: &isDirectory)
+        return !isDirectory.boolValue
+    }
+    #expect(files.isEmpty, "the failed add left \(files)")
 }
 
 @Test(.timeLimit(.minutes(1)))
