@@ -1105,7 +1105,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func unpin(id: String) throws  -> PinReport
     
-    func updateEdge(id: String, edit: EdgeEdit) throws  -> QueuedWrite
+    /**
+     * Answers `nil` for an edit that names no property and no new end, which
+     * queues no write.
+     */
+    func updateEdge(id: String, edit: EdgeEdit) throws  -> QueuedWrite?
     
     /**
      * Changes an item in the local copy and queues the change.
@@ -1903,8 +1907,12 @@ open func unpin(id: String)throws  -> PinReport  {
 })
 }
     
-open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite  {
-    return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    /**
+     * Answers `nil` for an edit that names no property and no new end, which
+     * queues no write.
+     */
+open func updateEdge(id: String, edit: EdgeEdit)throws  -> QueuedWrite?  {
+    return try  FfiConverterOptionTypeQueuedWrite.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_update_edge(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
@@ -10106,6 +10114,30 @@ fileprivate struct FfiConverterOptionTypeMissingGrant: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeQueuedWrite: FfiConverterRustBuffer {
+    typealias SwiftType = QueuedWrite?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeQueuedWrite.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeQueuedWrite.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeRefusal: FfiConverterRustBuffer {
     typealias SwiftType = Refusal?
 
@@ -11042,7 +11074,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_unpin() != 56069) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_update_edge() != 37231) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_update_edge() != 9377) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_update_item() != 30971) {
