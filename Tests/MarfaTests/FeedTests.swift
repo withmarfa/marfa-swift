@@ -284,7 +284,9 @@ struct Changes {
         await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m")) {
             _ = try await bounded("the catch-up") { try await copy.catchUp() }
         }
-        try await eventually("the catalog change was told") { heard.all == [refreshed(.catalog)] }
+        try await eventually("the catalog change was told") { !heard.all.isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all == [refreshed(.catalog)], "the catalog change was not told exactly once: \(heard.all)")
         try await bounded("close") { await copy.close() }
     }
 
@@ -300,7 +302,9 @@ struct Changes {
         }
         core.state.withLock { $0.catchUpChangesCatalog = true }
         _ = try? await bounded("the catch-up") { try await copy.catchUp() }
-        try await eventually("the catalog change was told") { heard.all == [refreshed(.catalog)] }
+        try await eventually("the catalog change was told") { !heard.all.isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all == [refreshed(.catalog)], "the catalog change was not told exactly once: \(heard.all)")
         try await bounded("close") { await copy.close() }
     }
 
