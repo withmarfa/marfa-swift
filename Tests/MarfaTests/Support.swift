@@ -133,7 +133,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var handle = MarfaCore.Handle.writer
         var follows: [Follow] = []
         var streamHeld = false
-        var caughtUp = MarfaCore.CatchUpReport(applied: 0, skipped: 0, cursor: "1", reachedHead: true)
+        var caughtUp = MarfaCore.CatchUpReport(
+            applied: 0, skipped: 0, cursor: "1", reachedHead: true, catalogChanged: false)
         var drained = MarfaCore.DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
             unclaimedSources: [], retryAfterSeconds: nil)
@@ -142,7 +143,6 @@ final class FakeCore: Core, @unchecked Sendable {
         var gated = false
         var readsFail: MarfaCore.MarfaError?
         var withdrawable: Set<String> = []
-        var catalogVersion: UInt64? = 1
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
         var declarations: [String] = []
@@ -248,9 +248,12 @@ final class FakeCore: Core, @unchecked Sendable {
     override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
         try refreshing()
         return try state.withLock { state in
-            if state.catchUpChangesCatalog { state.catalogVersion = (state.catalogVersion ?? 0) + 1 }
-            if let failure = state.catchUpFails { throw failure }
-            return state.caughtUp
+            if let failure = state.catchUpFails {
+                throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: state.catchUpChangesCatalog)
+            }
+            var report = state.caughtUp
+            report.catalogChanged = state.catchUpChangesCatalog
+            return report
         }
     }
 
@@ -258,7 +261,7 @@ final class FakeCore: Core, @unchecked Sendable {
         MarfaCore.Status(
             serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
             eventCursor: nil,
-            hydration: .complete, items: 0, edges: 0, catalogVersion: state.withLock { $0.catalogVersion })
+            hydration: .complete, items: 0, edges: 0, catalogVersion: 1)
     }
 
     override func withdraw(id: String) throws -> Bool {

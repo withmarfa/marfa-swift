@@ -130,12 +130,14 @@ public final class WorkingCopy: Sendable {
         await feed.pause()
         defer { feed.unpause() }
         // The core commits a new catalog before it applies anything, so a
-        // catch-up that then fails has still changed it.
+        // catch-up that then fails has still changed it, and says so.
         let (caughtUp, catalogChanged) = try await holder.runUntilCanceled { core, stop in
-            let before = try core.status().catalogVersion
-            let caughtUp = Result { try translated { CatchUpReport(try core.catchUp(stop: stop)) } }
-            let after = try? core.status().catalogVersion
-            return (caughtUp, after.map { $0 != before } ?? false)
+            do {
+                let report = try core.catchUp(stop: stop)
+                return (Result<CatchUpReport, MarfaError>.success(CatchUpReport(report)), report.catalogChanged)
+            } catch MarfaCore.CatchUpError.Failed(let error, let catalogChanged) {
+                return (.failure(MarfaError(error)), catalogChanged)
+            }
         }
         if catalogChanged {
             feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
@@ -178,8 +180,8 @@ public final class WorkingCopy: Sendable {
     ///
     /// When the follow stops with an error, every stream is told `.stopped`
     /// and it stays stopped until the app's next hydration or catch-up. On a
-    /// store that holds no completed hydration there are no server events
-    /// to follow until the next hydration. Local writes and declarations
+    /// store that holds no completed hydration the follow waits, asking the
+    /// server nothing, until one completes. Local writes and declarations
     /// still notify the writer's streams. `status().hydration` says which.
     /// A reader's watch keeps retrying and tells `.saved` once it reads a
     /// changed SQLite data version.
@@ -989,11 +991,8 @@ final class Feed: Sendable {
             case .following(let current, _) where current == generation:
                 state.phase = .idle
                 state.halted = true
-                // A store that holds no hydration has nothing to follow
-                // yet: the streams wait, and the next hydration starts it.
-                let told = error.flatMap { Self.awaitsHydration($0) ? nil : $0 }
-                state.failure = told
-                return (told == nil ? [] : Array(state.streams.values), [])
+                state.failure = error
+                return (error == nil ? [] : Array(state.streams.values), [])
             default:
                 return ([], [])
             }
@@ -1004,13 +1003,6 @@ final class Feed: Sendable {
             }
         }
         return ended.waiting
-    }
-
-    private static func awaitsHydration(_ error: MarfaError) -> Bool {
-        switch error {
-        case .hydrationIncomplete, .noCursor: true
-        default: false
-        }
     }
 
     private func untilStopped() async {
@@ -1153,27 +1145,19 @@ final class Listener: MarfaCore.ChangeListener, Sendable {
     private var feed: Feed? { held.withLock { $0.feed } }
 
     func changed(change: MarfaCore.Change) {
-        let origin: Change.Origin
-        switch change.event {
-        case Self.catalogChanged: origin = .refreshed(.catalog)
-        case Self.serverUnreachable:
-            feed?.reach(
-                change.reason.map(MarfaError.init) ?? .network(message: "the event stream could not be opened"),
+        switch change {
+        case .applied(let event, let itemId, let edgeId, let cursor):
+            feed?.announce(
+                Change(origin: .server(event: event, cursor: cursor), itemId: itemId, edgeId: edgeId),
                 from: generation)
-            return
-        case Self.serverReachable:
+        case .catalogChanged:
+            feed?.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil), from: generation)
+        case .serverUnreachable(let reason, _):
+            feed?.reach(MarfaError(reason), from: generation)
+        case .serverReachable:
             feed?.reach(nil, from: generation)
-            return
-        default: origin = .server(event: change.event, cursor: change.cursor)
         }
-        feed?.announce(Change(origin: origin, itemId: change.itemId, edgeId: change.edgeId), from: generation)
     }
-
-    /// What the core names, in place of an event's type, a stream that read a
-    /// changed catalog and the follow's word on the server.
-    static let catalogChanged = "catalog.changed"
-    static let serverUnreachable = "server.unreachable"
-    static let serverReachable = "server.reachable"
 
     /// Resumes waiters only once nothing on this thread holds the feed, since
     /// one may drop the working copy and open the store again at once.
