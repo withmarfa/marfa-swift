@@ -25715,12 +25715,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/bulk-get/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///
+                /// - Remark: Generated from `#/paths/items/bulk-get/POST/header/X-Marfa-Read-View`.
+                public var xMarfaReadView: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkGetItems.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkGetItems.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaReadView: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkGetItems.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaReadView = xMarfaReadView
                     self.accept = accept
                 }
             }
@@ -25806,6 +25815,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -25814,18 +25827,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -25842,21 +25858,29 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/content/json/metadata`.
                         public var metadata: [Components.Schemas.Metadata]?
+                        /// For each item returned, in the same order: `true` if listings show you the item, `false` if `source_filter` leaves it out of them. Present only when you send `X-Marfa-Read-View`.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/content/json/listed`.
+                        public var listed: [Swift.Bool]?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - items: The items you can read, in the order `ids` named them, each once. IDs that name nothing, a trashed item or an item whose type you can't read are left out.
                         ///   - metadata: The metadata of each item returned, in the same order. Present only when `include` has `metadata`.
+                        ///   - listed: For each item returned, in the same order: `true` if listings show you the item, `false` if `source_filter` leaves it out of them. Present only when you send `X-Marfa-Read-View`.
                         public init(
                             items: [Components.Schemas.Item],
-                            metadata: [Components.Schemas.Metadata]? = nil
+                            metadata: [Components.Schemas.Metadata]? = nil,
+                            listed: [Swift.Bool]? = nil
                         ) {
                             self.items = items
                             self.metadata = metadata
+                            self.listed = listed
                         }
                         public enum CodingKeys: String, CodingKey {
                             case items
                             case metadata
+                            case listed
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/content/application\/json`.
@@ -25889,7 +25913,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the items you can read, and `metadata` if you asked for it.
+            /// Returns the items you can read, `metadata` if you asked for it, and `listed` if you sent `X-Marfa-Read-View`.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/200`.
             ///
@@ -26159,6 +26183,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/403/headers/X-Marfa-Read-View`.
+                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -26168,13 +26196,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -26182,6 +26212,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.xMarfaReadView = xMarfaReadView
                     }
                 }
                 /// Received HTTP response headers
@@ -26236,6 +26267,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.BulkGetItems.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.BulkGetItems.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.BulkGetItems.Output.Conflict.Headers = .init(),
+                    body: Operations.BulkGetItems.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            ///
+            /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.BulkGetItems.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.BulkGetItems.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
