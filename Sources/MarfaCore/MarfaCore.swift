@@ -926,7 +926,10 @@ public protocol CoreProtocol: AnyObject, Sendable {
     /**
      * Takes a refused write out of the queue, with the content it carried.
      * Answers whether the row was one a discard takes: refused, and with no
-     * write still waiting on it.
+     * write still waiting on it, or a create refused onto a row its natural
+     * key names that no read has found, whose waiting writes it refuses
+     * unsent. A create's discard first waits for a drain already running to
+     * end.
      */
     func discard(id: String) throws  -> Bool
     
@@ -1481,7 +1484,10 @@ open func deleteItem(id: String)throws  -> QueuedWrite  {
     /**
      * Takes a refused write out of the queue, with the content it carried.
      * Answers whether the row was one a discard takes: refused, and with no
-     * write still waiting on it.
+     * write still waiting on it, or a create refused onto a row its natural
+     * key names that no read has found, whose waiting writes it refuses
+     * unsent. A create's discard first waits for a drain already running to
+     * end.
      */
 open func discard(id: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -3338,7 +3344,6 @@ public struct CatchUpReport: Equatable, Hashable {
     public var applied: UInt64
     public var skipped: UInt64
     public var cursor: String
-    public var reachedHead: Bool
     /**
      * The catch-up changed the catalog the copy holds.
      */
@@ -3346,14 +3351,13 @@ public struct CatchUpReport: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(applied: UInt64, skipped: UInt64, cursor: String, reachedHead: Bool, 
+    public init(applied: UInt64, skipped: UInt64, cursor: String, 
         /**
          * The catch-up changed the catalog the copy holds.
          */catalogChanged: Bool) {
         self.applied = applied
         self.skipped = skipped
         self.cursor = cursor
-        self.reachedHead = reachedHead
         self.catalogChanged = catalogChanged
     }
 
@@ -3376,7 +3380,6 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
                 applied: FfiConverterUInt64.read(from: &buf), 
                 skipped: FfiConverterUInt64.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
-                reachedHead: FfiConverterBool.read(from: &buf), 
                 catalogChanged: FfiConverterBool.read(from: &buf)
         )
     }
@@ -3385,7 +3388,6 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.applied, into: &buf)
         FfiConverterUInt64.write(value.skipped, into: &buf)
         FfiConverterString.write(value.cursor, into: &buf)
-        FfiConverterBool.write(value.reachedHead, into: &buf)
         FfiConverterBool.write(value.catalogChanged, into: &buf)
     }
 }
@@ -10972,7 +10974,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_delete_item() != 27931) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_discard() != 13602) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_discard() != 45168) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_drain() != 37997) {
