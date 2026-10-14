@@ -695,6 +695,10 @@ public struct Queue: Sendable {
     ///
     /// `false` for a write that is not refused, or that a waiting write
     /// still depends on, and `notFound` for an id the queue does not hold.
+    /// A create refused onto a row its natural key names that no read has
+    /// found is taken even with writes waiting on it, and they are refused
+    /// unsent. A create's discard first waits for a drain already running to
+    /// end.
     /// The copy's row already shows what the server holds.
     public func discard(_ id: String) async throws -> Bool {
         try await holder.run { core in try core.discard(id: id) }
