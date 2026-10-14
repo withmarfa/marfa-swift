@@ -1,6 +1,6 @@
 # marfa-swift
 
-The Swift package `Marfa`: Swift types, `async` calls, change streams and errors over `MarfaCore`, the Rust engine from `withmarfa/marfa` that every native client embeds. The core does the networking, storage and syncing.
+The Swift SDK for Marfa, as the Swift package `Marfa`: Swift types, `async` calls, change streams and errors over `MarfaCore`, the Rust engine from `withmarfa/marfa` that every native client embeds. The core does the networking, storage and syncing.
 
 ## Layout and build
 
