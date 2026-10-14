@@ -669,28 +669,23 @@ public struct CatchUpReport: Sendable, Hashable {
     public var applied: UInt64
     public var skipped: UInt64
     public var cursor: String
-    public var reachedHead: Bool
     /// The catch-up changed the type catalog the copy holds.
     public var catalogChanged: Bool
 
-    public init(applied: UInt64, skipped: UInt64, cursor: String, reachedHead: Bool, catalogChanged: Bool = false) {
+    public init(applied: UInt64, skipped: UInt64, cursor: String, catalogChanged: Bool = false) {
         self.applied = applied
         self.skipped = skipped
         self.cursor = cursor
-        self.reachedHead = reachedHead
         self.catalogChanged = catalogChanged
     }
 
     init(_ core: MarfaCore.CatchUpReport) {
         self.init(
-            applied: core.applied, skipped: core.skipped, cursor: core.cursor, reachedHead: core.reachedHead,
-            catalogChanged: core.catalogChanged)
+            applied: core.applied, skipped: core.skipped, cursor: core.cursor, catalogChanged: core.catalogChanged)
     }
 
     var core: MarfaCore.CatchUpReport {
-        MarfaCore.CatchUpReport(
-            applied: applied, skipped: skipped, cursor: cursor, reachedHead: reachedHead,
-            catalogChanged: catalogChanged)
+        MarfaCore.CatchUpReport(applied: applied, skipped: skipped, cursor: cursor, catalogChanged: catalogChanged)
     }
 }
 
