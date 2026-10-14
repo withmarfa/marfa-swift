@@ -1512,6 +1512,147 @@ extension Components {
                 case details
             }
         }
+        /// An instance: its identity, build, contract version and features.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InstanceDescription`.
+        public struct InstanceDescription: Codable, Hashable, Sendable {
+            /// Always `marfa`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/name`.
+            @frozen public enum NamePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case marfa = "marfa"
+            }
+            /// Always `marfa`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/name`.
+            public var name: Components.Schemas.InstanceDescription.NamePayload
+            /// The build the instance runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/version`.
+            public var version: Swift.String
+            /// Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/instance_id`.
+            public var instanceId: Swift.String
+            /// The contract version, the same number as this document's `info.version`. It stays at `0` until the first public release.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/contract`.
+            public var contract: Swift.Int
+            /// The features the instance serves, such as `items` and `webhooks`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/features`.
+            public var features: [Swift.String]
+            /// Creates a new `InstanceDescription`.
+            ///
+            /// - Parameters:
+            ///   - name: Always `marfa`.
+            ///   - version: The build the instance runs.
+            ///   - instanceId: Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
+            ///   - contract: The contract version, the same number as this document's `info.version`. It stays at `0` until the first public release.
+            ///   - features: The features the instance serves, such as `items` and `webhooks`.
+            public init(
+                name: Components.Schemas.InstanceDescription.NamePayload,
+                version: Swift.String,
+                instanceId: Swift.String,
+                contract: Swift.Int,
+                features: [Swift.String]
+            ) {
+                self.name = name
+                self.version = version
+                self.instanceId = instanceId
+                self.contract = contract
+                self.features = features
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case version
+                case instanceId = "instance_id"
+                case contract
+                case features
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
+        public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
+            public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
+            /// Creates a new `ValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// An item with its metadata.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemWithMetadata`.
@@ -4116,88 +4257,6 @@ extension Components {
                 case occurredAfter = "occurred_after"
                 case occurredBefore = "occurred_before"
                 case filter
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal`.
-        public struct ValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.ValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.ValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ValidationErrorRefusal/error`.
-            public var error: Components.Schemas.ValidationErrorRefusal._ErrorPayload
-            /// Creates a new `ValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.ValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
             }
         }
         /// An error response.
@@ -12332,6 +12391,340 @@ extension Components {
                 case error
             }
         }
+        /// An OAuth client: its app metadata and the grants it uses.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration`.
+        public struct OAuthClientRegistration: Codable, Hashable, Sendable {
+            /// The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/redirect_uris`.
+            public var redirectUris: [Swift.String]?
+            /// Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/scope`.
+            public var scope: Swift.String?
+            /// The app's name, which Marfa shows a person asked to approve it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/client_name`.
+            public var clientName: Swift.String?
+            /// The app's home page URL. Leave it out if the app has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/client_uri`.
+            public var clientUri: Swift.String?
+            /// The app's logo URL. Leave it out if the app has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/logo_uri`.
+            public var logoUri: Swift.String?
+            /// Contact addresses for the app. Leave it out if there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/contacts`.
+            public var contacts: [Swift.String]?
+            /// The app's terms of service URL. Leave it out if the app has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/tos_uri`.
+            public var tosUri: Swift.String?
+            /// The app's privacy policy URL. Leave it out if the app has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/policy_uri`.
+            public var policyUri: Swift.String?
+            /// The software's identifier. Leave it out if there is none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/software_id`.
+            public var softwareId: Swift.String?
+            /// The software's version. Leave it out if there is none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/software_version`.
+            public var softwareVersion: Swift.String?
+            /// A signed software statement. Leave it out to register without one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/software_statement`.
+            public var softwareStatement: Swift.String?
+            /// Addresses the app may return to after sign-out. Leave it out if there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/post_logout_redirect_uris`.
+            public var postLogoutRedirectUris: [Swift.String]?
+            /// `none` is public, `client_secret_basic` uses HTTP Basic and `client_secret_post` sends the secret in the body. Other methods, including `private_key_jwt`, are refused with `invalid_client_metadata`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/token_endpoint_auth_method`.
+            @frozen public enum TokenEndpointAuthMethodPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case none = "none"
+                case clientSecretBasic = "client_secret_basic"
+                case clientSecretPost = "client_secret_post"
+            }
+            /// `none` is public, `client_secret_basic` uses HTTP Basic and `client_secret_post` sends the secret in the body. Other methods, including `private_key_jwt`, are refused with `invalid_client_metadata`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/token_endpoint_auth_method`.
+            public var tokenEndpointAuthMethod: Components.Schemas.OAuthClientRegistration.TokenEndpointAuthMethodPayload?
+            /// The client's public JSON Web Key Set. Leave it out if the client has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks`.
+            public struct JwksPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks/KeysPayload`.
+                public struct KeysPayloadPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `KeysPayloadPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// The client's public JSON Web Keys, including any extension members.
+                ///
+                /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks/keys`.
+                public typealias KeysPayload = [Components.Schemas.OAuthClientRegistration.JwksPayload.KeysPayloadPayload]
+                /// The client's public JSON Web Keys, including any extension members.
+                ///
+                /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks/keys`.
+                public var keys: Components.Schemas.OAuthClientRegistration.JwksPayload.KeysPayload
+                /// Creates a new `JwksPayload`.
+                ///
+                /// - Parameters:
+                ///   - keys: The client's public JSON Web Keys, including any extension members.
+                public init(keys: Components.Schemas.OAuthClientRegistration.JwksPayload.KeysPayload) {
+                    self.keys = keys
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case keys
+                }
+            }
+            /// The client's public JSON Web Key Set. Leave it out if the client has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks`.
+            public var jwks: Components.Schemas.OAuthClientRegistration.JwksPayload?
+            /// The URL of the client's public JSON Web Key Set. Leave it out if the client has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks_uri`.
+            public var jwksUri: Swift.String?
+            /// The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`. Without `authorization_code`, add `refresh_token` to get a refresh token with `offline_access`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/grant_types`.
+            public var grantTypes: [Swift.String]?
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/ResponseTypesPayload`.
+            @frozen public enum ResponseTypesPayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case code = "code"
+            }
+            /// The response types the client uses. Defaults to `code` when `grant_types` includes `authorization_code`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/response_types`.
+            public typealias ResponseTypesPayload = [Components.Schemas.OAuthClientRegistration.ResponseTypesPayloadPayload]
+            /// The response types the client uses. Defaults to `code` when `grant_types` includes `authorization_code`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/response_types`.
+            public var responseTypes: Components.Schemas.OAuthClientRegistration.ResponseTypesPayload?
+            /// `web` or `native`, which decides the redirect URIs the client may use. Defaults to `web`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/application_type`.
+            @frozen public enum ApplicationTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case web = "web"
+                case native = "native"
+            }
+            /// `web` or `native`, which decides the redirect URIs the client may use. Defaults to `web`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/application_type`.
+            public var applicationType: Components.Schemas.OAuthClientRegistration.ApplicationTypePayload?
+            /// `public` for public subject identifiers. Leave it out to use public identifiers. `pairwise` is refused with `invalid_client_metadata`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/subject_type`.
+            @frozen public enum SubjectTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case _public = "public"
+            }
+            /// `public` for public subject identifiers. Leave it out to use public identifiers. `pairwise` is refused with `invalid_client_metadata`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/subject_type`.
+            public var subjectType: Components.Schemas.OAuthClientRegistration.SubjectTypePayload?
+            /// `true` to bind the client's access tokens to DPoP proofs. Leave it out for tokens without that binding.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/dpop_bound_access_tokens`.
+            public var dpopBoundAccessTokens: Swift.Bool?
+            /// Resource identifiers to register the client for. Leave it out for the instance's default resources.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/resources`.
+            public var resources: [Swift.String]?
+            /// Creates a new `OAuthClientRegistration`.
+            ///
+            /// - Parameters:
+            ///   - redirectUris: The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
+            ///   - scope: Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
+            ///   - clientName: The app's name, which Marfa shows a person asked to approve it.
+            ///   - clientUri: The app's home page URL. Leave it out if the app has none.
+            ///   - logoUri: The app's logo URL. Leave it out if the app has none.
+            ///   - contacts: Contact addresses for the app. Leave it out if there are none.
+            ///   - tosUri: The app's terms of service URL. Leave it out if the app has none.
+            ///   - policyUri: The app's privacy policy URL. Leave it out if the app has none.
+            ///   - softwareId: The software's identifier. Leave it out if there is none.
+            ///   - softwareVersion: The software's version. Leave it out if there is none.
+            ///   - softwareStatement: A signed software statement. Leave it out to register without one.
+            ///   - postLogoutRedirectUris: Addresses the app may return to after sign-out. Leave it out if there are none.
+            ///   - tokenEndpointAuthMethod: `none` is public, `client_secret_basic` uses HTTP Basic and `client_secret_post` sends the secret in the body. Other methods, including `private_key_jwt`, are refused with `invalid_client_metadata`.
+            ///   - jwks: The client's public JSON Web Key Set. Leave it out if the client has none.
+            ///   - jwksUri: The URL of the client's public JSON Web Key Set. Leave it out if the client has none.
+            ///   - grantTypes: The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`. Without `authorization_code`, add `refresh_token` to get a refresh token with `offline_access`.
+            ///   - responseTypes: The response types the client uses. Defaults to `code` when `grant_types` includes `authorization_code`.
+            ///   - applicationType: `web` or `native`, which decides the redirect URIs the client may use. Defaults to `web`.
+            ///   - subjectType: `public` for public subject identifiers. Leave it out to use public identifiers. `pairwise` is refused with `invalid_client_metadata`.
+            ///   - dpopBoundAccessTokens: `true` to bind the client's access tokens to DPoP proofs. Leave it out for tokens without that binding.
+            ///   - resources: Resource identifiers to register the client for. Leave it out for the instance's default resources.
+            public init(
+                redirectUris: [Swift.String]? = nil,
+                scope: Swift.String? = nil,
+                clientName: Swift.String? = nil,
+                clientUri: Swift.String? = nil,
+                logoUri: Swift.String? = nil,
+                contacts: [Swift.String]? = nil,
+                tosUri: Swift.String? = nil,
+                policyUri: Swift.String? = nil,
+                softwareId: Swift.String? = nil,
+                softwareVersion: Swift.String? = nil,
+                softwareStatement: Swift.String? = nil,
+                postLogoutRedirectUris: [Swift.String]? = nil,
+                tokenEndpointAuthMethod: Components.Schemas.OAuthClientRegistration.TokenEndpointAuthMethodPayload? = nil,
+                jwks: Components.Schemas.OAuthClientRegistration.JwksPayload? = nil,
+                jwksUri: Swift.String? = nil,
+                grantTypes: [Swift.String]? = nil,
+                responseTypes: Components.Schemas.OAuthClientRegistration.ResponseTypesPayload? = nil,
+                applicationType: Components.Schemas.OAuthClientRegistration.ApplicationTypePayload? = nil,
+                subjectType: Components.Schemas.OAuthClientRegistration.SubjectTypePayload? = nil,
+                dpopBoundAccessTokens: Swift.Bool? = nil,
+                resources: [Swift.String]? = nil
+            ) {
+                self.redirectUris = redirectUris
+                self.scope = scope
+                self.clientName = clientName
+                self.clientUri = clientUri
+                self.logoUri = logoUri
+                self.contacts = contacts
+                self.tosUri = tosUri
+                self.policyUri = policyUri
+                self.softwareId = softwareId
+                self.softwareVersion = softwareVersion
+                self.softwareStatement = softwareStatement
+                self.postLogoutRedirectUris = postLogoutRedirectUris
+                self.tokenEndpointAuthMethod = tokenEndpointAuthMethod
+                self.jwks = jwks
+                self.jwksUri = jwksUri
+                self.grantTypes = grantTypes
+                self.responseTypes = responseTypes
+                self.applicationType = applicationType
+                self.subjectType = subjectType
+                self.dpopBoundAccessTokens = dpopBoundAccessTokens
+                self.resources = resources
+            }
+            public enum CodingKeys: String, CodingKey {
+                case redirectUris = "redirect_uris"
+                case scope
+                case clientName = "client_name"
+                case clientUri = "client_uri"
+                case logoUri = "logo_uri"
+                case contacts
+                case tosUri = "tos_uri"
+                case policyUri = "policy_uri"
+                case softwareId = "software_id"
+                case softwareVersion = "software_version"
+                case softwareStatement = "software_statement"
+                case postLogoutRedirectUris = "post_logout_redirect_uris"
+                case tokenEndpointAuthMethod = "token_endpoint_auth_method"
+                case jwks
+                case jwksUri = "jwks_uri"
+                case grantTypes = "grant_types"
+                case responseTypes = "response_types"
+                case applicationType = "application_type"
+                case subjectType = "subject_type"
+                case dpopBoundAccessTokens = "dpop_bound_access_tokens"
+                case resources
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal`.
+        public struct StreamCapacityExhaustedOrWriteContentionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case streamCapacityExhausted = "stream_capacity_exhausted"
+                    case writeContention = "write_contention"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/code`.
+                public var code: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/details`.
+                public var details: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error`.
+            public var error: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload
+            /// Creates a new `StreamCapacityExhaustedOrWriteContentionRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// A webhook sends the events you choose, as you can read them, to a URL.
         ///
         /// - Remark: Generated from `#/components/schemas/Webhook`.
@@ -13275,89 +13668,6 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal`.
-        public struct StreamCapacityExhaustedOrWriteContentionRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case streamCapacityExhausted = "stream_capacity_exhausted"
-                    case writeContention = "write_contention"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/code`.
-                public var code: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error/details`.
-                public var details: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/StreamCapacityExhaustedOrWriteContentionRefusal/error`.
-            public var error: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload
-            /// Creates a new `StreamCapacityExhaustedOrWriteContentionRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.StreamCapacityExhaustedOrWriteContentionRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {

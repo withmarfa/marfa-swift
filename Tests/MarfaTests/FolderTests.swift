@@ -152,9 +152,11 @@ func addingAFolderAgainstAServerOutOfReachThrowsAndLeavesNoFile() async throws {
     } throws: { error in
         if case .network = error as? MarfaError { true } else { false }
     }
-    // The core makes the directory it is asked to follow, and takes back every file it put in it.
-    let files = FolderFixture.files(in: directory)
-    #expect(files.isEmpty, "the failed add left \(files)")
+    // The directory did not exist before the add, so a refused add leaves nothing of it.
+    let left = FolderFixture.files(in: directory)
+    #expect(
+        !FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)),
+        "the failed add left \(left)")
 }
 
 @Test(.timeLimit(.minutes(1)))

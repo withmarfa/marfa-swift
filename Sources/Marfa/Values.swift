@@ -306,8 +306,10 @@ public struct SearchHit: Sendable, Hashable {
 /// that conditional on the version it was read at. With no `tier`, the copy
 /// uses its slice's tier, `library` in a slice of both tiers, or `library`
 /// before its first hydration, and sends that tier explicitly, unless
-/// `source` and `sourceId` name an item the copy holds, which keeps its
-/// tier. A create outside the slice is held as a pin.
+/// `source` and `sourceId` name an item the copy holds, or the server's
+/// answer to a lookup of that natural key does not say that no row holds
+/// it. The create is then sent with no tier: a row keeps its own, and a new
+/// row takes the key's default. A create outside the slice is held as a pin.
 public struct Draft: Sendable, Hashable {
     public var type: String
     public var properties: JSONObject

@@ -79,7 +79,7 @@ import Testing
         #expect(Attachment(tier: .feed).tier == .feed)
         #expect(Attached(upload: write, item: write, edge: write).edge == write)
         #expect(Thumbnail(mimeType: "image/png", bytes: Data()).mimeType == "image/png")
-        #expect(CatchUpReport(applied: 1, skipped: 0, cursor: "1", reachedHead: true).reachedHead)
+        #expect(CatchUpReport(applied: 1, skipped: 0, cursor: "1").cursor == "1")
         let hydrated = HydrateReport(
             types: ["core.note"], tier: .library, edgeTypes: [], items: 1, edges: 0, pages: 1, cursor: "1")
         #expect(hydrated.tier == .library)

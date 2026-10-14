@@ -133,8 +133,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var handle = MarfaCore.Handle.writer
         var follows: [Follow] = []
         var streamHeld = false
-        var caughtUp = MarfaCore.CatchUpReport(
-            applied: 0, skipped: 0, cursor: "1", reachedHead: true, catalogChanged: false)
+        var caughtUp = MarfaCore.CatchUpReport(applied: 0, skipped: 0, cursor: "1", catalogChanged: false)
         var drained = MarfaCore.DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
             unclaimedSources: [], retryAfterSeconds: nil)

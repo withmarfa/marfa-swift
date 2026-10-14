@@ -258,8 +258,7 @@ struct OwnValueTypes {
             registeredTypes: ["app.new"],
             unregisteredTypes: [Marfa.UnregisteredType(id: "app.no", code: "forbidden", message: "m")])
         #expect(Marfa.HydrateReport(hydrated.core) == hydrated)
-        let caught = Marfa.CatchUpReport(
-            applied: 1, skipped: 2, cursor: "c", reachedHead: false, catalogChanged: true)
+        let caught = Marfa.CatchUpReport(applied: 1, skipped: 2, cursor: "c", catalogChanged: true)
         #expect(Marfa.CatchUpReport(caught.core) == caught)
         let status = Marfa.Status(
             serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],

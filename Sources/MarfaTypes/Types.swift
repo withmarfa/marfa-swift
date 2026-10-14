@@ -11,6 +11,13 @@ public import struct Foundation.Date
 #endif
 /// A type that performs HTTP operations defined by the OpenAPI document.
 public protocol APIProtocol: Sendable {
+    /// Describe the instance
+    ///
+    /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
+    ///
+    /// - Remark: HTTP `GET /`.
+    /// - Remark: Generated from `#/paths///get(getInstance)`.
+    func getInstance(_ input: Operations.GetInstance.Input) async throws -> Operations.GetInstance.Output
     /// List items
     ///
     /// Returns a page of the items you can read that match the filters. System items are left out unless you ask for them with `include=system`. Use `include` to add edges, metadata or extensions to each item.
@@ -690,6 +697,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
     func exportData(_ input: Operations.ExportData.Input) async throws -> Operations.ExportData.Output
+    /// Register an OAuth client
+    ///
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    ///
+    /// - Remark: HTTP `POST /auth/oauth2/register`.
+    /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
+    func registerOAuthClient(_ input: Operations.RegisterOAuthClient.Input) async throws -> Operations.RegisterOAuthClient.Output
+    /// Stream change events
+    ///
+    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
+    ///
+    /// - Remark: HTTP `GET /events`.
+    /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
+    func streamEvents(_ input: Operations.StreamEvents.Input) async throws -> Operations.StreamEvents.Output
     /// List webhooks
     ///
     /// Returns every webhook that belongs to you, with each `secret` shortened to its last four characters.
@@ -753,31 +774,19 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
     func getServerMetrics(_ input: Operations.GetServerMetrics.Input) async throws -> Operations.GetServerMetrics.Output
+}
+
+/// Convenience overloads for operation inputs.
+extension APIProtocol {
     /// Describe the instance
     ///
     /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
-    func getInstance(_ input: Operations.GetInstance.Input) async throws -> Operations.GetInstance.Output
-    /// Stream change events
-    ///
-    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
-    ///
-    /// - Remark: HTTP `GET /events`.
-    /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
-    func streamEvents(_ input: Operations.StreamEvents.Input) async throws -> Operations.StreamEvents.Output
-    /// Register an OAuth client
-    ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
-    ///
-    /// - Remark: HTTP `POST /auth/oauth2/register`.
-    /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
-    func registerOAuthClient(_ input: Operations.RegisterOAuthClient.Input) async throws -> Operations.RegisterOAuthClient.Output
-}
-
-/// Convenience overloads for operation inputs.
-extension APIProtocol {
+    public func getInstance(headers: Operations.GetInstance.Input.Headers = .init()) async throws -> Operations.GetInstance.Output {
+        try await getInstance(Operations.GetInstance.Input(headers: headers))
+    }
     /// List items
     ///
     /// Returns a page of the items you can read that match the filters. System items are left out unless you ask for them with `include=system`. Use `include` to add edges, metadata or extensions to each item.
@@ -2223,6 +2232,36 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Register an OAuth client
+    ///
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    ///
+    /// - Remark: HTTP `POST /auth/oauth2/register`.
+    /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
+    public func registerOAuthClient(
+        headers: Operations.RegisterOAuthClient.Input.Headers = .init(),
+        body: Operations.RegisterOAuthClient.Input.Body
+    ) async throws -> Operations.RegisterOAuthClient.Output {
+        try await registerOAuthClient(Operations.RegisterOAuthClient.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Stream change events
+    ///
+    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
+    ///
+    /// - Remark: HTTP `GET /events`.
+    /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
+    public func streamEvents(
+        query: Operations.StreamEvents.Input.Query = .init(),
+        headers: Operations.StreamEvents.Input.Headers = .init()
+    ) async throws -> Operations.StreamEvents.Output {
+        try await streamEvents(Operations.StreamEvents.Input(
+            query: query,
+            headers: headers
+        ))
+    }
     /// List webhooks
     ///
     /// Returns every webhook that belongs to you, with each `secret` shortened to its last four characters.
@@ -2349,45 +2388,6 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//metrics/get(getServerMetrics)`.
     public func getServerMetrics(headers: Operations.GetServerMetrics.Input.Headers = .init()) async throws -> Operations.GetServerMetrics.Output {
         try await getServerMetrics(Operations.GetServerMetrics.Input(headers: headers))
-    }
-    /// Describe the instance
-    ///
-    /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
-    ///
-    /// - Remark: HTTP `GET /`.
-    /// - Remark: Generated from `#/paths///get(getInstance)`.
-    public func getInstance(headers: Operations.GetInstance.Input.Headers = .init()) async throws -> Operations.GetInstance.Output {
-        try await getInstance(Operations.GetInstance.Input(headers: headers))
-    }
-    /// Stream change events
-    ///
-    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
-    ///
-    /// - Remark: HTTP `GET /events`.
-    /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
-    public func streamEvents(
-        query: Operations.StreamEvents.Input.Query = .init(),
-        headers: Operations.StreamEvents.Input.Headers = .init()
-    ) async throws -> Operations.StreamEvents.Output {
-        try await streamEvents(Operations.StreamEvents.Input(
-            query: query,
-            headers: headers
-        ))
-    }
-    /// Register an OAuth client
-    ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
-    ///
-    /// - Remark: HTTP `POST /auth/oauth2/register`.
-    /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
-    public func registerOAuthClient(
-        headers: Operations.RegisterOAuthClient.Input.Headers = .init(),
-        body: Operations.RegisterOAuthClient.Input.Body
-    ) async throws -> Operations.RegisterOAuthClient.Output {
-        try await registerOAuthClient(Operations.RegisterOAuthClient.Input(
-            headers: headers,
-            body: body
-        ))
     }
 }
 
