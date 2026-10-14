@@ -39,14 +39,14 @@ runs "the description check's workflow, which its test reads" true .github/workf
 runs "Dependabot's settings" false .github/dependabot.yml
 runs "agent settings" false .claude/settings.json
 runs "Codex's settings" false .codex/config.toml
-runs "a skill's script" false .agents/skills/withmarfa-github/helper.py
+runs "a skill's script" false .claude/skills/withmarfa-github/helper.py
 runs "a Git hook" false .githooks/pre-push
 runs "an issue template" false .github/ISSUE_TEMPLATE/bug.yml
-runs "a fixture under agent files, which a test could read" true .agents/skills/x/fixtures/input.json
-runs "a file that only looks like an agent directory" true Sources/Marfa/.agents/helper.swift
+runs "a fixture under agent files, which a test could read" true .claude/skills/x/fixtures/input.json
+runs "a file that only looks like an agent directory" true Sources/Marfa/.claude/helper.swift
 runs "a workflow other than the two the job reads" true .github/workflows/codeql.yml
 runs "the release workflow" true .github/workflows/release.yml
-runs "agent files beside Swift" true .agents/skills/x/helper.py Sources/Marfa/Server.swift
+runs "agent files beside Swift" true .claude/skills/x/helper.py Sources/Marfa/Server.swift
 runs "a Swift-only change" true Sources/Marfa/Server.swift
 runs "a test" true Tests/MarfaTests/LiveTests.swift
 runs "the core's pin, which is Rust" true core.pin
@@ -112,7 +112,7 @@ check "Full CI fails when the first job failed" "$(gate_passes 'failure skipped 
 
 # CodeQL starts no run for a change to instructions alone, on a pull request or a push.
 codeql="${root}/.github/workflows/codeql.yml"
-for directory in .agents .codex .githooks .claude; do
+for directory in .codex .githooks .claude; do
   check "CodeQL ignores ${directory} on a pull request and on a push" "$(grep -cF -e "- \"${directory}/**\"" "${codeql}")" 2
 done
 check "CodeQL ignores Markdown on a pull request and on a push" "$(grep -cF -e '- "**/*.md"' "${codeql}")" 2
@@ -148,12 +148,12 @@ commit() {
 git_in_repo init -q
 base="$(commit base)"
 docs="$(commit docs README.md)"
-agents="$(commit agents AGENTS.md .agents/skills/x/helper.py .codex/config.toml .githooks/pre-push)"
+agents="$(commit agents AGENTS.md .claude/skills/x/helper.py .codex/config.toml .githooks/pre-push)"
 swift="$(commit swift Sources/Marfa/Server.swift)"
 pin="$(commit pin core.pin)"
 flow="$(commit workflow .github/workflows/codeql.yml)"
-out="$(commit "move out of an agent directory" .agents/skills/x/helper.py=\>Sources/Marfa/helper.py)"
-into="$(commit "move into an agent directory" Sources/Marfa/Server.swift=\>.agents/Server.swift)"
+out="$(commit "move out of an agent directory" .claude/skills/x/helper.py=\>Sources/Marfa/helper.py)"
+into="$(commit "move into an agent directory" Sources/Marfa/Server.swift=\>.claude/Server.swift)"
 git_in_repo checkout -q -b elsewhere "${base}"
 elsewhere="$(commit "documentation on a line of history without the Swift change" NOTES.md)"
 

@@ -31,7 +31,7 @@ The Swift SDK for Marfa, as the Swift package `Marfa`: Swift types, `async` call
 ## Working here
 
 - American English in code, comments and commits. Scoped Conventional Commits (`feat(package):`, `fix(ci):`).
-- Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, since a squash merge leaves the branch unmerged to git) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
+- Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`, because git sees a squash-merged branch as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
 - Feature branches and pull requests; never push `main`. A session merges its own pull request once every required check is green and the review its risk calls for is done, with that depth stated on the pull request: squash, branch deleted.
 - Workflows use standard GitHub-hosted runners only. Never hold back a push or a check to ration runners.
 - No personal details of any machine or person: no absolute paths, hostnames, account names or credentials.
