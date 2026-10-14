@@ -26,7 +26,7 @@ affects() {
     fixtures/* | */fixtures/*) return 0 ;;
     # Nothing builds, tests or lints Markdown, wherever it is, or the
     # instructions for agents, in whatever format.
-    *.md | LICENSE | .claude/* | .agents/* | .codex/* | .githooks/*) return 1 ;;
+    *.md | LICENSE | .claude/* | .codex/* | .githooks/*) return 1 ;;
     *) return 0 ;;
   esac
 }

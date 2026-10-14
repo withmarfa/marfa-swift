@@ -12,7 +12,6 @@ on:
       - "**/*.md"
       - LICENSE
       - ".claude/**"
-      - ".agents/**"
       - ".codex/**"
       - ".githooks/**"
       - ".github/ISSUE_TEMPLATE/**"
@@ -23,7 +22,6 @@ on:
       - "**/*.md"
       - LICENSE
       - ".claude/**"
-      - ".agents/**"
       - ".codex/**"
       - ".githooks/**"
       - ".github/ISSUE_TEMPLATE/**"
