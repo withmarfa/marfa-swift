@@ -300,24 +300,14 @@ extension LiveWorkingCopies {
             #expect(held.state == .active)
         }
 
-        @Test func eachVerdictArrivesTyped() async throws {
+        @Test func aVerdictThatAcceptsMergesOrConflictsArrivesTyped() async throws {
             let copy = try await Live.hydrated()
             let titled = try await copy.items.create(
                 Draft(type: "core.note", properties: ["title": "first", "body": "first"], tier: .feed))
             let bodied = try await copy.items.create(
                 Draft(type: "core.note", properties: ["title": "other", "body": "first"], tier: .feed))
-            let refused = try await copy.items.create(
-                Draft(
-                    type: "system.connection",
-                    properties: ["kind": "app", "status": "active", "granted_at": "2026-01-01T00:00:00Z"]))
             var report = try await copy.queue.drain()
             #expect(report.verdicts.first { $0.id == titled.id }?.verdict == .accepted)
-            guard case .refused(let refusal) = report.verdicts.first(where: { $0.id == refused.id })?.verdict else {
-                Issue.record("the write to a type the key cannot write was not refused: \(report.verdicts)")
-                return
-            }
-            #expect(refusal.reason == "type_not_permitted")
-            #expect(refusal.code == "type_not_permitted")
             let titledId = try #require(titled.itemId)
             let bodiedId = try #require(bodied.itemId)
 
@@ -339,6 +329,21 @@ extension LiveWorkingCopies {
                 return
             }
             #expect(fields == ["body"])
+        }
+
+        @Test func aWriteToASystemRowIsRefusedBeforeItIsQueued() async throws {
+            let copy = try await Live.hydrated()
+            let note = try await copy.items.create(Live.note("queued \(UUID())"))
+            await #expect {
+                _ = try await copy.items.create(
+                    Draft(
+                        type: "system.connection",
+                        properties: ["kind": "app", "status": "active", "granted_at": "2026-01-01T00:00:00Z"]))
+            } throws: { error in
+                guard case Marfa.MarfaError.forbidden(let code, _) = error else { return false }
+                return code == "type_not_permitted"
+            }
+            #expect(try await copy.queue.all().map(\.id) == [note.id])
         }
 
         @Test func aConflictedCopyAndItsOriginalFindEachOtherAfterTheStoreOpensAgain() async throws {
