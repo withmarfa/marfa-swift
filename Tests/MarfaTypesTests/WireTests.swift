@@ -38,7 +38,7 @@ func theLiveTestHasAServerWhereItIsRequired() {
 func thePinnedServerAnswersInTheseTypes() async throws {
     let (url, key) = try #require(live)
     let (rootBody, _) = try await URLSession.shared.data(from: url)
-    let root = try JSONDecoder().decode(Operations.GetInstance.Output.Ok.Body.JsonPayload.self, from: rootBody)
+    let root = try JSONDecoder().decode(Components.Schemas.InstanceDescription.self, from: rootBody)
     #expect(root.contract == marfaContractVersion)
 
     let title = "Wire \(UUID())"
