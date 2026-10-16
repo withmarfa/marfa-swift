@@ -12,6 +12,212 @@ public import struct Foundation.Date
 extension Components {
     /// Types generated from the `#/components/schemas` section of the OpenAPI document.
     public enum Schemas {
+        /// An edge type says how edges of that type behave: its cardinality, what a delete does to the items they join, and which item types they can join.
+        ///
+        /// - Remark: Generated from `#/components/schemas/EdgeType`.
+        public struct EdgeType: Codable, Hashable, Sendable {
+            /// Unique identifier for the edge type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/id`.
+            public var id: Swift.String
+            /// A name for people to read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/label`.
+            public var label: Swift.String?
+            /// What the edge type is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/description`.
+            public var description: Swift.String?
+            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
+            @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case oneToOne = "one-to-one"
+                case oneToMany = "one-to-many"
+                case manyToOne = "many-to-one"
+                case manyToMany = "many-to-many"
+            }
+            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
+            public var cardinality: Components.Schemas.EdgeType.CardinalityPayload
+            /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/source_type_constraints`.
+            public var sourceTypeConstraints: [Swift.String]
+            /// The types an edge's target item can have, in the same form as `source_type_constraints`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/target_type_constraints`.
+            public var targetTypeConstraints: [Swift.String]
+            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
+            @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case cascade = "cascade"
+                case orphan = "orphan"
+                case block = "block"
+            }
+            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
+            public var cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload
+            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
+            public struct PropertySchemaPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.EdgePropertyDefinition]
+                /// Creates a new `PropertySchemaPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.EdgePropertyDefinition] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
+            public var propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
+            /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_name`.
+            public var reverseName: Swift.String?
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
+            @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case source = "source"
+                case target = "target"
+            }
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
+            public var writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
+            /// `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/shipped`.
+            public var shipped: Swift.Bool
+            /// Creates a new `EdgeType`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the edge type.
+            ///   - label: A name for people to read.
+            ///   - description: What the edge type is for.
+            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
+            ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`.
+            ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
+            ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
+            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
+            public init(
+                id: Swift.String,
+                label: Swift.String? = nil,
+                description: Swift.String? = nil,
+                cardinality: Components.Schemas.EdgeType.CardinalityPayload,
+                sourceTypeConstraints: [Swift.String],
+                targetTypeConstraints: [Swift.String],
+                cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload,
+                propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload,
+                reverseName: Swift.String? = nil,
+                writtenAt: Components.Schemas.EdgeType.WrittenAtPayload,
+                shipped: Swift.Bool
+            ) {
+                self.id = id
+                self.label = label
+                self.description = description
+                self.cardinality = cardinality
+                self.sourceTypeConstraints = sourceTypeConstraints
+                self.targetTypeConstraints = targetTypeConstraints
+                self.cascadeOnDelete = cascadeOnDelete
+                self.propertySchema = propertySchema
+                self.reverseName = reverseName
+                self.writtenAt = writtenAt
+                self.shipped = shipped
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case label
+                case description
+                case cardinality
+                case sourceTypeConstraints = "source_type_constraints"
+                case targetTypeConstraints = "target_type_constraints"
+                case cascadeOnDelete = "cascade_on_delete"
+                case propertySchema = "property_schema"
+                case reverseName = "reverse_name"
+                case writtenAt = "written_at"
+                case shipped
+            }
+        }
+        /// One property an edge of an edge type can carry.
+        ///
+        /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition`.
+        public struct EdgePropertyDefinition: Codable, Hashable, Sendable {
+            /// The property's type: one of the field types a type's `fields` take, except `thumbnail`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/type`.
+            public var _type: Swift.String
+            /// What the property holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/description`.
+            public var description: Swift.String?
+            /// `true` if every edge of the type must have the property.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/required`.
+            public var required: Swift.Bool?
+            /// The values an `enum` property takes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/enum_values`.
+            public var enumValues: [Swift.String]?
+            /// The type of each element of an `array` property. It can't be `thumbnail`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
+            public var itemsType: Swift.String?
+            /// A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
+            public var format: Swift.String?
+            /// Creates a new `EdgePropertyDefinition`.
+            ///
+            /// - Parameters:
+            ///   - _type: The property's type: one of the field types a type's `fields` take, except `thumbnail`.
+            ///   - description: What the property holds.
+            ///   - required: `true` if every edge of the type must have the property.
+            ///   - enumValues: The values an `enum` property takes.
+            ///   - itemsType: The type of each element of an `array` property. It can't be `thumbnail`.
+            ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
+            public init(
+                _type: Swift.String,
+                description: Swift.String? = nil,
+                required: Swift.Bool? = nil,
+                enumValues: [Swift.String]? = nil,
+                itemsType: Swift.String? = nil,
+                format: Swift.String? = nil
+            ) {
+                self._type = _type
+                self.description = description
+                self.required = required
+                self.enumValues = enumValues
+                self.itemsType = itemsType
+                self.format = format
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case description
+                case required
+                case enumValues = "enum_values"
+                case itemsType = "items_type"
+                case format
+            }
+        }
         /// A lever that applies to the types it names.
         ///
         /// - Remark: Generated from `#/components/schemas/TypeLever`.
@@ -371,7 +577,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/trashed_with`.
             public var trashedWith: Swift.String?
-            /// The item's outbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/edges` continues. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
+            /// The item's outbound edges you can read, by edge type, each the first page that `GET /items/{id}/edges` continues. Empty if `source_filter` leaves the item out. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/edges`.
             public struct EdgesPayload: Codable, Hashable, Sendable {
@@ -391,7 +597,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// The item's outbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/edges` continues. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
+            /// The item's outbound edges you can read, by edge type, each the first page that `GET /items/{id}/edges` continues. Empty if `source_filter` leaves the item out. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/edges`.
             public var edges: Components.Schemas.Item.EdgesPayload?
@@ -456,7 +662,7 @@ extension Components {
             ///   - updatedAt: When the item was last written, in UTC. A tag or extension write moves it too.
             ///   - trashedByCascade: Always `true` where present: the item went to the trash with another item, through a cascading edge such as `parent-of`. Present while it stays in the trash. Absent on an item trashed on its own.
             ///   - trashedWith: The ID of the item whose trash took this one into the trash, beside `trashed_by_cascade`, whatever became of that item since. Present only if you can read that item's type.
-            ///   - edges: The item's outbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/edges` continues. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
+            ///   - edges: The item's outbound edges you can read, by edge type, each the first page that `GET /items/{id}/edges` continues. Empty if `source_filter` leaves the item out. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
             ///   - extensions: The item's extension namespaces that you can read, each mapped to its data. Present only where `include` names `extensions`.
             public init(
                 id: Swift.String,
@@ -2576,7 +2782,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/metadata`.
             public var metadata: Components.Schemas.Metadata
-            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. Present with `include=backrefs`.
+            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/backrefs`.
             public struct BackrefsPayload: Codable, Hashable, Sendable {
@@ -2596,7 +2802,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. Present with `include=backrefs`.
+            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/backrefs`.
             public var backrefs: Components.Schemas.ItemDetail.BackrefsPayload?
@@ -2625,7 +2831,7 @@ extension Components {
             /// - Parameters:
             ///   - item: The item, with its outbound edges.
             ///   - metadata: The item's metadata.
-            ///   - backrefs: The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. Present with `include=backrefs`.
+            ///   - backrefs: The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Read-View`.
             ///   - neighbors: The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
             ///   - neighborsTruncated: `true` if this answer's edges reach more than 100 items, so `neighbors` leaves some out. Page `GET /items/{id}/edges` and `GET /items/{id}/backrefs` for the rest. Present with `include=neighbors`.
@@ -2992,7 +3198,7 @@ extension Components {
                 case error
             }
         }
-        /// A stale write that carried nothing to merge: the error and the item now.
+        /// A failed exact version precondition: the error and the item now.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemStaleVersion`.
         public struct ItemStaleVersion: Codable, Hashable, Sendable {
@@ -4986,210 +5192,23 @@ extension Components {
                 case error
             }
         }
-        /// An edge type says how edges of that type behave: its cardinality, what a delete does to the items they join, and which item types they can join.
+        /// One registered edge type.
         ///
-        /// - Remark: Generated from `#/components/schemas/EdgeType`.
-        public struct EdgeType: Codable, Hashable, Sendable {
-            /// Unique identifier for the edge type.
+        /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationResponse`.
+        public struct EdgeTypeRegistrationResponse: Codable, Hashable, Sendable {
+            /// The edge type.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/id`.
-            public var id: Swift.String
-            /// A name for people to read.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/label`.
-            public var label: Swift.String?
-            /// What the edge type is for.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/description`.
-            public var description: Swift.String?
-            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
-            @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case oneToOne = "one-to-one"
-                case oneToMany = "one-to-many"
-                case manyToOne = "many-to-one"
-                case manyToMany = "many-to-many"
-            }
-            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
-            public var cardinality: Components.Schemas.EdgeType.CardinalityPayload
-            /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/source_type_constraints`.
-            public var sourceTypeConstraints: [Swift.String]
-            /// The types an edge's target item can have, in the same form as `source_type_constraints`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/target_type_constraints`.
-            public var targetTypeConstraints: [Swift.String]
-            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
-            @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case cascade = "cascade"
-                case orphan = "orphan"
-                case block = "block"
-            }
-            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
-            public var cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload
-            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
-            public struct PropertySchemaPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.EdgePropertyDefinition]
-                /// Creates a new `PropertySchemaPayload`.
-                ///
-                /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.EdgePropertyDefinition] = .init()) {
-                    self.additionalProperties = additionalProperties
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
-                }
-            }
-            /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
-            public var propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
-            /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_name`.
-            public var reverseName: Swift.String?
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
-            @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case source = "source"
-                case target = "target"
-            }
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
-            public var writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
-            /// `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/shipped`.
-            public var shipped: Swift.Bool
-            /// Creates a new `EdgeType`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationResponse/edge_type`.
+            public var edgeType: Components.Schemas.EdgeType
+            /// Creates a new `EdgeTypeRegistrationResponse`.
             ///
             /// - Parameters:
-            ///   - id: Unique identifier for the edge type.
-            ///   - label: A name for people to read.
-            ///   - description: What the edge type is for.
-            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
-            ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
-            ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`.
-            ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
-            ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
-            ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
-            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
-            ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
-            public init(
-                id: Swift.String,
-                label: Swift.String? = nil,
-                description: Swift.String? = nil,
-                cardinality: Components.Schemas.EdgeType.CardinalityPayload,
-                sourceTypeConstraints: [Swift.String],
-                targetTypeConstraints: [Swift.String],
-                cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload,
-                propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload,
-                reverseName: Swift.String? = nil,
-                writtenAt: Components.Schemas.EdgeType.WrittenAtPayload,
-                shipped: Swift.Bool
-            ) {
-                self.id = id
-                self.label = label
-                self.description = description
-                self.cardinality = cardinality
-                self.sourceTypeConstraints = sourceTypeConstraints
-                self.targetTypeConstraints = targetTypeConstraints
-                self.cascadeOnDelete = cascadeOnDelete
-                self.propertySchema = propertySchema
-                self.reverseName = reverseName
-                self.writtenAt = writtenAt
-                self.shipped = shipped
+            ///   - edgeType: The edge type.
+            public init(edgeType: Components.Schemas.EdgeType) {
+                self.edgeType = edgeType
             }
             public enum CodingKeys: String, CodingKey {
-                case id
-                case label
-                case description
-                case cardinality
-                case sourceTypeConstraints = "source_type_constraints"
-                case targetTypeConstraints = "target_type_constraints"
-                case cascadeOnDelete = "cascade_on_delete"
-                case propertySchema = "property_schema"
-                case reverseName = "reverse_name"
-                case writtenAt = "written_at"
-                case shipped
-            }
-        }
-        /// One property an edge of an edge type can carry.
-        ///
-        /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition`.
-        public struct EdgePropertyDefinition: Codable, Hashable, Sendable {
-            /// The property's type: one of the field types a type's `fields` take, except `thumbnail`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/type`.
-            public var _type: Swift.String
-            /// What the property holds.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/description`.
-            public var description: Swift.String?
-            /// `true` if every edge of the type must have the property.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/required`.
-            public var required: Swift.Bool?
-            /// The values an `enum` property takes.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/enum_values`.
-            public var enumValues: [Swift.String]?
-            /// The type of each element of an `array` property. It can't be `thumbnail`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
-            public var itemsType: Swift.String?
-            /// A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
-            public var format: Swift.String?
-            /// Creates a new `EdgePropertyDefinition`.
-            ///
-            /// - Parameters:
-            ///   - _type: The property's type: one of the field types a type's `fields` take, except `thumbnail`.
-            ///   - description: What the property holds.
-            ///   - required: `true` if every edge of the type must have the property.
-            ///   - enumValues: The values an `enum` property takes.
-            ///   - itemsType: The type of each element of an `array` property. It can't be `thumbnail`.
-            ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
-            public init(
-                _type: Swift.String,
-                description: Swift.String? = nil,
-                required: Swift.Bool? = nil,
-                enumValues: [Swift.String]? = nil,
-                itemsType: Swift.String? = nil,
-                format: Swift.String? = nil
-            ) {
-                self._type = _type
-                self.description = description
-                self.required = required
-                self.enumValues = enumValues
-                self.itemsType = itemsType
-                self.format = format
-            }
-            public enum CodingKeys: String, CodingKey {
-                case _type = "type"
-                case description
-                case required
-                case enumValues = "enum_values"
-                case itemsType = "items_type"
-                case format
+                case edgeType = "edge_type"
             }
         }
         /// An error response.
@@ -5361,6 +5380,88 @@ extension Components {
         }
         /// An error response.
         ///
+        /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal`.
+        public struct EdgeTypeNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeTypeNotFound = "edge_type_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeTypeNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/ConflictRefusal`.
         public struct ConflictRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -5443,23 +5544,23 @@ extension Components {
         }
         /// An edge type to register.
         ///
-        /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest`.
-        public struct EdgeTypeRequest: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest`.
+        public struct EdgeTypeRegistrationRequest: Codable, Hashable, Sendable {
             /// The identifier of the edge type, such as `acme.list-member`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/id`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/id`.
             public var id: Swift.String
             /// A name for people to read.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/label`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/label`.
             public var label: Swift.String?
             /// What the edge type is for.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/description`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/description`.
             public var description: Swift.String?
             /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cardinality`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cardinality`.
             @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case oneToOne = "one-to-one"
                 case oneToMany = "one-to-many"
@@ -5468,19 +5569,19 @@ extension Components {
             }
             /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cardinality`.
-            public var cardinality: Components.Schemas.EdgeTypeRequest.CardinalityPayload
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cardinality`.
+            public var cardinality: Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload
             /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/source_type_constraints`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/source_type_constraints`.
             public var sourceTypeConstraints: [Swift.String]?
             /// The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/target_type_constraints`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/target_type_constraints`.
             public var targetTypeConstraints: [Swift.String]?
             /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cascade_on_delete`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case cascade = "cascade"
                 case orphan = "orphan"
@@ -5488,11 +5589,11 @@ extension Components {
             }
             /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/cascade_on_delete`.
-            public var cascadeOnDelete: Components.Schemas.EdgeTypeRequest.CascadeOnDeletePayload?
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cascade_on_delete`.
+            public var cascadeOnDelete: Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload?
             /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/property_schema`.
             public struct PropertySchemaPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
                 public var additionalProperties: [String: Components.Schemas.EdgePropertyDefinition]
@@ -5512,24 +5613,28 @@ extension Components {
             }
             /// The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/property_schema`.
-            public var propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload?
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/property_schema`.
+            public var propertySchema: Components.Schemas.EdgeTypeRegistrationRequest.PropertySchemaPayload?
             /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/reverse_name`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/reverse_name`.
             public var reverseName: Swift.String?
             /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/written_at`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
             @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case source = "source"
                 case target = "target"
             }
             /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRequest/written_at`.
-            public var writtenAt: Components.Schemas.EdgeTypeRequest.WrittenAtPayload?
-            /// Creates a new `EdgeTypeRequest`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
+            public var writtenAt: Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload?
+            /// `true` widens a registered type's endpoints in place. Retain every existing constraint token, or allow all types with `[]` or `*`; other members must stay unchanged. Omit or set `false` to register a new type. Not stored in the definition.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/evolve_constraints`.
+            public var evolveConstraints: Swift.Bool?
+            /// Creates a new `EdgeTypeRegistrationRequest`.
             ///
             /// - Parameters:
             ///   - id: The identifier of the edge type, such as `acme.list-member`.
@@ -5542,17 +5647,19 @@ extension Components {
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
+            ///   - evolveConstraints: `true` widens a registered type's endpoints in place. Retain every existing constraint token, or allow all types with `[]` or `*`; other members must stay unchanged. Omit or set `false` to register a new type. Not stored in the definition.
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
                 description: Swift.String? = nil,
-                cardinality: Components.Schemas.EdgeTypeRequest.CardinalityPayload,
+                cardinality: Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload,
                 sourceTypeConstraints: [Swift.String]? = nil,
                 targetTypeConstraints: [Swift.String]? = nil,
-                cascadeOnDelete: Components.Schemas.EdgeTypeRequest.CascadeOnDeletePayload? = nil,
-                propertySchema: Components.Schemas.EdgeTypeRequest.PropertySchemaPayload? = nil,
+                cascadeOnDelete: Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload? = nil,
+                propertySchema: Components.Schemas.EdgeTypeRegistrationRequest.PropertySchemaPayload? = nil,
                 reverseName: Swift.String? = nil,
-                writtenAt: Components.Schemas.EdgeTypeRequest.WrittenAtPayload? = nil
+                writtenAt: Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload? = nil,
+                evolveConstraints: Swift.Bool? = nil
             ) {
                 self.id = id
                 self.label = label
@@ -5564,6 +5671,7 @@ extension Components {
                 self.propertySchema = propertySchema
                 self.reverseName = reverseName
                 self.writtenAt = writtenAt
+                self.evolveConstraints = evolveConstraints
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -5576,6 +5684,7 @@ extension Components {
                 case propertySchema = "property_schema"
                 case reverseName = "reverse_name"
                 case writtenAt = "written_at"
+                case evolveConstraints = "evolve_constraints"
             }
         }
         /// A page holding every edge type.
@@ -5605,88 +5714,6 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case data
                 case nextCursor = "next_cursor"
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal`.
-        public struct EdgeTypeNotFoundRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgeTypeNotFound = "edge_type_not_found"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundRefusal/error`.
-            public var error: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload
-            /// Creates a new `EdgeTypeNotFoundRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.EdgeTypeNotFoundRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
             }
         }
         /// An error response.
@@ -12395,7 +12422,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration`.
         public struct OAuthClientRegistration: Codable, Hashable, Sendable {
-            /// The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
+            /// The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. At most 10. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/redirect_uris`.
             public var redirectUris: [Swift.String]?
@@ -12552,7 +12579,7 @@ extension Components {
             /// Creates a new `OAuthClientRegistration`.
             ///
             /// - Parameters:
-            ///   - redirectUris: The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
+            ///   - redirectUris: The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. At most 10. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
             ///   - scope: Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
             ///   - clientName: The app's name, which Marfa shows a person asked to approve it.
             ///   - clientUri: The app's home page URL. Leave it out if the app has none.
@@ -13503,6 +13530,88 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.ReadViewChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal`.
+        public struct InstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.InstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.InstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal/error`.
+            public var error: Components.Schemas.InstanceChangedRefusal._ErrorPayload
+            /// Creates a new `InstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InstanceChangedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {

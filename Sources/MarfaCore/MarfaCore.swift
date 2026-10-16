@@ -967,7 +967,10 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * the server nothing, until a hydration completes; an expired copy is
      * refused. `told_unreachable` says the app was last told
      * `ServerUnreachable` by a follow before this one, so this one tells
-     * `ServerReachable` when it has its first stream.
+     * `ServerReachable` when it has its first stream. Each time it tells
+     * `ServerReachable` with work queued for a drain, it drains once, after
+     * any drain under way, and tells `QueueDrained` or `QueueNotDrained`;
+     * `ended` follows that drain's end.
      */
     func follow(toldUnreachable: Bool, listener: ChangeListener)  -> Subscription
     
@@ -1581,7 +1584,10 @@ open func embedText(id: String, file: String)throws  -> String  {
      * the server nothing, until a hydration completes; an expired copy is
      * refused. `told_unreachable` says the app was last told
      * `ServerUnreachable` by a follow before this one, so this one tells
-     * `ServerReachable` when it has its first stream.
+     * `ServerReachable` when it has its first stream. Each time it tells
+     * `ServerReachable` with work queued for a drain, it drains once, after
+     * any drain under way, and tells `QueueDrained` or `QueueNotDrained`;
+     * `ended` follows that drain's end.
      */
 open func follow(toldUnreachable: Bool, listener: ChangeListener) -> Subscription  {
     return try!  FfiConverterTypeSubscription_lift(try! rustCall() {
@@ -2375,9 +2381,12 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * Makes `dir` a folder that follows the `system.folder` `folder`, and
      * lists it in the machine's registry. The directory is made if it is
      * not there. Its first sync waits: `sync` says what it will do, and
-     * `confirm_first_sync` lets it go.
+     * `confirm_first_sync` lets it go. The answer says why the directory is
+     * in cloud-synced or network storage, where it is; the folder is added
+     * all the same. Reads the file system, so it can wait on a mount that
+     * does not answer.
      */
-    func add(dir: String, folder: String) throws  -> ListedFolder
+    func add(dir: String, folder: String) throws  -> AddedFolder
     
     /**
      * Lets a paused large removal go: its deletes are queued, and files
@@ -2513,10 +2522,13 @@ public convenience init(url: String?, key: String?)throws  {
      * Makes `dir` a folder that follows the `system.folder` `folder`, and
      * lists it in the machine's registry. The directory is made if it is
      * not there. Its first sync waits: `sync` says what it will do, and
-     * `confirm_first_sync` lets it go.
+     * `confirm_first_sync` lets it go. The answer says why the directory is
+     * in cloud-synced or network storage, where it is; the folder is added
+     * all the same. Reads the file system, so it can wait on a mount that
+     * does not answer.
      */
-open func add(dir: String, folder: String)throws  -> ListedFolder  {
-    return try  FfiConverterTypeListedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func add(dir: String, folder: String)throws  -> AddedFolder  {
+    return try  FfiConverterTypeAddedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_add(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),
@@ -2693,8 +2705,10 @@ public func FfiConverterTypeFolders_lower(_ value: Folders) -> UInt64 {
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
  * a hydration left unfinished refuses reads, a catch-up keeps the cursor it
- * reached, and a drain leaves what it had not sent queued. A raised `Stop`
- * stays raised, so a call given one afterwards ends at once.
+ * reached, and a drain leaves what it had not sent queued, and an upload or
+ * item or edge write it had in flight queued as sent, for the next drain to
+ * send again under the same key. A raised `Stop` stays raised, so a call given one afterwards
+ * ends at once.
  */
 public protocol StopProtocol: AnyObject, Sendable {
     
@@ -2705,8 +2719,10 @@ public protocol StopProtocol: AnyObject, Sendable {
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
  * a hydration left unfinished refuses reads, a catch-up keeps the cursor it
- * reached, and a drain leaves what it had not sent queued. A raised `Stop`
- * stays raised, so a call given one afterwards ends at once.
+ * reached, and a drain leaves what it had not sent queued, and an upload or
+ * item or edge write it had in flight queued as sent, for the next drain to
+ * send again under the same key. A raised `Stop` stays raised, so a call given one afterwards
+ * ends at once.
  */
 open class Stop: StopProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -3002,6 +3018,85 @@ public func FfiConverterTypeAdded_lift(_ buf: RustBuffer) throws -> Added {
 #endif
 public func FfiConverterTypeAdded_lower(_ value: Added) -> RustBuffer {
     return FfiConverterTypeAdded.lower(value)
+}
+
+
+/**
+ * A folder `add` made, listed in the machine's registry.
+ */
+public struct AddedFolder: Equatable, Hashable {
+    /**
+     * The directory, resolved as far as it exists.
+     */
+    public var dir: String
+    /**
+     * The id of the `system.folder` whose settings it follows.
+     */
+    public var folder: String
+    /**
+     * Why the directory is in cloud-synced or network storage, where it is.
+     */
+    public var storage: StorageCause?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The directory, resolved as far as it exists.
+         */dir: String, 
+        /**
+         * The id of the `system.folder` whose settings it follows.
+         */folder: String, 
+        /**
+         * Why the directory is in cloud-synced or network storage, where it is.
+         */storage: StorageCause?) {
+        self.dir = dir
+        self.folder = folder
+        self.storage = storage
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension AddedFolder: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeAddedFolder: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AddedFolder {
+        return
+            try AddedFolder(
+                dir: FfiConverterString.read(from: &buf), 
+                folder: FfiConverterString.read(from: &buf), 
+                storage: FfiConverterOptionTypeStorageCause.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: AddedFolder, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterString.write(value.folder, into: &buf)
+        FfiConverterOptionTypeStorageCause.write(value.storage, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAddedFolder_lift(_ buf: RustBuffer) throws -> AddedFolder {
+    return try FfiConverterTypeAddedFolder.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAddedFolder_lower(_ value: AddedFolder) -> RustBuffer {
+    return FfiConverterTypeAddedFolder.lower(value)
 }
 
 
@@ -7775,8 +7870,9 @@ public func FfiConverterTypeCatchUpError_lower(_ value: CatchUpError) -> RustBuf
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * What a held stream changed in the copy, or what became of the server.
- * `cursor` is the cursor held after it.
+ * What a held stream changed in the copy, what became of the server, or
+ * what became of the queue it drained then. `cursor` is the cursor held
+ * after it.
  */
 
 public enum Change: Equatable, Hashable {
@@ -7800,9 +7896,22 @@ public enum Change: Equatable, Hashable {
     case serverUnreachable(reason: MarfaError, cursor: String
     )
     /**
-     * A stream is had again, which is when to drain what waited.
+     * A stream is had again. Where a drain has work queued, the follow
+     * drains once and tells `QueueDrained` or `QueueNotDrained`.
      */
     case serverReachable(cursor: String
+    )
+    /**
+     * The queue was drained once a stream was had again, and what that
+     * drain did, as `drain` returns it.
+     */
+    case queueDrained(report: DrainReport, cursor: String
+    )
+    /**
+     * The drain started once a stream was had again ended with `error`.
+     * The answers it had recorded stay recorded.
+     */
+    case queueNotDrained(error: MarfaError, cursor: String
     )
 
 
@@ -7837,6 +7946,12 @@ public struct FfiConverterTypeChange: FfiConverterRustBuffer {
         case 4: return .serverReachable(cursor: try FfiConverterString.read(from: &buf)
         )
         
+        case 5: return .queueDrained(report: try FfiConverterTypeDrainReport.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .queueNotDrained(error: try FfiConverterTypeMarfaError.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
+        )
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -7866,6 +7981,18 @@ public struct FfiConverterTypeChange: FfiConverterRustBuffer {
         
         case let .serverReachable(cursor):
             writeInt(&buf, Int32(4))
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .queueDrained(report,cursor):
+            writeInt(&buf, Int32(5))
+            FfiConverterTypeDrainReport.write(report, into: &buf)
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .queueNotDrained(error,cursor):
+            writeInt(&buf, Int32(6))
+            FfiConverterTypeMarfaError.write(error, into: &buf)
             FfiConverterString.write(cursor, into: &buf)
             
         }
@@ -8083,9 +8210,10 @@ public func FfiConverterTypeFileState_lower(_ value: FileState) -> RustBuffer {
 public enum FolderEvent: Equatable, Hashable {
     
     /**
-     * The directory is watched, and passes begin.
+     * The directory is watched, and passes begin. `storage` says why it is
+     * in cloud-synced or network storage, where it is.
      */
-    case watching(dir: String
+    case watching(dir: String, storage: StorageCause?
     )
     /**
      * The filesystem reported an error; the watch goes on.
@@ -8141,7 +8269,7 @@ public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .watching(dir: try FfiConverterString.read(from: &buf)
+        case 1: return .watching(dir: try FfiConverterString.read(from: &buf), storage: try FfiConverterOptionTypeStorageCause.read(from: &buf)
         )
         
         case 2: return .watcherFailed(message: try FfiConverterString.read(from: &buf)
@@ -8169,9 +8297,10 @@ public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
         switch value {
         
         
-        case let .watching(dir):
+        case let .watching(dir,storage):
             writeInt(&buf, Int32(1))
             FfiConverterString.write(dir, into: &buf)
+            FfiConverterOptionTypeStorageCause.write(storage, into: &buf)
             
         
         case let .watcherFailed(message):
@@ -9372,6 +9501,115 @@ public func FfiConverterTypeSortField_lower(_ value: SortField) -> RustBuffer {
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Why a folder's directory is in cloud-synced or network storage, where
+ * two programs may sync the same files or changes may not be noticed. An app
+ * shows it; it is a warning, and the folder works.
+ */
+
+public enum StorageCause: Equatable, Hashable {
+    
+    /**
+     * iCloud Drive syncs the files: the directory is below
+     * `Library/Mobile Documents`.
+     */
+    case iCloudDrive
+    /**
+     * A cloud service's File Provider syncs the files: the directory is
+     * below `Library/CloudStorage`.
+     */
+    case cloudService
+    /**
+     * macOS reports the directory as ubiquitous outside both of those
+     * places, as it does for `Desktop` and `Documents` where iCloud's
+     * "Desktop & Documents" is on. It reports every File Provider item so,
+     * so which service syncs it is not known: say "iCloud Drive or another
+     * cloud service".
+     */
+    case cloudSynced
+    /**
+     * A network file system, named as the operating system names it
+     * (`smbfs`, `nfs`, `afpfs`, `webdav`, `cifs` or `smb2`). Changes made
+     * from another computer may not be noticed.
+     */
+    case networkFileSystem(kind: String
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension StorageCause: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStorageCause: FfiConverterRustBuffer {
+    typealias SwiftType = StorageCause
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StorageCause {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .iCloudDrive
+        
+        case 2: return .cloudService
+        
+        case 3: return .cloudSynced
+        
+        case 4: return .networkFileSystem(kind: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: StorageCause, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .iCloudDrive:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .cloudService:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .cloudSynced:
+            writeInt(&buf, Int32(3))
+        
+        
+        case let .networkFileSystem(kind):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(kind, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStorageCause_lift(_ buf: RustBuffer) throws -> StorageCause {
+    return try FfiConverterTypeStorageCause.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStorageCause_lower(_ value: StorageCause) -> RustBuffer {
+    return FfiConverterTypeStorageCause.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum Tier: Equatable, Hashable {
     
@@ -10308,6 +10546,30 @@ fileprivate struct FfiConverterOptionTypeSliceTier: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeStorageCause: FfiConverterRustBuffer {
+    typealias SwiftType = StorageCause?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeStorageCause.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeStorageCause.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeTier: FfiConverterRustBuffer {
     typealias SwiftType = Tier?
 
@@ -10998,7 +11260,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_embed_text() != 54663) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 18794) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 58708) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_forget_answered() != 62545) {
@@ -11121,7 +11383,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folderlistener_ended() != 28733) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 58916) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 9043) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 13317) {
