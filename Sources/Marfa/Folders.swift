@@ -130,9 +130,9 @@ public struct Folders: Sendable {
 
 /// A folder kept in step while the app runs.
 ///
-/// Iterate it for what the watch does. The sequence ends after `stop()`, and after ``FolderEvent/removed`` or
-/// ``FolderEvent/unlisted``, without an error, and throws a `MarfaError` when the
-/// watch fails: when the server refuses the credential (`unauthorized`), when the server's changes stop
+/// Iterate it for what the watch does. The sequence ends without an error after `stop()`,
+/// ``FolderEvent/removed`` or ``FolderEvent/unlisted``. It throws a `MarfaError` when the watch fails:
+/// when the server refuses the credential (`unauthorized`), when the server's changes stop
 /// reaching the folder, or when the directory can't be watched. Cancelling the task that iterates it stops
 /// the watch, and so does releasing it while nothing iterates it; leaving a loop over it early doesn't, so
 /// call `stop()`.

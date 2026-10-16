@@ -406,7 +406,6 @@ extension LiveWorkingCopies {
                 }
                 return events
             }
-            // The call asks the watch for the folder instead of being refused.
             guard
                 case .synced = try await bounded(
                     "a sync beside the watch", within: 30, { try await folders.sync(directory) })
@@ -434,7 +433,6 @@ extension LiveWorkingCopies {
                 }
                 return events
             }
-            // Over a folder the watch holds, the call waits for it and then runs.
             let result = try await bounded("the sync", within: 30) { try await folders.sync(directory) }
             guard case .synced = result else {
                 Issue.record("the sync did not run: \(result)")
@@ -458,7 +456,6 @@ extension LiveWorkingCopies {
                 return events
             }
             try await bounded("the removal", within: 30) { try await folders.remove(directory) }
-            // The sequence ends without an error once the folder is gone.
             let events = try await bounded("the watch to end", within: 60) { try await heard.value }
             #expect(events.contains { if case .handedOver = $0 { true } else { false } }, "\(events)")
             #expect(events.contains { if case .removed = $0 { true } else { false } }, "\(events)")
