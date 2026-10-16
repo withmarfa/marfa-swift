@@ -87,7 +87,7 @@ public final class WorkingCopy: Sendable {
             try await holder.runUntilCanceled { core, stop in
                 try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes, stop: stop)
             })
-        feed.reached()
+        if feed.reached() { drainWhatWaited() }
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }
@@ -143,7 +143,7 @@ public final class WorkingCopy: Sendable {
             feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
         }
         let report = try caughtUp.get()
-        feed.reached()
+        if feed.reached() { drainWhatWaited() }
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -175,7 +175,9 @@ public final class WorkingCopy: Sendable {
     /// says neither.
     ///
     /// A held stream drains the writes queued meanwhile, once each time the
-    /// follow has its stream again, after any drain the app started has ended.
+    /// server is back, whether the follow has its stream again first or a
+    /// hydration or catch-up reaches the server first, after any drain the app
+    /// started has ended.
     /// The app has nothing to start on `.serverReachable`. The drain ends in
     /// `.queueDrained` with its report, or in `.queueNotDrained` with why it
     /// stopped, and the answers it had recorded stay recorded. For
@@ -203,6 +205,27 @@ public final class WorkingCopy: Sendable {
         continuation.onTermination = { [feed] _ in feed.remove(token) }
         _ = feed.add(continuation, as: token)
         return stream
+    }
+
+    /// Drains what waited while the server was away, after a call proved it
+    /// reachable.
+    ///
+    /// The held streams are told how it ended, as for a follow's own drain. A
+    /// drain with nothing to send tells nothing, and a copy closed meanwhile
+    /// tells nothing.
+    private func drainWhatWaited() {
+        Task { [holder, feed] in
+            do {
+                let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
+                guard !report.isIdle else { return }
+                for change in report.changes() { feed.announce(change) }
+                feed.announce(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+            } catch let error as MarfaError {
+                if case .closed = error { return }
+                feed.announce(Change(origin: .queueNotDrained(error), itemId: nil, edgeId: nil))
+            } catch {
+            }
+        }
     }
 
     /// Ends every stream `changes()` handed out, stops what feeds them, and
@@ -254,6 +277,12 @@ public final class WorkingCopy: Sendable {
 }
 
 extension DrainReport {
+    /// Whether the drain had nothing to send and nothing to say.
+    var isIdle: Bool {
+        answered == 0 && undelivered == 0 && unsent == 0 && unmade == 0 && verdicts.isEmpty && unavailable == nil
+            && stopped == nil
+    }
+
     /// What a drain tells a held stream: each write it answered, then that rows
     /// may have changed.
     func changes() -> [Change] {
@@ -817,9 +846,10 @@ final class Feed: Sendable {
         var unreachable: MarfaError?
         /// Set once the streams are told the server is unreachable.
         ///
-        /// Cleared only when a follow says it has its stream again, since the core
-        /// drains on that word. A call that reaches the server clears `unreachable`
-        /// first, and the follow it restarts must still drain what waited.
+        /// A follow that tells the server is back drains what waited, and
+        /// clears it. A call that reaches the server first clears
+        /// `unreachable`, so the follow it restarts is told nothing of the
+        /// outage and drains nothing; the copy drains what waited itself.
         var owesDrain = false
         var closed = false
         var source: Source
@@ -1000,8 +1030,16 @@ final class Feed: Sendable {
 
     /// A call that read the server, such as a catch-up, says it can be
     /// reached.
-    func reached() {
-        locked { state in tell(&state, nil) }
+    ///
+    /// Returns whether a held stream is owed the drain of what waited
+    /// while the server was away, which the caller then makes.
+    @discardableResult
+    func reached() -> Bool {
+        locked { state in
+            tell(&state, nil)
+            defer { state.owesDrain = false }
+            return state.owesDrain && state.source == .follow && !state.streams.isEmpty
+        }
     }
 
     private func tell(_ state: inout State, _ unreachable: MarfaError?) {
@@ -1099,7 +1137,7 @@ final class Feed: Sendable {
         case .follow:
             let subscription = try holder.with {
                 $0.follow(
-                    toldUnreachable: state.unreachable != nil || state.owesDrain,
+                    toldUnreachable: state.unreachable != nil,
                     listener: Listener(feed: self, generation: generation))
             }
             return .following(generation: generation, subscription)

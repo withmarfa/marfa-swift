@@ -148,8 +148,15 @@ struct LiveRestart {
             #expect(try await copy.queue.drain().verdicts.isEmpty)
             try await Task.sleep(for: .milliseconds(500))
             #expect(heard.all.filter { if case .queueDrained = $0.origin { true } else { false } }.count == 1)
+
+            // The recovery did not hide the next outage from the app.
+            try await own.stop()
+            try await eventually("the follow said the server went again", within: 60) {
+                heard.all.filter { if case .serverUnreachable = $0.origin { true } else { false } }.count == 2
+            }
             heard.stop()
             await copy.close()
+            try await own.start()
         } catch {
             try? await own.end()
             throw error

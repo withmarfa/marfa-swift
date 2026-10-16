@@ -97,35 +97,52 @@ struct CopyOptions {
     }
 
     @Test(arguments: ["catch-up", "hydration"])
-    func aFollowStartedAfterARecoveryStillOwesTheDrainOfWhatWaited(recovery: String) async throws {
+    func aRecoveryDrainsWhatWaitedOnceAndLeavesTheNextOutageToBeTold(recovery: String) async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
+        func count(_ kind: (Marfa.Change.Origin) -> Bool) -> Int { heard.all.filter { kind($0.origin) }.count }
+        let queueDrained = { (origin: Marfa.Change.Origin) in if case .queueDrained = origin { true } else { false } }
+        let unreachable = { (origin: Marfa.Change.Origin) in if case .serverUnreachable = origin { true } else { false }
+        }
+        let recover = {
+            if recovery == "catch-up" {
+                _ = try await copy.catchUp()
+            } else {
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+            }
+        }
         try await eventually("the follow started") { core.follows.count == 1 }
         let gone = MarfaCore.MarfaError.Network(message: "refused")
         core.change(0, MarfaCore.Change.serverUnreachable(reason: gone, cursor: "3"))
-        try await eventually("the server's going was told") { heard.all.count == 1 }
+        try await eventually("the server's going was told") { count(unreachable) == 1 }
 
-        // The call reaches the server, so the app is told it is back; the follow
-        // it restarts must still drain once, which the core does only for a follow
-        // told the server was unreachable.
-        if recovery == "catch-up" {
-            _ = try await copy.catchUp()
-        } else {
-            _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+        // The call proves the server is reachable, so the copy drains what waited
+        // itself: the follow it restarts is told only what the app was told, and
+        // starts no drain of its own.
+        let verdict = MarfaCore.DrainVerdict(
+            id: "q", kind: .createItem, itemId: "n1", edgeId: nil, verdict: .accepted, refusals: 0, replayed: false)
+        core.state.withLock {
+            $0.drained = MarfaCore.DrainReport(
+                answered: 1, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [verdict],
+                stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
         }
+        try await recover()
         try await eventually("the follow started again") { core.follows.count == 2 }
-        try await eventually("the return was told") { heard.all.count >= 2 }
-        #expect(core.follows[1].toldUnreachable, "the follow after a \(recovery) would not drain what waited")
+        try await eventually("the drain was told") { count(queueDrained) == 1 }
+        #expect(!core.follows[1].toldUnreachable, "the follow would hide the next outage from the app")
+        core.change(1, MarfaCore.Change.serverUnreachable(reason: gone, cursor: "3"))
+        try await eventually("the next outage was told") { count(unreachable) == 2 }
 
-        // The follow tells it has its stream: the app is not told a second time,
-        // and a follow started after that owes nothing.
-        core.change(1, MarfaCore.Change.serverReachable(cursor: "3"))
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(heard.all.filter { if case .serverReachable = $0.origin { true } else { false } }.count == 1)
-        _ = try await copy.catchUp()
-        try await eventually("the follow started once more") { core.follows.count == 3 }
-        #expect(!core.follows[2].toldUnreachable, "a drain already owed and made was owed again")
+        // The witness: nothing waits, so a second recovery tells no drain.
+        core.state.withLock {
+            $0.drained = MarfaCore.DrainReport(
+                answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [],
+                stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
+        }
+        try await recover()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(count(queueDrained) == 1)
         await copy.close()
     }
 
@@ -171,8 +188,7 @@ struct CopyOptions {
         core.change(core.follows.count - 1, MarfaCore.Change.serverReachable(cursor: "3"))
         try await Task.sleep(for: .milliseconds(100))
         #expect(heard.all.map(\.origin) == [.serverUnreachable(.network(message: "refused")), .serverReachable])
-        // The follow after the catch-up still owes the drain of what waited.
-        #expect(core.follows.last?.toldUnreachable == true)
+        #expect(core.follows.last?.toldUnreachable == false)
         await copy.close()
     }
 }
