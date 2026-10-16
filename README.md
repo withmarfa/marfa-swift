@@ -391,7 +391,29 @@ for try await event in watch {
 
 A folder in iCloud Drive, in a cloud service's synced location or on a network file system works as any other, but a second program may sync the same files, or changes made from another computer may not be noticed. `add(_:following:)` returns the cause as `storage`, and the `.watching` event carries it too. A `StorageCause` is `iCloudDrive`, `cloudService`, `cloudSynced` (iCloud Drive or another cloud service, which macOS doesn't tell apart) or `networkFileSystem(kind:)`. Its `warning` is a plain sentence that names the cause; show it once for each folder in a session.
 
-One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. It also throws `invalid` for a path that passes through a symbolic link, such as one under `/var` on a Mac, unless it is the path `list()` gives; pass that path. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
+One process works a folder at a time, and a watch lets go of its folder to a call that asks. When `add(_:following:)`, `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`, `restoreRemoval(in:)` or `remove(_:)` finds the folder held by a watch, the app's own or `marfa folders watch`, it asks the watch to let go and waits up to 10 seconds. A call that gets no answer in that time throws `MarfaError.readingHandle`, naming the folder; `watch(_:)` doesn't ask, so it throws `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
+
+What an app's own watch tells when a call takes its folder:
+
+| Event | Meaning |
+| --- | --- |
+| `.handedOver` | The watch let the folder go to a call or command, at the end of the step of its pass under way. No passes run until it is back, so don't show the folder as in step. |
+| `.takenBack` | The call ended, and the watch has the folder again and keeps it in step. This stands in for a second `.watching`. |
+| `.heldElsewhere` | Another process held the folder past the time a caller waits, with no call asking for it. Told once; the watch takes the folder back when that process lets go. |
+| `.removed`, `.unlisted` | The call removed the folder, or took it off the registry and left its state, so there is nothing to watch. The sequence ends without an error. |
+
+```swift
+for try await event in watch {
+    switch event {
+    case .handedOver, .heldElsewhere: showFolderPaused()
+    case .takenBack: showFolderInStep()
+    case .removed, .unlisted: showFolderGone()
+    default: break
+    }
+}
+```
+
+ `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. It also throws `invalid` for a path that passes through a symbolic link, such as one under `/var` on a Mac, unless it is the path `list()` gives; pass that path. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
 
 ## Keys
 

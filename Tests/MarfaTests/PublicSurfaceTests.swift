@@ -138,7 +138,9 @@ import Testing
     let event = FolderEvent.retrying(.network(message: "m"), after: .seconds(1))
     let told: Bool =
         switch event {
-        case .watching, .watcherFailed, .retrying, .unreachable, .reachable, .waiting, .passed: true
+        case .watching, .watcherFailed, .retrying, .unreachable, .reachable, .waiting, .passed, .handedOver,
+            .heldElsewhere, .takenBack, .removed, .unlisted:
+            true
         }
     #expect(told)
 }

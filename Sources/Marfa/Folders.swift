@@ -12,9 +12,14 @@ import Synchronization
 /// ``FolderSyncResult/awaitingConfirmation(_:)`` with what the sync will do, and nothing is written into the
 /// directory or sent until `confirmFirstSync(in:)`. `remove(_:)` cancels it and leaves the files.
 ///
-/// One process works a folder at a time. While the command-line tool or a watch holds a folder, `sync(_:)`,
-/// `confirmFirstSync(in:)`, `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)` and `watch(_:)` throw
-/// `MarfaError.readingHandle`; `status(of:)` still answers. Every call runs off the caller's thread.
+/// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `confirmFirstSync(in:)`,
+/// `confirmRemoval(in:)`, `restoreRemoval(in:)` or `remove(_:)` finds the folder held by a watch, whether this
+/// app's own or the command-line tool's, it asks the watch to let the folder go and waits up to 10 seconds. A
+/// watch of this app lets it go at the end of the step of its pass under way, tells ``FolderEvent/handedOver``,
+/// and takes the folder back once the call ends, telling ``FolderEvent/takenBack``. A folder that isn't let go in
+/// that time throws `MarfaError.readingHandle`, naming the folder. `watch(_:)` doesn't ask: it throws
+/// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
+/// Every call runs off the caller's thread.
 public struct Folders: Sendable {
     /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)` and `watch(_:)` reach.
     public let server: Server?
@@ -103,7 +108,9 @@ public struct Folders: Sendable {
     ///
     /// Throws at once when the folder can't be opened, such as when another process holds it, and throws
     /// `MarfaError.firstSyncWaiting` while the folder's first sync waits to be confirmed. Once started, the
-    /// watch holds the folder until it ends.
+    /// watch holds the folder until it ends, except while it lets the folder go to a call of ``Folders`` or a
+    /// command that asks for it: the watch tells ``FolderEvent/handedOver`` then, and ``FolderEvent/takenBack``
+    /// once it has the folder again.
     public func watch(_ directory: URL) async throws -> FolderWatch {
         let dir = directory.path(percentEncoded: false)
         let (events, continuation) = AsyncThrowingStream<FolderEvent, any Error>.makeStream()
@@ -123,8 +130,9 @@ public struct Folders: Sendable {
 
 /// A folder kept in step while the app runs.
 ///
-/// Iterate it for what the watch does. The sequence ends after `stop()`, and throws a `MarfaError` when the
-/// watch fails: when the server refuses the credential (`unauthorized`), when the server's changes stop
+/// Iterate it for what the watch does. The sequence ends without an error after `stop()`,
+/// ``FolderEvent/removed`` or ``FolderEvent/unlisted``. It throws a `MarfaError` when the watch fails:
+/// when the server refuses the credential (`unauthorized`), when the server's changes stop
 /// reaching the folder, or when the directory can't be watched. Cancelling the task that iterates it stops
 /// the watch, and so does releasing it while nothing iterates it; leaving a loop over it early doesn't, so
 /// call `stop()`.
@@ -236,6 +244,22 @@ public enum FolderEvent: Sendable, Hashable {
     case waiting(reason: String)
     /// A pass that changed something, or found something new to report.
     case passed(FolderPass)
+    /// A call of ``Folders`` or a command asked for the folder, and the watch let it go at the end of the step
+    /// of its pass under way. The watch waits, and takes the folder back once the folder is free: `takenBack`
+    /// says so. Passes don't run in between, so a folder shown as in step isn't while this stands.
+    case handedOver
+    /// The watch let the folder go, and another process holds it past the time a caller waits, with no call
+    /// asking for it. Reported once. The watch takes the folder back once that process lets it go.
+    case heldElsewhere
+    /// The watch took the folder back and keeps it in step again. It follows `handedOver` or `heldElsewhere`,
+    /// and stands in for a second `watching`.
+    case takenBack
+    /// The call the folder was let go to removed the folder from this Mac, so there is nothing to watch. The
+    /// watch ends without an error.
+    case removed
+    /// The call the folder was let go to took the folder off the Mac's registry and left its state. The watch
+    /// ends without an error, and the folder stays off the registry.
+    case unlisted
 
     init(_ core: MarfaCore.FolderEvent) {
         switch core {
@@ -247,6 +271,11 @@ public enum FolderEvent: Sendable, Hashable {
         case .reachable: self = .reachable
         case .waiting(let reason): self = .waiting(reason: reason)
         case .passed(let pass): self = .passed(FolderPass(pass))
+        case .handedOver: self = .handedOver
+        case .heldElsewhere: self = .heldElsewhere
+        case .takenBack: self = .takenBack
+        case .removed: self = .removed
+        case .unlisted: self = .unlisted
         }
     }
 }
