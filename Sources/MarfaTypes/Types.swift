@@ -48,7 +48,7 @@ public protocol APIProtocol: Sendable {
     func getItem(_ input: Operations.GetItem.Input) async throws -> Operations.GetItem.Output
     /// Update an item
     ///
-    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read: if the item changed since, Marfa merges your changes where nothing collides. To change its type, send `type` with `retype: true`.
+    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. To change its type, send `type` with `retype: true`.
     ///
     /// - Remark: HTTP `PATCH /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)`.
@@ -202,28 +202,28 @@ public protocol APIProtocol: Sendable {
     func deleteItemExtension(_ input: Operations.DeleteItemExtension.Input) async throws -> Operations.DeleteItemExtension.Output
     /// List outbound edges
     ///
-    /// Returns the edges that start at an item. An item in the trash still lists its edges. `GET /items/{id}/backrefs` lists the edges that point at it.
+    /// Returns the edges that start at an item. An item in the trash still lists its edges. If `source_filter` leaves the item out, none of its edges appear here. `GET /items/{id}/backrefs` lists the edges that point at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/edges`.
     /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)`.
     func listItemEdges(_ input: Operations.ListItemEdges.Input) async throws -> Operations.ListItemEdges.Output
     /// List inbound edges
     ///
-    /// Returns the edges that point at an item. An item in the trash still lists its edges. `GET /items/{id}/edges` lists the edges that start at it.
+    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose source item `source_filter` leaves out doesn't appear here, whatever the source of this item. `GET /items/{id}/edges` lists the edges that start at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/backrefs`.
     /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)`.
     func listItemBackrefs(_ input: Operations.ListItemBackrefs.Input) async throws -> Operations.ListItemBackrefs.Output
     /// List edges
     ///
-    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear here: `GET /events` reports deletions.
+    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose source item `source_filter` leaves out.
     ///
     /// - Remark: HTTP `GET /edges`.
     /// - Remark: Generated from `#/paths//edges/get(listEdges)`.
     func listEdges(_ input: Operations.ListEdges.Input) async throws -> Operations.ListEdges.Output
     /// Create an edge
     ///
-    /// Creates an edge between two existing items. Repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
+    /// Creates an edge between two existing items. After any `source_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
@@ -265,7 +265,7 @@ public protocol APIProtocol: Sendable {
     func listEdgeTypes(_ input: Operations.ListEdgeTypes.Input) async throws -> Operations.ListEdgeTypes.Output
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
@@ -699,7 +699,7 @@ public protocol APIProtocol: Sendable {
     func exportData(_ input: Operations.ExportData.Input) async throws -> Operations.ExportData.Output
     /// Register an OAuth client
     ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
     /// - Remark: HTTP `POST /auth/oauth2/register`.
     /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
@@ -851,7 +851,7 @@ extension APIProtocol {
     }
     /// Update an item
     ///
-    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read: if the item changed since, Marfa merges your changes where nothing collides. To change its type, send `type` with `retype: true`.
+    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. To change its type, send `type` with `retype: true`.
     ///
     /// - Remark: HTTP `PATCH /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)`.
@@ -908,11 +908,13 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)`.
     public func transitionItem(
         path: Operations.TransitionItem.Input.Path,
+        query: Operations.TransitionItem.Input.Query = .init(),
         headers: Operations.TransitionItem.Input.Headers = .init(),
         body: Operations.TransitionItem.Input.Body
     ) async throws -> Operations.TransitionItem.Output {
         try await transitionItem(Operations.TransitionItem.Input(
             path: path,
+            query: query,
             headers: headers,
             body: body
         ))
@@ -1201,7 +1203,7 @@ extension APIProtocol {
     }
     /// List outbound edges
     ///
-    /// Returns the edges that start at an item. An item in the trash still lists its edges. `GET /items/{id}/backrefs` lists the edges that point at it.
+    /// Returns the edges that start at an item. An item in the trash still lists its edges. If `source_filter` leaves the item out, none of its edges appear here. `GET /items/{id}/backrefs` lists the edges that point at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/edges`.
     /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)`.
@@ -1218,7 +1220,7 @@ extension APIProtocol {
     }
     /// List inbound edges
     ///
-    /// Returns the edges that point at an item. An item in the trash still lists its edges. `GET /items/{id}/edges` lists the edges that start at it.
+    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose source item `source_filter` leaves out doesn't appear here, whatever the source of this item. `GET /items/{id}/edges` lists the edges that start at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/backrefs`.
     /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)`.
@@ -1235,7 +1237,7 @@ extension APIProtocol {
     }
     /// List edges
     ///
-    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear here: `GET /events` reports deletions.
+    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose source item `source_filter` leaves out.
     ///
     /// - Remark: HTTP `GET /edges`.
     /// - Remark: Generated from `#/paths//edges/get(listEdges)`.
@@ -1250,15 +1252,17 @@ extension APIProtocol {
     }
     /// Create an edge
     ///
-    /// Creates an edge between two existing items. Repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
+    /// Creates an edge between two existing items. After any `source_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
     public func createEdge(
+        query: Operations.CreateEdge.Input.Query = .init(),
         headers: Operations.CreateEdge.Input.Headers = .init(),
         body: Operations.CreateEdge.Input.Body
     ) async throws -> Operations.CreateEdge.Output {
         try await createEdge(Operations.CreateEdge.Input(
+            query: query,
             headers: headers,
             body: body
         ))
@@ -1303,10 +1307,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//edges/{id}/delete(deleteEdge)`.
     public func deleteEdge(
         path: Operations.DeleteEdge.Input.Path,
+        query: Operations.DeleteEdge.Input.Query = .init(),
         headers: Operations.DeleteEdge.Input.Headers = .init()
     ) async throws -> Operations.DeleteEdge.Output {
         try await deleteEdge(Operations.DeleteEdge.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1336,7 +1342,7 @@ extension APIProtocol {
     }
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
@@ -2234,7 +2240,7 @@ extension APIProtocol {
     }
     /// Register an OAuth client
     ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
     /// - Remark: HTTP `POST /auth/oauth2/register`.
     /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.

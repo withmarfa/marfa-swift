@@ -1546,17 +1546,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateItem.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -1716,6 +1723,76 @@ public enum Operations {
                         case captureLongitude = "capture_longitude"
                         case tags
                         case edges
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self._type = try container.decode(
+                            Swift.String.self,
+                            forKey: ._type
+                        )
+                        self.properties = try container.decodeIfPresent(
+                            Operations.CreateItem.Input.Body.JsonPayload.PropertiesPayload.self,
+                            forKey: .properties
+                        )
+                        self.id = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .id
+                        )
+                        self.state = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .state
+                        )
+                        self.occurredAt = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .occurredAt
+                        )
+                        self.source = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .source
+                        )
+                        self.sourceId = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .sourceId
+                        )
+                        self.version = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .version
+                        )
+                        self.tier = try container.decodeIfPresent(
+                            Components.Schemas.Tier.self,
+                            forKey: .tier
+                        )
+                        self.captureLatitude = try container.decodeIfPresent(
+                            Swift.Double.self,
+                            forKey: .captureLatitude
+                        )
+                        self.captureLongitude = try container.decodeIfPresent(
+                            Swift.Double.self,
+                            forKey: .captureLongitude
+                        )
+                        self.tags = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .tags
+                        )
+                        self.edges = try container.decodeIfPresent(
+                            Operations.CreateItem.Input.Body.JsonPayload.EdgesPayload.self,
+                            forKey: .edges
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "type",
+                            "properties",
+                            "id",
+                            "state",
+                            "occurred_at",
+                            "source",
+                            "source_id",
+                            "version",
+                            "tier",
+                            "capture_latitude",
+                            "capture_longitude",
+                            "tags",
+                            "edges"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/items/POST/requestBody/content/application\/json`.
@@ -2062,7 +2139,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a field is invalid.
+            /// - `validation_error`: a field is invalid or undeclared.
             /// - `missing_required_field`: `type` is missing.
             /// - `unknown_type`: `type` isn't registered.
             /// - `invalid_id`: `id` or an edge target isn't a valid ID.
@@ -2507,7 +2584,9 @@ public enum Operations {
                         /// - Remark: Generated from `#/paths/items/POST/responses/409/content/json/value3`.
                         public var value3: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal?
                         /// - Remark: Generated from `#/paths/items/POST/responses/409/content/json/value4`.
-                        public var value4: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value4: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/POST/responses/409/content/json/value5`.
+                        public var value5: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
@@ -2515,16 +2594,19 @@ public enum Operations {
                         ///   - value2:
                         ///   - value3:
                         ///   - value4:
+                        ///   - value5:
                         public init(
                             value1: Components.Schemas.ItemVersionConflict? = nil,
                             value2: Components.Schemas.ItemAncestorUnavailable? = nil,
                             value3: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal? = nil,
-                            value4: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value4: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value5: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
                             self.value3 = value3
                             self.value4 = value4
+                            self.value5 = value5
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -2548,12 +2630,18 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value5 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
                                     self.value2,
                                     self.value3,
-                                    self.value4
+                                    self.value4,
+                                    self.value5
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -2565,6 +2653,7 @@ public enum Operations {
                             try self.value2?.encode(to: encoder)
                             try self.value3?.encode(to: encoder)
                             try self.value4?.encode(to: encoder)
+                            try self.value5?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/POST/responses/409/content/application\/json`.
@@ -5646,7 +5735,7 @@ public enum Operations {
     }
     /// Update an item
     ///
-    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read: if the item changed since, Marfa merges your changes where nothing collides. To change its type, send `type` with `retype: true`.
+    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. To change its type, send `type` with `retype: true`.
     ///
     /// - Remark: HTTP `PATCH /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)`.
@@ -5689,17 +5778,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateItem.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -5755,6 +5851,16 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/version`.
                     public var version: Swift.Int
+                    /// `exact` requires the item to still hold `version`, even if the fields changed do not collide. If omitted, a stale write can merge over changes to other fields.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/version_match`.
+                    @frozen public enum VersionMatchPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case exact = "exact"
+                    }
+                    /// `exact` requires the item to still hold `version`, even if the fields changed do not collide. If omitted, a stale write can merge over changes to other fields.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/version_match`.
+                    public var versionMatch: Operations.UpdateItem.Input.Body.JsonPayload.VersionMatchPayload?
                     /// Moves the item between `library` and `feed`.
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/tier`.
@@ -5799,6 +5905,7 @@ public enum Operations {
                     ///   - propertiesMode: How `properties` applies. `merge` (the default) lays them over the item's properties. `replace` takes them as the whole set, so a property you leave out is cleared.
                     ///   - retype: `true` moves the item to `type`. You need write on both types, and the properties the item ends up with must fit the new type. Naming the item's current type changes nothing.
                     ///   - version: The version of the item you read, which this update is based on.
+                    ///   - versionMatch: `exact` requires the item to still hold `version`, even if the fields changed do not collide. If omitted, a stale write can merge over changes to other fields.
                     ///   - tier: Moves the item between `library` and `feed`.
                     ///   - occurredAt: When the item occurred, as an ISO 8601 time.
                     ///   - sourceId: The item's new `source_id`. Marfa moves its natural key under the item's own `source`, which never changes.
@@ -5809,6 +5916,7 @@ public enum Operations {
                         propertiesMode: Operations.UpdateItem.Input.Body.JsonPayload.PropertiesModePayload? = nil,
                         retype: Swift.Bool? = nil,
                         version: Swift.Int,
+                        versionMatch: Operations.UpdateItem.Input.Body.JsonPayload.VersionMatchPayload? = nil,
                         tier: Components.Schemas.Tier? = nil,
                         occurredAt: Swift.String? = nil,
                         sourceId: Swift.String? = nil,
@@ -5819,6 +5927,7 @@ public enum Operations {
                         self.propertiesMode = propertiesMode
                         self.retype = retype
                         self.version = version
+                        self.versionMatch = versionMatch
                         self.tier = tier
                         self.occurredAt = occurredAt
                         self.sourceId = sourceId
@@ -5830,6 +5939,7 @@ public enum Operations {
                         case propertiesMode = "properties_mode"
                         case retype
                         case version
+                        case versionMatch = "version_match"
                         case tier
                         case occurredAt = "occurred_at"
                         case sourceId = "source_id"
@@ -5857,6 +5967,10 @@ public enum Operations {
                             Swift.Int.self,
                             forKey: .version
                         )
+                        self.versionMatch = try container.decodeIfPresent(
+                            Operations.UpdateItem.Input.Body.JsonPayload.VersionMatchPayload.self,
+                            forKey: .versionMatch
+                        )
                         self.tier = try container.decodeIfPresent(
                             Components.Schemas.Tier.self,
                             forKey: .tier
@@ -5879,6 +5993,7 @@ public enum Operations {
                             "properties_mode",
                             "retype",
                             "version",
+                            "version_match",
                             "tier",
                             "occurred_at",
                             "source_id",
@@ -6663,7 +6778,9 @@ public enum Operations {
                         /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/409/content/json/value4`.
                         public var value4: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal?
                         /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/409/content/json/value5`.
-                        public var value5: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value5: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/409/content/json/value6`.
+                        public var value6: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
@@ -6672,18 +6789,21 @@ public enum Operations {
                         ///   - value3:
                         ///   - value4:
                         ///   - value5:
+                        ///   - value6:
                         public init(
                             value1: Components.Schemas.ItemVersionConflict? = nil,
                             value2: Components.Schemas.ItemStaleVersion? = nil,
                             value3: Components.Schemas.ItemAncestorUnavailable? = nil,
                             value4: Components.Schemas.LinkTakenOrSourceIdConflictOrTypeMismatchRefusal? = nil,
-                            value5: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value5: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value6: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
                             self.value3 = value3
                             self.value4 = value4
                             self.value5 = value5
+                            self.value6 = value6
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -6712,13 +6832,19 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value6 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
                                     self.value2,
                                     self.value3,
                                     self.value4,
-                                    self.value5
+                                    self.value5,
+                                    self.value6
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -6731,6 +6857,7 @@ public enum Operations {
                             try self.value3?.encode(to: encoder)
                             try self.value4?.encode(to: encoder)
                             try self.value5?.encode(to: encoder)
+                            try self.value6?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/409/content/application\/json`.
@@ -6763,11 +6890,11 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `version_conflict`: `version` is stale and a change collides, or only edges change. `current` is the item now.
-            /// - `ancestor_unavailable`: Marfa holds no snapshot of `version` that you can read.
-            /// - `source_id_conflict`: another item under the source holds this `source_id`.
-            /// - `link_taken`: another item of the type holds this link.
-            /// - `type_mismatch`: `type` differs and `retype` isn't `true`.
+            /// - `version_conflict`: stale exact precondition, colliding change, or stale edges-only write. `current` is the item now.
+            /// - `ancestor_unavailable`: no readable snapshot of `version`.
+            /// - `source_id_conflict`: another item under the source holds `source_id`.
+            /// - `link_taken`: another item of the type holds the link.
+            /// - `type_mismatch`: `type` differs without `retype: true`.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/409`.
             ///
@@ -7562,17 +7689,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteItem.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -8240,18 +8374,23 @@ public enum Operations {
                         /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/json/value1`.
                         public var value1: Components.Schemas.ItemStaleVersion?
                         /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
+                        ///   - value3:
                         public init(
                             value1: Components.Schemas.ItemStaleVersion? = nil,
-                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
+                            self.value3 = value3
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -8265,10 +8404,16 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
-                                    self.value2
+                                    self.value2,
+                                    self.value3
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -8278,6 +8423,7 @@ public enum Operations {
                         public func encode(to encoder: any Swift.Encoder) throws {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/{id}/DELETE/responses/409/content/application\/json`.
@@ -9091,17 +9237,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/restore/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/restore/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreItem.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -9760,13 +9913,58 @@ public enum Operations {
                 public var headers: Operations.RestoreItem.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/{id}/restore/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/restore/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/restore/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/restore/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/{id}/restore/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.RestoreItem.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.RestoreItem.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -9790,7 +9988,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `idempotency_key_in_flight`: a request with this `Idempotency-Key` is still running, and this one wrote nothing. Retry.
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)/responses/409`.
             ///
@@ -10564,23 +10762,45 @@ public enum Operations {
                 }
             }
             public var path: Operations.TransitionItem.Input.Path
+            /// - Remark: Generated from `#/paths/items/{id}/transition/POST/query`.
+            public struct Query: Sendable, Hashable {
+                /// The item version you read. If it differs, nothing moves. Leave it out to move the item as it is.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/transition/POST/query/version`.
+                public var version: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - version: The item version you read. If it differs, nothing moves. Leave it out to move the item as it is.
+                public init(version: Swift.Int? = nil) {
+                    self.version = version
+                }
+            }
+            public var query: Operations.TransitionItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header`.
             public struct Headers: Sendable, Hashable {
                 /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/transition/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TransitionItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.TransitionItem.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -10620,14 +10840,17 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             ///   - body:
             public init(
                 path: Operations.TransitionItem.Input.Path,
+                query: Operations.TransitionItem.Input.Query = .init(),
                 headers: Operations.TransitionItem.Input.Headers = .init(),
                 body: Operations.TransitionItem.Input.Body
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
                 self.body = body
             }
@@ -11276,13 +11499,70 @@ public enum Operations {
                 public var headers: Operations.TransitionItem.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ItemStaleVersion?
+                        /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        ///   - value3:
+                        public init(
+                            value1: Components.Schemas.ItemStaleVersion? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                            self.value3 = value3
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2,
+                                    self.value3
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/{id}/transition/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.TransitionItem.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.TransitionItem.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -11306,7 +11586,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `idempotency_key_in_flight`: a request with this `Idempotency-Key` is still running, and this one wrote nothing. Retry.
+            /// `version_conflict`: `version` differs from the item. `current` is the item now; nothing moved.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/transition/post(transitionItem)/responses/409`.
             ///
@@ -14235,12 +14515,28 @@ public enum Operations {
             public var path: Operations.UpdateItemMetadata.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/header`.
             public struct Headers: Sendable, Hashable {
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateItemMetadata.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateItemMetadata.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateItemMetadata.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -14308,6 +14604,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -14316,18 +14620,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -14414,6 +14721,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -14423,13 +14738,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -14437,6 +14754,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -14742,6 +15060,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/404/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -14751,13 +15077,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -14765,6 +15093,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -14819,6 +15148,171 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UpdateItemMetadata.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/409/content/application\/json`.
+                    case json(Operations.UpdateItemMetadata.Output.Conflict.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.UpdateItemMetadata.Output.Conflict.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateItemMetadata.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UpdateItemMetadata.Output.Conflict.Headers = .init(),
+                    body: Operations.UpdateItemMetadata.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(updateItemMetadata)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.UpdateItemMetadata.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.UpdateItemMetadata.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -14912,6 +15406,127 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UpdateItemMetadata.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateItemMetadata.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UpdateItemMetadata.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.UpdateItemMetadata.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `idempotency_key_reused`: the key was first used for a different request. Nothing is written.
+            /// - `idempotency_result_not_retained`: the first response was too large to keep, so Marfa can't replay it. The write isn't repeated.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(updateItemMetadata)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.UpdateItemMetadata.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.UpdateItemMetadata.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -14943,6 +15558,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -14953,6 +15576,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -14960,7 +15584,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -14969,6 +15594,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15055,6 +15681,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/500/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/500/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15064,13 +15698,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -15078,6 +15714,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15164,6 +15801,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15173,13 +15818,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -15187,6 +15834,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15273,6 +15921,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/507/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/responses/507/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15282,13 +15938,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -15296,6 +15954,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15412,12 +16071,28 @@ public enum Operations {
             public var path: Operations.ReplaceItemMetadata.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/header`.
             public struct Headers: Sendable, Hashable {
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceItemMetadata.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceItemMetadata.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceItemMetadata.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -15485,6 +16160,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15493,18 +16176,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15591,6 +16277,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15600,13 +16294,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -15614,6 +16310,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15919,6 +16616,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/404/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15928,13 +16633,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -15942,6 +16649,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -15996,6 +16704,171 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReplaceItemMetadata.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/409/content/application\/json`.
+                    case json(Operations.ReplaceItemMetadata.Output.Conflict.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.ReplaceItemMetadata.Output.Conflict.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReplaceItemMetadata.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReplaceItemMetadata.Output.Conflict.Headers = .init(),
+                    body: Operations.ReplaceItemMetadata.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ReplaceItemMetadata.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ReplaceItemMetadata.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -16089,6 +16962,127 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReplaceItemMetadata.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReplaceItemMetadata.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReplaceItemMetadata.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.ReplaceItemMetadata.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `idempotency_key_reused`: the key was first used for a different request. Nothing is written.
+            /// - `idempotency_result_not_retained`: the first response was too large to keep, so Marfa can't replay it. The write isn't repeated.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.ReplaceItemMetadata.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.ReplaceItemMetadata.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -16120,6 +17114,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -16130,6 +17132,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -16137,7 +17140,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -16146,6 +17150,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -16232,6 +17237,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/500/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/500/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -16241,13 +17254,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -16255,6 +17270,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -16341,6 +17357,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -16350,13 +17374,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -16364,6 +17390,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -16450,6 +17477,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/507/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/responses/507/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -16459,13 +17494,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -16473,6 +17510,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -16589,12 +17627,28 @@ public enum Operations {
             public var path: Operations.AddItemTags.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/tags/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/tags/POST/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/tags/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddItemTags.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddItemTags.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.AddItemTags.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -16662,6 +17716,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -16670,18 +17732,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -16768,6 +17833,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -16777,13 +17850,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -16791,6 +17866,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -17097,6 +18173,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/404/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -17106,13 +18190,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -17120,6 +18206,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -17174,6 +18261,171 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.AddItemTags.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/409/content/application\/json`.
+                    case json(Operations.AddItemTags.Output.Conflict.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.AddItemTags.Output.Conflict.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.AddItemTags.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.AddItemTags.Output.Conflict.Headers = .init(),
+                    body: Operations.AddItemTags.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.AddItemTags.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.AddItemTags.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -17267,6 +18519,127 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.AddItemTags.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.AddItemTags.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.AddItemTags.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.AddItemTags.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `idempotency_key_reused`: the key was first used for a different request. Nothing is written.
+            /// - `idempotency_result_not_retained`: the first response was too large to keep, so Marfa can't replay it. The write isn't repeated.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.AddItemTags.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.AddItemTags.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -17298,6 +18671,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -17308,6 +18689,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -17315,7 +18697,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -17324,6 +18707,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -17410,6 +18794,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/500/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/500/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -17419,13 +18811,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -17433,6 +18827,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -17519,6 +18914,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -17528,13 +18931,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -17542,6 +18947,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -17628,6 +19034,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/507/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/POST/responses/507/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -17637,13 +19051,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -17651,6 +19067,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -17786,17 +19203,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/purge/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/purge/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PurgeItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.PurgeItem.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -18464,18 +19888,23 @@ public enum Operations {
                         /// - Remark: Generated from `#/paths/items/{id}/purge/POST/responses/409/content/json/value1`.
                         public var value1: Components.Schemas.ItemStaleVersion?
                         /// - Remark: Generated from `#/paths/items/{id}/purge/POST/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/purge/POST/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
+                        ///   - value3:
                         public init(
                             value1: Components.Schemas.ItemStaleVersion? = nil,
-                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
+                            self.value3 = value3
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -18489,10 +19918,16 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
-                                    self.value2
+                                    self.value2,
+                                    self.value3
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -18502,6 +19937,7 @@ public enum Operations {
                         public func encode(to encoder: any Swift.Encoder) throws {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/{id}/purge/POST/responses/409/content/application\/json`.
@@ -19320,12 +20756,28 @@ public enum Operations {
             public var path: Operations.RemoveItemTag.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveItemTag.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveItemTag.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveItemTag.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -19367,6 +20819,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -19375,18 +20835,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -19473,6 +20936,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -19482,13 +20953,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -19496,6 +20969,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -19801,6 +21275,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/404/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -19810,13 +21292,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -19824,6 +21308,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -19878,6 +21363,171 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RemoveItemTag.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/409/content/application\/json`.
+                    case json(Operations.RemoveItemTag.Output.Conflict.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.RemoveItemTag.Output.Conflict.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveItemTag.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RemoveItemTag.Output.Conflict.Headers = .init(),
+                    body: Operations.RemoveItemTag.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.RemoveItemTag.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.RemoveItemTag.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -19971,6 +21621,127 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RemoveItemTag.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveItemTag.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RemoveItemTag.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.RemoveItemTag.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `idempotency_key_reused`: the key was first used for a different request. Nothing is written.
+            /// - `idempotency_result_not_retained`: the first response was too large to keep, so Marfa can't replay it. The write isn't repeated.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.RemoveItemTag.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.RemoveItemTag.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -20002,6 +21773,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -20012,6 +21791,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -20019,7 +21799,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -20028,6 +21809,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -20114,6 +21896,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/500/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/500/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -20123,13 +21913,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -20137,6 +21929,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -20223,6 +22016,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -20232,13 +22033,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -20246,6 +22049,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -20332,6 +22136,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/507/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/{tag}/DELETE/responses/507/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -20341,13 +22153,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -20355,6 +22169,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -20456,12 +22271,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/bulk/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/bulk/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkUpsertItems.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkUpsertItems.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkUpsertItems.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -20618,11 +22442,11 @@ public enum Operations {
                             case edges
                         }
                     }
-                    /// The entries to write, at most 5,000.
+                    /// The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/items`.
                     public typealias ItemsPayload = [Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload]
-                    /// The entries to write, at most 5,000.
+                    /// The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/items`.
                     public var items: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayload
@@ -20652,7 +22476,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - items: The entries to write, at most 5,000.
+                    ///   - items: The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
                     ///   - mode: `upsert` (the default) updates the item an entry matches. `create_only` skips it, reporting `skipped` with reason `duplicate_source`, or `duplicate_id` if it matched by `id`.
                     ///   - atomic: Whether one failed entry rolls back the whole batch. Defaults to `true`. With `false`, that entry is `errored` and the rest are written.
                     ///   - enableFanout: Whether each write also calls outbound webhooks. Defaults to `false`. Marfa logs the events either way.
@@ -20676,6 +22500,36 @@ public enum Operations {
                         case atomic
                         case enableFanout = "enable_fanout"
                         case retype
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.items = try container.decode(
+                            Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayload.self,
+                            forKey: .items
+                        )
+                        self.mode = try container.decodeIfPresent(
+                            Operations.BulkUpsertItems.Input.Body.JsonPayload.ModePayload.self,
+                            forKey: .mode
+                        )
+                        self.atomic = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .atomic
+                        )
+                        self.enableFanout = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .enableFanout
+                        )
+                        self.retype = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .retype
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "items",
+                            "mode",
+                            "atomic",
+                            "enable_fanout",
+                            "retype"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/content/application\/json`.
@@ -20884,7 +22738,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body is malformed, or has more than 5,000 entries.
+            /// - `validation_error`: the body is malformed, has a key this operation doesn't declare, or has more than 5,000 entries.
             /// - `missing_required_field`: a required field is missing.
             /// - `bulk_atomic_rollback`: with `atomic` true, an entry was refused and nothing was written. `details.code` and `details.index` give its code and position. The status is the one that refusal carries alone.
             ///
@@ -21294,13 +23148,58 @@ public enum Operations {
                 public var headers: Operations.BulkUpsertItems.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.BulkAtomicRollbackRefusal?
+                        /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.BulkAtomicRollbackRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/bulk/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.BulkAtomicRollbackRefusal)
+                    case json(Operations.BulkUpsertItems.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.BulkAtomicRollbackRefusal {
+                    public var json: Operations.BulkUpsertItems.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -21924,17 +23823,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/bulk-actions/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/bulk-actions/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyBulkAction.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ApplyBulkAction.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -23030,13 +24936,58 @@ public enum Operations {
                 public var headers: Operations.ApplyBulkAction.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.ApplyBulkAction.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.ApplyBulkAction.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -23060,7 +25011,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `idempotency_key_in_flight`: a request with this `Idempotency-Key` is still running, and this one wrote nothing. Retry.
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)/responses/409`.
             ///
@@ -24898,12 +26849,21 @@ public enum Operations {
             public var path: Operations.CancelBulkActionJob.Input.Path
             /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CancelBulkActionJob.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CancelBulkActionJob.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CancelBulkActionJob.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -25455,6 +27415,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CancelBulkActionJob.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk-actions/jobs/{id}/cancel/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CancelBulkActionJob.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CancelBulkActionJob.Output.Conflict.Headers = .init(),
+                    body: Operations.CancelBulkActionJob.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.CancelBulkActionJob.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.CancelBulkActionJob.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -26037,17 +28106,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/bulk-get/POST/header/X-Marfa-Read-View`.
                 public var xMarfaReadView: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/bulk-get/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkGetItems.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     xMarfaReadView: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkGetItems.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -26646,13 +28722,58 @@ public enum Operations {
                 public var headers: Operations.BulkGetItems.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ReadViewChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ReadViewChangedRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Operations.BulkGetItems.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Operations.BulkGetItems.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -27272,12 +29393,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/lookup/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/lookup/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupItems.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupItems.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupItems.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -27863,6 +29993,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.LookupItems.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/lookup/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.LookupItems.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.LookupItems.Output.Conflict.Headers = .init(),
+                    body: Operations.LookupItems.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.LookupItems.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.LookupItems.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/lookup/POST/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -28436,12 +30675,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/tombstones/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/tombstones/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SettleTombstones.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SettleTombstones.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SettleTombstones.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -28991,6 +31239,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.SettleTombstones.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/tombstones/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SettleTombstones.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.SettleTombstones.Output.Conflict.Headers = .init(),
+                    body: Operations.SettleTombstones.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.SettleTombstones.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.SettleTombstones.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -31770,12 +34127,28 @@ public enum Operations {
             public var path: Operations.ReplaceItemExtension.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/header`.
             public struct Headers: Sendable, Hashable {
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceItemExtension.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceItemExtension.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceItemExtension.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -31846,6 +34219,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -31854,18 +34235,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -31952,6 +34336,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -31961,13 +34353,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -31975,6 +34369,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -32281,6 +34676,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/404/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -32290,13 +34693,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -32304,6 +34709,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -32358,6 +34764,171 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReplaceItemExtension.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/409/content/application\/json`.
+                    case json(Operations.ReplaceItemExtension.Output.Conflict.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.ReplaceItemExtension.Output.Conflict.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReplaceItemExtension.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReplaceItemExtension.Output.Conflict.Headers = .init(),
+                    body: Operations.ReplaceItemExtension.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ReplaceItemExtension.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ReplaceItemExtension.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -32451,6 +35022,127 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReplaceItemExtension.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReplaceItemExtension.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReplaceItemExtension.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.ReplaceItemExtension.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `idempotency_key_reused`: the key was first used for a different request. Nothing is written.
+            /// - `idempotency_result_not_retained`: the first response was too large to keep, so Marfa can't replay it. The write isn't repeated.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.ReplaceItemExtension.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.ReplaceItemExtension.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -32482,6 +35174,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -32492,6 +35192,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -32499,7 +35200,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -32508,6 +35210,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -32594,6 +35297,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/500/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/500/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -32603,13 +35314,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -32617,6 +35330,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -32703,6 +35417,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -32712,13 +35434,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -32726,6 +35450,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -32812,6 +35537,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/507/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/507/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -32821,13 +35554,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -32835,6 +35570,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -32960,12 +35696,28 @@ public enum Operations {
             public var path: Operations.DeleteItemExtension.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/header/Idempotency-Key`.
+                public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteItemExtension.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteItemExtension.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteItemExtension.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -33007,6 +35759,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/200/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33015,18 +35775,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
-                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -33113,6 +35876,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/400/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/400/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33122,13 +35893,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -33136,6 +35909,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -33442,6 +36216,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/404/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33451,13 +36233,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -33465,6 +36249,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -33519,6 +36304,171 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DeleteItemExtension.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/409/content/application\/json`.
+                    case json(Operations.DeleteItemExtension.Output.Conflict.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.DeleteItemExtension.Output.Conflict.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteItemExtension.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DeleteItemExtension.Output.Conflict.Headers = .init(),
+                    body: Operations.DeleteItemExtension.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.DeleteItemExtension.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.DeleteItemExtension.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -33612,6 +36562,127 @@ public enum Operations {
                     }
                 }
             }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DeleteItemExtension.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/422/content/application\/json`.
+                    case json(Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteItemExtension.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DeleteItemExtension.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.DeleteItemExtension.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `idempotency_key_reused`: the key was first used for a different request. Nothing is written.
+            /// - `idempotency_result_not_retained`: the first response was too large to keep, so Marfa can't replay it. The write isn't repeated.
+            ///
+            /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.DeleteItemExtension.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.DeleteItemExtension.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -33643,6 +36714,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/429/headers/Retry-After`.
                     public var retryAfter: Components.Headers.RetryAfter?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/429/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33653,6 +36732,7 @@ public enum Operations {
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
                     ///   - retryAfter: Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -33660,7 +36740,8 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        retryAfter: Components.Headers.RetryAfter? = nil
+                        retryAfter: Components.Headers.RetryAfter? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -33669,6 +36750,7 @@ public enum Operations {
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
                         self.retryAfter = retryAfter
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -33755,6 +36837,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/500/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/500/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33764,13 +36854,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -33778,6 +36870,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -33864,6 +36957,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/503/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/503/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33873,13 +36974,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -33887,6 +36990,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -33973,6 +37077,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/507/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// - Remark: Generated from `#/components/headers/Idempotency-Replayed`.
+                    @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
+                        case _true = "true"
+                    }
+                    /// Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/DELETE/responses/507/headers/Idempotency-Replayed`.
+                    public var idempotencyReplayed: Components.Headers.IdempotencyReplayed?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -33982,13 +37094,15 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - idempotencyReplayed: Sent as `true` when this response was served from the record of an earlier request carrying the same `Idempotency-Key`, rather than by performing the write. It is only ever sent on a replay and only with that value, so its absence means the write was performed. The status and body are the first attempt's, which is why the header can arrive on an error: a recorded 409 replays as a 409. Read a replayed response exactly as the original would have been read: the header says where the answer came from, not that anything went wrong.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        idempotencyReplayed: Components.Headers.IdempotencyReplayed? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -33996,6 +37110,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
+                        self.idempotencyReplayed = idempotencyReplayed
                     }
                 }
                 /// Received HTTP response headers
@@ -34088,7 +37203,7 @@ public enum Operations {
     }
     /// List outbound edges
     ///
-    /// Returns the edges that start at an item. An item in the trash still lists its edges. `GET /items/{id}/backrefs` lists the edges that point at it.
+    /// Returns the edges that start at an item. An item in the trash still lists its edges. If `source_filter` leaves the item out, none of its edges appear here. `GET /items/{id}/backrefs` lists the edges that point at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/edges`.
     /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)`.
@@ -35324,7 +38439,7 @@ public enum Operations {
     }
     /// List inbound edges
     ///
-    /// Returns the edges that point at an item. An item in the trash still lists its edges. `GET /items/{id}/edges` lists the edges that start at it.
+    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose source item `source_filter` leaves out doesn't appear here, whatever the source of this item. `GET /items/{id}/edges` lists the edges that start at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/backrefs`.
     /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)`.
@@ -36421,7 +39536,7 @@ public enum Operations {
     }
     /// List edges
     ///
-    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear here: `GET /events` reports deletions.
+    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose source item `source_filter` leaves out.
     ///
     /// - Remark: HTTP `GET /edges`.
     /// - Remark: Generated from `#/paths//edges/get(listEdges)`.
@@ -37536,30 +40651,52 @@ public enum Operations {
     }
     /// Create an edge
     ///
-    /// Creates an edge between two existing items. Repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
+    /// Creates an edge between two existing items. After any `source_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
     public enum CreateEdge {
         public static let id: Swift.String = "createEdge"
         public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/edges/POST/query`.
+            public struct Query: Sendable, Hashable {
+                /// The source item version you read. If it differs, the edge is not changed. Leave it out to use the source as it is.
+                ///
+                /// - Remark: Generated from `#/paths/edges/POST/query/source_version`.
+                public var sourceVersion: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - sourceVersion: The source item version you read. If it differs, the edge is not changed. Leave it out to use the source as it is.
+                public init(sourceVersion: Swift.Int? = nil) {
+                    self.sourceVersion = sourceVersion
+                }
+            }
+            public var query: Operations.CreateEdge.Input.Query
             /// - Remark: Generated from `#/paths/edges/POST/header`.
             public struct Headers: Sendable, Hashable {
                 /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/edges/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/edges/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateEdge.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateEdge.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -37636,6 +40773,36 @@ public enum Operations {
                         case edgeType = "edge_type"
                         case properties
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.id = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .id
+                        )
+                        self.sourceId = try container.decode(
+                            Swift.String.self,
+                            forKey: .sourceId
+                        )
+                        self.targetId = try container.decode(
+                            Swift.String.self,
+                            forKey: .targetId
+                        )
+                        self.edgeType = try container.decode(
+                            Swift.String.self,
+                            forKey: .edgeType
+                        )
+                        self.properties = try container.decodeIfPresent(
+                            Operations.CreateEdge.Input.Body.JsonPayload.PropertiesPayload.self,
+                            forKey: .properties
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "id",
+                            "source_id",
+                            "target_id",
+                            "edge_type",
+                            "properties"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/edges/POST/requestBody/content/application\/json`.
                 case json(Operations.CreateEdge.Input.Body.JsonPayload)
@@ -37644,12 +40811,15 @@ public enum Operations {
             /// Creates a new `Input`.
             ///
             /// - Parameters:
+            ///   - query:
             ///   - headers:
             ///   - body:
             public init(
+                query: Operations.CreateEdge.Input.Query = .init(),
                 headers: Operations.CreateEdge.Input.Headers = .init(),
                 body: Operations.CreateEdge.Input.Body
             ) {
+                self.query = query
                 self.headers = headers
                 self.body = body
             }
@@ -37774,7 +40944,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the stored edge with `acknowledged: true`. `id` repeats a create you made with the same source, target and edge type, so Marfa wrote nothing and sent no event.
+            /// Returns the stored edge with `acknowledged: true` after any `source_version` precondition passes. `id` repeats a create you made with the same source, target and edge type, so Marfa wrote nothing and sent no event.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/200`.
             ///
@@ -38009,7 +41179,7 @@ public enum Operations {
             }
             /// - `missing_required_field`: `source_id`, `target_id` or `edge_type` is missing.
             /// - `invalid_id`: `source_id`, `target_id` or `id` isn't a valid ID.
-            /// - `validation_error`, `invalid_properties`: a field is invalid, or a property breaks the edge type's schema.
+            /// - `validation_error`, `invalid_properties`: a field is invalid or undeclared, or a property breaks its schema.
             /// - `edge_constraint_violation`, `edge_cycle`: the edge exists (`details.constraint` is `duplicate`), breaks its type's rules or closes a cycle.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/400`.
@@ -38443,20 +41613,30 @@ public enum Operations {
                     /// - Remark: Generated from `#/paths/edges/POST/responses/409/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
                         /// - Remark: Generated from `#/paths/edges/POST/responses/409/content/json/value1`.
-                        public var value1: Components.Schemas.IdReusedRefusal?
+                        public var value1: Components.Schemas.ItemStaleVersion?
                         /// - Remark: Generated from `#/paths/edges/POST/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value2: Components.Schemas.IdReusedRefusal?
+                        /// - Remark: Generated from `#/paths/edges/POST/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/edges/POST/responses/409/content/json/value4`.
+                        public var value4: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
+                        ///   - value3:
+                        ///   - value4:
                         public init(
-                            value1: Components.Schemas.IdReusedRefusal? = nil,
-                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value1: Components.Schemas.ItemStaleVersion? = nil,
+                            value2: Components.Schemas.IdReusedRefusal? = nil,
+                            value3: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value4: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
+                            self.value3 = value3
+                            self.value4 = value4
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -38470,10 +41650,22 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value4 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
-                                    self.value2
+                                    self.value2,
+                                    self.value3,
+                                    self.value4
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -38483,6 +41675,8 @@ public enum Operations {
                         public func encode(to encoder: any Swift.Encoder) throws {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
+                            try self.value4?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/edges/POST/responses/409/content/application\/json`.
@@ -38515,7 +41709,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `id_reused`: `id` belongs to a different edge. `details.differs` lists which of `source_id`, `target_id` and `edge_type` differ. If you can't read that edge, only `details.existing_id` is set.
+            /// - `version_conflict`: `source_version` differs; `current` is the source now.
+            /// - `id_reused`: `id` belongs to a different edge. `details.differs` lists the differing ends or type; an unreadable edge supplies only `details.existing_id`.
             ///
             /// - Remark: Generated from `#/paths//edges/post(createEdge)/responses/409`.
             ///
@@ -40496,17 +43691,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/edges/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/edges/{id}/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateEdge.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateEdge.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -40574,6 +43776,31 @@ public enum Operations {
                         case sourceId = "source_id"
                         case targetId = "target_id"
                         case version
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.properties = try container.decodeIfPresent(
+                            Operations.UpdateEdge.Input.Body.JsonPayload.PropertiesPayload.self,
+                            forKey: .properties
+                        )
+                        self.sourceId = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .sourceId
+                        )
+                        self.targetId = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .targetId
+                        )
+                        self.version = try container.decode(
+                            Swift.Int.self,
+                            forKey: .version
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "properties",
+                            "source_id",
+                            "target_id",
+                            "version"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/edges/{id}/PATCH/requestBody/content/application\/json`.
@@ -40808,9 +44035,9 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `version` is missing, or `properties` is missing and no end moves.
-            /// - `validation_error`, `invalid_properties`: the body moves both ends, the edge type can't move that end, or a property is invalid or breaks its schema.
+            /// - `validation_error`, `invalid_properties`: the body has an undeclared key, moves both ends or an end its type can't move, or a property breaks its schema.
             /// - `invalid_id`: `source_id` or `target_id` isn't a valid ID.
-            /// - `edge_constraint_violation`, `edge_cycle`: the moved edge breaks its edge type's rules.
+            /// - `edge_constraint_violation`, `edge_cycle`: the moved edge breaks its type's rules.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/patch(updateEdge)/responses/400`.
             ///
@@ -41246,18 +44473,23 @@ public enum Operations {
                         /// - Remark: Generated from `#/paths/edges/{id}/PATCH/responses/409/content/json/value1`.
                         public var value1: Components.Schemas.EdgeVersionConflict?
                         /// - Remark: Generated from `#/paths/edges/{id}/PATCH/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/edges/{id}/PATCH/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
+                        ///   - value3:
                         public init(
                             value1: Components.Schemas.EdgeVersionConflict? = nil,
-                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
+                            self.value3 = value3
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -41271,10 +44503,16 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
-                                    self.value2
+                                    self.value2,
+                                    self.value3
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -41284,6 +44522,7 @@ public enum Operations {
                         public func encode(to encoder: any Swift.Encoder) throws {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/edges/{id}/PATCH/responses/409/content/application\/json`.
@@ -42090,23 +45329,45 @@ public enum Operations {
                 }
             }
             public var path: Operations.DeleteEdge.Input.Path
+            /// - Remark: Generated from `#/paths/edges/{id}/DELETE/query`.
+            public struct Query: Sendable, Hashable {
+                /// The source item version you read. If it differs, the edge is not changed. Leave it out to use the source as it is.
+                ///
+                /// - Remark: Generated from `#/paths/edges/{id}/DELETE/query/source_version`.
+                public var sourceVersion: Swift.Int?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - sourceVersion: The source item version you read. If it differs, the edge is not changed. Leave it out to use the source as it is.
+                public init(sourceVersion: Swift.Int? = nil) {
+                    self.sourceVersion = sourceVersion
+                }
+            }
+            public var query: Operations.DeleteEdge.Input.Query
             /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
                 /// A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
                 ///
                 /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/edges/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteEdge.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteEdge.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -42115,12 +45376,15 @@ public enum Operations {
             ///
             /// - Parameters:
             ///   - path:
+            ///   - query:
             ///   - headers:
             public init(
                 path: Operations.DeleteEdge.Input.Path,
+                query: Operations.DeleteEdge.Input.Query = .init(),
                 headers: Operations.DeleteEdge.Input.Headers = .init()
             ) {
                 self.path = path
+                self.query = query
                 self.headers = headers
             }
         }
@@ -42764,13 +46028,70 @@ public enum Operations {
                 public var headers: Operations.DeleteEdge.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/edges/{id}/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edges/{id}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/edges/{id}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ItemStaleVersion?
+                        /// - Remark: Generated from `#/paths/edges/{id}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/edges/{id}/DELETE/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        ///   - value3:
+                        public init(
+                            value1: Components.Schemas.ItemStaleVersion? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                            self.value3 = value3
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2,
+                                    self.value3
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/edges/{id}/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.DeleteEdge.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.DeleteEdge.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -42794,7 +46115,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `idempotency_key_in_flight`: a request with this `Idempotency-Key` is still running, and this one wrote nothing. Retry.
+            /// `version_conflict`: `source_version` differs from the source item. `current` is the source now; no edge changed.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/delete(deleteEdge)/responses/409`.
             ///
@@ -43555,12 +46876,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/edges/bulk/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/edges/bulk/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkUpsertEdges.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkUpsertEdges.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkUpsertEdges.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -43650,11 +46980,11 @@ public enum Operations {
                             case version
                         }
                     }
-                    /// The entries to write, at most 5,000. The items they join must already exist.
+                    /// The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/edges`.
                     public typealias EdgesPayload = [Operations.BulkUpsertEdges.Input.Body.JsonPayload.EdgesPayloadPayload]
-                    /// The entries to write, at most 5,000. The items they join must already exist.
+                    /// The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/edges`.
                     public var edges: Operations.BulkUpsertEdges.Input.Body.JsonPayload.EdgesPayload
@@ -43680,7 +47010,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - edges: The entries to write, at most 5,000. The items they join must already exist.
+                    ///   - edges: The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
                     ///   - mode: `upsert` (the default) merges an entry's properties into the edge it matches. `create_only` skips it, reporting `skipped` with reason `duplicate_edge`.
                     ///   - atomic: Whether one failed entry rolls back the whole batch. Defaults to `true`. With `false`, that entry is `errored` and the rest are written.
                     ///   - enableFanout: Whether each write also calls outbound webhooks. Defaults to `false`. Marfa logs the events either way.
@@ -43700,6 +47030,31 @@ public enum Operations {
                         case mode
                         case atomic
                         case enableFanout = "enable_fanout"
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.edges = try container.decode(
+                            Operations.BulkUpsertEdges.Input.Body.JsonPayload.EdgesPayload.self,
+                            forKey: .edges
+                        )
+                        self.mode = try container.decodeIfPresent(
+                            Operations.BulkUpsertEdges.Input.Body.JsonPayload.ModePayload.self,
+                            forKey: .mode
+                        )
+                        self.atomic = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .atomic
+                        )
+                        self.enableFanout = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .enableFanout
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "edges",
+                            "mode",
+                            "atomic",
+                            "enable_fanout"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/content/application\/json`.
@@ -43908,9 +47263,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body is malformed, or has more than 5,000 entries.
-            /// - `missing_required_field`: `edges` is missing, or an entry is missing `source_id`, `target_id` or `edge_type`.
-            /// - `bulk_atomic_rollback`: with `atomic` true, an entry was refused and nothing was written. `details.code` and `details.index` give its code and position. The status is the one that refusal carries alone.
+            /// - `validation_error`: the body is malformed, has an undeclared key, or has more than 5,000 entries.
+            /// - `missing_required_field`: `edges` is missing, or an entry lacks `source_id`, `target_id` or `edge_type`.
+            /// - `bulk_atomic_rollback`: with `atomic` true, an entry was refused and nothing was written. `details.code` and `details.index` give its code and position. The status is that refusal's own.
             ///
             /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/400`.
             ///
@@ -44317,13 +47672,58 @@ public enum Operations {
                 public var headers: Operations.BulkUpsertEdges.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.BulkAtomicRollbackRefusal?
+                        /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.BulkAtomicRollbackRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.BulkAtomicRollbackRefusal)
+                    case json(Operations.BulkUpsertEdges.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.BulkAtomicRollbackRefusal {
+                    public var json: Operations.BulkUpsertEdges.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -45883,7 +49283,7 @@ public enum Operations {
     }
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
@@ -45892,12 +49292,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/edge-types/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/edge-types/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterEdgeType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterEdgeType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterEdgeType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -45905,7 +49314,7 @@ public enum Operations {
             /// - Remark: Generated from `#/paths/edge-types/POST/requestBody`.
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/edge-types/POST/requestBody/content/application\/json`.
-                case json(Components.Schemas.EdgeTypeRequest)
+                case json(Components.Schemas.EdgeTypeRegistrationRequest)
             }
             public var body: Operations.RegisterEdgeType.Input.Body
             /// Creates a new `Input`.
@@ -45922,6 +49331,108 @@ public enum Operations {
             }
         }
         @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RegisterEdgeType.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/200/content/application\/json`.
+                    case json(Components.Schemas.EdgeTypeRegistrationResponse)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.EdgeTypeRegistrationResponse {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RegisterEdgeType.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RegisterEdgeType.Output.Ok.Headers = .init(),
+                    body: Operations.RegisterEdgeType.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Returns the widened edge type, or its unchanged definition for a repeated request.
+            ///
+            /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RegisterEdgeType.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RegisterEdgeType.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct Created: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/edge-types/POST/responses/201/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -45971,28 +49482,13 @@ public enum Operations {
                 public var headers: Operations.RegisterEdgeType.Output.Created.Headers
                 /// - Remark: Generated from `#/paths/edge-types/POST/responses/201/content`.
                 @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/201/content/json`.
-                    public struct JsonPayload: Codable, Hashable, Sendable {
-                        /// - Remark: Generated from `#/paths/edge-types/POST/responses/201/content/json/edge_type`.
-                        public var edgeType: Components.Schemas.EdgeType
-                        /// Creates a new `JsonPayload`.
-                        ///
-                        /// - Parameters:
-                        ///   - edgeType:
-                        public init(edgeType: Components.Schemas.EdgeType) {
-                            self.edgeType = edgeType
-                        }
-                        public enum CodingKeys: String, CodingKey {
-                            case edgeType = "edge_type"
-                        }
-                    }
                     /// - Remark: Generated from `#/paths/edge-types/POST/responses/201/content/application\/json`.
-                    case json(Operations.RegisterEdgeType.Output.Created.Body.JsonPayload)
+                    case json(Components.Schemas.EdgeTypeRegistrationResponse)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Operations.RegisterEdgeType.Output.Created.Body.JsonPayload {
+                    public var json: Components.Schemas.EdgeTypeRegistrationResponse {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -46369,6 +49865,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct NotFound: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RegisterEdgeType.Output.NotFound.Headers
+                /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/404/content/application\/json`.
+                    case json(Components.Schemas.EdgeTypeNotFoundRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.EdgeTypeNotFoundRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RegisterEdgeType.Output.NotFound.Body
+                /// Creates a new `NotFound`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RegisterEdgeType.Output.NotFound.Headers = .init(),
+                    body: Operations.RegisterEdgeType.Output.NotFound.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `edge_type_not_found`: constraint evolution names no registered edge type.
+            ///
+            /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)/responses/404`.
+            ///
+            /// HTTP response code: `404 notFound`.
+            case notFound(Operations.RegisterEdgeType.Output.NotFound)
+            /// The associated value of the enum case if `self` is `.notFound`.
+            ///
+            /// - Throws: An error if `self` is not `.notFound`.
+            /// - SeeAlso: `.notFound`.
+            public var notFound: Operations.RegisterEdgeType.Output.NotFound {
+                get throws {
+                    switch self {
+                    case let .notFound(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct Conflict: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/edge-types/POST/responses/409/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -46425,13 +50030,58 @@ public enum Operations {
                 public var headers: Operations.RegisterEdgeType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/edge-types/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edge-types/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/edge-types/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConflictRefusal?
+                        /// - Remark: Generated from `#/paths/edge-types/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConflictRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/edge-types/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConflictRefusal)
+                    case json(Operations.RegisterEdgeType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConflictRefusal {
+                    public var json: Operations.RegisterEdgeType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -46455,7 +50105,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `conflict`: `id` is the name of an edge type Marfa ships, `id` or `reverse_name` is already the ID or reverse name of an edge type, or `reverse_name` equals `id`.
+            /// `conflict`: `id` is the name of an edge type Marfa ships, `id` or `reverse_name` is already the ID or reverse name of an edge type, or `reverse_name` equals `id`, or constraint evolution would remove a constraint token without allowing every type or change another definition member.
             ///
             /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)/responses/409`.
             ///
@@ -47088,12 +50738,21 @@ public enum Operations {
             public var query: Operations.DeleteEdgeType.Input.Query
             /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteEdgeType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteEdgeType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteEdgeType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -47710,13 +51369,58 @@ public enum Operations {
                 public var headers: Operations.DeleteEdgeType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.EdgeTypeInUseRefusal?
+                        /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.EdgeTypeInUseRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/edge-types/{id}/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.EdgeTypeInUseRefusal)
+                    case json(Operations.DeleteEdgeType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgeTypeInUseRefusal {
+                    public var json: Operations.DeleteEdgeType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -49285,12 +52989,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/types/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/types/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -49805,13 +53518,58 @@ public enum Operations {
                 public var headers: Operations.RegisterType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/types/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/types/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal?
+                        /// - Remark: Generated from `#/paths/types/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/types/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal)
+                    case json(Operations.RegisterType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.LinkTakenOrTypeAlreadyExistsRefusal {
+                    public var json: Operations.RegisterType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -51618,12 +55376,21 @@ public enum Operations {
             public var path: Operations.ReplaceType.Input.Path
             /// - Remark: Generated from `#/paths/types/{id}/PUT/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/types/{id}/PUT/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -52251,13 +56018,58 @@ public enum Operations {
                 public var headers: Operations.ReplaceType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.LinkTakenRefusal?
+                        /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.LinkTakenRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/application\/json`.
-                    case json(Components.Schemas.LinkTakenRefusal)
+                    case json(Operations.ReplaceType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.LinkTakenRefusal {
+                    public var json: Operations.ReplaceType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -53023,12 +56835,21 @@ public enum Operations {
             public var query: Operations.DeleteType.Input.Query
             /// - Remark: Generated from `#/paths/types/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/types/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -53646,13 +57467,58 @@ public enum Operations {
                 public var headers: Operations.DeleteType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal?
+                        /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal)
+                    case json(Operations.DeleteType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal {
+                    public var json: Operations.DeleteType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -54273,12 +58139,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/types/normalize/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/types/normalize/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.NormalizeType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.NormalizeType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.NormalizeType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -54683,13 +58558,58 @@ public enum Operations {
                 public var headers: Operations.NormalizeType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/types/normalize/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/normalize/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/types/normalize/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.TypeChainUnresolvableRefusal?
+                        /// - Remark: Generated from `#/paths/types/normalize/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.TypeChainUnresolvableRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/types/normalize/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.TypeChainUnresolvableRefusal)
+                    case json(Operations.NormalizeType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.TypeChainUnresolvableRefusal {
+                    public var json: Operations.NormalizeType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -58358,12 +62278,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/blobs/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/blobs/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadBlob.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadBlob.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UploadBlob.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -58847,6 +62776,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UploadBlob.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/blobs/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadBlob.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UploadBlob.Output.Conflict.Headers = .init(),
+                    body: Operations.UploadBlob.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.UploadBlob.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.UploadBlob.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -64745,12 +68783,21 @@ public enum Operations {
             public var path: Operations.DeleteBlobLocation.Input.Path
             /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteBlobLocation.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteBlobLocation.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteBlobLocation.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -65364,13 +69411,58 @@ public enum Operations {
                 public var headers: Operations.DeleteBlobLocation.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.CopiesBelowMinimumRefusal?
+                        /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.CopiesBelowMinimumRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/blobs/{hash}/locations/{store}/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.CopiesBelowMinimumRefusal)
+                    case json(Operations.DeleteBlobLocation.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CopiesBelowMinimumRefusal {
+                    public var json: Operations.DeleteBlobLocation.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -66850,12 +70942,21 @@ public enum Operations {
             public var path: Operations.RunHousekeeping.Input.Path
             /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RunHousekeeping.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RunHousekeeping.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RunHousekeeping.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -67468,13 +71569,58 @@ public enum Operations {
                 public var headers: Operations.RunHousekeeping.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.HousekeepingJobRunningRefusal?
+                        /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.HousekeepingJobRunningRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/housekeeping/{name}/run/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.HousekeepingJobRunningRefusal)
+                    case json(Operations.RunHousekeeping.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.HousekeepingJobRunningRefusal {
+                    public var json: Operations.RunHousekeeping.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -68918,12 +73064,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/connectors/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterConnector.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterConnector.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RegisterConnector.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -69502,6 +73657,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RegisterConnector.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RegisterConnector.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RegisterConnector.Output.Conflict.Headers = .init(),
+                    body: Operations.RegisterConnector.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.RegisterConnector.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.RegisterConnector.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -71048,12 +75312,21 @@ public enum Operations {
             public var path: Operations.DeleteConnector.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteConnector.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteConnector.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteConnector.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -71605,6 +75878,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DeleteConnector.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteConnector.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DeleteConnector.Output.Conflict.Headers = .init(),
+                    body: Operations.DeleteConnector.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.DeleteConnector.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.DeleteConnector.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -72198,12 +76580,21 @@ public enum Operations {
             public var path: Operations.HeartbeatConnector.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HeartbeatConnector.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HeartbeatConnector.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HeartbeatConnector.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -72772,6 +77163,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.HeartbeatConnector.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/heartbeat/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.HeartbeatConnector.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.HeartbeatConnector.Output.Conflict.Headers = .init(),
+                    body: Operations.HeartbeatConnector.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(heartbeatConnector)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.HeartbeatConnector.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.HeartbeatConnector.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -74345,12 +78845,21 @@ public enum Operations {
             public var path: Operations.ReportConnectorRun.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReportConnectorRun.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReportConnectorRun.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReportConnectorRun.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -74970,6 +79479,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReportConnectorRun.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReportConnectorRun.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReportConnectorRun.Output.Conflict.Headers = .init(),
+                    body: Operations.ReportConnectorRun.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/runs/post(reportConnectorRun)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ReportConnectorRun.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ReportConnectorRun.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -76625,12 +81243,21 @@ public enum Operations {
             public var path: Operations.CreateInboundEndpoint.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateInboundEndpoint.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateInboundEndpoint.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateInboundEndpoint.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -77279,13 +81906,58 @@ public enum Operations {
                 public var headers: Operations.CreateInboundEndpoint.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConflictRefusal?
+                        /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConflictRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConflictRefusal)
+                    case json(Operations.CreateInboundEndpoint.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConflictRefusal {
+                    public var json: Operations.CreateInboundEndpoint.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -77929,12 +82601,21 @@ public enum Operations {
             public var path: Operations.RetireInboundEndpoint.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RetireInboundEndpoint.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RetireInboundEndpoint.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RetireInboundEndpoint.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -78487,6 +83168,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RetireInboundEndpoint.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/{endpoint_id}/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RetireInboundEndpoint.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RetireInboundEndpoint.Output.Conflict.Headers = .init(),
+                    body: Operations.RetireInboundEndpoint.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.RetireInboundEndpoint.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.RetireInboundEndpoint.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -81269,12 +86059,21 @@ public enum Operations {
             public var path: Operations.MarkInboundDeliveriesHandled.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkInboundDeliveriesHandled.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkInboundDeliveriesHandled.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.MarkInboundDeliveriesHandled.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -81894,6 +86693,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.MarkInboundDeliveriesHandled.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.MarkInboundDeliveriesHandled.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.MarkInboundDeliveriesHandled.Output.Conflict.Headers = .init(),
+                    body: Operations.MarkInboundDeliveriesHandled.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.MarkInboundDeliveriesHandled.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.MarkInboundDeliveriesHandled.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -82482,12 +87390,21 @@ public enum Operations {
             public var path: Operations.HoldConnector.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HoldConnector.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HoldConnector.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.HoldConnector.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -83162,13 +88079,58 @@ public enum Operations {
                 public var headers: Operations.HoldConnector.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConnectorHeldRefusal?
+                        /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConnectorHeldRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConnectorHeldRefusal)
+                    case json(Operations.HoldConnector.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConnectorHeldRefusal {
+                    public var json: Operations.HoldConnector.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -83818,12 +88780,21 @@ public enum Operations {
             public var query: Operations.ReleaseConnectorHold.Input.Query
             /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReleaseConnectorHold.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReleaseConnectorHold.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReleaseConnectorHold.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -84379,6 +89350,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReleaseConnectorHold.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/hold/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReleaseConnectorHold.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReleaseConnectorHold.Output.Conflict.Headers = .init(),
+                    body: Operations.ReleaseConnectorHold.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ReleaseConnectorHold.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ReleaseConnectorHold.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -86034,12 +91114,21 @@ public enum Operations {
             public var path: Operations.ReplaceConnectorState.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceConnectorState.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceConnectorState.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceConnectorState.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -86772,13 +91861,58 @@ public enum Operations {
                 public var headers: Operations.ReplaceConnectorState.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConnectorHeldRefusal?
+                        /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConnectorHeldRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConnectorHeldRefusal)
+                    case json(Operations.ReplaceConnectorState.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConnectorHeldRefusal {
+                    public var json: Operations.ReplaceConnectorState.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -87413,12 +92547,21 @@ public enum Operations {
             public var path: Operations.DeleteConnectorState.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteConnectorState.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteConnectorState.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteConnectorState.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -87970,6 +93113,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DeleteConnectorState.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/state/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteConnectorState.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DeleteConnectorState.Output.Conflict.Headers = .init(),
+                    body: Operations.DeleteConnectorState.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.DeleteConnectorState.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.DeleteConnectorState.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -89666,12 +94918,21 @@ public enum Operations {
             public var path: Operations.WriteConnectorAgreements.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.WriteConnectorAgreements.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.WriteConnectorAgreements.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.WriteConnectorAgreements.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -90423,13 +95684,58 @@ public enum Operations {
                 public var headers: Operations.WriteConnectorAgreements.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConnectorHeldRefusal?
+                        /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConnectorHeldRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConnectorHeldRefusal)
+                    case json(Operations.WriteConnectorAgreements.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConnectorHeldRefusal {
+                    public var json: Operations.WriteConnectorAgreements.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -91064,12 +96370,21 @@ public enum Operations {
             public var path: Operations.LookupConnectorAgreements.Input.Path
             /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupConnectorAgreements.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupConnectorAgreements.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.LookupConnectorAgreements.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -91670,6 +96985,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.LookupConnectorAgreements.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.LookupConnectorAgreements.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.LookupConnectorAgreements.Output.Conflict.Headers = .init(),
+                    body: Operations.LookupConnectorAgreements.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.LookupConnectorAgreements.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.LookupConnectorAgreements.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -92247,17 +97671,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/folders/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/folders/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateFolder.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateFolder.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -92923,13 +98354,58 @@ public enum Operations {
                 public var headers: Operations.CreateFolder.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/folders/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/folders/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/folders/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/folders/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/folders/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.CreateFolder.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.CreateFolder.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -92953,7 +98429,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `idempotency_key_in_flight`: a request with this `Idempotency-Key` is still running, and this one wrote nothing. Retry.
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
             ///
             /// - Remark: Generated from `#/paths//folders/post(createFolder)/responses/409`.
             ///
@@ -93733,17 +99209,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/folders/{id}/PATCH/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/folders/{id}/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateFolder.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateFolder.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -94554,21 +100037,26 @@ public enum Operations {
                         /// - Remark: Generated from `#/paths/folders/{id}/PATCH/responses/409/content/json/value2`.
                         public var value2: Components.Schemas.ItemAncestorUnavailable?
                         /// - Remark: Generated from `#/paths/folders/{id}/PATCH/responses/409/content/json/value3`.
-                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value3: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/folders/{id}/PATCH/responses/409/content/json/value4`.
+                        public var value4: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
                         ///   - value3:
+                        ///   - value4:
                         public init(
                             value1: Components.Schemas.ItemVersionConflict? = nil,
                             value2: Components.Schemas.ItemAncestorUnavailable? = nil,
-                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value3: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value4: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
                             self.value3 = value3
+                            self.value4 = value4
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -94587,11 +100075,17 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value4 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
                                     self.value2,
-                                    self.value3
+                                    self.value3,
+                                    self.value4
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -94602,6 +100096,7 @@ public enum Operations {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
                             try self.value3?.encode(to: encoder)
+                            try self.value4?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/folders/{id}/PATCH/responses/409/content/application\/json`.
@@ -95415,17 +100910,24 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/header/Idempotency-Key`.
                 public var idempotencyKey: Swift.String?
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeFolder.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
                 ///   - idempotencyKey: A unique key that makes the request safe to retry. If you send the same request with the same key again, Marfa returns the first response and doesn't write again. A key belongs to the credential that sends it.
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
                     idempotencyKey: Swift.String? = nil,
+                    xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeFolder.AcceptableContentType>] = .defaultValues()
                 ) {
                     self.idempotencyKey = idempotencyKey
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -96084,13 +101586,58 @@ public enum Operations {
                 public var headers: Operations.RevokeFolder.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/folders/{id}/revoke/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.IdempotencyKeyInFlightRefusal)
+                    case json(Operations.RevokeFolder.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.IdempotencyKeyInFlightRefusal {
+                    public var json: Operations.RevokeFolder.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -96114,7 +101661,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `idempotency_key_in_flight`: a request with this `Idempotency-Key` is still running, and this one wrote nothing. Retry.
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)/responses/409`.
             ///
@@ -97953,12 +103500,21 @@ public enum Operations {
             public var path: Operations.ReportFolderStatus.Input.Path
             /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReportFolderStatus.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReportFolderStatus.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReportFolderStatus.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -98522,6 +104078,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReportFolderStatus.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/folders/{id}/status/PUT/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReportFolderStatus.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReportFolderStatus.Output.Conflict.Headers = .init(),
+                    body: Operations.ReportFolderStatus.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//folders/{id}/status/put(reportFolderStatus)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ReportFolderStatus.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ReportFolderStatus.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -100033,12 +105698,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/keys/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/keys/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateKey.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateKey.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateKey.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -100821,13 +106495,58 @@ public enum Operations {
                 public var headers: Operations.CreateKey.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/keys/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/keys/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/keys/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConflictRefusal?
+                        /// - Remark: Generated from `#/paths/keys/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConflictRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/keys/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConflictRefusal)
+                    case json(Operations.CreateKey.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConflictRefusal {
+                    public var json: Operations.CreateKey.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -102527,12 +108246,21 @@ public enum Operations {
             public var path: Operations.UpdateKey.Input.Path
             /// - Remark: Generated from `#/paths/keys/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/keys/{id}/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateKey.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateKey.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateKey.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -103371,6 +109099,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UpdateKey.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateKey.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UpdateKey.Output.Conflict.Headers = .init(),
+                    body: Operations.UpdateKey.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.UpdateKey.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.UpdateKey.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/keys/{id}/PATCH/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -103959,12 +109796,21 @@ public enum Operations {
             public var path: Operations.RevokeKey.Input.Path
             /// - Remark: Generated from `#/paths/keys/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/keys/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeKey.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeKey.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RevokeKey.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -104516,6 +110362,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RevokeKey.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/keys/{id}/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RevokeKey.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RevokeKey.Output.Conflict.Headers = .init(),
+                    body: Operations.RevokeKey.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.RevokeKey.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.RevokeKey.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -106027,12 +111982,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/config/PUT/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/config/PUT/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceConfig.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceConfig.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ReplaceConfig.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -106651,6 +112615,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ReplaceConfig.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/config/PUT/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/config/PUT/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ReplaceConfig.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ReplaceConfig.Output.Conflict.Headers = .init(),
+                    body: Operations.ReplaceConfig.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ReplaceConfig.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ReplaceConfig.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/config/PUT/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -107224,12 +113297,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/restore/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/restore/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreArchive.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreArchive.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RestoreArchive.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -107852,13 +113934,58 @@ public enum Operations {
                 public var headers: Operations.RestoreArchive.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/restore/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/restore/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConflictOrLinkTakenRefusal?
+                        /// - Remark: Generated from `#/paths/restore/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConflictOrLinkTakenRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/restore/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConflictOrLinkTakenRefusal)
+                    case json(Operations.RestoreArchive.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConflictOrLinkTakenRefusal {
+                    public var json: Operations.RestoreArchive.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -109427,12 +115554,21 @@ public enum Operations {
             public var path: Operations.DeletePlatformType.Input.Path
             /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeletePlatformType.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeletePlatformType.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeletePlatformType.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -110069,13 +116205,58 @@ public enum Operations {
                 public var headers: Operations.DeletePlatformType.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConflictRefusal?
+                        /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConflictRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/platform-types/{id}/DELETE/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConflictRefusal)
+                    case json(Operations.DeletePlatformType.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConflictRefusal {
+                    public var json: Operations.DeletePlatformType.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -111737,12 +117918,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/owner/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/owner/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateOwner.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateOwner.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateOwner.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -112190,13 +118380,58 @@ public enum Operations {
                 public var headers: Operations.CreateOwner.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/owner/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/owner/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/owner/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.OwnerExistsRefusal?
+                        /// - Remark: Generated from `#/paths/owner/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.OwnerExistsRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/owner/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.OwnerExistsRefusal)
+                    case json(Operations.CreateOwner.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.OwnerExistsRefusal {
+                    public var json: Operations.CreateOwner.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -113504,12 +119739,21 @@ public enum Operations {
             public var path: Operations.UpdateSignIn.Input.Path
             /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateSignIn.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateSignIn.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateSignIn.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -114098,6 +120342,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UpdateSignIn.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/PATCH/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateSignIn.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UpdateSignIn.Output.Conflict.Headers = .init(),
+                    body: Operations.UpdateSignIn.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/patch(updateSignIn)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.UpdateSignIn.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.UpdateSignIn.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -114713,12 +121066,21 @@ public enum Operations {
             public var query: Operations.EndSignIn.Input.Query
             /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EndSignIn.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EndSignIn.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.EndSignIn.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -115273,6 +121635,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.EndSignIn.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.EndSignIn.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.EndSignIn.Output.Conflict.Headers = .init(),
+                    body: Operations.EndSignIn.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.EndSignIn.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.EndSignIn.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -116876,7 +123347,7 @@ public enum Operations {
     }
     /// Register an OAuth client
     ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
     /// - Remark: HTTP `POST /auth/oauth2/register`.
     /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
@@ -117493,7 +123964,7 @@ public enum Operations {
                 }
             }
             /// - `invalid_client_metadata`: client metadata is invalid.
-            /// - `invalid_redirect_uri`: a redirect URI is invalid.
+            /// - `invalid_redirect_uri`: a redirect URI is invalid, or there are more than 10.
             /// - `invalid_scope`: a scope is not allowed.
             /// - `invalid_target`: a resource is invalid.
             /// - `invalid_software_statement`: a software statement is invalid.
@@ -120200,12 +126671,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/webhooks/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/webhooks/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateWebhook.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateWebhook.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateWebhook.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -120715,6 +127195,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CreateWebhook.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/webhooks/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CreateWebhook.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CreateWebhook.Output.Conflict.Headers = .init(),
+                    body: Operations.CreateWebhook.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.CreateWebhook.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.CreateWebhook.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -122370,12 +128959,21 @@ public enum Operations {
             public var path: Operations.UpdateWebhook.Input.Path
             /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateWebhook.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateWebhook.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateWebhook.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -123001,6 +129599,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UpdateWebhook.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateWebhook.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UpdateWebhook.Output.Conflict.Headers = .init(),
+                    body: Operations.UpdateWebhook.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.UpdateWebhook.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.UpdateWebhook.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct ContentTooLarge: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/413/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -123589,12 +130296,21 @@ public enum Operations {
             public var path: Operations.DeleteWebhook.Input.Path
             /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteWebhook.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteWebhook.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteWebhook.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -124146,6 +130862,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "notFound",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DeleteWebhook.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/DELETE/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteWebhook.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DeleteWebhook.Output.Conflict.Headers = .init(),
+                    body: Operations.DeleteWebhook.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.DeleteWebhook.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.DeleteWebhook.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
                             response: self
                         )
                     }
@@ -125837,12 +132662,21 @@ public enum Operations {
             public var path: Operations.RedeliverWebhookDelivery.Input.Path
             /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/header`.
             public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RedeliverWebhookDelivery.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
-                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RedeliverWebhookDelivery.AcceptableContentType>] = .defaultValues()) {
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RedeliverWebhookDelivery.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
             }
@@ -126455,13 +133289,58 @@ public enum Operations {
                 public var headers: Operations.RedeliverWebhookDelivery.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.ConflictRefusal?
+                        /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.ConflictRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/webhooks/{id}/deliveries/{delivery_id}/redeliver/POST/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ConflictRefusal)
+                    case json(Operations.RedeliverWebhookDelivery.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ConflictRefusal {
+                    public var json: Operations.RedeliverWebhookDelivery.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):

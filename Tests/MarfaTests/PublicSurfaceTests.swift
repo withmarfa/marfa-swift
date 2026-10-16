@@ -110,6 +110,14 @@ import Testing
 @Test func anAppMakesItsOwnFolderValues() {
     let listed = ListedFolder(directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f")
     #expect(listed.folderId == "f")
+    let added = AddedFolder(
+        directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f", storage: .cloudSynced)
+    #expect(added.storage == .cloudSynced)
+    let cause: Bool =
+        switch StorageCause.networkFileSystem(kind: "nfs") {
+        case .iCloudDrive, .cloudService, .cloudSynced, .networkFileSystem: true
+        }
+    #expect(cause)
     let status = FolderStatus(
         files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: PausedRemoval(disk: 2),
         firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0)))
@@ -145,7 +153,9 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         }
     let originRead: Bool =
         switch origin {
-        case .local, .server, .serverUnreachable, .serverReachable, .answered, .saved, .refreshed, .stopped: true
+        case .local, .server, .serverUnreachable, .serverReachable, .queueDrained, .queueNotDrained, .answered, .saved,
+            .refreshed, .stopped:
+            true
         }
     let errorRead: Bool =
         switch error {

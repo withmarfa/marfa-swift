@@ -96,6 +96,70 @@ struct CopyOptions {
         await copy.close()
     }
 
+    @Test(arguments: ["catch-up", "hydration"])
+    func aRecoveryWithAStreamHeldLeavesTheFollowToTellTheServerIsBackAndToDrain(recovery: String) async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let heard = Heard(copy.changes())
+        func count(_ kind: (Marfa.Change.Origin) -> Bool) -> Int { heard.all.filter { kind($0.origin) }.count }
+        let reachable = { (origin: Marfa.Change.Origin) in if case .serverReachable = origin { true } else { false } }
+        let unreachable = { (origin: Marfa.Change.Origin) in if case .serverUnreachable = origin { true } else { false }
+        }
+        try await eventually("the follow started") { core.follows.count == 1 }
+        let gone = MarfaCore.MarfaError.Network(message: "refused")
+        core.change(0, MarfaCore.Change.serverUnreachable(reason: gone, cursor: "3"))
+        try await eventually("the server's going was told") { count(unreachable) == 1 }
+
+        if recovery == "catch-up" {
+            _ = try await copy.catchUp()
+        } else {
+            _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+        }
+        try await eventually("the follow started again") { core.follows.count == 2 }
+        // The call says nothing of the server: the follow it restarted is told the
+        // app thinks it is away, so it tells it is back, and drains, when it has its stream.
+        #expect(core.follows[1].toldUnreachable)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(count(reachable) == 0, "the \(recovery) told the server was back before the follow did")
+        core.change(1, MarfaCore.Change.serverReachable(cursor: "3"))
+        try await eventually("the follow told the server was back") { count(reachable) == 1 }
+        let report = MarfaCore.DrainReport(
+            answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [],
+            stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
+        core.change(1, MarfaCore.Change.queueDrained(report: report, cursor: "3"))
+        try await eventually("the drain was told") {
+            heard.all.contains { $0.origin == .queueDrained(Marfa.DrainReport(report)) }
+        }
+
+        // The next outage is told.
+        core.change(1, MarfaCore.Change.serverUnreachable(reason: gone, cursor: "3"))
+        try await eventually("the next outage was told") { count(unreachable) == 2 }
+        await copy.close()
+    }
+
+    @Test(arguments: ["catch-up", "hydration"])
+    func aRecoveryWithNoStreamHeldTellsTheServerIsBack(recovery: String) async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let first = Heard(copy.changes())
+        try await eventually("the follow started") { core.follows.count == 1 }
+        core.change(0, MarfaCore.Change.serverUnreachable(reason: .Network(message: "refused"), cursor: "3"))
+        try await eventually("the server's going was told") { first.all.count == 1 }
+        first.stop()
+        try await eventually("the follow stopped with the last stream") { core.follows[0].stopped }
+
+        if recovery == "catch-up" {
+            _ = try await copy.catchUp()
+        } else {
+            _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+        }
+        // A stream added now is told the server is away if the call left it so.
+        let late = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(late.all.isEmpty, "a call that reached the server left a stream told: \(late.all)")
+        await copy.close()
+    }
+
     @Test(arguments: Errors.cases)
     func anUnreachableServerIsToldWithTheErrorItCameWith(coreError: MarfaCore.MarfaError, expected: Marfa.MarfaError)
         async throws
@@ -134,11 +198,15 @@ struct CopyOptions {
         // A catch-up that reaches the server says it came back, once.
         core.state.withLock { $0.catchUpFails = nil }
         _ = try await copy.catchUp()
+        try await eventually("the follow started again") { core.follows.count == 3 }
+        #expect(core.follows[2].toldUnreachable, "the follow was not told the server was away")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all.count == 1, "the catch-up told the server was back before the follow did")
+        core.change(2, MarfaCore.Change.serverReachable(cursor: "3"))
         try await eventually("the server's return was told") { heard.all.count == 2 }
-        core.change(core.follows.count - 1, MarfaCore.Change.serverReachable(cursor: "3"))
+        core.change(2, MarfaCore.Change.serverReachable(cursor: "3"))
         try await Task.sleep(for: .milliseconds(100))
         #expect(heard.all.map(\.origin) == [.serverUnreachable(.network(message: "refused")), .serverReachable])
-        #expect(core.follows.last?.toldUnreachable == false)
         await copy.close()
     }
 }

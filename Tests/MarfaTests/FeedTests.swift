@@ -366,6 +366,55 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
+    @Test func theFollowsOwnDrainIsToldWithItsAnswersAndItsReport() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let heard = Heard(copy.changes())
+        try await eventually("the follow started") { core.follows.count == 1 }
+        let verdict = MarfaCore.DrainVerdict(
+            id: "q", kind: .createItem, itemId: "n1", edgeId: nil, verdict: .accepted, refusals: 0, replayed: false)
+        let report = MarfaCore.DrainReport(
+            answered: 1, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [verdict],
+            stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
+        core.change(0, MarfaCore.Change.queueDrained(report: report, cursor: "3"))
+        let told = Marfa.DrainReport(report)
+        try await eventually("the drain was told") { heard.all.count == 3 }
+        #expect(
+            heard.all == [
+                Marfa.Change(origin: .answered(told.verdicts[0]), itemId: "n1", edgeId: nil),
+                refreshed(.drained),
+                Marfa.Change(origin: .queueDrained(told), itemId: nil, edgeId: nil),
+            ])
+        // The witness: a drain that answered nothing tells only its report.
+        let idle = MarfaCore.DrainReport(
+            answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
+            unclaimedSources: [], retryAfterSeconds: nil)
+        core.change(0, MarfaCore.Change.queueDrained(report: idle, cursor: "3"))
+        try await eventually("the idle drain was told") { heard.all.count == 4 }
+        #expect(heard.all[3] == Marfa.Change(origin: .queueDrained(Marfa.DrainReport(idle)), itemId: nil, edgeId: nil))
+        try await bounded("close") { await copy.close() }
+    }
+
+    @Test func aFollowDrainThatStoppedIsToldWithItsError() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let heard = Heard(copy.changes())
+        try await eventually("the follow started") { core.follows.count == 1 }
+        core.change(
+            0,
+            MarfaCore.Change.queueNotDrained(
+                error: .RateLimited(code: "rate_limited", message: "slow", retryAfterSeconds: 4), cursor: "3"))
+        try await eventually("the stop was told") { heard.all.count == 1 }
+        #expect(
+            heard.all == [
+                Marfa.Change(
+                    origin: .queueNotDrained(.rateLimited(code: "rate_limited", message: "slow", retryAfterSeconds: 4)),
+                    itemId: nil, edgeId: nil)
+            ])
+        #expect(core.follows.count == 1, "a drain that stopped ended the follow")
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func aWithdrawThatTookAWriteIsToldOnce() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)

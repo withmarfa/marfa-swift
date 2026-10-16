@@ -35,7 +35,7 @@ struct LiveRestart {
         return (status, try JSONObject(json: String(decoding: body, as: UTF8.self))["item"]?.object)
     }
 
-    @Test func theFollowSaysWhenTheServerGoesAndComesBackAndADrainThenSends() async throws {
+    @Test func theFollowSaysWhenTheServerGoesAndComesBackAndDrainsWhatWaitedOnce() async throws {
         let own = try await OwnServer.boot()
         do {
             let copy = try await Self.hydrated(own)
@@ -74,11 +74,89 @@ struct LiveRestart {
             }
             #expect(heard.all.filter { if case .serverUnreachable = $0.origin { true } else { false } }.count == 1)
             #expect(heard.all.filter { if case .serverReachable = $0.origin { true } else { false } }.count == 1)
+            // The app starts no drain: the held stream sends the write itself and says so.
+            try await eventually("the follow said it drained what waited", within: 60) {
+                heard.all.contains { if case .queueDrained = $0.origin { true } else { false } }
+            }
+            let drained = heard.all.compactMap { change -> DrainReport? in
+                if case .queueDrained(let report) = change.origin { report } else { nil }
+            }
+            #expect(drained.count == 1)
+            #expect(drained.first?.verdicts.map(\.verdict) == [.accepted])
+            #expect(
+                heard.all.contains {
+                    if case .answered(let answer) = $0.origin { answer.verdict == .accepted } else { false }
+                })
+            #expect(heard.all.filter { if case .queueNotDrained = $0.origin { true } else { false } }.isEmpty)
             #expect(heard.stops.isEmpty)
-            #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
             #expect(try await Self.read(own, id).item?["properties"]?.object?["title"] == "while away")
+            // Sent once: nothing is left for a drain the app starts, and the stream told no second drain.
+            #expect(try await copy.queue.drain().verdicts.isEmpty)
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(heard.all.filter { if case .queueDrained = $0.origin { true } else { false } }.count == 1)
             heard.stop()
             await copy.close()
+        } catch {
+            try? await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    @Test func aCatchUpThatReachesTheServerFirstStillLeavesTheFollowToDrainWhatWaitedOnce() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            let copy = try await Self.hydrated(own)
+            let made = try await copy.items.create(Self.note("before the server went"))
+            #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
+            let heard = Heard(copy.changes())
+            try await Task.sleep(for: .milliseconds(500))
+
+            try await own.stop()
+            try await eventually("the follow said the server went", within: 30) {
+                heard.all.contains { if case .serverUnreachable = $0.origin { true } else { false } }
+            }
+            let id = try #require(made.itemId)
+            let held = try #require(try await copy.items.get(id))
+            _ = try await copy.items.update(id, Edit(.merge(["title": "while away"]), baseVersion: held.version))
+
+            // The follow asks again at a falling rate, so that after this wait its next
+            // ask is far off: the app reaches the server first, and is told it is back.
+            try await Task.sleep(for: .seconds(16))
+            try await own.start()
+            try await eventually("a call reached the server", within: 60) {
+                do {
+                    _ = try await copy.catchUp()
+                    return true
+                } catch {
+                    return false
+                }
+            }
+            try await eventually("the app was told the server is back", within: 30) {
+                heard.all.contains { if case .serverReachable = $0.origin { true } else { false } }
+            }
+            // The app starts no drain: the follow it restarted still sends the write, and says so.
+            try await eventually("the follow said it drained what waited", within: 60) {
+                heard.all.contains { if case .queueDrained = $0.origin { true } else { false } }
+            }
+            let drained = heard.all.compactMap { change -> DrainReport? in
+                if case .queueDrained(let report) = change.origin { report } else { nil }
+            }
+            #expect(drained.count == 1)
+            #expect(drained.first?.verdicts.map(\.verdict) == [.accepted])
+            #expect(try await Self.read(own, id).item?["properties"]?.object?["title"] == "while away")
+            #expect(try await copy.queue.drain().verdicts.isEmpty)
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(heard.all.filter { if case .queueDrained = $0.origin { true } else { false } }.count == 1)
+
+            // The recovery did not hide the next outage from the app.
+            try await own.stop()
+            try await eventually("the follow said the server went again", within: 60) {
+                heard.all.filter { if case .serverUnreachable = $0.origin { true } else { false } }.count == 2
+            }
+            heard.stop()
+            await copy.close()
+            try await own.start()
         } catch {
             try? await own.end()
             throw error
