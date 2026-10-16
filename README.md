@@ -112,7 +112,7 @@ let record = try await copy.items.list(ListFilters(tier: .library))
 
 In a copy that holds one tier, the same item leaves the copy once the server answers the move.
 
-Nothing runs on its own. The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does, and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events; if it stops with an error, the next hydration or catch-up starts it again.
+The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does, and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events, and drains the queued writes once each time its server is back; if it stops with an error, the next hydration or catch-up starts it again.
 
 Each queued write carries its `verdict` once the server answers it. A write held behind another that has no answer yet is `waiting`, with no verdict, and goes once that write is answered; a `blocked` verdict is a stop the app may have to act on, by releasing or withdrawing it. A `refused` verdict carries a typed `Refusal`: the server's code and message, each property it would not take and why, whether the row is in the bin, and any permission the key lacks. A refused write that carried content keeps it in `body` through `forgetAnswered()`, so the app can offer it back to the person, until `queue.discard(_:)` takes it out. A drain's report lists each write it answered with the item or edge it wrote, and a held `changes()` stream is told each one as `.answered`. On a store that has never hydrated, the writer's stream receives local write and declaration notifications, and its follow waits for the first hydration before it follows server events.
 
@@ -126,7 +126,7 @@ Hydration normally holds the edges going out from items in its slice. To hold an
 
 `ListFilters` and `SearchFilters` carry `filter`, an expression in the server's listing grammar, and `beneath`, the root of a held `parent-of` subtree. A local filter cannot use a back-reference condition. These options narrow what the copy already holds.
 
-`Status.instanceId` names the instance the copy was hydrated from. `copyExpired(reason:message:)` means hydration is needed while the queue is kept. Structural changes such as a newly registered type, or a change to read access, expire a certified view with `read_view_changed`; a held `changes()` stream reports the cause through `.stopped(.copyExpired(reason:message:))`. A store whose shape this build cannot read throws `wrongSchema(path:reason:unsent:message:)`, including the count of pending writes where its queue is readable. A refusal without the server's contract throws `unnamed(status:message:)` when read directly; a drain reports such a gateway refusal as unavailable and keeps its writes. A success missing the contract is refused as `contractMismatch`.
+`Status.instanceId` names the instance the copy was hydrated from. `copyExpired(reason:message:)` means hydration is needed while the queue is kept. Structural changes such as a newly registered type, or a change to read access, expire a certified view with `read_view_changed`; a held `changes()` stream reports the cause through `.stopped(.copyExpired(reason:message:))`. `reason` is an open string, so a switch over it keeps a default. When the server at the copy's address refuses a write or lookup because it is another instance than the copy was hydrated from, the call throws `copyExpired(reason: "instance_changed", …)` and the write stays queued under its key; hydrate again, and it goes to the instance now there. A store whose shape this build cannot read throws `wrongSchema(path:reason:unsent:message:)`, including the count of pending writes where its queue is readable. A refusal without the server's contract throws `unnamed(status:message:)` when read directly; a drain reports such a gateway refusal as unavailable and keeps its writes. A success missing the contract is refused as `contractMismatch`.
 
 `storageFull(message:)` identifies exhausted local storage, while `io(message:)` preserves another local I/O failure. `signedOut(origin:message:)` and `noKeychain(message:)` retain credential failures without inventing a server refusal. `redirected(origin:status:location:message:)` preserves the actual redirect response and its optional destination; the client does not follow it. `contractMismatch` carries an optional HTTP status, which is nil when the failure supplies none. These causes remain typed when reported by a stopped change stream.
 
@@ -258,26 +258,27 @@ Only one end moves, and only where the end that stays holds one edge of the type
 
 A refusal that turns on rows the copy may not hold is queued, and the server refuses it with its own code in the write's `verdict`: `edge_cycle` for a longer `parent-of` or `supersedes` cycle, `edge_constraint_violation` for a new end that already holds its one edge, and `item_not_found` for a new end the server does not hold. The edge returns to where it was.
 
-Once the server accepts a source move, the drain throws `copyExpired(reason: "read_view_changed", …)`, as it does for a retype: the write is answered, and the app hydrates again. A target move leaves the copy current.
+Once the server accepts a source move, the copy expires. The drain sends the writes queued behind the move first, then throws `copyExpired(reason: "read_view_changed", …)` once, after the last, as it does for a retype: the writes are answered, and the app hydrates again. A drain that ends with a wait, an unreachable server, a stopped credential or a write left undelivered returns its report instead, and the next call throws `copyExpired`. A target move leaves the copy current.
 
 ## Keep a copy in sync
 
-Nothing runs on its own, so an app drives the copy through its life:
+An app drives the copy through its life:
 
 1. **On first launch, or when `status().hydration` is `never` or `expired`,** call `hydrate(types:tier:)`. It replaces the copy with the slice and keeps the queue.
 1. **When the app starts or comes to the front,** call `catchUp()` to apply what changed while it was away, then `queue.drain()` to send what it queued.
 1. **While a screen shows server data,** hold a `changes()` stream. It follows the server's events and tells each one as `.server`.
 1. **When the stream tells `.serverUnreachable(error)`,** show the app as offline; `error` is typed, such as `network`, `rateLimited` or `server`. The follow keeps asking at a falling rate. Writes still queue. The copy tells this once until the server is reached again, however often the follow starts again around a catch-up or a hydration, and a stream added meanwhile is told it first.
-1. **When it tells `.serverReachable`,** call `queue.drain()` to send what waited, and show the app as online again. A hydration, a catch-up or a drain that reaches the server tells it too.
+1. **When it tells `.serverReachable`,** show the app as online again. A hydration, a catch-up or a drain that reaches the server tells it too. A held stream sends what waited by itself, so there is nothing to start.
+1. **When it tells `.queueDrained(report)`,** the stream has drained the writes queued while the server was away, once for each return. `report` is the drain's report, and each write it answered is told as `.answered`, as for a drain the app starts. When it tells `.queueNotDrained(error)`, that drain stopped with `error`: the answers it had recorded stay recorded and the rest stay queued, and the stream doesn't try again until its server next returns, so call `queue.drain()` once the app can.
 1. **After each write the person makes,** call `queue.drain()` when the app is online; a drain that cannot reach the server leaves the writes waiting, uncounted.
 
 ```swift
 for await change in copy.changes() {
     switch change.origin {
     case .serverUnreachable(let error): showOffline(error)
-    case .serverReachable:
-        showOnline()
-        _ = try? await copy.queue.drain()
+    case .serverReachable: showOnline()
+    case .queueDrained(let report): showSent(report)
+    case .queueNotDrained(let error): showNotSent(error)
     case .stopped(.copyExpired):
         _ = try? await copy.hydrate(types: ["core.note"], tier: .library)
     case .stopped(.unauthorized), .stopped(.signedOut):
@@ -288,7 +289,7 @@ for await change in copy.changes() {
 }
 ```
 
-A stream that tells `.stopped` has ended its follow until the next hydration or catch-up. `copyExpired` means the copy can no longer be kept current from where it is, after the server's log moved past it, another instance answered at its address, or its read view changed, such as after a retype or a type registered: hydrate again, and the queue survives. `unauthorized` means the server refused the key, and `signedOut` that a signed-in credential is gone: get a new key and pass it to `useKey(_:)`, and the follow starts again with it.
+A stream that tells `.stopped` has ended its follow until the next hydration or catch-up. `copyExpired` means the copy can no longer be kept current from where it is, after the server's log moved past it, another instance answered at its address (`instance_changed`), or its read view changed, such as after a retype or a type registered: hydrate again, and the queue survives. `unauthorized` means the server refused the key, and `signedOut` that a signed-in credential is gone: get a new key and pass it to `useKey(_:)`, and the follow starts again with it.
 
 ## Read and manage folders
 
@@ -327,7 +328,11 @@ A folder is a directory whose files Marfa keeps in step with the search a `syste
 
     let folders = Folders(server: Server(url: serverURL, key: key))
     let notes = URL(filePath: "/path/to/Notes", directoryHint: .isDirectory)
-    _ = try await folders.add(notes, following: folderID)
+    let added = try await folders.add(notes, following: folderID)
+    if let storage = added.storage {
+        // The folder is added all the same. Show this once for the folder.
+        showWarning(storage.warning)
+    }
 
     switch try await folders.sync(notes) {
     case .awaitingConfirmation(let plan):
@@ -383,6 +388,8 @@ for try await event in watch {
     if case .passed(let pass) = event { print(pass.scan.created, "created") }
 }
 ```
+
+A folder in iCloud Drive, in a cloud service's synced location or on a network file system works as any other, but a second program may sync the same files, or changes made from another computer may not be noticed. `add(_:following:)` returns the cause as `storage`, and the `.watching` event carries it too. A `StorageCause` is `iCloudDrive`, `cloudService`, `cloudSynced` (iCloud Drive or another cloud service, which macOS doesn't tell apart) or `networkFileSystem(kind:)`. Its `warning` is a plain sentence that names the cause; show it once for each folder in a session.
 
 One process works a folder at a time. While a watch, or `marfa folders watch`, holds a folder, the other calls on it throw `MarfaError.readingHandle`; `status(of:)` still answers. `remove(_:)` throws `invalid` while writes wait to be sent, except for a first sync still waiting, and keeps the files when it removes the folder. It also throws `invalid` for a path that passes through a symbolic link, such as one under `/var` on a Mac, unless it is the path `list()` gives; pass that path. `watch(_:)` throws `MarfaError.firstSyncWaiting` until the first sync is confirmed. Folders are available on macOS only. The registry is the file `MARFA_FOLDER_REGISTRY` names, or `~/Library/Application Support/Marfa/folders.json`; a sandboxed app has its own home directory, and so its own registry.
 

@@ -30,7 +30,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// names the writes another build can still send, where the queue is readable.
     case wrongSchema(path: String, reason: String, unsent: UInt64?, message: String)
     case readingHandle(message: String)
-    /// Hydration is needed to make the copy current; its queue is kept.
+    /// Hydration is needed to make the copy current; its queue is kept. `reason`
+    /// is an open string, such as `read_view_changed` or `instance_changed`.
     case copyExpired(reason: String, message: String)
     case streamIncomplete(reason: String, message: String)
     case wrongServer(expected: String, got: String, message: String)
@@ -413,10 +414,14 @@ public struct Edit: Sendable, Hashable {
 /// move the copy cannot judge, such as one that closes a longer cycle, is
 /// queued and refused by the server, and its verdict says why.
 ///
-/// Once the server accepts a source move, the drain throws
-/// `MarfaError.copyExpired` with the reason `read_view_changed`, as it does
-/// for a retype. The write is answered, and the app hydrates again. A target
-/// move does not expire the copy.
+/// Once the server accepts a source move, the copy expires. The drain sends
+/// the writes queued behind the move first, then throws
+/// `MarfaError.copyExpired` with the reason `read_view_changed` once, after
+/// the last, as it does for a retype. The writes are answered, and the app
+/// hydrates again. A drain that ends with a wait, an unreachable server, a
+/// stopped credential or a write left undelivered returns its report instead,
+/// and the next call throws `copyExpired`. A target move does not expire the
+/// copy.
 public struct EdgeEdit: Sendable, Hashable {
     /// The end of an edge to move, and the item to move it to.
     public enum Move: Sendable, Hashable {

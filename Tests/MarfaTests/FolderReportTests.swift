@@ -87,4 +87,37 @@ func aFlaggedFileNamesTheItemAPullHeldBack(flag: String) {
     #expect(fields == ["body"])
     #expect(pass.drain.verdicts.first?.itemId == "item-1")
 }
+
+@Test(arguments: [
+    (MarfaCore.StorageCause.iCloudDrive, Marfa.StorageCause.iCloudDrive),
+    (.cloudService, .cloudService),
+    (.cloudSynced, .cloudSynced),
+    (.networkFileSystem(kind: "smbfs"), .networkFileSystem(kind: "smbfs")),
+])
+func aFolderInSyncedOrNetworkStorageIsAddedWithTheCause(core: MarfaCore.StorageCause, expected: Marfa.StorageCause) {
+    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: core))
+    #expect(added.storage == expected)
+    #expect(added.folderId == "f")
+    #expect(added.directory == URL(filePath: "/Notes", directoryHint: .isDirectory))
+    let watching = Marfa.FolderEvent(MarfaCore.FolderEvent.watching(dir: "/Notes", storage: core))
+    #expect(watching == .watching(URL(filePath: "/Notes", directoryHint: .isDirectory), storage: expected))
+}
+
+@Test func aFolderInPlainStorageIsAddedWithNoCause() {
+    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: nil))
+    #expect(added.storage == nil)
+    #expect(
+        Marfa.FolderEvent(MarfaCore.FolderEvent.watching(dir: "/Notes", storage: nil))
+            == .watching(URL(filePath: "/Notes", directoryHint: .isDirectory), storage: nil))
+}
+
+@Test func eachCauseHasOnePlainWarningThatNamesIt() {
+    #expect(StorageCause.iCloudDrive.warning.hasPrefix("This folder is in iCloud Drive."))
+    #expect(StorageCause.cloudService.warning.hasPrefix("This folder is in a cloud service."))
+    #expect(StorageCause.cloudSynced.warning.hasPrefix("This folder is in iCloud Drive or another cloud service."))
+    let network = StorageCause.networkFileSystem(kind: "smbfs").warning
+    #expect(network.hasPrefix("This folder is on a network file system (smbfs)."))
+    #expect(network.contains("another computer"))
+    #expect(StorageCause.cloudSynced.location == "iCloud Drive or another cloud service")
+}
 #endif

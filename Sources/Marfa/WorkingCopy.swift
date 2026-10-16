@@ -5,11 +5,11 @@ import Synchronization
 /// A local copy of a slice of one server, and the queue of writes it holds
 /// for that server.
 ///
-/// Nothing runs on its own: the app decides when to hydrate, catch up,
-/// drain and `forgetAnswered()`. Every call that can wait on the store or the
-/// network runs off the caller's thread, except a reader's first
-/// `changes()`, which reads the store before it returns and so can wait
-/// behind the copy's other reads.
+/// The app decides when to hydrate, catch up, drain and `forgetAnswered()`;
+/// only a held `changes()` stream drains on its own, once each time its server
+/// is back. Every call that can wait on the store or the network runs off the
+/// caller's thread, except a reader's first `changes()`, which reads the store
+/// before it returns and so can wait behind the copy's other reads.
 public final class WorkingCopy: Sendable {
     let holder: CoreHolder
     let feed: Feed
@@ -169,10 +169,18 @@ public final class WorkingCopy: Sendable {
     /// The copy says what became of the server: `.serverUnreachable` with
     /// the failure when the follow cannot have its stream, and
     /// `.serverReachable` when it has one again, or a hydration, catch-up or
-    /// drain reaches the server, which is when to drain what the app queued
-    /// meanwhile. Each is told once for each change, however often the follow
-    /// starts again, and a stream added while the server is unreachable is
-    /// told so first. A copy that reaches its server at once says neither.
+    /// drain reaches the server. Each is told once for each change, however
+    /// often the follow starts again, and a stream added while the server is
+    /// unreachable is told so first. A copy that reaches its server at once
+    /// says neither.
+    ///
+    /// A held stream drains the writes queued meanwhile, once each time the
+    /// follow has its stream again, after any drain the app started has ended.
+    /// The app has nothing to start on `.serverReachable`. The drain ends in
+    /// `.queueDrained` with its report, or in `.queueNotDrained` with why it
+    /// stopped, and the answers it had recorded stay recorded. Each write it
+    /// answered is told as `.answered`, as for a drain the app starts. A copy
+    /// opened without a server, and a reader, drain nothing.
     ///
     /// A writer with a server follows the server's events only while at least
     /// one stream is held, and pauses the follow during a hydration or
@@ -243,6 +251,18 @@ public final class WorkingCopy: Sendable {
     }
 }
 
+extension DrainReport {
+    /// What a drain tells a held stream: each write it answered, then that rows
+    /// may have changed.
+    func changes() -> [Change] {
+        var told = verdicts.filter { $0.verdict != nil }.map {
+            Change(origin: .answered($0), itemId: $0.itemId, edgeId: $0.edgeId)
+        }
+        if !verdicts.isEmpty { told.append(Change(origin: .refreshed(.drained), itemId: nil, edgeId: nil)) }
+        return told
+    }
+}
+
 /// One change to the copy, and where it came from.
 public struct Change: Sendable, Hashable {
     public enum Origin: Sendable, Hashable {
@@ -253,9 +273,17 @@ public struct Change: Sendable, Hashable {
         /// It keeps asking, at a falling rate, and is told once however many
         /// attempts fail.
         case serverUnreachable(MarfaError)
-        /// The follow has its stream again after `.serverUnreachable`: a
-        /// good moment to drain.
+        /// The follow has its stream again after `.serverUnreachable`. A held
+        /// stream drains the queue now, and tells how it ended.
         case serverReachable
+        /// The drain the follow ran when the server came back ended, and this
+        /// is what it did. Told after the `.answered` and `.refreshed(.drained)`
+        /// of the writes it answered.
+        case queueDrained(DrainReport)
+        /// The drain the follow ran when the server came back stopped with
+        /// this error. The answers it had recorded stay recorded, and the
+        /// writes it did not reach stay queued for the next drain.
+        case queueNotDrained(MarfaError)
         /// A drain answered this write; `itemId` and `edgeId` name what it
         /// wrote. Told for each write with a verdict, before the drain's
         /// `.refreshed(.drained)`.
@@ -643,16 +671,12 @@ public struct Queue: Sendable {
 
     /// Sends what the queue holds once, and records each verdict.
     ///
-    /// Nothing drains on its own.
+    /// A held `changes()` stream also drains once each time its server is back;
+    /// otherwise nothing drains on its own.
     public func drain() async throws -> DrainReport {
         let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
         if report.answered > 0 { feed.reached() }
-        for answered in report.verdicts where answered.verdict != nil {
-            feed.announce(Change(origin: .answered(answered), itemId: answered.itemId, edgeId: answered.edgeId))
-        }
-        if !report.verdicts.isEmpty {
-            feed.announce(Change(origin: .refreshed(.drained), itemId: nil, edgeId: nil))
-        }
+        for change in report.changes() { feed.announce(change) }
         return report
     }
 
@@ -1168,6 +1192,14 @@ final class Listener: MarfaCore.ChangeListener, Sendable {
             feed?.reach(MarfaError(reason), from: generation)
         case .serverReachable:
             feed?.reach(nil, from: generation)
+        case .queueDrained(let report, _):
+            let report = DrainReport(report)
+            for change in report.changes() + [Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)] {
+                feed?.announce(change, from: generation)
+            }
+        case .queueNotDrained(let error, _):
+            feed?.announce(
+                Change(origin: .queueNotDrained(MarfaError(error)), itemId: nil, edgeId: nil), from: generation)
         }
     }
 

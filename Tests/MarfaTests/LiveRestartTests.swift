@@ -35,7 +35,7 @@ struct LiveRestart {
         return (status, try JSONObject(json: String(decoding: body, as: UTF8.self))["item"]?.object)
     }
 
-    @Test func theFollowSaysWhenTheServerGoesAndComesBackAndADrainThenSends() async throws {
+    @Test func theFollowSaysWhenTheServerGoesAndComesBackAndDrainsWhatWaitedOnce() async throws {
         let own = try await OwnServer.boot()
         do {
             let copy = try await Self.hydrated(own)
@@ -74,9 +74,26 @@ struct LiveRestart {
             }
             #expect(heard.all.filter { if case .serverUnreachable = $0.origin { true } else { false } }.count == 1)
             #expect(heard.all.filter { if case .serverReachable = $0.origin { true } else { false } }.count == 1)
+            // The app starts no drain: the held stream sends the write itself and says so.
+            try await eventually("the follow said it drained what waited", within: 60) {
+                heard.all.contains { if case .queueDrained = $0.origin { true } else { false } }
+            }
+            let drained = heard.all.compactMap { change -> DrainReport? in
+                if case .queueDrained(let report) = change.origin { report } else { nil }
+            }
+            #expect(drained.count == 1)
+            #expect(drained.first?.verdicts.map(\.verdict) == [.accepted])
+            #expect(
+                heard.all.contains {
+                    if case .answered(let answer) = $0.origin { answer.verdict == .accepted } else { false }
+                })
+            #expect(heard.all.filter { if case .queueNotDrained = $0.origin { true } else { false } }.isEmpty)
             #expect(heard.stops.isEmpty)
-            #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
             #expect(try await Self.read(own, id).item?["properties"]?.object?["title"] == "while away")
+            // Sent once: nothing is left for a drain the app starts, and the stream told no second drain.
+            #expect(try await copy.queue.drain().verdicts.isEmpty)
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(heard.all.filter { if case .queueDrained = $0.origin { true } else { false } }.count == 1)
             heard.stop()
             await copy.close()
         } catch {

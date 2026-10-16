@@ -123,6 +123,10 @@ struct Errors {
         ),
         (.ReadingHandle(message: "m"), .readingHandle(message: "m")),
         (.CopyExpired(reason: "aged_out", message: "m"), .copyExpired(reason: "aged_out", message: "m")),
+        (
+            .CopyExpired(reason: "instance_changed", message: "m"),
+            .copyExpired(reason: "instance_changed", message: "m")
+        ),
         (.StreamIncomplete(reason: "r", message: "m"), .streamIncomplete(reason: "r", message: "m")),
         (.WrongServer(expected: "a", got: "b", message: "m"), .wrongServer(expected: "a", got: "b", message: "m")),
         (.BytesAbsent(hash: "h", reason: "r", message: "m"), .bytesAbsent(hash: "h", reason: "r", message: "m")),

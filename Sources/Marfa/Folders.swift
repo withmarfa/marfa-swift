@@ -32,9 +32,12 @@ public struct Folders: Sendable {
     ///
     /// The directory is made if it isn't there. Its first sync waits: `sync(_:)` says what it will do, and
     /// `confirmFirstSync(in:)` lets it go.
-    public func add(_ directory: URL, following folderId: String) async throws -> ListedFolder {
+    ///
+    /// A directory in iCloud Drive, in a cloud service's synced location or on a network file system is added
+    /// all the same. The result's ``AddedFolder/storage`` says which, so the app can warn once.
+    public func add(_ directory: URL, following folderId: String) async throws -> AddedFolder {
         let dir = directory.path(percentEncoded: false)
-        return ListedFolder(try await run { folders in try folders.add(dir: dir, folder: folderId) })
+        return AddedFolder(try await run { folders in try folders.add(dir: dir, folder: folderId) })
     }
 
     /// The folders the Mac's registry lists, including those the command-line tool added.
@@ -217,8 +220,9 @@ private final class FolderRelay: MarfaCore.FolderListener, Sendable {
 
 /// What a watch does, each when it happens.
 public enum FolderEvent: Sendable, Hashable {
-    /// The watch is watching the directory, and its passes begin.
-    case watching(URL)
+    /// The watch is watching the directory, and its passes begin. `storage` says why the directory is in
+    /// cloud-synced or network storage, where it is; the watch works all the same.
+    case watching(URL, storage: StorageCause?)
     /// The file system reported an error; the watch goes on.
     case watcherFailed(message: String)
     /// Hydrating the folder failed, and the watch tries again after the wait. Reported once for each run of
@@ -235,7 +239,8 @@ public enum FolderEvent: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderEvent) {
         switch core {
-        case .watching(let dir): self = .watching(URL(filePath: dir, directoryHint: .isDirectory))
+        case .watching(let dir, let storage):
+            self = .watching(URL(filePath: dir, directoryHint: .isDirectory), storage: storage.map(StorageCause.init))
         case .watcherFailed(let message): self = .watcherFailed(message: message)
         case .retrying(let error, let waitMs): self = .retrying(MarfaError(error), after: .milliseconds(waitMs))
         case .unreachable(let reason): self = .unreachable(reason: reason)
@@ -260,6 +265,75 @@ public struct ListedFolder: Sendable, Hashable {
 
     init(_ core: MarfaCore.ListedFolder) {
         self.init(directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder)
+    }
+}
+
+/// A folder `add(_:following:)` made.
+public struct AddedFolder: Sendable, Hashable {
+    /// The directory, with symbolic links resolved as far as it exists.
+    public var directory: URL
+    /// The id of the `system.folder` item whose settings the folder follows.
+    public var folderId: String
+    /// Why the directory is in cloud-synced or network storage, where it is.
+    ///
+    /// The folder works all the same.
+    public var storage: StorageCause?
+
+    public init(directory: URL, folderId: String, storage: StorageCause? = nil) {
+        self.directory = directory
+        self.folderId = folderId
+        self.storage = storage
+    }
+
+    init(_ core: MarfaCore.AddedFolder) {
+        self.init(
+            directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder,
+            storage: core.storage.map(StorageCause.init))
+    }
+}
+
+/// Why a folder's directory is in cloud-synced or network storage, where a second program may sync the same
+/// files or changes may not be noticed.
+///
+/// It is a warning, not a refusal: the folder works. Show ``warning`` once for each folder in a session.
+public enum StorageCause: Sendable, Hashable {
+    /// iCloud Drive syncs the files.
+    case iCloudDrive
+    /// A cloud service syncs the files.
+    case cloudService
+    /// macOS reports the directory as synced by iCloud Drive or by another cloud service, and doesn't say which.
+    case cloudSynced
+    /// A network file system holds the files, named as macOS names it, such as `smbfs` or `nfs`. Changes made
+    /// from another computer may not be noticed.
+    case networkFileSystem(kind: String)
+
+    /// Where the folder is, to finish a sentence such as "This folder is in …".
+    public var location: String {
+        switch self {
+        case .iCloudDrive: "iCloud Drive"
+        case .cloudService: "a cloud service"
+        case .cloudSynced: "iCloud Drive or another cloud service"
+        case .networkFileSystem(let kind): "a network file system (\(kind))"
+        }
+    }
+
+    /// A plain warning that names the cause.
+    public var warning: String {
+        switch self {
+        case .iCloudDrive, .cloudService, .cloudSynced:
+            "This folder is in \(location). Marfa and the service both sync its files, which can cause clashes."
+        case .networkFileSystem:
+            "This folder is on \(location). Changes made from another computer may not be noticed."
+        }
+    }
+
+    init(_ core: MarfaCore.StorageCause) {
+        switch core {
+        case .iCloudDrive: self = .iCloudDrive
+        case .cloudService: self = .cloudService
+        case .cloudSynced: self = .cloudSynced
+        case .networkFileSystem(let kind): self = .networkFileSystem(kind: kind)
+        }
     }
 }
 
