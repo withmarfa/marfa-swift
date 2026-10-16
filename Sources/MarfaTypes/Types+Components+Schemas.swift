@@ -447,7 +447,7 @@ extension Components {
             /// The edge's version. It goes up by one on every update, including one that changes nothing.
             ///
             /// - Remark: Generated from `#/components/schemas/Edge/version`.
-            public var version: Swift.Double
+            public var version: Swift.Int
             /// Creates a new `Edge`.
             ///
             /// - Parameters:
@@ -467,7 +467,7 @@ extension Components {
                 properties: Components.Schemas.Edge.PropertiesPayload,
                 createdAt: Swift.String,
                 updatedAt: Swift.String,
-                version: Swift.Double
+                version: Swift.Int
             ) {
                 self.id = id
                 self.sourceId = sourceId
@@ -536,7 +536,7 @@ extension Components {
             /// The item's version. It starts at 1 and goes up by one on each update to the item's properties, `tier`, `occurred_at`, `source_id` or type. A change to its state, tags, extensions or edges leaves it as it is.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/version`.
-            public var version: Swift.Double
+            public var version: Swift.Int
             /// The `version` the item's type had when the item was created. Marfa never changes it, even when the item moves to another type, and doesn't act on it.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/schema_version`.
@@ -670,7 +670,7 @@ extension Components {
                 properties: Components.Schemas.Item.PropertiesPayload,
                 state: Components.Schemas.ItemState,
                 tier: Components.Schemas.Tier? = nil,
-                version: Swift.Double,
+                version: Swift.Int,
                 schemaVersion: Swift.Int,
                 source: Swift.String,
                 sourceId: Swift.String? = nil,
@@ -1046,7 +1046,7 @@ extension Components {
             /// The item version the snapshot records.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/version`.
-            public var version: Swift.Double
+            public var version: Swift.Int
             /// The item's properties at this version.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/properties`.
@@ -1157,7 +1157,7 @@ extension Components {
             public init(
                 id: Swift.String,
                 itemId: Swift.String,
-                version: Swift.Double,
+                version: Swift.Int,
                 properties: Components.Schemas.Version.PropertiesPayload,
                 _type: Swift.String,
                 tier: Components.Schemas.Tier,
@@ -1312,7 +1312,7 @@ extension Components {
             /// The item version this side shows.
             ///
             /// - Remark: Generated from `#/components/schemas/ConflictSnapshot/version`.
-            public var version: Swift.Double
+            public var version: Swift.Int
             /// The item's properties at this version.
             ///
             /// - Remark: Generated from `#/components/schemas/ConflictSnapshot/properties`.
@@ -1365,7 +1365,7 @@ extension Components {
             ///   - _type: The item's type identifier at this version.
             public init(
                 id: Swift.String,
-                version: Swift.Double,
+                version: Swift.Int,
                 properties: Components.Schemas.ConflictSnapshot.PropertiesPayload,
                 tier: Components.Schemas.Tier,
                 occurredAt: Swift.String,
@@ -2301,7 +2301,7 @@ extension Components {
             /// The `version` you sent.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemAncestorUnavailable/requested_version`.
-            public var requestedVersion: Swift.Double
+            public var requestedVersion: Swift.Int
             /// Creates a new `ItemAncestorUnavailable`.
             ///
             /// - Parameters:
@@ -2311,7 +2311,7 @@ extension Components {
             public init(
                 error: Components.Schemas.AncestorUnavailableError,
                 current: Components.Schemas.ConflictSnapshot,
-                requestedVersion: Swift.Double
+                requestedVersion: Swift.Int
             ) {
                 self.error = error
                 self.current = current
@@ -5987,7 +5987,7 @@ extension Components {
             /// The version number the type was last saved with.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
-            public var version: Swift.Double
+            public var version: Swift.Int
             /// Which fields clients show as an item's title and body.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
@@ -6027,7 +6027,7 @@ extension Components {
                 compatibleWith: [Swift.String]? = nil,
                 roles: [Components.Schemas.TypeRole]? = nil,
                 fields: Components.Schemas.TypeDefinition.FieldsPayload,
-                version: Swift.Double,
+                version: Swift.Int,
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,

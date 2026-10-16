@@ -980,6 +980,14 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func forgetAnswered() throws  -> UInt64
     
+    /**
+     * Clears only the named writes, under the rules `forget_answered`
+     * keeps, and says how many went. Every other answered write stays, so an
+     * app clears just the answers it has read; an id that names no write, or
+     * one not answered, is ignored.
+     */
+    func forgetAnsweredIds(ids: [String]) throws  -> UInt64
+    
     func get(id: String) throws  -> Item?
     
     /**
@@ -1607,6 +1615,21 @@ open func forgetAnswered()throws  -> UInt64  {
     return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_forget_answered(
             self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Clears only the named writes, under the rules `forget_answered`
+     * keeps, and says how many went. Every other answered write stays, so an
+     * app clears just the answers it has read; an id that names no write, or
+     * one not answered, is ignored.
+     */
+open func forgetAnsweredIds(ids: [String])throws  -> UInt64  {
+    return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_forget_answered_ids(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(ids),$0
     )
 })
 }
@@ -11352,6 +11375,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_forget_answered() != 62545) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_forget_answered_ids() != 22867) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_get() != 61377) {
