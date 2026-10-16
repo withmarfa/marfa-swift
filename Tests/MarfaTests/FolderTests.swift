@@ -406,10 +406,13 @@ extension LiveWorkingCopies {
                 }
                 return events
             }
-            await #expect {
-                try await folders.sync(directory)
-            } throws: { error in
-                if case .readingHandle = error as? MarfaError { true } else { false }
+            // The call asks the watch for the folder instead of being refused.
+            guard
+                case .synced = try await bounded(
+                    "a sync beside the watch", within: 30, { try await folders.sync(directory) })
+            else {
+                Issue.record("a sync over a folder the app's own watch holds did not run")
+                return
             }
             try FolderFixture.note("Watched", in: directory)
             let events = try await bounded("a pass that sends the new file", within: 60) { try await heard.value }
@@ -418,6 +421,49 @@ extension LiveWorkingCopies {
 
             try await bounded("the watch to stop", within: 20) { await watch.stop() }
             _ = try await folders.sync(directory)
+        }
+
+        @Test func aCallOverAFolderTheAppsOwnWatchHoldsSucceedsAndTheWatchHandsItOverAndTakesItBack() async throws {
+            let directory = try await FolderFixture.synced()
+            let watch = try await folders.watch(directory)
+            let heard = Task {
+                var events: [FolderEvent] = []
+                for try await event in watch {
+                    events.append(event)
+                    if case .takenBack = event { break }
+                }
+                return events
+            }
+            // Over a folder the watch holds, the call waits for it and then runs.
+            let result = try await bounded("the sync", within: 30) { try await folders.sync(directory) }
+            guard case .synced = result else {
+                Issue.record("the sync did not run: \(result)")
+                return
+            }
+            let events = try await bounded("the watch to take the folder back", within: 60) { try await heard.value }
+            let handedOver = events.firstIndex { if case .handedOver = $0 { true } else { false } }
+            let takenBack = events.firstIndex { if case .takenBack = $0 { true } else { false } }
+            #expect(handedOver != nil, "\(events)")
+            if let handedOver, let takenBack { #expect(handedOver < takenBack, "\(events)") }
+            #expect(events.filter { if case .watching = $0 { true } else { false } }.count == 1, "\(events)")
+            try await bounded("the watch to stop", within: 20) { await watch.stop() }
+        }
+
+        @Test func removingAFolderTheAppsOwnWatchHoldsEndsTheWatchAfterTellingRemoved() async throws {
+            let directory = try await FolderFixture.synced()
+            let watch = try await folders.watch(directory)
+            let heard = Task {
+                var events: [FolderEvent] = []
+                for try await event in watch { events.append(event) }
+                return events
+            }
+            try await bounded("the removal", within: 30) { try await folders.remove(directory) }
+            // The sequence ends without an error once the folder is gone.
+            let events = try await bounded("the watch to end", within: 60) { try await heard.value }
+            #expect(events.contains { if case .handedOver = $0 { true } else { false } }, "\(events)")
+            #expect(events.contains { if case .removed = $0 { true } else { false } }, "\(events)")
+            #expect(
+                !(try await folders.list()).contains { $0.directory.lastPathComponent == directory.lastPathComponent })
         }
 
         @Test func aWatchEndsWithoutAnErrorWhenItIsStopped() async throws {
@@ -446,22 +492,26 @@ extension LiveWorkingCopies {
             let iterating = Task {
                 for try await _ in watch {}
             }
-            // The witness: the folder is held while the watch runs.
-            await #expect(throws: MarfaError.self) { try await folders.sync(directory) }
+            // The witness: the folder is held while the watch runs, and a watch does not ask for it.
+            await #expect(throws: MarfaError.self) { try await folders.watch(directory) }
             iterating.cancel()
-            try await eventually("a sync after the cancel", within: 20) {
-                (try? await folders.sync(directory)) != nil
+            try await eventually("a watch after the cancel", within: 20) {
+                guard let again = try? await folders.watch(directory) else { return false }
+                await again.stop()
+                return true
             }
         }
 
         @Test func releasingAWatchNobodyIteratesStopsItAndFreesTheFolder() async throws {
             let directory = try await FolderFixture.synced()
             var watch: FolderWatch? = try await folders.watch(directory)
-            await #expect(throws: MarfaError.self) { try await folders.sync(directory) }
+            await #expect(throws: MarfaError.self) { try await folders.watch(directory) }
             #expect(watch != nil)
             watch = nil
-            try await eventually("a sync after the release", within: 20) {
-                (try? await folders.sync(directory)) != nil
+            try await eventually("a watch after the release", within: 20) {
+                guard let again = try? await folders.watch(directory) else { return false }
+                await again.stop()
+                return true
             }
         }
 
