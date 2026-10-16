@@ -62,5 +62,38 @@ extension LiveWorkingCopies {
             await fresh.close()
             await copy.close()
         }
+
+        @Test func aLinkKeepsTheItemItNamedWhenAnotherItemTakesTheOldTitleAndAnotherLinkIsAdded() async throws {
+            let copy = try await Live.hydrated()
+            let title = "Renamed \(UUID())"
+            let plan = try #require(try await copy.items.create(Live.note(title)).itemId)
+            let host = try #require(
+                try await copy.items.create(
+                    Draft(
+                        type: "core.note",
+                        properties: ["title": .string("Host \(UUID())"), "body": .string("see [[\(title)]]")],
+                        tier: .feed)
+                ).itemId)
+            _ = try await copy.queue.drain()
+            #expect(try await copy.items.links(in: host).links.map(\.target) == [.item(id: plan)])
+
+            let held = try #require(try await copy.items.get(plan))
+            _ = try await copy.items.update(
+                plan, Edit(.merge(["title": .string("\(title) v2")]), baseVersion: held.version))
+            let taker = try #require(try await copy.items.create(Live.note(title)).itemId)
+            _ = try await copy.queue.drain()
+
+            let current = try #require(try await copy.items.get(host))
+            _ = try await copy.items.update(
+                host,
+                Edit(.merge(["body": .string("see [[\(title)]] [[\(taker)]]")]), baseVersion: current.version))
+
+            let found = try await copy.items.links(in: host)
+            #expect(found.links.map(\.name) == [title, taker])
+            #expect(
+                found.links.map(\.target) == [.item(id: plan), .item(id: taker)],
+                "the old link came to name the item that took its title: \(found.links)")
+            await copy.close()
+        }
     }
 }
