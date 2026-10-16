@@ -80,6 +80,7 @@ struct Closing {
         await refused("queue.all") { _ = try await copy.queue.all() }
         await refused("queue.drain") { _ = try await copy.queue.drain() }
         await refused("queue.forgetAnswered") { _ = try await copy.queue.forgetAnswered() }
+        await refused("queue.forgetAnswered(ids:)") { _ = try await copy.queue.forgetAnswered(ids: ["a"]) }
         await refused("queue.release") { _ = try await copy.queue.release("a") }
         await refused("queue.withdraw") { _ = try await copy.queue.withdraw("a") }
         await refused("queue.discard") { _ = try await copy.queue.discard("a") }
