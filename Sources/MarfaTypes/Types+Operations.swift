@@ -10831,6 +10831,16 @@ public enum Operations {
                     public enum CodingKeys: String, CodingKey {
                         case state
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.state = try container.decode(
+                            Operations.TransitionItem.Input.Body.JsonPayload.StatePayload.self,
+                            forKey: .state
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "state"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/items/{id}/transition/POST/requestBody/content/application\/json`.
                 case json(Operations.TransitionItem.Input.Body.JsonPayload)
@@ -11068,7 +11078,7 @@ public enum Operations {
             }
             /// - `invalid_transition`: the type's lifecycle doesn't allow the move, such as `trashed` to `archived`. Restore first.
             /// - `edge_constraint_violation`: a `block` edge holds an item that a move to `trashed` would take.
-            /// - `validation_error`: `state` is not a valid state.
+            /// - `validation_error`: `state` is invalid, or the body has a field this endpoint doesn't take.
             /// - `missing_required_field`: `state` is missing.
             /// - `invalid_id`: the ID is not valid.
             ///
@@ -14559,6 +14569,16 @@ public enum Operations {
                     public enum CodingKeys: String, CodingKey {
                         case tags
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.tags = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .tags
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "tags"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/items/{id}/metadata/PATCH/requestBody/content/application\/json`.
                 case json(Operations.UpdateItemMetadata.Input.Body.JsonPayload)
@@ -14791,7 +14811,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: `tags` is not a list of valid tags, or the item would hold more than 100.
+            /// - `validation_error`: `tags` is not a list of valid tags or the item would hold more than 100, or the body has a field this endpoint doesn't take.
             /// - `invalid_id`: the ID is not a valid item ID.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/patch(updateItemMetadata)/responses/400`.
@@ -16115,6 +16135,16 @@ public enum Operations {
                     public enum CodingKeys: String, CodingKey {
                         case tags
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.tags = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .tags
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "tags"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/items/{id}/metadata/PUT/requestBody/content/application\/json`.
                 case json(Operations.ReplaceItemMetadata.Input.Body.JsonPayload)
@@ -16347,7 +16377,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: `tags` is not a list of valid tags, or has more than 100.
+            /// - `validation_error`: `tags` is not a list of valid tags or has more than 100, or the body has a field this endpoint doesn't take.
             /// - `invalid_id`: the ID is not a valid item ID.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)/responses/400`.
@@ -17671,6 +17701,16 @@ public enum Operations {
                     public enum CodingKeys: String, CodingKey {
                         case tags
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.tags = try container.decode(
+                            [Swift.String].self,
+                            forKey: .tags
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "tags"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/items/{id}/tags/POST/requestBody/content/application\/json`.
                 case json(Operations.AddItemTags.Input.Body.JsonPayload)
@@ -17903,7 +17943,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: `tags` is empty or not a list of valid tags, or the item would hold more than 100.
+            /// - `validation_error`: `tags` is empty or not a list of valid tags or the item would hold more than 100, or the body has a field this endpoint doesn't take.
             /// - `missing_required_field`: `tags` is missing.
             /// - `invalid_id`: the ID is not a valid item ID.
             ///
@@ -22442,11 +22482,11 @@ public enum Operations {
                             case edges
                         }
                     }
-                    /// The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
+                    /// The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.unknown_body_fields` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/items`.
                     public typealias ItemsPayload = [Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload]
-                    /// The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
+                    /// The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.unknown_body_fields` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/items`.
                     public var items: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayload
@@ -22476,7 +22516,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - items: The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
+                    ///   - items: The entries to write, at most 5,000. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.unknown_body_fields` names each key.
                     ///   - mode: `upsert` (the default) updates the item an entry matches. `create_only` skips it, reporting `skipped` with reason `duplicate_source`, or `duplicate_id` if it matched by `id`.
                     ///   - atomic: Whether one failed entry rolls back the whole batch. Defaults to `true`. With `false`, that entry is `errored` and the rest are written.
                     ///   - enableFanout: Whether each write also calls outbound webhooks. Defaults to `false`. Marfa logs the events either way.
@@ -23907,6 +23947,41 @@ public enum Operations {
                             case action
                             case state
                         }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.filter = try container.decodeIfPresent(
+                                Components.Schemas.BulkActionFilter.self,
+                                forKey: .filter
+                            )
+                            self.dryRun = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .dryRun
+                            )
+                            self.maxItems = try container.decodeIfPresent(
+                                Swift.Int.self,
+                                forKey: .maxItems
+                            )
+                            self.enableFanout = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .enableFanout
+                            )
+                            self.action = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case1Payload.ActionPayload.self,
+                                forKey: .action
+                            )
+                            self.state = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case1Payload.StatePayload.self,
+                                forKey: .state
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "filter",
+                                "dry_run",
+                                "max_items",
+                                "enable_fanout",
+                                "action",
+                                "state"
+                            ])
+                        }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case1`.
                     case case1(Operations.ApplyBulkAction.Input.Body.JsonPayload.Case1Payload)
@@ -23974,6 +24049,46 @@ public enum Operations {
                             case confirm
                             case expectedIds = "expected_ids"
                         }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.filter = try container.decodeIfPresent(
+                                Components.Schemas.BulkActionFilter.self,
+                                forKey: .filter
+                            )
+                            self.dryRun = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .dryRun
+                            )
+                            self.maxItems = try container.decodeIfPresent(
+                                Swift.Int.self,
+                                forKey: .maxItems
+                            )
+                            self.enableFanout = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .enableFanout
+                            )
+                            self.action = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload.ActionPayload.self,
+                                forKey: .action
+                            )
+                            self.confirm = try container.decodeIfPresent(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload.ConfirmPayload.self,
+                                forKey: .confirm
+                            )
+                            self.expectedIds = try container.decodeIfPresent(
+                                [Swift.String].self,
+                                forKey: .expectedIds
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "filter",
+                                "dry_run",
+                                "max_items",
+                                "enable_fanout",
+                                "action",
+                                "confirm",
+                                "expected_ids"
+                            ])
+                        }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case2`.
                     case case2(Operations.ApplyBulkAction.Input.Body.JsonPayload.Case2Payload)
@@ -24035,6 +24150,46 @@ public enum Operations {
                             case add
                             case remove
                         }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.filter = try container.decodeIfPresent(
+                                Components.Schemas.BulkActionFilter.self,
+                                forKey: .filter
+                            )
+                            self.dryRun = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .dryRun
+                            )
+                            self.maxItems = try container.decodeIfPresent(
+                                Swift.Int.self,
+                                forKey: .maxItems
+                            )
+                            self.enableFanout = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .enableFanout
+                            )
+                            self.action = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case3Payload.ActionPayload.self,
+                                forKey: .action
+                            )
+                            self.add = try container.decodeIfPresent(
+                                [Swift.String].self,
+                                forKey: .add
+                            )
+                            self.remove = try container.decodeIfPresent(
+                                [Swift.String].self,
+                                forKey: .remove
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "filter",
+                                "dry_run",
+                                "max_items",
+                                "enable_fanout",
+                                "action",
+                                "add",
+                                "remove"
+                            ])
+                        }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case3`.
                     case case3(Operations.ApplyBulkAction.Input.Body.JsonPayload.Case3Payload)
@@ -24089,6 +24244,41 @@ public enum Operations {
                             case enableFanout = "enable_fanout"
                             case action
                             case tier
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.filter = try container.decodeIfPresent(
+                                Components.Schemas.BulkActionFilter.self,
+                                forKey: .filter
+                            )
+                            self.dryRun = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .dryRun
+                            )
+                            self.maxItems = try container.decodeIfPresent(
+                                Swift.Int.self,
+                                forKey: .maxItems
+                            )
+                            self.enableFanout = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .enableFanout
+                            )
+                            self.action = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case4Payload.ActionPayload.self,
+                                forKey: .action
+                            )
+                            self.tier = try container.decode(
+                                Components.Schemas.Tier.self,
+                                forKey: .tier
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "filter",
+                                "dry_run",
+                                "max_items",
+                                "enable_fanout",
+                                "action",
+                                "tier"
+                            ])
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case4`.
@@ -24163,6 +24353,41 @@ public enum Operations {
                             case action
                             case patch
                         }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.filter = try container.decodeIfPresent(
+                                Components.Schemas.BulkActionFilter.self,
+                                forKey: .filter
+                            )
+                            self.dryRun = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .dryRun
+                            )
+                            self.maxItems = try container.decodeIfPresent(
+                                Swift.Int.self,
+                                forKey: .maxItems
+                            )
+                            self.enableFanout = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .enableFanout
+                            )
+                            self.action = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case5Payload.ActionPayload.self,
+                                forKey: .action
+                            )
+                            self.patch = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case5Payload.PatchPayload.self,
+                                forKey: .patch
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "filter",
+                                "dry_run",
+                                "max_items",
+                                "enable_fanout",
+                                "action",
+                                "patch"
+                            ])
+                        }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case5`.
                     case case5(Operations.ApplyBulkAction.Input.Body.JsonPayload.Case5Payload)
@@ -24217,6 +24442,41 @@ public enum Operations {
                             case enableFanout = "enable_fanout"
                             case action
                             case occurredAt = "occurred_at"
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.filter = try container.decodeIfPresent(
+                                Components.Schemas.BulkActionFilter.self,
+                                forKey: .filter
+                            )
+                            self.dryRun = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .dryRun
+                            )
+                            self.maxItems = try container.decodeIfPresent(
+                                Swift.Int.self,
+                                forKey: .maxItems
+                            )
+                            self.enableFanout = try container.decodeIfPresent(
+                                Swift.Bool.self,
+                                forKey: .enableFanout
+                            )
+                            self.action = try container.decode(
+                                Operations.ApplyBulkAction.Input.Body.JsonPayload.Case6Payload.ActionPayload.self,
+                                forKey: .action
+                            )
+                            self.occurredAt = try container.decode(
+                                Swift.String.self,
+                                forKey: .occurredAt
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "filter",
+                                "dry_run",
+                                "max_items",
+                                "enable_fanout",
+                                "action",
+                                "occurred_at"
+                            ])
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case6`.
@@ -28167,6 +28427,21 @@ public enum Operations {
                         case ids
                         case include
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.ids = try container.decode(
+                            [Swift.String].self,
+                            forKey: .ids
+                        )
+                        self.include = try container.decodeIfPresent(
+                            Operations.BulkGetItems.Input.Body.JsonPayload.IncludePayload.self,
+                            forKey: .include
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "ids",
+                            "include"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/items/bulk-get/POST/requestBody/content/application\/json`.
                 case json(Operations.BulkGetItems.Input.Body.JsonPayload)
@@ -28417,7 +28692,7 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `ids` is missing.
-            /// - `validation_error`: `ids` is not a list, or has more than 100 IDs.
+            /// - `validation_error`: `ids` is not a list or has more than 100 IDs, or the body has a field this endpoint doesn't take.
             /// - `invalid_id`: an ID in `ids` is not a valid item ID.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/400`.
@@ -46980,11 +47255,11 @@ public enum Operations {
                             case version
                         }
                     }
-                    /// The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
+                    /// The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.unknown_body_fields` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/edges`.
                     public typealias EdgesPayload = [Operations.BulkUpsertEdges.Input.Body.JsonPayload.EdgesPayloadPayload]
-                    /// The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
+                    /// The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.unknown_body_fields` names each key.
                     ///
                     /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/edges`.
                     public var edges: Operations.BulkUpsertEdges.Input.Body.JsonPayload.EdgesPayload
@@ -47010,7 +47285,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - edges: The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.errors` names each key.
+                    ///   - edges: The entries to write, at most 5,000. The items they join must already exist. An entry with a key this operation doesn't declare is refused as `validation_error`, and `details.unknown_body_fields` names each key.
                     ///   - mode: `upsert` (the default) merges an entry's properties into the edge it matches. `create_only` skips it, reporting `skipped` with reason `duplicate_edge`.
                     ///   - atomic: Whether one failed entry rolls back the whole batch. Defaults to `true`. With `false`, that entry is `errored` and the rest are written.
                     ///   - enableFanout: Whether each write also calls outbound webhooks. Defaults to `false`. Marfa logs the events either way.
@@ -73111,6 +73386,21 @@ public enum Operations {
                         case name
                         case description
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.name = try container.decode(
+                            Swift.String.self,
+                            forKey: .name
+                        )
+                        self.description = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .description
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "name",
+                            "description"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/connectors/POST/requestBody/content/application\/json`.
                 case json(Operations.RegisterConnector.Input.Body.JsonPayload)
@@ -78923,6 +79213,36 @@ public enum Operations {
                         case summary
                         case error
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.outcome = try container.decode(
+                            Operations.ReportConnectorRun.Input.Body.JsonPayload.OutcomePayload.self,
+                            forKey: .outcome
+                        )
+                        self.startedAt = try container.decode(
+                            Swift.String.self,
+                            forKey: .startedAt
+                        )
+                        self.finishedAt = try container.decode(
+                            Swift.String.self,
+                            forKey: .finishedAt
+                        )
+                        self.summary = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .summary
+                        )
+                        self.error = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .error
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "outcome",
+                            "started_at",
+                            "finished_at",
+                            "summary",
+                            "error"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/runs/POST/requestBody/content/application\/json`.
                 case json(Operations.ReportConnectorRun.Input.Body.JsonPayload)
@@ -81289,6 +81609,21 @@ public enum Operations {
                     public enum CodingKeys: String, CodingKey {
                         case label
                         case duplicateHeader = "duplicate_header"
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.label = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .label
+                        )
+                        self.duplicateHeader = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .duplicateHeader
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "label",
+                            "duplicate_header"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/endpoints/POST/requestBody/content/application\/json`.
@@ -86114,6 +86449,21 @@ public enum Operations {
                         case ids
                         case outcome
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.ids = try container.decode(
+                            [Swift.String].self,
+                            forKey: .ids
+                        )
+                        self.outcome = try container.decode(
+                            Operations.MarkInboundDeliveriesHandled.Input.Body.JsonPayload.OutcomePayload.self,
+                            forKey: .outcome
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "ids",
+                            "outcome"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/deliveries/handled/POST/requestBody/content/application\/json`.
                 case json(Operations.MarkInboundDeliveriesHandled.Input.Body.JsonPayload)
@@ -87426,6 +87776,16 @@ public enum Operations {
                     }
                     public enum CodingKeys: String, CodingKey {
                         case process
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.process = try container.decode(
+                            Swift.String.self,
+                            forKey: .process
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "process"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/hold/POST/requestBody/content/application\/json`.
@@ -91188,6 +91548,26 @@ public enum Operations {
                         case process
                         case problems
                         case state
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.process = try container.decode(
+                            Swift.String.self,
+                            forKey: .process
+                        )
+                        self.problems = try container.decodeIfPresent(
+                            Components.Schemas.ConnectorProblems.self,
+                            forKey: .problems
+                        )
+                        self.state = try container.decode(
+                            Operations.ReplaceConnectorState.Input.Body.JsonPayload.StatePayload.self,
+                            forKey: .state
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "process",
+                            "problems",
+                            "state"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/state/PUT/requestBody/content/application\/json`.
@@ -95032,6 +95412,26 @@ public enum Operations {
                         case set
                         case clear
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.process = try container.decode(
+                            Swift.String.self,
+                            forKey: .process
+                        )
+                        self.set = try container.decodeIfPresent(
+                            Operations.WriteConnectorAgreements.Input.Body.JsonPayload.SetPayload.self,
+                            forKey: .set
+                        )
+                        self.clear = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .clear
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "process",
+                            "set",
+                            "clear"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/requestBody/content/application\/json`.
                 case json(Operations.WriteConnectorAgreements.Input.Body.JsonPayload)
@@ -96406,6 +96806,16 @@ public enum Operations {
                     }
                     public enum CodingKeys: String, CodingKey {
                         case itemIds = "item_ids"
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.itemIds = try container.decode(
+                            [Swift.String].self,
+                            forKey: .itemIds
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "item_ids"
+                        ])
                     }
                 }
                 /// - Remark: Generated from `#/paths/connectors/{id}/agreements/lookup/POST/requestBody/content/application\/json`.
@@ -98044,7 +98454,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a setting is malformed, such as a `system.*` type, an invalid `filter` or a `first_placement` directory outside the folder. `details.errors[0].path` names it.
+            /// - `validation_error`: a setting is malformed, such as a `system.*` type, an invalid `filter` or a `first_placement` directory outside the folder. `details.errors[0].path` names it. A key the body or a setting doesn't declare is named in `details.unknown_body_fields`.
             /// - `missing_required_field`: `title` is missing.
             /// - `unknown_type`: a setting names a type that isn't registered.
             ///
@@ -99598,7 +100008,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a setting is malformed (`details.errors[0].path` names it), the body names no setting, or the query has a parameter such as `conflict`, which this endpoint doesn't take.
+            /// - `validation_error`: a setting is malformed (`details.errors[0].path` names it), a key is undeclared (`details.unknown_body_fields` names it), the body names no setting, or the query has `conflict`.
             /// - `missing_required_field`: `version` is missing.
             /// - `unknown_type`: a setting names a type that isn't registered.
             /// - `invalid_id`: the ID is malformed.
@@ -117981,6 +118391,31 @@ public enum Operations {
                         case name
                         case code
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.email = try container.decode(
+                            Swift.String.self,
+                            forKey: .email
+                        )
+                        self.password = try container.decode(
+                            Swift.String.self,
+                            forKey: .password
+                        )
+                        self.name = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .name
+                        )
+                        self.code = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .code
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "email",
+                            "password",
+                            "name",
+                            "code"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/owner/POST/requestBody/content/application\/json`.
                 case json(Operations.CreateOwner.Input.Body.JsonPayload)
@@ -118146,7 +118581,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Owner details are invalid.
+            /// Owner details are invalid, or the body has a field this endpoint doesn't take.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/400`.
             ///
@@ -126751,6 +127186,31 @@ public enum Operations {
                         case typeFilter = "type_filter"
                         case secret
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.url = try container.decode(
+                            Swift.String.self,
+                            forKey: .url
+                        )
+                        self.events = try container.decode(
+                            Operations.CreateWebhook.Input.Body.JsonPayload.EventsPayload.self,
+                            forKey: .events
+                        )
+                        self.typeFilter = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .typeFilter
+                        )
+                        self.secret = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .secret
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "url",
+                            "events",
+                            "type_filter",
+                            "secret"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/webhooks/POST/requestBody/content/application\/json`.
                 case json(Operations.CreateWebhook.Input.Body.JsonPayload)
@@ -126958,7 +127418,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a field is invalid. For example, `url` isn't `http` or `https`, carries a user name or password, or names an IP address that isn't public; `events` is empty or names an unknown event or `*`; `secret` is too short; or `type_filter` is `*`, malformed or a list.
+            /// - `validation_error`: a field is invalid. For example, `url` isn't `http` or `https`, carries a user name or password, or names an IP address that isn't public; `events` is empty or names an unknown event or `*`; `secret` is too short; or `type_filter` is `*`, malformed or a list; or the body has a field this endpoint doesn't take.
             /// - `missing_required_field`: `url` or `events` is missing.
             ///
             /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)/responses/400`.
@@ -129039,6 +129499,31 @@ public enum Operations {
                         case typeFilter = "type_filter"
                         case active
                     }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.url = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .url
+                        )
+                        self.events = try container.decodeIfPresent(
+                            Operations.UpdateWebhook.Input.Body.JsonPayload.EventsPayload.self,
+                            forKey: .events
+                        )
+                        self.typeFilter = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .typeFilter
+                        )
+                        self.active = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .active
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "url",
+                            "events",
+                            "type_filter",
+                            "active"
+                        ])
+                    }
                 }
                 /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/content/application\/json`.
                 case json(Operations.UpdateWebhook.Input.Body.JsonPayload)
@@ -129249,7 +129734,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a field is invalid. For example, `url` isn't `http` or `https`, carries a user name or password, or names an IP address that isn't public; `events` is empty or names an unknown event or `*`; or `type_filter` is `*`, malformed or a list.
+            /// - `validation_error`: a field is invalid. For example, `url` isn't `http` or `https`, carries a user name or password, or names an IP address that isn't public; `events` is empty or names an unknown event or `*`; or `type_filter` is `*`, malformed or a list; or the body has a field this endpoint doesn't take.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/400`.
             ///

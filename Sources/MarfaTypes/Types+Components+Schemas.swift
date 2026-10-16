@@ -4464,6 +4464,51 @@ extension Components {
                 case occurredBefore = "occurred_before"
                 case filter
             }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.state = try container.decodeIfPresent(
+                    Components.Schemas.ItemState.self,
+                    forKey: .state
+                )
+                self.source = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .source
+                )
+                self.tier = try container.decodeIfPresent(
+                    Components.Schemas.Tier.self,
+                    forKey: .tier
+                )
+                self.tags = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .tags
+                )
+                self.occurredAfter = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .occurredAfter
+                )
+                self.occurredBefore = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .occurredBefore
+                )
+                self.filter = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .filter
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "type",
+                    "state",
+                    "source",
+                    "tier",
+                    "tags",
+                    "occurred_after",
+                    "occurred_before",
+                    "filter"
+                ])
+            }
         }
         /// An error response.
         ///
@@ -5686,6 +5731,66 @@ extension Components {
                 case writtenAt = "written_at"
                 case evolveConstraints = "evolve_constraints"
             }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.label = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.description = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.cardinality = try container.decode(
+                    Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload.self,
+                    forKey: .cardinality
+                )
+                self.sourceTypeConstraints = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .sourceTypeConstraints
+                )
+                self.targetTypeConstraints = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .targetTypeConstraints
+                )
+                self.cascadeOnDelete = try container.decodeIfPresent(
+                    Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload.self,
+                    forKey: .cascadeOnDelete
+                )
+                self.propertySchema = try container.decodeIfPresent(
+                    Components.Schemas.EdgeTypeRegistrationRequest.PropertySchemaPayload.self,
+                    forKey: .propertySchema
+                )
+                self.reverseName = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .reverseName
+                )
+                self.writtenAt = try container.decodeIfPresent(
+                    Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload.self,
+                    forKey: .writtenAt
+                )
+                self.evolveConstraints = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .evolveConstraints
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "label",
+                    "description",
+                    "cardinality",
+                    "source_type_constraints",
+                    "target_type_constraints",
+                    "cascade_on_delete",
+                    "property_schema",
+                    "reverse_name",
+                    "written_at",
+                    "evolve_constraints"
+                ])
+            }
         }
         /// A page holding every edge type.
         ///
@@ -6665,8 +6770,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/id`.
             public var id: Swift.String
-            /// A container of undocumented properties.
-            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `TypeDefinitionInput`.
             ///
             /// - Parameters:
@@ -6683,7 +6786,6 @@ extension Components {
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
             ///   - id: The type's identifier, such as `acme.deal` or `user.recipe`.
-            ///   - additionalProperties: A container of undocumented properties.
             public init(
                 fields: Components.Schemas.TypeDefinitionInput.FieldsPayload,
                 version: Swift.Int? = nil,
@@ -6697,8 +6799,7 @@ extension Components {
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
-                id: Swift.String,
-                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+                id: Swift.String
             ) {
                 self.fields = fields
                 self.version = version
@@ -6713,7 +6814,6 @@ extension Components {
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
                 self.id = id
-                self.additionalProperties = additionalProperties
             }
             public enum CodingKeys: String, CodingKey {
                 case fields
@@ -6784,7 +6884,7 @@ extension Components {
                     Swift.String.self,
                     forKey: .id
                 )
-                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "fields",
                     "version",
                     "parent",
@@ -6799,62 +6899,6 @@ extension Components {
                     "merge_policy",
                     "id"
                 ])
-            }
-            public func encode(to encoder: any Swift.Encoder) throws {
-                var container = encoder.container(keyedBy: CodingKeys.self)
-                try container.encode(
-                    self.fields,
-                    forKey: .fields
-                )
-                try container.encodeIfPresent(
-                    self.version,
-                    forKey: .version
-                )
-                try container.encodeIfPresent(
-                    self.parent,
-                    forKey: .parent
-                )
-                try container.encodeIfPresent(
-                    self.label,
-                    forKey: .label
-                )
-                try container.encodeIfPresent(
-                    self.description,
-                    forKey: .description
-                )
-                try container.encodeIfPresent(
-                    self.roles,
-                    forKey: .roles
-                )
-                try container.encodeIfPresent(
-                    self.required,
-                    forKey: .required
-                )
-                try container.encodeIfPresent(
-                    self.compatibleWith,
-                    forKey: .compatibleWith
-                )
-                try container.encodeIfPresent(
-                    self.displayHints,
-                    forKey: .displayHints
-                )
-                try container.encodeIfPresent(
-                    self.linkField,
-                    forKey: .linkField
-                )
-                try container.encodeIfPresent(
-                    self.versionPolicy,
-                    forKey: .versionPolicy
-                )
-                try container.encodeIfPresent(
-                    self.mergePolicy,
-                    forKey: .mergePolicy
-                )
-                try container.encode(
-                    self.id,
-                    forKey: .id
-                )
-                try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
         /// One type.
@@ -7246,8 +7290,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy`.
             public var mergePolicy: Components.Schemas.MergePolicy?
-            /// A container of undocumented properties.
-            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+            /// The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/id`.
+            public var id: Swift.String?
             /// Creates a new `TypeDefinitionUpdate`.
             ///
             /// - Parameters:
@@ -7263,7 +7309,7 @@ extension Components {
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
-            ///   - additionalProperties: A container of undocumented properties.
+            ///   - id: The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             public init(
                 fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload,
                 version: Swift.Int? = nil,
@@ -7277,7 +7323,7 @@ extension Components {
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
-                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+                id: Swift.String? = nil
             ) {
                 self.fields = fields
                 self.version = version
@@ -7291,7 +7337,7 @@ extension Components {
                 self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
-                self.additionalProperties = additionalProperties
+                self.id = id
             }
             public enum CodingKeys: String, CodingKey {
                 case fields
@@ -7306,6 +7352,7 @@ extension Components {
                 case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
+                case id
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -7357,7 +7404,11 @@ extension Components {
                     Components.Schemas.MergePolicy.self,
                     forKey: .mergePolicy
                 )
-                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                self.id = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "fields",
                     "version",
                     "parent",
@@ -7369,60 +7420,9 @@ extension Components {
                     "display_hints",
                     "link_field",
                     "version_policy",
-                    "merge_policy"
+                    "merge_policy",
+                    "id"
                 ])
-            }
-            public func encode(to encoder: any Swift.Encoder) throws {
-                var container = encoder.container(keyedBy: CodingKeys.self)
-                try container.encode(
-                    self.fields,
-                    forKey: .fields
-                )
-                try container.encodeIfPresent(
-                    self.version,
-                    forKey: .version
-                )
-                try container.encodeIfPresent(
-                    self.parent,
-                    forKey: .parent
-                )
-                try container.encodeIfPresent(
-                    self.label,
-                    forKey: .label
-                )
-                try container.encodeIfPresent(
-                    self.description,
-                    forKey: .description
-                )
-                try container.encodeIfPresent(
-                    self.roles,
-                    forKey: .roles
-                )
-                try container.encodeIfPresent(
-                    self.required,
-                    forKey: .required
-                )
-                try container.encodeIfPresent(
-                    self.compatibleWith,
-                    forKey: .compatibleWith
-                )
-                try container.encodeIfPresent(
-                    self.displayHints,
-                    forKey: .displayHints
-                )
-                try container.encodeIfPresent(
-                    self.linkField,
-                    forKey: .linkField
-                )
-                try container.encodeIfPresent(
-                    self.versionPolicy,
-                    forKey: .versionPolicy
-                )
-                try container.encodeIfPresent(
-                    self.mergePolicy,
-                    forKey: .mergePolicy
-                )
-                try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
         /// An error response.
