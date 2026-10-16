@@ -258,7 +258,7 @@ Only one end moves, and only where the end that stays holds one edge of the type
 
 A refusal that turns on rows the copy may not hold is queued, and the server refuses it with its own code in the write's `verdict`: `edge_cycle` for a longer `parent-of` or `supersedes` cycle, `edge_constraint_violation` for a new end that already holds its one edge, and `item_not_found` for a new end the server does not hold. The edge returns to where it was.
 
-Once the server accepts a source move, the copy expires. The drain sends the writes queued behind the move first, then throws `copyExpired(reason: "read_view_changed", …)` once, after the last, as it does for a retype: the writes are answered, and the app hydrates again. A drain that ends with a wait, an unreachable server, a stopped credential or a write left undelivered returns its report instead, and the next call throws `copyExpired`. A target move leaves the copy current.
+Once the server accepts a source move, the copy expires. The drain sends the writes queued behind the move first, then throws `copyExpired(reason: "read_view_changed", …)` once, after the last: the writes are answered, and the app hydrates again. A drain that ends with a wait, an unreachable server, a stopped credential or a write left undelivered returns its report instead, and the next call throws `copyExpired`. A target move leaves the copy current.
 
 ## Keep a copy in sync
 

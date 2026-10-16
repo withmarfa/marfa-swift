@@ -417,11 +417,10 @@ public struct Edit: Sendable, Hashable {
 /// Once the server accepts a source move, the copy expires. The drain sends
 /// the writes queued behind the move first, then throws
 /// `MarfaError.copyExpired` with the reason `read_view_changed` once, after
-/// the last, as it does for a retype. The writes are answered, and the app
-/// hydrates again. A drain that ends with a wait, an unreachable server, a
-/// stopped credential or a write left undelivered returns its report instead,
-/// and the next call throws `copyExpired`. A target move does not expire the
-/// copy.
+/// the last. The writes are answered, and the app hydrates again. A drain
+/// that ends with a wait, an unreachable server, a stopped credential or a
+/// write left undelivered returns its report instead, and the next call
+/// throws `copyExpired`. A target move does not expire the copy.
 public struct EdgeEdit: Sendable, Hashable {
     /// The end of an edge to move, and the item to move it to.
     public enum Move: Sendable, Hashable {

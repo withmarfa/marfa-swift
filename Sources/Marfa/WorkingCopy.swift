@@ -178,9 +178,11 @@ public final class WorkingCopy: Sendable {
     /// follow has its stream again, after any drain the app started has ended.
     /// The app has nothing to start on `.serverReachable`. The drain ends in
     /// `.queueDrained` with its report, or in `.queueNotDrained` with why it
-    /// stopped, and the answers it had recorded stay recorded. Each write it
-    /// answered is told as `.answered`, as for a drain the app starts. A copy
-    /// opened without a server, and a reader, drain nothing.
+    /// stopped, and the answers it had recorded stay recorded. For
+    /// `.queueDrained`, each write with a verdict is told as `.answered`, as
+    /// for a drain the app starts. A `.queueNotDrained` error carries no
+    /// per-write notifications; read the queue for answers recorded before
+    /// the error. A copy opened without a server, and a reader, drain nothing.
     ///
     /// A writer with a server follows the server's events only while at least
     /// one stream is held, and pauses the follow during a hydration or
@@ -813,6 +815,12 @@ final class Feed: Sendable {
         /// What the streams were last told of the server, kept across
         /// follows: a new follow is told it, and a stream added is told it.
         var unreachable: MarfaError?
+        /// Set once the streams are told the server is unreachable.
+        ///
+        /// Cleared only when a follow says it has its stream again, since the core
+        /// drains on that word. A call that reaches the server clears `unreachable`
+        /// first, and the follow it restarts must still drain what waited.
+        var owesDrain = false
         var closed = false
         var source: Source
         /// Holds every source off, as a key change does while the core is
@@ -986,6 +994,7 @@ final class Feed: Sendable {
         locked { state in
             guard state.phase.runs(generation) else { return }
             tell(&state, unreachable)
+            if unreachable == nil { state.owesDrain = false }
         }
     }
 
@@ -1001,6 +1010,7 @@ final class Feed: Sendable {
         default: break
         }
         state.unreachable = unreachable
+        if unreachable != nil { state.owesDrain = true }
         let origin: Change.Origin = unreachable.map { .serverUnreachable($0) } ?? .serverReachable
         let change = Change(origin: origin, itemId: nil, edgeId: nil)
         state.told += state.streams.values.map { ($0, change) }
@@ -1089,7 +1099,8 @@ final class Feed: Sendable {
         case .follow:
             let subscription = try holder.with {
                 $0.follow(
-                    toldUnreachable: state.unreachable != nil, listener: Listener(feed: self, generation: generation))
+                    toldUnreachable: state.unreachable != nil || state.owesDrain,
+                    listener: Listener(feed: self, generation: generation))
             }
             return .following(generation: generation, subscription)
         case .watch:
