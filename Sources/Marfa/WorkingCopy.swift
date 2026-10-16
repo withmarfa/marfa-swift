@@ -719,6 +719,18 @@ public struct Queue: Sendable {
         try await holder.run { core in try core.forgetAnswered() }
     }
 
+    /// Clears only the named answered writes, under the rules
+    /// `forgetAnswered()` keeps, and returns how many went.
+    ///
+    /// Every other answered write stays, so an app clears just the answers it
+    /// has read; a drain that ran since, such as the one a held `changes()`
+    /// stream makes when its server is back, leaves its answers for the next
+    /// read. An id that names no write, or a write with no answer yet, is
+    /// ignored, and an empty list clears nothing.
+    public func forgetAnswered(ids: [String]) async throws -> UInt64 {
+        try await holder.run { core in try core.forgetAnsweredIds(ids: ids) }
+    }
+
     /// Takes a refused write, and the content it carried, out of the queue.
     ///
     /// `false` for a write that is not refused, or that a waiting write
